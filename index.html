@@ -40,13 +40,6 @@
   .c-pause{grid-area:pause;margin-left:6px}
   .val-row{display:flex;align-items:center;gap:6px}
   .lbl-split{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-  @media (max-width:560px){
-    .hud-bar{grid-template-columns:auto 1fr auto;grid-template-areas:"score cheese pause" "lives lives heat";padding:8px 10px}
-    .c-cheese{justify-self:center;border-left:0}
-    .c-lives{padding-left:2px;border-left:0}
-    .c-heat{padding-right:2px}
-    .c-pause{margin-left:0}
-  }
   .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--label);font-weight:800}
   .stack{display:grid;gap:2px}
   .score-val{font-family:var(--display);font-size:26px;line-height:1;color:var(--cheese);font-variant-numeric:tabular-nums;min-width:3ch}
@@ -65,6 +58,23 @@
   .time{font-variant-numeric:tabular-nums;font-weight:800;font-size:13px;letter-spacing:0;text-transform:none;color:var(--paper);min-width:4ch;text-align:right}
   .heat{width:100%;min-width:72px;height:6px;border-radius:3px;background:rgba(251,241,220,.16);overflow:hidden}
   .heat i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cheese),var(--danger));transition:width .5s}
+  @media (max-width:560px){
+    .hud-bar{grid-template-columns:auto auto 1fr auto auto;grid-template-areas:"score cheese lives heat pause";padding:6px 8px;border-radius:13px}   /* one compact row on phones */
+    .hud-cell{padding:0 6px;gap:2px}
+    .c-score{padding-left:0}
+    .lbl{font-size:7.5px;letter-spacing:.08em}
+    .score-val{font-size:19px;min-width:2ch}
+    .combo{font-size:10px;padding:0 4px}
+    .wedge{width:20px;height:14px}
+    .cheeses{gap:2px}
+    .lives{grid-template-columns:repeat(9,8px);gap:1px}
+    .pip{width:8px;height:8px}
+    .heat{min-width:38px}
+    .time{font-size:10px;min-width:3ch}
+    .lbl-split{gap:4px}
+    .c-pause{margin-left:4px}
+    .hud .icon-btn{width:28px;height:28px;border-radius:8px}
+  }
   .icon-btn{pointer-events:auto;appearance:none;border:1.5px solid rgba(251,241,220,.25);background:rgba(251,241,220,.08);color:var(--paper);
             width:34px;height:34px;border-radius:10px;display:grid;place-items:center;cursor:pointer;padding:0}
   .icon-btn:focus-visible{outline:2px solid var(--cheese);outline-offset:2px}
@@ -467,7 +477,8 @@ function updateDresser(dt) {
   for (const d of dresserDoors) {
     d.angle += (d.target - d.angle) * Math.min(1, dt * 6);
     d.hinge.rotation.y = d.angle;
-    d.inside.visible = d.angle < -0.12;
+    d.inside.visible = d.angle < -0.04;
+    d.stage.scale.z = Math.max(0.02, Math.min(1, 0.4 * Math.tan(Math.min(1.5, -d.angle))));   // contents ease out only as far as the opening door has cleared
   }
 }
 function knockDiffuser() {
@@ -909,7 +920,7 @@ function makePistol() {
     box(d.w, IN(0.8), IN(2.5), shelfMat, 0, 0, IN(0.9), inside);                                          // mid shelf edge
     const stage = new THREE.Group(); inside.add(stage);                                                   // contents kept to the middle 78%: clear of both door swings
     stages[n % stages.length](stage, d.w * 0.78, d.h);
-    const rig = { hinge, inside, angle: 0, target: 0, x: hinge.position.x + d.w / 2, center: new THREE.Vector3(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.1) };
+    const rig = { hinge, inside, stage, angle: 0, target: 0, x: hinge.position.x + d.w / 2, center: new THREE.Vector3(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.1) };
     if (n === 2) { pistolDoor = rig; stage.traverse(o => { if (o.isMesh && o.userData.pistol) tapTargets.push(o); }); }
     m.userData.dresserDoor = rig; tapTargets.push(m);
     dresserDoors.push(rig);
@@ -939,10 +950,10 @@ const staticTex = new THREE.CanvasTexture(staticCanvas); staticTex.magFilter = T
 const tvOffMat = screen.material, tvStaticMat = basic(0xffffff, { map: staticTex });
 const tvLight = new THREE.PointLight(0xd6e4ff, 0, 7, 2); tvLight.position.set(MAIN_CX, CAB_H + FT(2), IN(34)); scene.add(tvLight);
 let tvOn = false, staticTick = 0, tvBroken = false;
-const tvBrokenMat = lam(0xffffff, { map: canvasTex(192, 108, (g, w, h) => {      // shot-out screen: a bullet hole and a spiderweb of cracks
+const tvBrokenMat = basic(0xffffff, { map: canvasTex(192, 108, (g, w, h) => {      // shot-out screen: a bullet hole and a spiderweb of cracks
   g.fillStyle = '#0b0b0d'; g.fillRect(0, 0, w, h);
   const cx = w * 0.62, cy = h * 0.42, rays = [];
-  const line = (pts, a) => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.strokeStyle = `rgba(220,228,236,${a})`; g.lineWidth = 1; g.stroke(); };
+  const line = (pts, a) => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.strokeStyle = `rgba(168,172,178,${a})`; g.lineWidth = 1; g.stroke(); };
   for (let i = 0; i < 16; i++) { let a = i / 16 * Math.PI * 2 + Math.random() * 0.3, x = cx, y = cy; const pts = [[x, y]]; for (let d = 0; d < 40 + Math.random() * 110; d += 8) { a += (Math.random() - 0.5) * 0.4; x += Math.cos(a) * 8; y += Math.sin(a) * 8; pts.push([x, y]); } rays.push(pts); line(pts, 0.75); }
   for (const r of [2, 4, 7]) { const pts = rays.map(p => p[Math.min(p.length - 1, r)]); pts.push(pts[0]); line(pts, 0.5); }
   g.fillStyle = 'rgba(200,210,220,.12)'; for (let i = 0; i < 6; i++) { const p = rays[i * 2]; g.beginPath(); g.moveTo(cx, cy); g.lineTo(...p[Math.min(p.length - 1, 5)]); g.lineTo(...rays[i * 2 + 1][Math.min(rays[i * 2 + 1].length - 1, 5)]); g.fill(); }
@@ -2697,7 +2708,7 @@ function takeGun() {
 }
 function tracer(a, b, delay) {
   const t = gunRig.tracers.find(t => t.life <= 0); if (!t) return;
-  setTimeout(() => { t.l.geometry.setFromPoints([a, b]); t.l.visible = true; t.life = 0.14; }, delay || 0);
+  setTimeout(() => { t.l.geometry.setFromPoints([a, b]); t.l.visible = true; t.life = 0.2; }, delay || 0);
 }
 function onScreen(p) { const v = p.clone().project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1 && v.z < 1; }
 function shootMouse(m) {
@@ -2724,12 +2735,22 @@ function fireGun() {
   gr.held.lookAt(gr.aim); gr.held.updateMatrixWorld(true);
   const muzzle = gr.held.localToWorld(gr.held.userData.muzzle.clone());
   targets.forEach((m, i) => { tracer(muzzle, m.center.clone(), i * 25); setTimeout(() => shootMouse(m), 40 + i * 25); });
-  if (gr.ammo === 0) {                                              // last round: off the floor and into the TV
-    const bounce = new THREE.Vector3(CAT_POS.x + (Math.random() < 0.5 ? -1.6 : 1.6), 0.02, CAT_POS.z + 2.6);
+  if (gr.ammo === 0) {                                              // last round: pinballs off four surfaces round the room, then into the TV
+    const sx = Math.random() < 0.5 ? -1 : 1, W = ROOM.halfW - 0.03;
+    const hops = [
+      new THREE.Vector3(sx * W, 1.3 + Math.random() * 0.6, 6.2 + Math.random()),              // side wall
+      new THREE.Vector3(sx * 1.4, 0.02, 9.3 + Math.random()),                                  // the floor
+      new THREE.Vector3(-sx * W, 2.7 + Math.random() * 0.5, 7.2 + Math.random()),             // the other wall
+      new THREE.Vector3(sx * W, 3.3 + Math.random() * 0.4, 2.8 + Math.random() * 0.8),        // back across the room, high up
+    ];
     const hole = screen.getWorldPosition(new THREE.Vector3()); hole.x += IN(8); hole.y += IN(3); hole.z += 0.05;
-    tracer(muzzle, bounce, 0); setTimeout(() => { burst(bounce.clone().setY(0.08), 0xfff0a0, 6, 2, 2, 0.35); sfx.ricochet(); }, 60);
-    tracer(bounce, hole, 260); setTimeout(breakTV, 330);
-    setTimeout(tossGun, 900);
+    const path = [muzzle, ...hops, hole], STEP = 130;
+    for (let i = 0; i < path.length - 1; i++) {
+      tracer(path[i], path[i + 1], i * STEP);
+      if (i < hops.length) { const h = hops[i]; setTimeout(() => { burst(h.clone(), 0xfff0a0, 6, 2, 2, 0.3); sfx.ricochet(); }, (i + 1) * STEP - 20); }
+    }
+    setTimeout(breakTV, path.length * STEP - 60);
+    setTimeout(tossGun, path.length * STEP + 600);
   }
   showFireBtn();
 }
@@ -2754,7 +2775,7 @@ function tossGun() {                                                 // empty: s
 }
 function updateGun(dt) {
   const gr = gunRig;
-  for (const t of gr.tracers) if (t.life > 0) { t.life -= dt; t.l.material.opacity = Math.max(0, t.life / 0.14); if (t.life <= 0) t.l.visible = false; }
+  for (const t of gr.tracers) if (t.life > 0) { t.life -= dt; t.l.material.opacity = Math.max(0, t.life / 0.2); if (t.life <= 0) t.l.visible = false; }
   if (gr.flashT > 0) { gr.flashT -= dt; if (gr.flashT <= 0) gr.flash.visible = false; }
   if (gr.state === 'cat') {
     gr.recoil = Math.max(0, gr.recoil - dt * 6);
@@ -3178,7 +3199,7 @@ const FIT_POINTS = [
   new THREE.Vector3(-ROOM.halfW + COUCH_DEPTH, 0.4, COUCH_LEFT_Z0), new THREE.Vector3(-ROOM.halfW + COUCH_DEPTH, 0.4, COUCH_LEFT_Z0 + FT(2.85) * 3),
   new THREE.Vector3(ROOM.halfW - COUCH_DEPTH, 0.4, COUCH_RIGHT_Z0), new THREE.Vector3(ROOM.halfW - COUCH_DEPTH, 0.4, COUCH_RIGHT_Z0 + FT(2.85) * 3),
 ];
-const CAM_PULLBACK = 1.32, CAM_PULLBACK_PORTRAIT = 1.08;   // >1 = camera further back than the tightest fit (phones need less)                              // >1 = camera further back than the tightest fit
+const CAM_PULLBACK = 1.32, CAM_PULLBACK_PORTRAIT = 1.0;   // >1 = camera further back than the tightest fit (phones need less)                              // >1 = camera further back than the tightest fit
 function fitCamera() {
   const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
   renderer.setSize(w, h);
@@ -3186,9 +3207,9 @@ function fitCamera() {
   camera.fov = aspect < 1 ? 48 : 40;
   camera.updateProjectionMatrix();
   camera.clearViewOffset();
-  const el = THREE.MathUtils.degToRad(aspect < 0.75 ? 58 : aspect < 1.3 ? 46 : 40);   // camera tilt: lower = more 'standing in the room'
+  const el = THREE.MathUtils.degToRad(aspect < 0.75 ? 70 : aspect < 1.3 ? 46 : 40);   // phones look almost straight down so the tall room fills the screen   // camera tilt: lower = more 'standing in the room'
   const dir = new THREE.Vector3(0, Math.sin(el), Math.cos(el));
-  const topLimit = aspect < 1 ? 0.66 : 0.74;   // leave room for the HUD
+  const topLimit = aspect < 0.75 ? 0.84 : aspect < 1 ? 0.66 : 0.74;   // the one-row phone HUD is short   // leave room for the HUD
   const bottom = -0.97, v = new THREE.Vector3();
   let dist = 6, minY = 0, maxY = 0;
   for (let i = 0; i < 160; i++) {
@@ -3209,7 +3230,7 @@ function fitCamera() {
   minY = Infinity; maxY = -Infinity;
   for (const p of FIT_POINTS) { v.copy(p).project(camera); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); }
   // pin the top of the play area (TV + dresser) just under the HUD; any spare height goes to floor at the bottom
-  const shift = topLimit - maxY;
+  const shift = aspect < 0.75 ? (topLimit + bottom) / 2 - (maxY + minY) / 2 + 0.06 : topLimit - maxY;   // phones: room centred between the HUD and the bottom edge
   camera.setViewOffset(w, h, 0, shift * h / 2, w, h);
   catCard.scale.y = Math.min(2.2, 1 / Math.cos(el));   // undo the downward view's squash on the cat photo
   camBase.copy(camera.position);
