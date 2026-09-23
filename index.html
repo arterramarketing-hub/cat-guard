@@ -928,7 +928,7 @@ const showCtx = showCanvas.getContext('2d'), showTex = new THREE.CanvasTexture(s
 const showCast = [
   { x: 70, scarf: '#d8322b', hat: '#33c2c9', bobble: '#f5d33a', pom: 'flat', band: ['#f5d33a', 2.5], arms: '#f5d33a', fat: 1.4, talk: 0, arm: 0, pose: 0 },   // chubby: red scarf, turquoise hat, yellow pom-pom
   { x: 130, scarf: '#f07a1f', hat: '#3fbf45', flaps: true, square: true, band: ['#2c9433', 8, true], arms: '#3fbf45', talk: 0, arm: 0, pose: 0 },   // orange scarf, square-topped green hat with built-in earmuffs
-  { x: 186, scarf: '#7a4a2a', hat: '#3553c6', bobble: '#e0322b', pom: 'fuzzy', band: ['#e0322b', 4], tall: 12, arms: '#e0322b', talk: 0, arm: 0, pose: 0 },   // brown scarf, blue hat, red pom-pom
+  { x: 186, scarf: '#7a4a2a', hat: '#3553c6', bobble: '#e0322b', pom: 'fuzzy', band: ['#e0322b', 4], tall: 12, arms: '#e0322b', noBrows: true, talk: 0, arm: 0, pose: 0 },   // brown scarf, blue hat, red pom-pom
 ];
 function drawShow(t) {
   const g = showCtx, W = 256, H = 144;
@@ -938,12 +938,22 @@ function drawShow(t) {
   g.fillStyle = '#1f4f35'; for (let x = 8; x < W; x += 38) { g.beginPath(); g.moveTo(x, 50); g.lineTo(x + 6, 72); g.lineTo(x - 6, 72); g.fill(); }   // pines
   g.fillStyle = '#8a5a3a'; g.fillRect(0, 66, W, 4); for (let x = 4; x < W; x += 14) g.fillRect(x, 58, 3, 12);                                       // picket fence
   g.fillStyle = '#f1f4f6'; g.fillRect(0, 70, W, H - 70); g.fillStyle = '#dde5ea'; for (let i = 0; i < 5; i++) g.fillRect((i * 57) % W, 84 + i * 11, 40, 2);   // snow
+  const speaker = showCast.find(k => k.talk > 0);
   for (const c of showCast) {
-    const bob = c.pose * 2, x = c.x, y = 112 - bob;
+    const bob = c.pose * 2 + (c.talk ? Math.abs(Math.sin(t * 16 + c.x)) * 3 : 0), x = c.x, y = 112 - bob;   // talkers bounce as they rant
     g.lineWidth = 1.2; g.strokeStyle = '#1f1712';
     const F = c.fat || 1; g.fillStyle = '#9b8f86'; g.beginPath(); g.ellipse(x, y - (F - 1) * 6, 20 * F, 17 * (1 + (F - 1) * 0.5), 0, 0, 7); g.fill(); g.stroke();                                   // body
     g.strokeStyle = c.arms || '#6f645c'; g.lineWidth = 3;                                                                                      // arms (flailing when talking)
-    for (const sx of [-1, 1]) { const a = -0.6 + (c.arm * (sx > 0 ? 1 : 0.4)) * Math.sin(t * 14 + x); g.beginPath(); g.moveTo(x + sx * 16 * F, y - 4); g.lineTo(x + sx * (26 * F + 4 * c.arm), y - 4 - 12 * Math.sin(a + (sx > 0 ? 0.9 : 0.2)) * (c.talk ? 1.4 : 0.4)); g.stroke(); }
+    g.lineCap = 'round';
+    for (const sx of [-1, 1]) {                                          // two-part arms: hanging at rest, thrown up and waving while arguing
+      const k = c.arm, wave = Math.sin(t * 13 + x * 0.1 + (sx > 0 ? 0 : 1.7));
+      const shX = x + sx * 16 * F, shY = y - 6;
+      const elX = shX + sx * (5 + 6 * k), elY = shY + 7 - 13 * k;
+      const hdX = elX + sx * (2 + 6 * k + 3 * k * wave), hdY = elY + 7 - 17 * k - 5 * k * wave;
+      g.beginPath(); g.moveTo(shX, shY); g.lineTo(elX, elY); g.lineTo(hdX, hdY); g.stroke();
+      g.fillStyle = c.arms || '#6f645c'; g.beginPath(); g.arc(hdX, hdY, 2.4, 0, 7); g.fill();   // mitten
+    }
+    g.lineCap = 'butt';
     g.lineWidth = 1.2; g.strokeStyle = '#1f1712';
     const hx = x + (c.talk ? 2 : 0), hy = y - 30 + (F > 1 ? 3 : 0);
     const scarfW = F > 1 ? 40 * F * 0.92 : 34;                           // the chubby one's scarf wraps his whole width
@@ -977,9 +987,9 @@ function drawShow(t) {
       else { g.fillStyle = c.bobble || '#fff'; g.beginPath(); g.arc(hx, hy - 21, 3.8, 0, 7); g.fill(); g.stroke(); }                                        // bobble
     }
     if (F === 1) { g.fillStyle = c.scarf; g.fillRect(hx - 17, hy + 13, 34, 6); g.fillRect(hx + 6, hy + 16, 6, 12); }                                 // scarf
-    const look = c.talk ? (x < 128 ? 2 : -2) : 0;
+    const look = speaker && speaker !== c ? Math.sign(speaker.x - x) * 2 : c.talk ? (x < 128 ? 2 : -2) : 0;   // everyone glares at whoever's talking
     for (const sx of [-1, 1]) { g.fillStyle = '#fff'; g.beginPath(); g.ellipse(hx + sx * 7, hy - 3, 6, 7, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = '#111'; g.beginPath(); g.arc(hx + sx * 7 + look, hy - 2, 1.8, 0, 7); g.fill(); }
-    g.strokeStyle = '#1f1712'; g.lineWidth = 1.6; for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(hx + sx * 11, hy - 12 - (c.talk ? 1 : 0)); g.lineTo(hx + sx * 3, hy - 10 + (c.talk ? 2 : 0)); g.stroke(); }   // cross brows
+    if (!c.noBrows) { g.strokeStyle = '#1f1712'; g.lineWidth = 1.6; for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(hx + sx * 11, hy - 12 - (c.talk ? 2 : 0)); g.lineTo(hx + sx * 3, hy - 11 + (c.talk ? 3 : 0)); g.stroke(); } }   // brows: furious V while talking
     g.fillStyle = '#e77b86'; g.beginPath(); g.arc(hx, hy + 5, 2.4, 0, 7); g.fill();
     g.fillStyle = '#3a1414'; const open = c.talk ? 2 + 4 * Math.abs(Math.sin(t * 22 + x)) : 0.8; g.beginPath(); g.ellipse(hx, hy + 10, 5, open, 0, 0, 7); g.fill();   // mouth
     if (F > 1) { g.strokeStyle = '#1f1712'; g.lineWidth = 1.1; g.beginPath(); g.ellipse(hx, hy + 11, 11, 2.2, 0, 0.2, Math.PI - 0.2); g.stroke(); }   // double-chin line (between the mouth and the head's outline)
