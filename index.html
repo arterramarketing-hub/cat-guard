@@ -622,7 +622,7 @@ function updateBlanket(dt, time) {
   if (b.state === 'flying') {
     b.t = Math.min(1, b.t + dt / 0.5);
     if (b.dest === 'mouse' && b.victim && b.victim.active) b.to.set(b.victim.root.position.x, 0.25, b.victim.root.position.z);   // homing
-    if (b.dest !== 'cat' && b.heap.position.y < 1.4 && b.t > 0.15)             // swallows the first mouse it sweeps over on the way
+    if (b.dest !== 'cat' && b.t > 0.12)                                         // swallows the first mouse it passes over on the way
       for (const m of mice) if (m.active && m.hittable && !m.boss && Math.hypot(m.root.position.x - b.heap.position.x, m.root.position.z - b.heap.position.z) < 0.8) { b.dest = 'mouse'; b.victim = m; b.to.set(m.root.position.x, 0.25, m.root.position.z); b.t = 1; break; }
     const k = b.t, e = k * k * (3 - 2 * k);
     b.heap.position.lerpVectors(b.from, b.to, e); b.heap.position.y += Math.sin(k * Math.PI) * 1.6;
@@ -2200,7 +2200,7 @@ class Cheese {
     this.mushVis.add(new THREE.Mesh(mushStemGeo, mushStemMat));
     const cap = new THREE.Mesh(mushCapGeo, this.mushMat); cap.position.y = 4 * MU; this.mushVis.add(cap);
     const under = new THREE.Mesh(mushUnderGeo, mushUnderMat); under.rotation.x = Math.PI / 2; under.position.y = 4 * MU + 0.003; this.mushVis.add(under);
-    this.mushVis.userData.baseScale = 1.25;                                   // big toadstools
+    this.mushVis.userData.baseScale = 1.05;                                   // big toadstools
     this.mushVis.visible = false; scene.add(this.mushVis);
     this.warnMat = new THREE.MeshBasicMaterial({ color: 0xe2452c, transparent: true, opacity: 0, depthWrite: false });
     this.warn = new THREE.Mesh(warnGeo, this.warnMat); this.warn.rotation.x = -Math.PI / 2;
@@ -2976,13 +2976,15 @@ function updateCutscene(dt) {
   const c = cine; if (!c) return;
   c.t += dt;
   const m = c.m, p = m.root.position, T = 3.6;
-  m.update(dt * 0.9, clock);                                          // he keeps climbing out while we watch
+  m.update(dt * 0.9, clock);                                          // he climbs out of his hole while we watch...
+  if (m.state !== 'emerge' && m.state !== 'peek') { if (!c.hold) c.hold = m.root.position.clone(); m.root.position.copy(c.hold); }   // ...but gets no head start
   const toCam = c.fromPos.clone().sub(p).setY(0).normalize(), face = new THREE.Vector3(Math.sin(m.root.rotation.y), 0, Math.cos(m.root.rotation.y));
   const dir = face.multiplyScalar(0.75).addScaledVector(toCam, 0.25).normalize();   // stand in front of his face
   const close = p.clone().addScaledVector(dir, 4.3).setY(1.9), eye = p.clone().setY(0.95);
   const k = c.t < 0.9 ? easeInOut(c.t / 0.9) : c.t < T - 0.8 ? 1 : easeInOut(Math.max(0, (T - c.t) / 0.8));
   camBase.lerpVectors(c.fromPos, close, k); c.look.lerpVectors(c.fromLook, eye, k);
   if (!c.roared && c.t > 1.0) { c.roared = true; sfx.roar(); shake = Math.max(shake, reduceMotion ? 0.06 : 0.45); }
+  if (!c.screeched && c.t > T - 1.3) { c.screeched = true; sfx.screech(); shake = Math.max(shake, reduceMotion ? 0.04 : 0.25); }   // a last screech before play resumes
   if (c.t >= T) endCutscene();
 }
 function endCutscene() {
@@ -2990,6 +2992,35 @@ function endCutscene() {
   camBase.copy(cine.fromPos); cine = null; ui.hud.hidden = false; state = 'playing'; fitCamera();
 }
 const easeInOut = k => k * k * (3 - 2 * k);
+// his crown flies off and lands on the cat's head, where it stays for the rest of the game
+let catCrown = null, crownFlight = null;
+function claimCrown(m) {
+  if (!catCrown) {
+    catCrown = m.crown.clone(true); catCrown.visible = true; scene.add(catCrown);
+  }
+  m.crown.updateMatrixWorld(true);
+  const from = m.crown.getWorldPosition(new THREE.Vector3());
+  catCard.updateMatrixWorld(true);
+  const top = new THREE.Box3().setFromObject(catCard).max.y;
+  crownFlight = { t: 0, from, to: new THREE.Vector3(CAT_POS.x - 0.02, top - 0.2, CAT_POS.z + 0.18) };
+  catCrown.position.copy(from); catCrown.scale.setScalar(2.4); catCrown.visible = true;
+  m.crown.visible = false;
+  floatText(from.clone().setY(from.y + 0.6), 'Crown claimed!', 'clutch');
+}
+function updateCatCrown(dt) {
+  if (!catCrown || !catCrown.visible) return;
+  if (crownFlight) {
+    crownFlight.t = Math.min(1, crownFlight.t + dt / 1.1);
+    const k = crownFlight.t, e = k * k * (3 - 2 * k);
+    catCrown.position.lerpVectors(crownFlight.from, crownFlight.to, e); catCrown.position.y += Math.sin(k * Math.PI) * 2.2;
+    catCrown.rotation.set(0, k * Math.PI * 4, (1 - k) * 0.6);
+    catCrown.scale.setScalar(THREE.MathUtils.lerp(2.4, 3.2, e));
+    if (k >= 1) { crownFlight = null; sfx.sparkle(); tailWag = 2; burst(catCrown.position.clone(), 0xf2c14a, 10, 1.5, 2, 0.5); }
+  } else {                                                             // riding along on her head as she leans and flinches
+    catCrown.rotation.set(0, Math.sin(clock * 0.8) * 0.15, -0.12 + Math.sin(clock * 1.7) * 0.03);   // sits a little jauntily, gently turning
+  }
+}
+function resetCatCrown() { if (catCrown) catCrown.visible = false; crownFlight = null; }
 function hurtBoss(m, dmg) {                                         // returns true once he's beaten
   m.hp -= dmg;
   if (m.hp > 0) {
@@ -3002,6 +3033,7 @@ function hurtBoss(m, dmg) {                                         // returns t
     return false;
   }
   score += 500; showBanner('Rat King defeated! +500'); burst(m.center.clone().setY(0.6), 0xf2c14a, 16, 3.5, 4, 1.2); sfx.gasp();
+  claimCrown(m);
   return true;
 }
 function whack(m) {
@@ -3308,7 +3340,7 @@ function clearField() { for (const m of mice) m.release(); }
 function resetGame() {
   clearField();
   cheeses.forEach(c => c.reset());
-  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx();
+  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false; bossDone = false;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -3513,6 +3545,15 @@ const sfx = {
   powerUp: () => { tone(90, 600, 0.45, 'sawtooth', 0.04); },
   bassDrop: () => { tone(200, 35, 1.1, 'sine', 0.4); tone(100, 30, 1.1, 'sawtooth', 0.08); noise(0.8, 0.12, 3000); },
   burritoCrash: () => { tone(120, 40, 0.35, 'sine', 0.4); noise(0.5, 0.45, 2400); setTimeout(() => { noise(0.12, 0.25, 4000); tone(700, 500, 0.06, 'triangle', 0.06); }, 160); setTimeout(() => { noise(0.1, 0.2, 3000); tone(900, 650, 0.05, 'triangle', 0.05); }, 300); setTimeout(() => noise(0.25, 0.12, 1200), 420); },   // thud, smash and clatter somewhere off screen
+  screech: () => {                                                  // a shrill, rattling rat screech
+    if (!actx || !soundOn) return;
+    const t = actx.currentTime + 0.01, o = actx.createOscillator(), v = actx.createOscillator(), vg = actx.createGain(), bp = actx.createBiquadFilter(), g = actx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(1500, t); o.frequency.exponentialRampToValueAtTime(3200, t + 0.25); o.frequency.exponentialRampToValueAtTime(2100, t + 0.8);
+    v.frequency.value = 42; vg.gain.value = 260; v.connect(vg); vg.connect(o.frequency);
+    bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 1.2;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.04); g.gain.setValueAtTime(0.16, t + 0.55); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.85);
+    o.connect(bp); bp.connect(g); g.connect(actx.destination); o.start(t); v.start(t); o.stop(t + 0.9); v.stop(t + 0.9); noise(0.8, 0.08, 6000);
+  },
   roar: () => { tone(95, 55, 1.1, 'sawtooth', 0.22); tone(140, 70, 0.9, 'square', 0.06, 0.05); noise(1.0, 0.3, 700); },   // the Rat King's roar
   bossHorn: () => { tone(110, 98, 0.9, 'sawtooth', 0.12); tone(165, 147, 0.9, 'sawtooth', 0.08, 0.05); tone(220, 196, 0.7, 'square', 0.04, 0.4); },   // regal fanfare
   gunshot: () => { noise(0.2, 0.6, 6000); tone(190, 45, 0.2, 'sine', 0.38); noise(0.6, 0.12, 900); },   // crack + thump + room tail
@@ -3751,6 +3792,7 @@ function frame(now) {
   updateGloves(dt, clock);
   updateSteam(clock);
   updateBoom(dt);
+  updateCatCrown(dt);
   updateRoomFx(dt);
   updateWallpaper(dt);
   updateFan(dt);
