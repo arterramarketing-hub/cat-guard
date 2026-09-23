@@ -134,7 +134,7 @@
 <!-- Start -->
 <section class="screen" id="startScreen">
   <div class="card">
-    <p class="eyebrow">Three cheeses · eight holes · one cat</p>
+    <p class="eyebrow">Three cheeses · seven holes · one cat</p>
     <h1>Cat <span class="g">Guard</span></h1>
     <ul class="rules">
       <li>
@@ -193,15 +193,24 @@
    ===================================================================== */
 const CFG = {
   // ---- Difficulty ramp ----------------------------------------------
-  RAMP_SECONDS: 170,        // seconds of play until full difficulty (d = 1)
-  RAMP_CURVE: 1.2,          // >1 = gentler start, steeper late game; 1 = linear
+  RAMP_SECONDS: 120,        // seconds of play until the base ramp tops out (d = 1)
+  RAMP_CURVE: 1.0,          // >1 = gentler start, steeper late game; 1 = linear
+
+  // ---- Overtime: after the ramp it never stops getting harder --------
+  OVERTIME_STEP: 30,        // every N seconds past RAMP_SECONDS…
+  OVERTIME_SPEED: 0.08,     // …mice move 8% faster (run + carry)
+  OVERTIME_SPEED_MAX: 1.8,  //    capped at 180% of the ramp's top speed
+  OVERTIME_SPAWN: 0.06,     // …spawn interval shrinks by 6%
+  OVERTIME_SPAWN_MIN: 0.55, //    down to 55% of the ramp's fastest interval
+  OVERTIME_EXTRA_MICE: 1,   // …one more mouse allowed on the field
+  MAX_ACTIVE_CAP: 11,
 
   // ---- Spawning (interpolated by d) --------------------------------
-  spawnInterval:   [2.1, 0.55], // seconds between spawn events
+  spawnInterval:   [1.5, 0.45], // seconds between spawn events
   spawnJitter:     0.3,         // ± fraction of randomness applied to each interval
-  maxActive:       [1, 7.99],   // cap on mice on the field (floored → 1..7)
-  multiSpawnChance:[0.0, 0.4],  // chance a spawn event releases 2 mice at once
-  FIRST_SPAWN_DELAY: 1.2,       // grace period at the start of a run
+  maxActive:       [1, 8.99],   // cap on mice on the field (floored → 1..8)
+  multiSpawnChance:[0.05, 0.45], // chance a spawn event releases 2 mice at once
+  FIRST_SPAWN_DELAY: 0.8,       // grace period at the start of a run
 
   // ---- Bombs --------------------------------------------------------
   bombRatio:       [0.10, 0.34],// probability any given spawn is a bomb mouse
@@ -213,11 +222,11 @@ const CFG = {
   BOMB_TAP_PENALTY: 0.35,       // tap tie-break: when a bomb and a normal mouse overlap, favour the normal one
 
   // ---- Mouse behaviour (interpolated by d) --------------------------
-  pauseTime:       [1.15, 0.45],// how long a mouse peeks out of its hole before deciding
-  retreatChance:   [0.45, 0.12],// chance a normal mouse ducks back in instead of charging
-  runSpeed:        [1.35, 3.1], // world units per second toward the cheese
-  grabTime:        [1.0, 0.55], // seconds a mouse tugs at the cheese before hauling it off
-  CARRY_SPEED:     0.55,        // carrying speed as a fraction of runSpeed
+  pauseTime:       [0.8, 0.3], // how long a mouse peeks out of its hole before deciding
+  retreatChance:   [0.3, 0.08], // chance a normal mouse ducks back in instead of charging
+  runSpeed:        [2.2, 4.4],  // world units per second toward the cheese
+  grabTime:        [0.7, 0.35], // seconds a mouse tugs at the cheese before hauling it off
+  CARRY_SPEED:     0.6,         // carrying speed as a fraction of runSpeed
   SPEED_VARIANCE:  0.15,        // ± per-mouse speed randomness
 
   // ---- Threat readability ------------------------------------------
@@ -248,16 +257,20 @@ const lerpPair = (pair, d) => pair[0] + (pair[1] - pair[0]) * d;
 function getDifficulty(t) {
   const x = Math.min(1, t / CFG.RAMP_SECONDS);
   const d = Math.pow(x, CFG.RAMP_CURVE);
+  // overtime: how many OVERTIME_STEPs we are past the end of the ramp (0 during the ramp)
+  const over = Math.max(0, t - CFG.RAMP_SECONDS) / CFG.OVERTIME_STEP;
+  const speedMul = Math.min(CFG.OVERTIME_SPEED_MAX, 1 + CFG.OVERTIME_SPEED * over);
+  const spawnMul = Math.max(CFG.OVERTIME_SPAWN_MIN, 1 - CFG.OVERTIME_SPAWN * over);
   return {
-    d,
-    spawnInterval:    lerpPair(CFG.spawnInterval, d),
-    maxActive:        Math.floor(lerpPair(CFG.maxActive, d)),
+    d, over,
+    spawnInterval:    lerpPair(CFG.spawnInterval, d) * spawnMul,
+    maxActive:        Math.min(CFG.MAX_ACTIVE_CAP, Math.floor(lerpPair(CFG.maxActive, d)) + Math.floor(over) * CFG.OVERTIME_EXTRA_MICE),
     multiSpawnChance: lerpPair(CFG.multiSpawnChance, d),
     bombRatio:        lerpPair(CFG.bombRatio, d),
     bombLifetime:     lerpPair(CFG.bombLifetime, d),
     pauseTime:        lerpPair(CFG.pauseTime, d),
     retreatChance:    lerpPair(CFG.retreatChance, d),
-    runSpeed:         lerpPair(CFG.runSpeed, d),
+    runSpeed:         lerpPair(CFG.runSpeed, d) * speedMul,
     grabTime:         lerpPair(CFG.grabTime, d),
   };
 }
@@ -267,12 +280,12 @@ function getDifficulty(t) {
    ===================================================================== */
 const ROOM = { halfW: 4.5, depth: 13, wallH: 9, visDepth: 24 };  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
 const HOLES = [
-  { x: -3.4, z: 0,    n: [0, 1]  }, { x: 3.4, z: 0, n: [0, 1] },                                  // back wall, either side of the cat
+  { x: 3.95, z: 0,   n: [0, 1]  },                                                                  // back wall, right corner past the shelf
   { x: -4.5, z: 4.2,  n: [1, 0]  }, { x: -4.5, z: 7.6, n: [1, 0] }, { x: -4.5, z: 11.0, n: [1, 0] }, // left wall
   { x:  4.5, z: 3.2,  n: [-1, 0] }, { x: 4.5, z: 6.4, n: [-1, 0] }, { x: 4.5, z: 9.8, n: [-1, 0] },  // right wall
 ];
 const CHEESE_SPOTS = [ { x: -1.4, z: 5.0 }, { x: 1.6, z: 7.4 }, { x: -0.3, z: 10.0 } ];
-const CAT_POS = new THREE.Vector3(0, 0, 1.7);   // cat guards from the top of the screen, swiping down
+const CAT_POS = new THREE.Vector3(0, 0.34, 2.7);   // cat guards from the top of the screen, swiping down
 
 /* =====================================================================
    RENDERER / SCENE
@@ -280,11 +293,11 @@ const CAT_POS = new THREE.Vector3(0, 0, 1.7);   // cat guards from the top of th
 const stage = document.getElementById('stage');
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-renderer.setClearColor(0x24403a);
+renderer.setClearColor(0x2b2520);
 stage.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x1d302b, 30, 60);
+scene.fog = new THREE.Fog(0xcfc6b6, 34, 70);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 80);
 const camBase = new THREE.Vector3();
 const camTarget = new THREE.Vector3(0, 0.3, 6.4);
@@ -308,66 +321,158 @@ function canvasTex(w, h, draw, rx, ry) {
   t.anisotropy = 4;
   return t;
 }
-const floorTex = canvasTex(256, 256, (g, w, h) => {
-  const tones = ['#7a4f33', '#84573a', '#6f472f', '#8b5d3d'];
-  for (let i = 0; i < 8; i++) {
-    g.fillStyle = tones[(i * 3) % 4]; g.fillRect(0, i * 32, w, 32);
-    g.fillStyle = 'rgba(40,20,10,.35)'; g.fillRect(0, i * 32, w, 2);
-    g.fillRect((i * 97) % w, i * 32, 2, 32);
-    g.fillStyle = 'rgba(255,220,180,.05)';
-    for (let k = 0; k < 5; k++) g.fillRect(0, i * 32 + 6 + k * 5 + ((i * k) % 3), w, 1);
+// beige carpet
+const floorTex = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#a08a74'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2600; i++) {
+    const v = Math.random();
+    g.fillStyle = v < 0.5 ? 'rgba(90,60,35,.18)' : 'rgba(255,235,205,.16)';
+    g.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5);
   }
-}, 2, 5.9);
-const wallTex = canvasTex(128, 128, (g, w, h) => {
-  g.fillStyle = '#2f5a53'; g.fillRect(0, 0, w, h);
-  g.fillStyle = '#34635b'; g.fillRect(0, 0, w / 2, h);
-  g.fillStyle = 'rgba(251,241,220,.22)';
-  for (let y = 8; y < h; y += 32) { g.beginPath(); g.arc(w * 0.75, y, 3, 0, 7); g.fill(); g.beginPath(); g.arc(w * 0.75, y + 16, 1.5, 0, 7); g.fill(); }
-}, 7, 6.2);
-const wallTexSide = wallTex.clone(); wallTexSide.needsUpdate = true; wallTexSide.repeat.set(18.7, 6.2);
+}, 6, 16);
+// white-painted vertical wood paneling
+const panelTex = canvasTex(128, 64, (g, w, h) => {
+  g.fillStyle = '#ebe7de'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += 32) {
+    g.fillStyle = 'rgba(70,60,45,.22)'; g.fillRect(x, 0, 2, h);
+    g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(x + 2, 0, 1, h);
+    g.fillStyle = 'rgba(0,0,0,.03)'; g.fillRect(x + 16, 0, 16, h);
+  }
+}, 7.5, 1);
+const panelTexSide = panelTex.clone(); panelTexSide.needsUpdate = true; panelTexSide.repeat.set(20, 1);
+// carved dark-wood cabinet door
+const carvedTex = canvasTex(128, 160, (g, w, h) => {
+  g.fillStyle = '#35211a'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#1e120d'; g.lineWidth = 6; g.strokeRect(8, 8, w - 16, h - 16);
+  g.strokeStyle = '#4e3325'; g.lineWidth = 2; g.strokeRect(14, 14, w - 28, h - 28);
+  const cx = w / 2, cy = h / 2;
+  g.lineWidth = 4;
+  for (let i = 0; i < 6; i++) {           // leafy medallion
+    const a = i / 6 * Math.PI * 2;
+    g.strokeStyle = i % 2 ? '#5d3d2b' : '#1f130e';
+    g.beginPath(); g.ellipse(cx + Math.cos(a) * 18, cy + Math.sin(a) * 26, 12, 20, a, 0, Math.PI * 2); g.stroke();
+  }
+  g.fillStyle = '#5d3d2b'; g.beginPath(); g.arc(cx, cy, 9, 0, 7); g.fill();
+  for (const s of [-1, 1]) {              // scrolls top & bottom
+    g.strokeStyle = '#4a2f22';
+    g.beginPath(); g.arc(cx + s * 22, 34, 12, 0, Math.PI * 1.5); g.stroke();
+    g.beginPath(); g.arc(cx + s * 22, h - 34, 12, Math.PI, Math.PI * 2.5); g.stroke();
+  }
+}, 1, 1);
+// cream blanket with green / red / yellow / black stripes
+const stripeTex = canvasTex(64, 128, (g, w, h) => {
+  g.fillStyle = '#efe7d6'; g.fillRect(0, 0, w, h);
+  [['#1f7a4a', 30], ['#c8322b', 48], ['#e6bf38', 66], ['#1b1b1b', 84]].forEach(([c, y]) => { g.fillStyle = c; g.fillRect(0, y, w, 9); });
+}, 1, 1);
+// TV picture: blue acoustic-foam pattern with a cartoon singer
+const tvTex = canvasTex(256, 150, (g, w, h) => {
+  for (let y = 0; y < h; y += 16) for (let x = 0; x < w; x += 16) {
+    g.fillStyle = '#3f6fc4'; g.fillRect(x, y, 16, 16);
+    g.fillStyle = '#7ea6ea'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 16, y); g.lineTo(x + 8, y + 8); g.fill();
+    g.fillStyle = '#22428c'; g.beginPath(); g.moveTo(x, y + 16); g.lineTo(x + 16, y + 16); g.lineTo(x + 8, y + 8); g.fill();
+  }
+  g.fillStyle = '#8a8fa8'; g.beginPath(); g.ellipse(120, 118, 34, 40, 0, 0, 7); g.fill();
+  g.fillStyle = '#f2ece0'; g.beginPath(); g.arc(118, 66, 20, 0, 7); g.fill();
+  g.fillStyle = '#e8452f'; g.beginPath(); g.ellipse(112, 52, 24, 10, -0.3, 0, 7); g.fill();
+  g.fillStyle = '#1b1b1b'; g.fillRect(138, 104, 40, 26);
+  g.strokeStyle = '#1b1b1b'; g.lineWidth = 3; g.beginPath(); g.moveTo(190, 20); g.quadraticCurveTo(170, 60, 200, 110); g.stroke();
+  g.fillStyle = '#c9d2e4'; g.fillRect(186, 40, 18, 30);
+}, 1, 1);
+const glowTex = canvasTex(128, 128, (g, w, h) => {
+  const gr = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(110,240,215,.9)'); gr.addColorStop(0.5, 'rgba(80,200,210,.35)'); gr.addColorStop(1, 'rgba(80,200,210,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+}, 1, 1);
+const blindsTex = canvasTex(32, 64, (g, w, h) => {
+  g.fillStyle = '#f4f2ee'; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(0,0,0,.12)'; for (let y = 0; y < h; y += 8) g.fillRect(0, y, w, 1);
+}, 1, 3);
+const cordTex = canvasTex(64, 32, (g, w, h) => {          // cream corduroy
+  g.fillStyle = '#e9e1d2'; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(120,100,70,.18)'; for (let x = 0; x < w; x += 6) g.fillRect(x, 0, 2, h);
+}, 4, 1);
 
-/* ---------- room ---------- */
+/* ---------- room: carpet, white paneling ---------- */
 const lam = (color, extra) => new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {}));
+const basic = (color, extra) => new THREE.MeshBasicMaterial(Object.assign({ color }, extra || {}));
+const box = (w, h, d, mat, x, y, z, parent) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); (parent || scene).add(m); return m; };
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, ROOM.visDepth), lam(0xffffff, { map: floorTex }));
 floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, ROOM.visDepth / 2);
 scene.add(floor);
-
-const backWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, ROOM.wallH), lam(0xffffff, { map: wallTex }));
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, ROOM.wallH), lam(0xffffff, { map: panelTex }));
 backWall.position.set(0, ROOM.wallH / 2, 0);
 scene.add(backWall);
 for (const side of [-1, 1]) {
-  const w = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.visDepth, ROOM.wallH), lam(0xe6e6e6, { map: wallTexSide }));
+  const w = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.visDepth, ROOM.wallH), lam(0xf2efe8, { map: panelTexSide }));
   w.rotation.y = -side * Math.PI / 2;
   w.position.set(side * ROOM.halfW, ROOM.wallH / 2, ROOM.visDepth / 2);
   scene.add(w);
 }
-// baseboards + chair rail
-const trimMat = lam(0xefe0c2);
-function trim(w, h, d, x, y, z) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), trimMat); m.position.set(x, y, z); scene.add(m); }
-trim(ROOM.halfW * 2, 0.3, 0.08, 0, 0.15, 0.04);
-trim(0.08, 0.3, ROOM.visDepth, -ROOM.halfW + 0.04, 0.15, ROOM.visDepth / 2);
-trim(0.08, 0.3, ROOM.visDepth, ROOM.halfW - 0.04, 0.15, ROOM.visDepth / 2);
-trim(ROOM.halfW * 2, 0.07, 0.07, 0, 1.25, 0.035);
-trim(0.07, 0.07, ROOM.visDepth, -ROOM.halfW + 0.035, 1.25, ROOM.visDepth / 2);
-trim(0.07, 0.07, ROOM.visDepth, ROOM.halfW - 0.035, 1.25, ROOM.visDepth / 2);
-// window with moonlit sky on the back wall
+const trimMat = lam(0xf4f1ea);
+box(ROOM.halfW * 2, 0.22, 0.06, trimMat, 0, 0.11, 0.03);
+box(0.06, 0.22, ROOM.visDepth, trimMat, -ROOM.halfW + 0.03, 0.11, ROOM.visDepth / 2);
+box(0.06, 0.22, ROOM.visDepth, trimMat, ROOM.halfW - 0.03, 0.11, ROOM.visDepth / 2);
+
+/* ---------- back of the room: carved credenzas, TV, blankets, candles, star lamp ---------- */
+const woodMat = lam(0x3b261c), woodTopMat = lam(0x2e1c14), doorMat = lam(0xffffff, { map: carvedTex });
+function credenza(x, width, height, doors) {
+  box(width, height, 0.56, woodMat, x, height / 2, 0.3);
+  box(width + 0.06, 0.06, 0.62, woodTopMat, x, height + 0.03, 0.31);
+  const dw = (width - 0.12) / doors;
+  for (let i = 0; i < doors; i++) {
+    const d = new THREE.Mesh(new THREE.PlaneGeometry(dw - 0.06, height - 0.2), doorMat);
+    d.position.set(x - width / 2 + 0.06 + dw * (i + 0.5), height / 2, 0.585); scene.add(d);
+  }
+}
+credenza(-3.35, 2.2, 0.95, 2);     // left cabinet with the blankets
+credenza(0.35, 4.3, 0.85, 4);      // long credenza under the TV
+// folded blanket stack + striped blanket on top
+[0x9a9ca0, 0xc9c6bf, 0x7f8388, 0xb5b3ad].forEach((c, i) => box(1.45 - i * 0.04, 0.12, 0.5, lam(c), -3.5 + (i % 2) * 0.05, 1.04 + i * 0.12, 0.3));
+const striped = box(1.6, 0.42, 0.62, lam(0xffffff, { map: stripeTex }), -3.45, 1.72, 0.32); striped.rotation.z = 0.05;
+box(0.34, 0.2, 0.2, lam(0x1b1b1b), -3.4, 2.03, 0.25);                      // little speaker
+// TV + glow
+const tv = new THREE.Group(); tv.position.set(0.2, 0.88, 0.32); scene.add(tv);
+box(0.5, 0.04, 0.3, lam(0x222222), 0, 0.02, 0, tv);
+box(0.08, 0.14, 0.06, lam(0x222222), 0, 0.1, 0, tv);
+box(2.5, 1.46, 0.07, lam(0x151515), 0, 0.9, 0, tv);
+const screen = new THREE.Mesh(new THREE.PlaneGeometry(2.38, 1.34), basic(0xffffff, { map: tvTex })); screen.position.set(0, 0.9, 0.04); tv.add(screen);
+box(1.9, 0.08, 0.12, lam(0x2a2a2a), 0, 0.04, 0.22, tv);                    // soundbar
+const glow = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 3.2), basic(0xffffff, { map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+glow.position.set(0.2, 1.85, 0.03); scene.add(glow);
+const tvLight = new THREE.PointLight(0x62e3d2, 0.55, 7, 2); tvLight.position.set(0.2, 1.8, 1.2); scene.add(tvLight);
+// candles (flicker in the main loop)
+const candleMat = lam(0xf1ead6), flames = [];
+for (const [x, y, z, h] of [[-1.35, 0.88, 0.35, 0.55], [-2.45, 0.98, 0.4, 0.5], [1.85, 0.88, 0.3, 0.4], [2.05, 0.88, 0.42, 0.28]]) {
+  const c = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, h, 12), candleMat); c.position.set(x, y + h / 2, z); scene.add(c);
+  const f = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 5), basic(0xffc15a)); f.position.set(x, y + h + 0.05, z); f.scale.y = 1.7; scene.add(f); flames.push(f);
+}
+// white diffuser + small bits
+const diff = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), lam(0xf6f4ef)); diff.scale.y = 1.3; diff.position.set(2.2, 1.08, 0.3); scene.add(diff);
+box(0.16, 0.1, 0.16, lam(0xf0b8a0), -0.95, 0.93, 0.35);
+// paper star lamp on its stand, right corner
 (() => {
-  const g = new THREE.Group();
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.3, 0.06), trimMat); g.add(frame);
-  const sky = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.1), new THREE.MeshBasicMaterial({ color: 0x223a5a })); sky.position.z = 0.035; g.add(sky);
-  const moon = new THREE.Mesh(new THREE.CircleGeometry(0.14, 16), new THREE.MeshBasicMaterial({ color: 0xfff1c4 })); moon.position.set(0.45, 0.25, 0.04); g.add(moon);
-  const barV = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.04), trimMat); barV.position.z = 0.05; g.add(barV);
-  const barH = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.06, 0.04), trimMat); barH.position.z = 0.05; g.add(barH);
-  g.position.set(0, 2.9, 0.03);
-  scene.add(g);
+  const s = new THREE.Shape();
+  for (let i = 0; i < 10; i++) { const r = i % 2 ? 0.28 : 0.7, a = Math.PI / 2 + i * Math.PI / 5; (i ? s.lineTo : s.moveTo).call(s, Math.cos(a) * r, Math.sin(a) * r); }
+  const star = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.12, bevelEnabled: false }), lam(0xf1f1ee, { emissive: 0x303030 }));
+  star.position.set(2.75, 2.2, 0.25); star.rotation.set(0.1, -0.35, 0.15); scene.add(star);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.6, 6), lam(0xd9d6cf)); pole.position.set(2.75, 0.8, 0.35); scene.add(pole);
 })();
-// rug under the cat
-const rug = new THREE.Mesh(new THREE.CircleGeometry(1.5, 28), lam(0x9c3b2e));
-rug.rotation.x = -Math.PI / 2; rug.scale.set(1.35, 1, 1); rug.position.set(0, 0.01, 1.9);
-scene.add(rug);
-const rugIn = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 28), new THREE.MeshBasicMaterial({ color: 0xe3b35a }));
-rugIn.rotation.x = -Math.PI / 2; rugIn.scale.set(1.35, 1, 1); rugIn.position.set(0, 0.015, 1.9);
-scene.add(rugIn);
+// black shelf with a plant in the right corner
+box(0.6, 1.3, 0.45, lam(0x1c1c1e), 3.2, 0.65, 0.28);
+const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.11, 0.22, 10), lam(0xe9e4da)); pot.position.set(3.2, 1.41, 0.3); scene.add(pot);
+const leafMat = lam(0x3f8a45);
+for (let i = 0; i < 6; i++) { const l = new THREE.Mesh(new THREE.SphereGeometry(0.13, 7, 5), leafMat); l.position.set(3.2 + Math.cos(i) * 0.14, 1.62 + (i % 3) * 0.09, 0.3 + Math.sin(i) * 0.12); scene.add(l); }
+// window with blinds on the left wall, doorway on the right wall
+(() => {
+  const w = new THREE.Group(); w.position.set(-ROOM.halfW + 0.02, 1.95, 1.9); w.rotation.y = Math.PI / 2; scene.add(w);
+  box(1.8, 1.25, 0.05, trimMat, 0, 0, 0, w);
+  const bl = new THREE.Mesh(new THREE.PlaneGeometry(1.62, 1.08), lam(0xffffff, { map: blindsTex })); bl.position.z = 0.03; w.add(bl);
+  const d = new THREE.Group(); d.position.set(ROOM.halfW - 0.02, 1.15, 1.35); d.rotation.y = -Math.PI / 2; scene.add(d);
+  box(1.2, 2.3, 0.05, trimMat, 0, 0, 0, d);
+  const gap = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 2.2), basic(0x22313a)); gap.position.set(0, -0.05, 0.03); d.add(gap);
+})();
+// cream corduroy floor cushion the cat sits on (like the modular sofa)
+const cushion = box(2.1, 0.34, 1.9, lam(0xffffff, { map: cordTex }), 0, 0.17, CAT_POS.z + 0.1);
 
 /* ---------- mouse holes ---------- */
 function archShape(w, h) {
@@ -534,7 +639,7 @@ catBody.add(head);
 })();
 const tailPivot = new THREE.Group(); tailPivot.position.set(0, 0.42, -0.8); catBody.add(tailPivot);
 tailPivot.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
-  new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.35, 0.2, -0.45), new THREE.Vector3(0.45, 0.8, -0.55), new THREE.Vector3(0.2, 1.3, -0.4)
+  new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.4, 0.05, -0.35), new THREE.Vector3(0.85, 0.2, -0.2), new THREE.Vector3(1.05, 0.5, 0.1)
 ]), 12, 0.1, 6), backMat));
 // swipe arm + paw live in world space so they can stretch across the room
 const armGeo = new THREE.CylinderGeometry(0.12, 0.15, 1, 7); armGeo.translate(0, 0.5, 0);
@@ -1189,8 +1294,8 @@ const sfx = {
    Portrait phones get a steeper, more top-down angle.
    ===================================================================== */
 const FIT_POINTS = [
-  [-ROOM.halfW, 0, 0], [ROOM.halfW, 0, 0], [-ROOM.halfW, 1.0, 0], [ROOM.halfW, 1.0, 0],
-  [-ROOM.halfW, 0, 11.8], [ROOM.halfW, 0, 11.8], [-1, 0, 12.8], [1, 0, 12.8], [0, 3.4, 1.7],
+  [-ROOM.halfW, 0, 0], [ROOM.halfW, 0, 0], [-ROOM.halfW, 2.7, 0], [ROOM.halfW, 2.7, 0],
+  [-ROOM.halfW, 0, 11.8], [ROOM.halfW, 0, 11.8], [-1, 0, 12.8], [1, 0, 12.8], [0, 3.8, 2.7],
 ].map(a => new THREE.Vector3(...a));
 function fitCamera() {
   const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
@@ -1260,6 +1365,8 @@ function frame(now) {
   camera.position.copy(camBase);
   if (shake > 0) camera.position.add(new THREE.Vector3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0));
   lamp.intensity = 0.5 + Math.sin(clock * 1.3) * 0.03;
+  for (let i = 0; i < flames.length; i++) flames[i].scale.set(1, 1.5 + Math.sin(clock * 9 + i * 2) * 0.25, 1);
+  tvLight.intensity = 0.5 + Math.sin(clock * 3.1) * 0.06;
 
   renderer.render(scene, camera);
 }
