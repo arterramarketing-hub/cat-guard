@@ -90,6 +90,16 @@
   .btn:focus-visible{outline:3px solid var(--danger);outline-offset:3px}
   .foot{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:#6e5a43}
   .foot-btns{display:flex;gap:14px}
+  .prize-pick{display:flex;align-items:center;gap:8px}
+  .pick-lbl{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#8a5a2c;margin-right:2px}
+  .pick{flex:1;appearance:none;display:flex;align-items:center;justify-content:center;gap:6px;font:800 14px var(--body);color:var(--ink);
+        background:var(--paper-2);border:2px solid var(--ink);border-radius:12px;padding:8px 6px;cursor:pointer}
+  .pick svg{width:26px;height:18px}
+  .pick[aria-checked="true"]{background:var(--cheese);box-shadow:0 3px 0 var(--ink)}
+  .pick:focus-visible{outline:3px solid var(--danger);outline-offset:2px}
+  .wedge.mush .cap{fill:#d23a3a;stroke:#6e1b1b}
+  .wedge.mush .stem{fill:#f3ece0;stroke:#b9ad99}
+  .wedge.gone circle{opacity:.15}
   .link-btn{appearance:none;background:none;border:none;font:inherit;color:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:4px 0}
   .reason{margin:0;font-size:15px;color:#5a4633}
   .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0}
@@ -126,7 +136,7 @@
 <div class="hud" id="hud" hidden>
   <div class="hud-bar">
     <div class="hud-cell c-score"><span class="lbl">Score</span><div class="val-row"><span class="score-val" id="score">0</span><span class="combo" id="combo" hidden>x2</span></div></div>
-    <div class="hud-cell c-cheese"><span class="lbl">Cheese</span><div class="cheeses" id="cheeses"></div></div>
+    <div class="hud-cell c-cheese"><span class="lbl" id="prizeLabel">Cheese</span><div class="cheeses" id="cheeses"></div></div>
     <div class="hud-cell c-lives"><span class="lbl">Lives</span><div class="lives" id="lives"></div></div>
     <div class="hud-cell c-heat"><span class="lbl lbl-split"><span>Heat</span><span class="time" id="time">0:00</span></span><div class="heat"><i id="heat"></i></div></div>
     <button class="icon-btn c-pause" id="pauseBtn" aria-label="Pause">
@@ -138,22 +148,27 @@
 <!-- Start -->
 <section class="screen" id="startScreen">
   <div class="card">
-    <p class="eyebrow">Three cheeses · six hideouts · one cat</p>
+    <p class="eyebrow">Three <span class="pw-many">cheeses</span> · six hideouts · one cat</p>
     <h1>Princess Kitty <span class="g">Defender</span></h1>
     <ul class="rules">
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><ellipse cx="17" cy="24" rx="14" ry="6" fill="none" stroke="#e2452c" stroke-width="3"/><ellipse cx="17" cy="19" rx="7" ry="6" fill="#9b8f86" stroke="#1f1712" stroke-width="1.5"/><circle cx="12" cy="12" r="3.5" fill="#e7a3a0" stroke="#1f1712" stroke-width="1.5"/><circle cx="22" cy="12" r="3.5" fill="#e7a3a0" stroke="#1f1712" stroke-width="1.5"/></svg>
-        <span><b>Swipe mice before they haul the cheese home.</b> The bigger a mouse looks, the closer it is to stealing.</span>
+        <span><b>Swipe mice before they haul the <span class="pw-one">cheese</span> home.</b> The bigger a mouse looks, the closer it is to stealing.</span>
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="16" cy="20" r="10" fill="#1f1712"/><path d="M20 11 q3 -5 7 -4" stroke="#8a6a45" stroke-width="2" fill="none"/><circle cx="27" cy="7" r="3.5" fill="#ffb02e"/><circle cx="27" cy="7" r="1.6" fill="#fff4c2"/></svg>
-        <span><b>Leave bomb mice alone.</b> Dark fur, lit fuse. Tapping one costs the cat a life. They taunt from their hideouts, and guard the very last cheese.</span>
+        <span><b>Leave bomb mice alone.</b> Dark fur, lit fuse. Tapping one costs the cat a life. They taunt from their hideouts, and guard the very last <span class="pw-one">cheese</span>.</span>
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><path d="M3 27 L31 27 L3 9 Z" fill="#f4c13d" stroke="#1f1712" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="20" r="2" fill="#c98e12"/><circle cx="15" cy="23" r="1.5" fill="#c98e12"/></svg>
-        <span>Swipe a thief and it <b>drops the cheese where it stands</b>, often nearer a hole. Lose all three cheeses, or all <b>9 lives</b>, and it's over.</span>
+        <span>Swipe a thief and it <b>drops the <span class="pw-one">cheese</span> where it stands</b>, often nearer a hole. Lose all three <span class="pw-many">cheeses</span>, or all <b>9 lives</b>, and it's over.</span>
       </li>
     </ul>
+    <div class="prize-pick" role="radiogroup" aria-label="What the cat protects">
+      <span class="pick-lbl">Protect</span>
+      <button class="pick" id="pickCheese" role="radio" aria-checked="true"><svg viewBox="0 0 36 24" aria-hidden="true"><path d="M3 22 L34 22 L3 4 Z" fill="#f4c13d" stroke="#1f1712" stroke-width="2" stroke-linejoin="round"/></svg>Cheese</button>
+      <button class="pick" id="pickMush" role="radio" aria-checked="false"><svg viewBox="0 0 36 24" aria-hidden="true"><path d="M4 13 Q18 -4 32 13 Z" fill="#d23a3a" stroke="#1f1712" stroke-width="1.8"/><path d="M14 13 L22 13 L21 22 L15 22 Z" fill="#f3ece0" stroke="#1f1712" stroke-width="1.5"/><circle cx="12" cy="8" r="2" fill="#fff"/><circle cx="21" cy="5" r="1.8" fill="#fff"/></svg>Mushrooms</button>
+    </div>
     <button class="btn" id="startBtn">Start guarding</button>
     <div class="foot"><span>Best: <span id="bestStart">—</span></span><span class="foot-btns"><button class="link-btn" id="musicBtn">Music: on</button><button class="link-btn" id="soundBtn">Sound: on</button></span></div>
   </div>
@@ -680,6 +695,28 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(MIR_W - IN(5), MIR_H - IN(5)), basic(0xffffff, { map: mirrorTex }));
   glass.position.set(0, MIR_H / 2, IN(0.8)); lean.add(glass);
 
+  /* ---- dichroic acrylic side table (right-side up): stadium-oval top on four arched panel legs,
+          tucked between the doorway and the right sofa, long side pointing into the room ---- */
+  {
+    const irid = canvasTex(8, 128, (g, w, h) => {
+      const gr = g.createLinearGradient(0, 0, 0, h);
+      ['#ff6a3d', '#ffb13b', '#f5f24a', '#6dff6a', '#3de0ff', '#5a7dff'].forEach((c, i, a) => gr.addColorStop(i / (a.length - 1), c));
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    }, 1, 1);
+    const acrylic = basic(0xffffff, { map: irid, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+    const T_L = IN(20), T_W = IN(12), T_H = IN(18);
+    const TX = ROOM.halfW - T_L / 2 - IN(4), TZ = (DOOR_Z1 + CASING + COUCH_RIGHT_Z0 - IN(7)) / 2;
+    const table = new THREE.Group(); table.position.set(TX, 0, TZ); scene.add(table);
+    const top = new THREE.Shape(), rr = T_W / 2, sx0 = T_L / 2 - rr;
+    top.moveTo(-sx0, -rr); top.lineTo(sx0, -rr); top.absarc(sx0, 0, rr, -Math.PI / 2, Math.PI / 2, false); top.lineTo(-sx0, rr); top.absarc(-sx0, 0, rr, Math.PI / 2, Math.PI * 1.5, false);
+    const topGeo = new THREE.ExtrudeGeometry(top, { depth: IN(0.5), bevelEnabled: false, curveSegments: 16 }); topGeo.rotateX(-Math.PI / 2);
+    const topMesh = new THREE.Mesh(topGeo, acrylic); topMesh.position.y = T_H; table.add(topMesh);
+    const legW = IN(5), legR = legW / 2, leg = new THREE.Shape();            // arched panel, rounded end on the floor
+    leg.moveTo(-legR, T_H); leg.lineTo(-legR, legR); leg.absarc(0, legR, legR, Math.PI, Math.PI * 2, false); leg.lineTo(legR, T_H); leg.lineTo(-legR, T_H);
+    const legGeo = new THREE.ExtrudeGeometry(leg, { depth: IN(0.4), bevelEnabled: false, curveSegments: 12 }); legGeo.rotateY(Math.PI / 2);
+    for (const lx of [-IN(4.5), IN(4.5)]) for (const lz of [-IN(3), IN(3)]) { const m = new THREE.Mesh(legGeo, acrylic); m.position.set(lx, 0, lz); table.add(m); }
+  }
+
   /* ---- wall sconce on the right wall above the mirror: brass plate + arm, frosted tulip shade ---- */
   const brass = lam(0xb08d57), scY = FT(6.3);
   const scG = new THREE.Group(); scG.position.set(ROOM.halfW - 0.01, 0, MIR_Z); scG.rotation.y = -Math.PI / 2; scene.add(scG);   // local +z points into the room
@@ -725,6 +762,33 @@ function couch(side, z0, modules) {                    // side: -1 = left wall, 
 }
 couch(-1, COUCH_LEFT_Z0, 3);
 couch(1, COUCH_RIGHT_Z0, 3);
+
+/* ---------- black throw blanket (white underside) draped over the front edge of the left sofa ---------- */
+{
+  const L = FT(2.7), SEAT_TOP = IN(17) + IN(1), FRONT_X = -ROOM.halfW + COUCH_DEPTH, onSeat = IN(18), drop = IN(14);
+  const z0 = COUCH_LEFT_Z0 + FT(2.85) * 2 + IN(4);                          // across the front seat section
+  const g = new THREE.PlaneGeometry(1, 1, 18, 22), pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const u = pos.getX(i) + 0.5, t = 0.5 - pos.getY(i), s = t * (onSeat + drop);   // u along the sofa, s across then down
+    let x, y, z = z0 + u * L;
+    if (s < onSeat) { x = FRONT_X - onSeat + s; y = SEAT_TOP + 0.045 + Math.sin(u * 9 + s * 4) * 0.018; }      // lying on the seat, soft wrinkles
+    else {
+      const d = s - onSeat, k = d / drop;
+      x = FRONT_X + 0.03 + Math.sin(u * 7 + d * 5) * 0.03; y = SEAT_TOP - d;                                    // hanging down the front
+      if (u > 0.72 && k > 0.55) {                                                                               // one corner curls back up: white side shows
+        const c = Math.min(1, (u - 0.72) / 0.28) * (k - 0.55) / 0.45, ang = c * 2.2, r = drop * 0.35;
+        x += Math.sin(ang) * r * 0.9; y += (1 - Math.cos(ang)) * r;
+      }
+    }
+    pos.setXYZ(i, x, y, z);
+  }
+  g.computeVertexNormals();
+  // make sure the black face is the one facing up on the seat
+  const upFacing = g.attributes.normal.getY(0) > 0;
+  const black = lam(0x1c1c20, { side: upFacing ? THREE.FrontSide : THREE.BackSide });
+  const white = lam(0xf2efe9, { side: upFacing ? THREE.BackSide : THREE.FrontSide });
+  scene.add(new THREE.Mesh(g, black)); scene.add(new THREE.Mesh(g, white));
+}
 
 /* ---------- half disco balls glued, scattered, on the right wall above the sofa ---------- */
 const discoTex = canvasTex(64, 32, (g, w, h) => {
@@ -874,6 +938,14 @@ const warnGeo = new THREE.RingGeometry(0.95, 1.15, 32);
    toward its own hole ('carried'). Whack the carrier and the cheese is
    dropped right there on the floor ('dropped') — usually closer to a hole
    than before. Reaching the hole = the cheese is gone for good. */
+/* PRIZE: what the cat protects. Chosen on the start screen, remembered per browser. */
+const PRIZES = { cheese: { one: 'cheese', many: 'cheeses', label: 'Cheese' }, mushroom: { one: 'mushroom', many: 'mushrooms', label: 'Mushrooms' } };
+let prizeMode = 'cheese';
+try { if (localStorage.getItem('catguard.prize') === 'mushroom') prizeMode = 'mushroom'; } catch (e) {}
+const PZ = () => PRIZES[prizeMode];
+const mushStemGeo = new THREE.CylinderGeometry(0.1, 0.14, 0.34, 14), mushCapGeo = new THREE.SphereGeometry(0.34, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+const mushGillGeo = new THREE.CircleGeometry(0.32, 18), mushSpotGeo = new THREE.SphereGeometry(0.05, 8, 6);
+const mushStemMat = lam(0xf3ece0), mushSpotMat = lam(0xffffff);
 class Cheese {
   constructor(spot) {
     this.home = new THREE.Vector3(spot.x, 0, spot.z);
@@ -885,13 +957,33 @@ class Cheese {
       const d = new THREE.Mesh(dimpleGeo, dimpleMat); d.rotation.x = -Math.PI / 2; d.position.set(x, 0.385, z); this.wedge.add(d);
     }
     scene.add(this.wedge);
+    this.cheeseVis = this.wedge; this.cheeseMat = this.mat;
+    // big red toadstool with white spots (the alternative prize)
+    this.mushMat = lam(0xd23a3a, { emissive: 0x000000 });
+    this.mushVis = new THREE.Group();
+    const stem = new THREE.Mesh(mushStemGeo, mushStemMat); stem.position.y = 0.17; this.mushVis.add(stem);
+    const cap = new THREE.Mesh(mushCapGeo, this.mushMat); cap.scale.y = 0.72; cap.position.y = 0.3; this.mushVis.add(cap);
+    const gill = new THREE.Mesh(mushGillGeo, mushStemMat); gill.rotation.x = Math.PI / 2; gill.position.y = 0.3; this.mushVis.add(gill);
+    for (let i = 0; i < 8; i++) {
+      const th = i < 1 ? 0 : 0.55 + (i % 2) * 0.35, ph = i * 2.1;
+      const sp = new THREE.Mesh(mushSpotGeo, mushSpotMat);
+      sp.position.set(Math.sin(th) * Math.cos(ph) * 0.33, 0.3 + Math.cos(th) * 0.33 * 0.72, Math.sin(th) * Math.sin(ph) * 0.33); sp.scale.y = 0.45; this.mushVis.add(sp);
+    }
+    this.mushVis.userData.baseScale = 1.5;                                   // big toadstools
+    this.mushVis.visible = false; scene.add(this.mushVis);
     this.warnMat = new THREE.MeshBasicMaterial({ color: 0xe2452c, transparent: true, opacity: 0, depthWrite: false });
     this.warn = new THREE.Mesh(warnGeo, this.warnMat); this.warn.rotation.x = -Math.PI / 2;
     this.warn.visible = false;     // warning ring under cheese removed
     scene.add(this.warn);
     this.reset();
   }
+  usePrize() {                                    // swap the visible model to the chosen prize
+    const mush = prizeMode === 'mushroom';
+    this.cheeseVis.visible = false; this.mushVis.visible = false;
+    this.wedge = mush ? this.mushVis : this.cheeseVis; this.mat = mush ? this.mushMat : this.cheeseMat;
+  }
   reset() {
+    this.usePrize();
     this.state = 'home'; this.alive = true; this.claimant = null;
     this.pos.copy(this.home); this.danger = 0; this.shownDanger = 0; this.hitT = 0; this.dropT = 0;
     this.wedge.visible = true; this.wedge.rotation.y = Math.random() * Math.PI * 2;
@@ -919,7 +1011,8 @@ class Cheese {
     if (this.dropT > 0) { this.dropT = Math.max(0, this.dropT - dt); y += Math.sin((1 - this.dropT / 0.45) * Math.PI) * 0.45; }
     this.wedge.position.set(this.pos.x, y, this.pos.z);
     const jig = this.hitT > 0 ? 1 + Math.sin(this.hitT * 50) * 0.08 * this.hitT : 1;
-    this.wedge.scale.set(s * jig, s / jig, s * jig);
+    const bs = this.wedge.userData.baseScale || 1;
+    this.wedge.scale.set(s * jig * bs, s / jig * bs, s * jig * bs);
     this.hitT = Math.max(0, this.hitT - dt);
     this.mat.emissive.setRGB(this.hitT * 1.2, 0, 0);
     // warning ring under the cheese = how close the nearest thief is
@@ -1531,14 +1624,14 @@ function onCheeseStolen(m, c) {
   c.lose();
   combo = 0;
   burst(m.hole.mouthOut.clone().setY(0.4), 0xf4c13d, 8, 1.8, 2.5, 0.9);
-  floatText(m.hole.mouthOut.clone().setY(1.1), 'Cheese stolen!', 'bad');
+  floatText(m.hole.mouthOut.clone().setY(1.1), `${PZ().label === 'Cheese' ? 'Cheese' : 'Mushroom'} stolen!`, 'bad');
   sfx.bite(true);
   vibrate(60);
   updateHud();
   if (!lastStandWarned && cheeses.filter(x => x.alive).length === 1) {
     lastStandWarned = true;
     const last = cheeses.find(x => x.alive);
-    floatText(last.pos.clone().setY(1.4), 'Last cheese! Bombs are guarding it', 'warn');
+    floatText(last.pos.clone().setY(1.4), `Last ${PZ().one}! Bombs are guarding it`, 'warn');
   }
   checkEnd();
 }
@@ -1564,14 +1657,29 @@ const ui = {
 };
 const PAW = '<svg class="pip" viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="16" rx="6.2" ry="5.2"/><circle cx="4.8" cy="9.6" r="2.5"/><circle cx="9.3" cy="5" r="2.5"/><circle cx="14.7" cy="5" r="2.5"/><circle cx="19.2" cy="9.6" r="2.5"/></svg>';
 ui.lives.innerHTML = PAW.repeat(CFG.LIVES);
-(() => {
-  // one wedge per cheese; its class shows where the cheese is (plate / floor / being stolen / gone)
+function buildPrizeIcons() {
+  // one icon per prize; its class shows where it is (home / floor / being stolen / gone)
   let html = '';
   for (let c = 0; c < cheeses.length; c++) {
-    html += `<svg class="wedge" viewBox="0 0 36 24" aria-label="Cheese ${c + 1}"><path d="M3 22 L34 22 L3 4 Z"/><circle cx="9" cy="16" r="2" fill="#c98e12"/></svg>`;
+    html += prizeMode === 'mushroom'
+      ? `<svg class="wedge mush" viewBox="0 0 36 24" aria-label="Mushroom ${c + 1}"><path class="cap" d="M4 13 Q18 -4 32 13 Z"/><path class="stem" d="M14 13 L22 13 L21 22 L15 22 Z"/><circle cx="12" cy="8" r="2" fill="#fff"/><circle cx="20" cy="5" r="1.8" fill="#fff"/><circle cx="26" cy="9" r="1.6" fill="#fff"/></svg>`
+      : `<svg class="wedge" viewBox="0 0 36 24" aria-label="Cheese ${c + 1}"><path d="M3 22 L34 22 L3 4 Z"/><circle cx="9" cy="16" r="2" fill="#c98e12"/></svg>`;
   }
   ui.cheeses.innerHTML = html;
-})();
+  $('prizeLabel').textContent = PZ().label;
+  document.querySelectorAll('.pw-one').forEach(e => e.textContent = PZ().one);
+  document.querySelectorAll('.pw-many').forEach(e => e.textContent = PZ().many);
+  for (const [id, mode] of [['pickCheese', 'cheese'], ['pickMush', 'mushroom']]) $(id).setAttribute('aria-checked', String(prizeMode === mode));
+}
+buildPrizeIcons();
+function setPrize(mode) {
+  prizeMode = mode;
+  try { localStorage.setItem('catguard.prize', mode); } catch (e) {}
+  cheeses.forEach(c => c.reset());
+  buildPrizeIcons(); updateHud();
+}
+$('pickCheese').addEventListener('click', () => setPrize('cheese'));
+$('pickMush').addEventListener('click', () => setPrize('mushroom'));
 const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 let lastTimeShown = -1;
 function updateHud() {
@@ -1646,9 +1754,9 @@ function showGameOver() {
   const best = getBest(), isNew = score > best;
   if (isNew) setBest(score);
   $('overEyebrow').textContent = isNew && score > 0 ? 'New best!' : 'Game over';
-  $('overTitle').textContent = endReason === 'cheese' ? 'The cheese is gone' : 'Out of lives';
+  $('overTitle').textContent = endReason === 'cheese' ? (prizeMode === 'mushroom' ? 'The mushrooms are gone' : 'The cheese is gone') : 'Out of lives';
   $('overReason').textContent = endReason === 'cheese'
-    ? 'The mice dragged every cheese into their holes. Swipe the thieves first, even if it means a dropped cheese.'
+    ? `The mice dragged every ${PZ().one} into their holes. Swipe the thieves first, even if it means a dropped ${PZ().one}.`
     : 'Nine bombs is a lot, even for a cat. Leave them be and they head back into their holes.';
   $('oScore').textContent = score;
   $('oTime').textContent = fmtTime(elapsed);
