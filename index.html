@@ -399,6 +399,11 @@ const cordTex = canvasTex(64, 32, (g, w, h) => {          // cream corduroy
   g.fillStyle = 'rgba(110,90,62,.3)'; for (let x = 0; x < w; x += 6) g.fillRect(x, 0, 2, h);
   g.fillStyle = 'rgba(255,250,240,.35)'; for (let x = 3; x < w; x += 6) g.fillRect(x, 0, 1, h);
 }, 4, 1);
+const cordTexH = canvasTex(32, 64, (g, w, h) => {         // same corduroy, ribs running horizontally
+  g.fillStyle = '#f1ece4'; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(120,104,82,.22)'; for (let y = 0; y < h; y += 6) g.fillRect(0, y, w, 2);
+  g.fillStyle = 'rgba(255,253,248,.45)'; for (let y = 3; y < h; y += 6) g.fillRect(0, y, w, 1);
+}, 1, 3);
 
 /* ---------- room: carpet, white paneling ---------- */
 const lam = (color, extra) => new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {}));
@@ -584,7 +589,8 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   const scLight = new THREE.PointLight(0xffdcae, 0.3, 5, 2); scLight.position.set(0, scY, IN(12)); scG.add(scLight);
 })();
 /* ---------- cream corduroy modular sofas along both side walls ---------- */
-const cordMat = lam(0xd9d6d0, { map: cordTex }), couchBaseMat = lam(0xc3bfb8, { map: cordTex }), couchGapMat = basic(0x1a1512);   // tops no longer blow out
+// whiter cream sofa; base a hair darker so the cushion edges read
+const cordMat = lam(0xf2eee7, { map: cordTexH }), couchBaseMat = lam(0xe4dfd6, { map: cordTexH }), couchGapMat = basic(0x1a1512);
 // pillow = a squashed "superellipsoid": square-ish outline with rounded corners, fat in the middle, thin at the seams
 const PILLOW_GEO = (() => {
   const w = IN(18), h = IN(18), t = IN(7), g = new THREE.SphereGeometry(1, 24, 18), p = g.attributes.position;
@@ -595,7 +601,7 @@ const PILLOW_GEO = (() => {
   }
   g.computeVertexNormals(); return g;
 })();
-const pillowMat = lam(0xffffff, { emissive: 0x2a2a2a });                 // crisp white pillows
+const pillowMat = cordMat;                                                // pillows match the sofa fabric
 function couch(side, z0, modules) {                    // side: -1 = left wall, +1 = right wall
   const D = COUCH_DEPTH, MOD = FT(2.85), SEAT_H = IN(17), LEG = IN(3), BACK_T = IN(8), BACK_H = IN(30), ARM_T = IN(7), ARM_H = IN(23);
   const wallX = side * ROOM.halfW, inX = -side, len = MOD * modules, zc = z0 + len / 2;
@@ -628,13 +634,18 @@ const discoMat = new THREE.MeshPhongMaterial({ map: discoTex, specular: 0xffffff
 const discoGlints = [];
 {
   let seed = 11; const r01 = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  // even spread: one ball per cell of a jittered grid, from just past the door casing to the end of the sofa
-  const Z0 = DOOR_Z1 + CASING + 0.35, Z1 = COUCH_RIGHT_Z0 + FT(2.85) * 3 - 0.2, Y0 = 3.0, Y1 = DOOR_H + 0.9, COLS = 11, ROWS = 2;   // 22 balls (was 27), set higher on the wall
-  const cells = [];
-  for (let c = 0; c < COLS; c++) for (let rw = 0; rw < ROWS; rw++) cells.push([c, rw]);
-  for (const [c, rw] of cells) {
+  // even, organic scatter: random "darts" that must keep a minimum distance from every ball already placed
+  // (blue-noise), so there are no rows and no clumps. From just past the door casing to the end of the sofa.
+  const Z0 = DOOR_Z1 + CASING + 0.35, Z1 = COUCH_RIGHT_Z0 + FT(2.85) * 3 - 0.2, Y0 = 3.0, Y1 = DOOR_H + 0.9, COUNT = 22;
+  const spots = [];
+  for (let minD = 0.95; spots.length < COUNT && minD > 0.3; minD *= 0.93) {
+    for (let tries = 0; tries < 400 && spots.length < COUNT; tries++) {
+      const z = Z0 + r01() * (Z1 - Z0), y = Y0 + r01() * (Y1 - Y0);
+      if (spots.every(([sz, sy]) => Math.hypot(sz - z, sy - y) >= minD)) spots.push([z, y]);
+    }
+  }
+  for (const [z, y] of spots) {
     const r = 0.06 + r01() * 0.09;
-    const z = Z0 + (c + 0.2 + r01() * 0.6) * (Z1 - Z0) / COLS, y = Y0 + (rw + 0.2 + r01() * 0.6) * (Y1 - Y0) / ROWS;
     const d = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), discoMat);
     d.rotation.set(r01() * 3, 0, Math.PI / 2); d.rotateY(r01() * 6);   // dome points out of the wall, facets turned randomly
     d.position.set(ROOM.halfW - 0.005, y, z); scene.add(d);
@@ -1539,7 +1550,7 @@ function noise(dur, vol, freq) {
   src.connect(f); f.connect(g); g.connect(actx.destination); src.start();
 }
 const sfx = {
-  whack: clutch => { tone(clutch ? 900 : 620, 180, 0.12, 'square', 0.07); if (clutch) tone(1200, 1500, 0.08, 'triangle', 0.05, 0.06); },
+  whack: clutch => { tone(170, 90, 0.05, 'sine', 0.08); const f = 2500 + Math.random() * 500; tone(f, f * 1.45, 0.09, 'sine', 0.07, 0.015); if (clutch) tone(f * 1.2, f * 1.8, 0.08, 'sine', 0.06, 0.11); },   // soft bop + mouse squeak (double squeak on a clutch save)
   miss: () => noise(0.06, 0.12, 900),
   boom: () => { noise(0.5, 0.5, 700); tone(160, 40, 0.4, 'sine', 0.25); },
   grab: () => sfx.squeak(3),
