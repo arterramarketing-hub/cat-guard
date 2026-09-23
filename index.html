@@ -430,7 +430,75 @@ const cordTexH = canvasTex(32, 64, (g, w, h) => {         // same corduroy, ribs
 const lam = (color, extra) => new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {}));
 const basic = (color, extra) => new THREE.MeshBasicMaterial(Object.assign({ color }, extra || {}));
 const box = (w, h, d, mat, x, y, z, parent) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); (parent || scene).add(m); return m; };
-let starMesh = null;
+let starMesh = null, mirrorRig = null, gloveRig = null, windowRig = null, tableRig = null;
+const steamPuffs = [];
+function breakTable() {
+  const t = tableRig; if (!t || t.broken) return;
+  t.broken = true; sfx.shatter(); shake = Math.max(shake, reduceMotion ? 0.06 : 0.4);
+  for (const p of t.pieces) { p.v.set((Math.random() - 0.3) * -1.6, 1.2 + Math.random() * 1.2, (Math.random() - 0.5) * 2.2); p.w.set((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 8); p.down = false; }
+  for (const s of t.shards) {
+    s.mesh.visible = true; s.down = false;
+    s.mesh.position.set((Math.random() - 0.5) * 1.4, t.T_H + (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.8);
+    s.v.set(-Math.random() * 3 - 0.3, 1 + Math.random() * 2.5, (Math.random() - 0.5) * 3.5); s.w.set(Math.random() * 12, Math.random() * 12, Math.random() * 12);
+  }
+}
+function updateTable(dt) {
+  const t = tableRig; if (!t || !t.broken) return;
+  const fall = (o, v, w, restY, restQuat) => {
+    v.y -= 9.8 * dt; o.position.addScaledVector(v, dt);
+    o.rotation.x += w.x * dt; o.rotation.y += w.y * dt; o.rotation.z += w.z * dt;
+    if (o.position.y <= restY) { o.position.y = restY; if (v.y < -2.2) { v.y *= -0.25; v.x *= 0.5; v.z *= 0.5; w.multiplyScalar(0.5); } else return true; }
+    return false;
+  };
+  for (const p of t.pieces) if (!p.down && fall(p.mesh, p.v, p.w, p.restY, p.restQuat)) { p.down = true; p.mesh.quaternion.copy(p.restQuat); }
+  for (const s of t.shards) if (!s.down && fall(s.mesh, s.v, s.w, 0.012)) { s.down = true; s.mesh.rotation.set(-Math.PI / 2, 0, Math.random() * 6); }
+}
+function resetTable() {
+  const t = tableRig; if (!t) return;
+  t.broken = false;
+  for (const p of t.pieces) { p.mesh.position.copy(p.homePos); p.mesh.quaternion.copy(p.homeQuat); }
+  for (const s of t.shards) s.mesh.visible = false;
+}
+function toggleBlinds() { const r = windowRig; if (!r) return; r.target = r.target > 0.4 ? 0.06 : r.base; sfx.rattle(); }
+function updateBlinds(dt) {
+  const r = windowRig; if (!r) return;
+  r.c += (r.target - r.c) * Math.min(1, dt * 3);
+  const cover = r.WIN_H * r.c;
+  r.bl.scale.y = cover / r.blindH; r.bl.position.y = r.WIN_H / 2 - cover / 2;
+  r.bt.repeat.set(1, 4 * r.c);                                     // keep the slats the same size as it rolls
+  r.rail.position.y = r.WIN_H / 2 - cover;
+  const open = (1 - r.c) / (1 - r.base);                             // 1 = today's 25% gap, ~3.8 = fully up
+  r.shaft.material.opacity = Math.min(1, 0.55 + 0.45 * open); r.shaft.scale.y = 0.8 + 0.2 * open;
+  r.patch.material.opacity = Math.min(1, 0.5 + 0.5 * open); r.patch.scale.set(1 + 0.25 * (open - 1), 1, 1);
+  r.sun.intensity = 0.25 * open;
+}
+// mirror: a springy tip. A tap rocks it forward off the wall; it swings back, clacks and settles.
+function hitMirror() { if (mirrorRig) { mirrorRig.vel += 3.4; sfx.whoosh(); } }
+function updateMirror(dt) {
+  const m = mirrorRig; if (!m) return;
+  m.vel += (-38 * m.tip - 2.4 * m.vel) * dt; m.tip += m.vel * dt;
+  if (m.tip < 0) { m.tip = 0; if (m.vel < -0.7) sfx.clack(); m.vel *= -0.28; }   // back against the wall
+  m.lean.rotation.x = m.base + m.tip;
+}
+// mini boxing gloves on strings under the sconce: idle sway, a big swing when batted
+function hitGloves() { if (gloveRig) { gloveRig.swing = 1; sfx.thump(); } }
+function updateGloves(dt, time) {
+  const gr = gloveRig; if (!gr) return;
+  gr.swing = Math.max(0, gr.swing - dt * 0.6);
+  gr.pivots.forEach((pv, i) => {
+    pv.rotation.x = Math.sin(time * 1.6 + i * 1.3) * 0.05 + gr.swing * Math.sin(time * 7 + i) * 0.55;
+    pv.rotation.z = Math.sin(time * 1.1 + i * 2.1) * 0.04 + gr.swing * Math.cos(time * 6 + i * 1.7) * 0.3;
+  });
+}
+// diffuser steam: a handful of very faint wisps that rise, spread and fade, on a loop
+function updateSteam(time) {
+  for (const w of steamPuffs) {
+    const k = (time * 0.22 + w.phase) % 1;
+    w.sprite.position.set(w.x + Math.sin(time * 0.9 + w.phase * 6) * IN(0.8) * k, w.y + k * IN(11), w.z);
+    w.sprite.scale.setScalar(IN(1.2) + k * IN(4.5));
+    w.sprite.material.opacity = 0.11 * Math.sin(k * Math.PI);
+  }
+}
 const starSpin = { home: 0, target: 0, wobble: 0 };
 function nudgeStar() { starSpin.target += 0.22; starSpin.wobble = 1; sfx.rustle(); }   // each tap turns it a little further round its stand
 function updateStar(dt) {
@@ -582,6 +650,16 @@ for (const [x, z, r, h] of [[MAIN_X0 + IN(4), IN(9), IN(2), IN(12)], [TV_L - IN(
 const candleLight = new THREE.PointLight(0xffb45a, 0.32, 6, 2); candleLight.position.set(0.2, CAB_H + FT(1.2), IN(30)); scene.add(candleLight);
 // white diffuser (~7") + pink salt lamp
 const diff = new THREE.Mesh(new THREE.SphereGeometry(IN(3.5), 12, 8), lam(0xf6f4ef)); diff.scale.y = 1.3; diff.position.set(MAIN_X0 + MAIN_W - IN(5), CAB_H + IN(4.5), IN(11)); scene.add(diff);
+{ // it's an air diffuser: little spout on top, faint mist rising
+  const topY = diff.position.y + IN(3.5) * 1.3;
+  const spout = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.55), IN(0.85), IN(0.7), 12), lam(0xd9d4ca)); spout.position.set(diff.position.x, topY + IN(0.15), diff.position.z); scene.add(spout);
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(IN(0.35), 10), basic(0x6f6a63)); hole.rotation.x = -Math.PI / 2; hole.position.set(diff.position.x, topY + IN(0.52), diff.position.z); scene.add(hole);
+  const steamTex = canvasTex(64, 64, (g, w, h) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, 1, 1);
+  for (let i = 0; i < 6; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: steamTex, transparent: true, depthWrite: false, opacity: 0 }));
+    scene.add(sp); steamPuffs.push({ sprite: sp, phase: i / 6, x: diff.position.x, y: topY + IN(0.6), z: diff.position.z });
+  }
+}
 box(IN(4), IN(4), IN(4), lam(0xf0b8a0), LEFT_X0 + LEFT_W - IN(14), CAB_H + IN(2), IN(12));   // pink salt lamp
 // right-corner black shelf (~4' tall, 14" wide) with a plant, and the paper star lamp (2' star on a 5' pole)
 // levelled shelving: black metal frame, five open shelves with odds and ends, plant on top
@@ -670,18 +748,21 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   const sky = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W, WIN_H), basic(0xfdf7e8)); sky.position.z = IN(0.55); w.add(sky);          // bright daylight
   const bt = blindsTex.clone(); bt.needsUpdate = true; bt.repeat.set(1, 3 * (1 - OPEN));
   const bl = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W, blindH), lam(0xffffff, { map: bt })); bl.position.set(0, WIN_H / 2 - blindH / 2, IN(0.7)); w.add(bl);
-  box(WIN_W, IN(1.2), IN(1), lam(0xe8e5df), 0, WIN_H / 2 - blindH, IN(0.9), w);                                              // bottom rail
+  const rail = box(WIN_W, IN(1.2), IN(1), lam(0xe8e5df), 0, WIN_H / 2 - blindH, IN(0.9), w);                                   // bottom rail
   box(WIN_W + CASING * 2 + IN(2), IN(1.5), IN(3), trimMat, 0, -WIN_H / 2 - CASING, IN(1.5), w);                              // sill
   // light coming in: a soft shaft from the open strip down onto the carpet, plus real light
   const shaftTex = canvasTex(4, 64, (g, cw, ch) => { const gr = g.createLinearGradient(0, 0, 0, ch); gr.addColorStop(0, 'rgba(255,246,222,.3)'); gr.addColorStop(1, 'rgba(255,246,222,0)'); g.fillStyle = gr; g.fillRect(0, 0, cw, ch); }, 1, 1);
   const shaftLen = FT(6.5), shaft = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W, shaftLen), basic(0xffffff, { map: shaftTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
   const sy = WIN_SILL + openH / 2, dropAngle = 0.62;                                   // sun comes in and down
   shaft.position.set(-ROOM.halfW + Math.sin(dropAngle) * shaftLen / 2, sy - Math.cos(dropAngle) * shaftLen / 2, winZ);
-  shaft.rotation.set(0, Math.PI / 2, 0); shaft.rotateX(-dropAngle);            // top at the window, foot out on the carpet scene.add(shaft);
+  shaft.rotation.set(0, Math.PI / 2, 0); shaft.rotateX(-dropAngle); scene.add(shaft);   // top at the window, foot out on the carpet
   const patchTex = canvasTex(64, 64, (g, cw, ch) => { const gr = g.createRadialGradient(32, 32, 4, 32, 32, 32); gr.addColorStop(0, 'rgba(255,244,215,.28)'); gr.addColorStop(1, 'rgba(255,244,215,0)'); g.fillStyle = gr; g.fillRect(0, 0, cw, ch); }, 1, 1);
   const patch = new THREE.Mesh(new THREE.PlaneGeometry(FT(3.2), WIN_W * 1.1), basic(0xffffff, { map: patchTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   patch.rotation.x = -Math.PI / 2; patch.position.set(-ROOM.halfW + Math.tan(dropAngle) * sy, 0.012, winZ); scene.add(patch);
   const sun = new THREE.PointLight(0xfff1d8, 0.25, 9, 2); sun.position.set(-ROOM.halfW + FT(1), WIN_SILL + openH, winZ); scene.add(sun);
+  // blinds rig: c = fraction of the window the blind covers (0.75 = 25% open). A tap rolls it up; another rolls it down.
+  windowRig = { bl, rail, bt, blindH, WIN_H, c: 1 - OPEN, target: 1 - OPEN, shaft, patch, sun, base: 1 - OPEN };
+  w.traverse(o => { if (o.isMesh) { o.userData.window = true; tapTargets.push(o); } });
 
   /* ---- tall grey-framed mirror (18" x 52") leaning back against the right wall, past the corner shelf ---- */
   const MIR_W = IN(18), MIR_H = IN(52), MIR_LEAN = Math.asin(IN(8) / MIR_H);
@@ -694,6 +775,8 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
     box(bw, bh, IN(0.6), frameDark, x, y, IN(0.9), lean);                                        // raised panel moulding
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(MIR_W - IN(5), MIR_H - IN(5)), basic(0xffffff, { map: mirrorTex }));
   glass.position.set(0, MIR_H / 2, IN(0.8)); lean.add(glass);
+  mirrorRig = { lean, base: -MIR_LEAN, tip: 0, vel: 0, glass };
+  lean.traverse(o => { if (o.isMesh) { o.userData.mirror = true; tapTargets.push(o); } });
 
   /* ---- dichroic acrylic side table (right-side up): stadium-oval top on four arched panel legs,
           tucked between the doorway and the right sofa, long side pointing into the room ---- */
@@ -715,6 +798,15 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
     leg.moveTo(-legR, T_H); leg.lineTo(-legR, legR); leg.absarc(0, legR, legR, Math.PI, Math.PI * 2, false); leg.lineTo(legR, T_H); leg.lineTo(-legR, T_H);
     const legGeo = new THREE.ExtrudeGeometry(leg, { depth: IN(0.4), bevelEnabled: false, curveSegments: 12 }); legGeo.rotateY(Math.PI / 2);
     for (const lx of [-T_L * 0.24, T_L * 0.24]) for (const lz of [-T_W * 0.26, T_W * 0.26]) { const m = new THREE.Mesh(legGeo, acrylic); m.position.set(lx, 0, lz); table.add(m); }
+    // shatter rig: the top and legs tumble to the carpet, plus a spray of little rainbow shards
+    const shardGeo = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(IN(2.2), IN(0.4)), new THREE.Vector2(IN(0.8), IN(1.9))]));
+    const shards = [];
+    for (let i = 0; i < 26; i++) { const sh = new THREE.Mesh(shardGeo, acrylic); sh.visible = false; table.add(sh); shards.push({ mesh: sh, v: new THREE.Vector3(), w: new THREE.Vector3(), down: false }); }
+    tableRig = { broken: false, T_H, shards, pieces: table.children.filter(c => !shards.some(s => s.mesh === c)).map((mesh, i) => ({
+      mesh, homePos: mesh.position.clone(), homeQuat: mesh.quaternion.clone(), v: new THREE.Vector3(), w: new THREE.Vector3(), down: false,
+      restY: i === 0 ? IN(0.3) : IN(0.25), restQuat: i === 0 ? new THREE.Quaternion() : new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.random() * 6, Math.PI / 2, 'YXZ')) })) };
+    table.traverse(o => { if (o.isMesh) { o.userData.table = true; tapTargets.push(o); } });
+    tableRig.center = new THREE.Vector3(TX, T_H * 0.7, TZ);
   }
 
   /* ---- wall sconce on the right wall above the mirror: brass plate + arm, frosted tulip shade ---- */
@@ -727,6 +819,24 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   const scGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8 }));
   scGlow.position.set(0, scY + IN(3), IN(6)); scGlow.scale.setScalar(FT(1.6)); scG.add(scGlow);
   const scLight = new THREE.PointLight(0xffdcae, 0.3, 5, 2); scLight.position.set(0, scY, IN(12)); scG.add(scLight);
+  // pair of mini boxing gloves, Greek blue with a white cuff and the flag's white cross, hanging on laces from the arm
+  {
+    const blue = lam(0x1f5fbf), white = lam(0xf7f7f4), lace = lam(0xf2f2ee);
+    const mitt = new THREE.SphereGeometry(IN(1.5), 14, 10), thumb = new THREE.SphereGeometry(IN(0.65), 10, 8), cuff = new THREE.CylinderGeometry(IN(1.05), IN(1.2), IN(1.3), 14);
+    gloveRig = { pivots: [], swing: 0 };
+    for (const [gx, len] of [[-IN(1.4), IN(6.5)], [IN(1.4), IN(8.5)]]) {
+      const pv = new THREE.Group(); pv.position.set(gx, scY - IN(0.6), IN(4.5)); scG.add(pv);
+      const str = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.12), IN(0.12), len, 5), lace); str.position.y = -len / 2; pv.add(str);
+      const g = new THREE.Group(); g.position.y = -len - IN(1.2); g.rotation.z = Math.PI; pv.add(g);          // hangs fingers-down
+      const m = new THREE.Mesh(mitt, blue); m.scale.set(1, 1.25, 0.85); m.position.y = IN(0.9); g.add(m);
+      const t = new THREE.Mesh(thumb, blue); t.position.set(IN(1.2), IN(0.4), IN(0.4)); t.scale.set(0.8, 1.3, 0.8); g.add(t);
+      const c = new THREE.Mesh(cuff, white); c.position.y = -IN(0.9); g.add(c);
+      const crossV = new THREE.Mesh(new THREE.BoxGeometry(IN(0.35), IN(1.7), IN(0.2)), white); crossV.position.set(0, IN(1.1), IN(1.25)); g.add(crossV);
+      const crossH = new THREE.Mesh(new THREE.BoxGeometry(IN(1.5), IN(0.35), IN(0.2)), white); crossH.position.set(0, IN(1.2), IN(1.25)); g.add(crossH);
+      pv.traverse(o => { if (o.isMesh) { o.userData.gloves = true; tapTargets.push(o); } });
+      gloveRig.pivots.push(pv);
+    }
+  }
 })();
 /* ---------- cream corduroy modular sofas along both side walls ---------- */
 // whiter cream sofa; base a hair darker so the cushion edges read
@@ -753,7 +863,7 @@ function couch(side, z0, modules) {                    // side: -1 = left wall, 
     box(BACK_T, BACK_H - SEAT_H + IN(4), MOD - 0.09, cordMat, wallX + inX * BACK_T / 2, SEAT_H + (BACK_H - SEAT_H) / 2 - IN(2), z); // back cushion
   }
   for (const za of [z0 - ARM_T / 2, z0 + len + ARM_T / 2]) box(D, ARM_H - LEG, ARM_T, cordMat, wallX + inX * D / 2, LEG + (ARM_H - LEG) / 2, za); // arms
-  for (const [pz, tw] of [[z0 + IN(15), 0.25], [z0 + len - IN(15), -0.3]]) {                                   // two puffy corduroy pillows
+  for (const [pz, tw] of [[z0 + IN(15), 0.25], [side < 0 ? z0 + len * 0.55 : z0 + len - IN(15), -0.3]]) {   // left sofa: 2nd pillow sits clear of the blanket                                   // two puffy corduroy pillows
     const pil = new THREE.Mesh(PILLOW_GEO, pillowMat);
     pil.position.set(wallX + inX * (BACK_T + IN(5)), SEAT_H + IN(9), pz); pil.rotation.set(tw, 0, -side * 0.3); scene.add(pil);
     registerProp(pil, { restHalf: IN(3.2), restQuat: yawRest(0, Math.PI / 2),                                      // lands lying flat
@@ -763,31 +873,44 @@ function couch(side, z0, modules) {                    // side: -1 = left wall, 
 couch(-1, COUCH_LEFT_Z0, 3);
 couch(1, COUCH_RIGHT_Z0, 3);
 
-/* ---------- black throw blanket (white underside) thrown over the front arm of the left sofa ----------
-   Cross-section: a flap lies on the seat, rises over the inside of the arm, crosses its top, then hangs
-   down the outside almost to the carpet; one bottom corner flips up so the white underside shows. */
+/* ---------- black throw blanket (white underside) tossed DIAGONALLY across the left sofa's front arm and seat ----------
+   Drape = a flat rectangle, rotated in plan, laid onto a height map of the sofa (seat, back cushion, arm). The height is
+   sampled a little around each point and the blanket floats just above the highest one, so it never clips into a
+   cushion edge. Anything past the sofa's front edge or the arm's outside face hangs straight down, and the hanging
+   corner curls back so the white underside shows. */
 {
-  const ARM_T = IN(7), ARM_H = IN(23), SEAT_TOP = IN(17) + IN(1) + 0.04, lift = 0.035;
-  const armIn = COUCH_LEFT_Z0 + FT(2.85) * 3, armOut = armIn + ARM_T;          // inner / outer faces of the front arm
-  const W = COUCH_DEPTH * 1.05, X0 = -ROOM.halfW + 0.1;                                // blanket width runs along the arm (wall → front)
-  const seg = [0.42, ARM_H - SEAT_TOP, ARM_T, ARM_H - 0.22], total = seg.reduce((a, b) => a + b);
-  const g = new THREE.PlaneGeometry(1, 1, 20, 30), pos = g.attributes.position;
+  const WALL = -ROOM.halfW, FRONT = WALL + COUCH_DEPTH, BACK_EDGE = WALL + IN(8);
+  const SEAT = IN(17) + IN(1), BACKTOP = IN(29), ARM_H = IN(23), ARM_T = IN(7);
+  const armIn = COUCH_LEFT_Z0 + FT(2.85) * 3, armOut = armIn + ARM_T, LIFT = 0.045, PAD = 0.14;
+  const H = (x, z) => {                                             // sofa surface height at a plan point (0 = off the sofa)
+    if (x < WALL || x > FRONT || z > armOut || z < COUCH_LEFT_Z0 - ARM_T) return 0;
+    if (z >= armIn) return ARM_H;
+    return x < BACK_EDGE ? BACKTOP : SEAT;
+  };
+  const Hs = (x, z) => Math.max(H(x, z), H(x - PAD, z), H(x + PAD, z), H(x, z - PAD), H(x, z + PAD));   // look around → no clipping at steps
+  const W = FT(3.0), L = FT(2.2), ang = -0.62, cx = FRONT + 0.05, cz = armIn - 0.1;          // keeps every corner off the tall back cushion     // size, plan angle, centre
+  const g = new THREE.PlaneGeometry(1, 1, 36, 28), pos = g.attributes.position;
+  const ca = Math.cos(ang), sa = Math.sin(ang);
   for (let i = 0; i < pos.count; i++) {
-    const u = pos.getX(i) + 0.5, s = (0.5 - pos.getY(i)) * total;
-    let x = X0 + u * W, y, z, d = s;
-    if (d < seg[0]) { z = armIn - seg[0] + d - lift; y = SEAT_TOP + Math.sin(u * 8 + d * 6) * 0.015; }                   // on the seat
-    else if ((d -= seg[0]) < seg[1]) { z = armIn - lift; y = SEAT_TOP + d; }                                                // up the inside of the arm
-    else if ((d -= seg[1]) < seg[2]) { z = armIn + d; y = ARM_H + lift; }                                                     // over the top
-    else {                                                                                                                  // hanging down the outside
-      d -= seg[2]; const k = d / seg[3];
-      z = armOut + lift + Math.sin(u * 6 + d * 4) * 0.035; y = ARM_H - d;
-      if (u > 0.74 && k > 0.62) { const c = Math.min(1, (u - 0.74) / 0.26) * (k - 0.62) / 0.38, ang = c * 2.3, r = seg[3] * 0.3; z += Math.sin(ang) * r; y += (1 - Math.cos(ang)) * r; }
+    const u = pos.getX(i), v = pos.getY(i);
+    let x = cx + (u * W) * ca - (v * L) * sa, z = cz + (u * W) * sa + (v * L) * ca;
+    x = Math.max(WALL + 0.06, x);
+    // how far this point overhangs the sofa's front edge / the arm's outside face
+    const overX = Math.max(0, x - FRONT), overZ = Math.max(0, z - armOut);
+    const ex = Math.min(x, FRONT - 0.01), ez = Math.min(z, armOut - 0.01);
+    let y = Hs(ex, ez) + LIFT + Math.sin(u * 11 + v * 7) * 0.012;
+    if (overX > 0) { x = FRONT + 0.035; y -= overX; }                 // hangs down the front
+    if (overZ > 0) { z = armOut + 0.035; y -= overZ; }                // hangs down the arm's outside
+    const over = overX + overZ;
+    if (over > 0.55) {                                                // bottom of the hang curls back: white side shows
+      const c = Math.min(1, (over - 0.55) / 0.35), a = c * 2.1, r = 0.22;
+      y += (1 - Math.cos(a)) * r;
+      if (overX >= overZ) x += Math.sin(a) * r; else z += Math.sin(a) * r;
     }
-    x += Math.sin(s * 3 + u * 2) * 0.02;
-    pos.setXYZ(i, x, y, z);
+    pos.setXYZ(i, x, Math.max(0.03, y), z);
   }
   g.computeVertexNormals();
-  const upFacing = g.attributes.normal.getY(Math.round(0.5 * 21 + 21 * 3)) > 0;   // a vertex on the seat flap: black side should face up
+  const mid = Math.floor(pos.count / 2), upFacing = g.attributes.normal.getY(mid) > 0;   // centre vertex lies on top: black up
   scene.add(new THREE.Mesh(g, lam(0x1c1c20, { side: upFacing ? THREE.FrontSide : THREE.BackSide })));
   scene.add(new THREE.Mesh(g, lam(0xf2efe9, { side: upFacing ? THREE.BackSide : THREE.FrontSide })));
 }
@@ -1592,11 +1715,19 @@ function interactables() {
   }
   screen.getWorldPosition(_ip); list.push({ obj: screen, pos: _ip.clone(), r: 1.4 });
   if (starMesh) list.push({ obj: starMesh, pos: starMesh.position.clone(), r: 1.0 });
+  if (tableRig && !tableRig.broken) list.push({ obj: tableRig.pieces[0].mesh, pos: tableRig.center, r: 0.9 });
+  if (windowRig) { windowRig.bl.getWorldPosition(_ip); list.push({ obj: windowRig.bl, pos: _ip.clone(), r: 1.2 }); }
+  if (mirrorRig) { mirrorRig.glass.getWorldPosition(_ip); list.push({ obj: mirrorRig.glass, pos: _ip.clone(), r: 1.1 }); }
+  if (gloveRig) { gloveRig.pivots[0].getWorldPosition(_ip); list.push({ obj: gloveRig.pivots[0].children[0], pos: _ip.clone().setY(_ip.y - IN(8)), r: 0.45 }); }
   return list;
 }
 function interact(o, point) {
   if (o.userData.tv) { startSwipe(point, true); setTV(!tvOn); sfx.tvStatic(tvOn); tapShake(); return true; }
   if (o.userData.star) { startSwipe(point, true); setTimeout(nudgeStar, 90); tapShake(); return true; }
+  if (o.userData.table) { if (tableRig && tableRig.broken) return false; startSwipe(point, true); setTimeout(breakTable, 90); return true; }
+  if (o.userData.window) { startSwipe(point, true); setTimeout(toggleBlinds, 90); tapShake(); return true; }
+  if (o.userData.mirror) { startSwipe(point, true); setTimeout(hitMirror, 90); tapShake(); return true; }
+  if (o.userData.gloves) { startSwipe(point, true); setTimeout(hitGloves, 90); tapShake(); return true; }
   if (o.userData.prop) { const pr = o.userData.prop; startSwipe(point, true); setTimeout(() => knockProp(pr), 90); tapShake(); return true; }
   return false;
 }
@@ -1745,7 +1876,7 @@ function clearField() { for (const m of mice) m.release(); }
 function resetGame() {
   clearField();
   cheeses.forEach(c => c.reset());
-  resetProps(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0;
+  resetProps(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; if (windowRig) windowRig.target = windowRig.base; resetTable();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -1848,13 +1979,13 @@ const sfx = {
   // a fast flutter for the rasp, plus a puff of air. Five variants picked at random so hits don't all sound alike.
   plush: clutch => {
     if (!actx || !soundOn) return;
-    const V = [[820, 1500, 1150, 0.17], [1000, 1750, 1350, 0.13], [680, 1300, 980, 0.21], [900, 1250, 1600, 0.16], [760, 1600, 900, 0.19]];
+    const V = [[1250, 2300, 1750, 0.15], [1500, 2650, 2050, 0.12], [1050, 2000, 1500, 0.18], [1350, 1900, 2450, 0.14], [1150, 2400, 1400, 0.16]];   // higher, squeakier
     const play = (v, t0) => {
       const [f0, f1, f2, dur] = v, t = actx.currentTime + t0;
       const o = actx.createOscillator(), fl = actx.createOscillator(), fg = actx.createGain(), bp = actx.createBiquadFilter(), g = actx.createGain();
       o.type = 'square'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.35); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
       fl.frequency.value = 38; fg.gain.value = 45; fl.connect(fg); fg.connect(o.frequency);
-      bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 2.2;
+      bp.type = 'bandpass'; bp.frequency.value = 2800; bp.Q.value = 2.2;
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.012); g.gain.setValueAtTime(0.16, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
       o.connect(bp); bp.connect(g); g.connect(actx.destination);
       o.start(t); fl.start(t); o.stop(t + dur + 0.02); fl.stop(t + dur + 0.02);
@@ -1865,7 +1996,14 @@ const sfx = {
     if (clutch || Math.random() < 0.3) play(V[(Math.random() * V.length) | 0], v[3] + 0.05);   // sometimes a double squeeze
   },
   rustle: () => noise(0.18, 0.1, 5200),                            // paper star
-  squeak: n => { for (let i = 0; i < n; i++) { const f = 2600 + Math.random() * 700; tone(f, f + 600 + Math.random() * 400, 0.06, 'sine', 0.05, i * 0.09); } },   // mouse squeaks
+  shatter: () => {                                                  // acrylic breaking: bright crash + a scatter of tiny tinkles
+    noise(0.45, 0.4, 11000); noise(0.2, 0.25, 3000);
+    for (let i = 0; i < 12; i++) { const f = 3000 + Math.random() * 5000; tone(f, f * 0.9, 0.08, 'triangle', 0.035, 0.03 + Math.random() * 0.45); }
+  },
+  rattle: () => { for (let i = 0; i < 6; i++) tone(900 + Math.random() * 500, 700, 0.03, 'square', 0.02, i * 0.045); },   // blind slats
+  whoosh: () => noise(0.25, 0.06, 1400),                           // mirror tipping
+  clack: () => { tone(520, 260, 0.07, 'triangle', 0.06); noise(0.05, 0.1, 2500); },   // mirror back against the wall
+  squeak: n => { for (let i = 0; i < n; i++) { const f = 3400 + Math.random() * 900; tone(f, f + 600 + Math.random() * 400, 0.06, 'sine', 0.05, i * 0.09); } },   // mouse squeaks
   angryMeow: () => {
     // A cat meow is HIGH (fundamental ~550–1000 Hz), glides up then down ("mi-AOW"), and its vowel comes from two
     // narrow resonances sweeping ee → ah → ow. Everything under ~450 Hz is cut, so no elephant rumble.
@@ -2023,6 +2161,11 @@ function frame(now) {
   updateProps(dt);
   updateTV(dt);
   updateStar(dt);
+  updateMirror(dt);
+  updateBlinds(dt);
+  updateTable(dt);
+  updateGloves(dt, clock);
+  updateSteam(clock);
   updateBoom(dt);
 
   shake = Math.max(0, shake - dt * 1.4);
