@@ -926,9 +926,9 @@ tv.children.forEach(c => { if (c.isMesh && c !== screen) { c.userData.tv = true;
 const showCanvas = document.createElement('canvas'); showCanvas.width = 256; showCanvas.height = 144;
 const showCtx = showCanvas.getContext('2d'), showTex = new THREE.CanvasTexture(showCanvas), tvShowMat = basic(0xffffff, { map: showTex });
 const showCast = [
-  { x: 72, scarf: '#e0452f', hat: '#3f6fd1', talk: 0, arm: 0, pose: 0 },
-  { x: 128, scarf: '#f2c230', hat: null, talk: 0, arm: 0, pose: 0 },
-  { x: 184, scarf: '#3fa34d', hat: '#8a3fc4', talk: 0, arm: 0, pose: 0 },
+  { x: 72, scarf: '#d8322b', hat: '#33c2c9', talk: 0, arm: 0, pose: 0 },                  // red scarf, turquoise hat
+  { x: 128, scarf: '#f07a1f', hat: '#3fbf45', flaps: true, talk: 0, arm: 0, pose: 0 },     // orange scarf, green hat with built-in earmuffs
+  { x: 184, scarf: '#7a4a2a', hat: '#3553c6', talk: 0, arm: 0, pose: 0 },                  // brown scarf, blue hat
 ];
 function drawShow(t) {
   const g = showCtx, W = 256, H = 144;
@@ -948,7 +948,11 @@ function drawShow(t) {
     const hx = x + (c.talk ? 2 : 0), hy = y - 30;
     for (const sx of [-1, 1]) { g.fillStyle = '#9b8f86'; g.beginPath(); g.arc(hx + sx * 15, hy - 14, 9, 0, 7); g.fill(); g.stroke(); g.fillStyle = '#e7a3a0'; g.beginPath(); g.arc(hx + sx * 15, hy - 14, 5, 0, 7); g.fill(); }   // ears
     g.fillStyle = '#b0a59c'; g.beginPath(); g.ellipse(hx, hy, 19, 17, 0, 0, 7); g.fill(); g.stroke();                               // head
-    if (c.hat) { g.fillStyle = c.hat; g.beginPath(); g.ellipse(hx, hy - 12, 15, 8, 0, Math.PI, 0); g.fill(); g.stroke(); g.fillStyle = '#fff'; g.beginPath(); g.arc(hx, hy - 21, 3.5, 0, 7); g.fill(); }
+    if (c.hat) {
+      g.fillStyle = c.hat; g.beginPath(); g.ellipse(hx, hy - 12, 15, 8, 0, Math.PI, 0); g.fill(); g.stroke();
+      if (c.flaps) for (const sx of [-1, 1]) { g.beginPath(); g.ellipse(hx + sx * 17, hy - 4, 6, 10, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = 'rgba(0,0,0,.15)'; g.beginPath(); g.ellipse(hx + sx * 17, hy - 2, 3.5, 6, 0, 0, 7); g.fill(); g.fillStyle = c.hat; }   // earmuff flaps
+      else { g.fillStyle = '#fff'; g.beginPath(); g.arc(hx, hy - 21, 3.5, 0, 7); g.fill(); }                                        // bobble
+    }
     g.fillStyle = c.scarf; g.fillRect(hx - 17, hy + 13, 34, 6); g.fillRect(hx + 6, hy + 16, 6, 12);                                 // scarf
     const look = c.talk ? (x < 128 ? 2 : -2) : 0;
     for (const sx of [-1, 1]) { g.fillStyle = '#fff'; g.beginPath(); g.ellipse(hx + sx * 7, hy - 3, 6, 7, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = '#111'; g.beginPath(); g.arc(hx + sx * 7 + look, hy - 2, 1.8, 0, 7); g.fill(); }
