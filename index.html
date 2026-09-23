@@ -310,7 +310,7 @@ const CFG = {
   // ---- Anti-spam (stops camping the last cheese) --------------------
   SWIPE_COOLDOWN: 0.28,     // seconds before the paw can swipe again
   WHIFF_COOLDOWN: 0.45,     // extra recovery after a swipe that hits nothing (cat is off balance)
-  LAST_STAND_BOMB_GUARD: true, // with one cheese left, bomb mice go and stand guard around it
+  LAST_STAND_BOMB_GUARD: false, // with one cheese left, bomb mice go and stand guard around it
 
   // ---- Rules & scoring ---------------------------------------------
   LIVES: 9,
@@ -370,7 +370,7 @@ const HOLES = [
   { kind: 'fire',  x: -ROOM.halfW + FIRE.d + 0.02,      z: FIRE.z, n: [1, 0] },   // out of the fireplace past the end of the left sofa
   { kind: 'door',  x:  ROOM.halfW + 0.6,         z: 5.4 / 1.3, n: [-1, 0] }, // through the doorway (DOOR_Z)
 ];
-const CHEESE_SPOTS = [ { x: -1.5, z: 5.9 }, { x: 1.6, z: 6.7 }, { x: 0.05, z: 9.7 } ];   // an even triangle in the open middle of the room
+const CHEESE_SPOTS = [ { x: -0.7, z: 4.9 }, { x: 0.8, z: 7.5 }, { x: -0.35, z: 10.3 } ];   // a tall zig-zag down the middle of the room   // an even triangle in the open middle of the room
 const CAT_POS = new THREE.Vector3(0, 0, 2.2);   // cat guards from the top of the screen, swiping down
 
 /* =====================================================================
@@ -692,7 +692,7 @@ function updateBlinds(dt) {
   r.bt.repeat.set(1, 4 * r.c);                                     // keep the slats the same size as it rolls
   r.rail.position.y = r.WIN_H / 2 - cover;
   const open = (1 - r.c) / (1 - r.base);                             // 1 = today's 25% gap, ~3.8 = fully up
-  const dim = 1 + (1 - lightF) * 1.4;                                // lights off: the daylight through the window stands out much more
+  const dim = 1 + (1 - lightF) * 0.55;                               // lights off: the window light stands out, without blowing everything out
   // the light pours in through the whole open part of the window: the cone gets taller and the patch on the carpet longer as the blinds go up
   const openH = r.WIN_H * (1 - r.c), tn = Math.tan(r.dropAngle);
   r.shafts.forEach((sh, k) => {
@@ -702,7 +702,7 @@ function updateBlinds(dt) {
   r.shaft.material.opacity = Math.min(1, 0.4 + 0.2 * open) * dim;
   r.patch.material.opacity = Math.min(1, 0.5 + 0.5 * open) * dim;
   r.patch.position.x = -ROOM.halfW + tn * (WIN_SILL + openH / 2); r.patch.scale.set((tn * openH + FT(1.6)) / FT(3.2), 1, 1);
-  r.sun.intensity = 0.14 * open * (1 + (1 - lightF) * 1.5);
+  r.sun.intensity = 0.14 * open * (1 + (1 - lightF) * 0.5);
   r.glow.material.opacity = (1 - lightF) * 0.9 * Math.min(1, 0.45 + 0.2 * open); r.glow.scale.set(IN(80) * (1 + 0.1 * open), IN(40) + (1 - r.c) * IN(30), 1);
 }
 // mirror: a springy tip. A tap rocks it forward off the wall; it swings back, clacks and settles.
@@ -1296,6 +1296,12 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   const wt = panelTexSide.clone(); wt.needsUpdate = true; wt.repeat.set(1 / (IN(8) * 4), 1 / Hh);   // shape UVs are in world units
   const rw = new THREE.Mesh(new THREE.ShapeGeometry(s), lam(0xf2efe8, { map: wt })); rw.userData.rightWall = true;
   rw.rotation.y = -Math.PI / 2; rw.position.set(ROOM.halfW, oy, L / 2); scene.add(rw);
+  { // a plain run of wallpaper behind the right sofa: same warm white, just no panel lines (a faint paper texture instead)
+    const plain = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#f4f2ee'; g.fillRect(0, 0, w, h); for (let i = 0; i < 900; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,.025)' : 'rgba(255,255,255,.35)'; g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1); } }, 6, 6);
+    const z0 = COUCH_RIGHT_Z0 - IN(7), z1 = Math.min(ROOM.visDepth, COUCH_RIGHT_Z0 + FT(2.85) * 3 + IN(7));
+    const pw = new THREE.Mesh(new THREE.PlaneGeometry(z1 - z0, ROOM.wallH), lam(0xf2efe8, { map: plain })); pw.userData.rightWall = true;
+    pw.rotation.y = -Math.PI / 2; pw.position.set(ROOM.halfW - 0.008, ROOM.wallH / 2, (z0 + z1) / 2); scene.add(pw);
+  }
   box(0.05, 0.26, DOOR_Z0 - CASING, trimMat, ROOM.halfW - 0.025, 0.13, (DOOR_Z0 - CASING) / 2);                  // baseboard, split at the door
   box(0.05, 0.26, L - DOOR_Z1 - CASING, trimMat, ROOM.halfW - 0.025, 0.13, (L + DOOR_Z1 + CASING) / 2);
   // jambs + header give the opening its thickness
@@ -2235,7 +2241,7 @@ class Cheese {
     this.usePrize();
     this.state = 'home'; this.alive = true; this.claimant = null;
     this.pos.copy(this.home); this.danger = 0; this.shownDanger = 0; this.hitT = 0; this.dropT = 0;
-    this.yaw = Math.random() * Math.PI * 2; this.wob = 0; this.tdir = 0; this.off = new THREE.Vector2();
+    this.yaw = Math.random() * Math.PI * 2; this.wob = 0; this.tdir = 0; this.off = new THREE.Vector2(); this.downT = 0; this.lie = 0;
     this.wedge.visible = true; this.wedge.rotation.set(0, this.yaw, 0);
   }
   get available() { return this.alive && !this.claimant; }
@@ -2249,7 +2255,7 @@ class Cheese {
     }
     this.claimant = null;
   }
-  nudge() { if (!this.alive || this.state === 'carried') return; this.yaw += (Math.random() < 0.5 ? -1 : 1) * (0.4 + Math.random() * 0.25); this.wob = 1; this.tdir = Math.random() * Math.PI * 2; sfx.nudge(); }
+  nudge() { if (!this.alive || this.state === 'carried') return; this.yaw += (Math.random() < 0.5 ? -1 : 1) * (0.4 + Math.random() * 0.25); this.wob = 1; this.tdir = Math.random() * Math.PI * 2; this.downT = 1.8; sfx.nudge(); }
   lose() { this.state = 'gone'; this.alive = false; this.claimant = null; this.wedge.visible = false; }
   update(dt, time) {
     let y = 0, s = 1;                                    // cheese sits right on the carpet
@@ -2264,10 +2270,14 @@ class Cheese {
       this.wob = Math.max(0, (this.wob || 0) - dt * 1.4);
       this.wedge.rotation.y += (this.yaw - this.wedge.rotation.y) * Math.min(1, dt * 8);
       // tumbles: tips over hard one way, rocks back and forth and settles, skidding a little across the carpet
-      const tilt = 0.62 * Math.pow(this.wob, 1.4) * Math.cos((1 - this.wob) * 11);
+      this.downT = Math.max(0, (this.downT || 0) - dt);
+      const want = this.downT > 0.35 ? 1.4 : 0;                            // knocked flat on its side, then back up
+      this.lie = (this.lie || 0) + (want - (this.lie || 0)) * Math.min(1, dt * (want ? 9 : 5));
+      const rock = want ? Math.sin(this.downT * 14) * 0.08 * Math.max(0, this.downT - 1.3) : Math.sin(this.downT * 20) * 0.12 * this.downT;
+      const tilt = this.lie + rock;
       this.wedge.rotation.x = tilt * Math.cos(this.tdir); this.wedge.rotation.z = tilt * Math.sin(this.tdir);
-      y += Math.abs(Math.sin(this.wob * Math.PI * 2)) * 0.1 * this.wob;
-      if (this.wob > 0) { this.off.x += Math.sin(this.tdir) * this.wob * 0.5 * dt; this.off.y += Math.cos(this.tdir) * this.wob * 0.5 * dt; if (this.off.length() > 0.3) this.off.setLength(0.3); }
+      y += Math.sin(Math.min(1, this.lie / 1.4) * Math.PI / 2) * 0.2 * (this.wedge.userData.baseScale || 1);   // cap resting on the carpet
+      if (this.downT > 1.5) { this.off.x += Math.sin(this.tdir) * 0.5 * dt; this.off.y += Math.cos(this.tdir) * 0.5 * dt; if (this.off.length() > 0.14) this.off.setLength(0.14); }   // only a short skid
     }
     if (this.state === 'carried') this.off.set(0, 0);
     this.wedge.position.set(this.pos.x + this.off.x, y, this.pos.z + this.off.y);
