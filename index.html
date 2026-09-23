@@ -692,7 +692,7 @@ function updateBlinds(dt) {
   r.bt.repeat.set(1, 4 * r.c);                                     // keep the slats the same size as it rolls
   r.rail.position.y = r.WIN_H / 2 - cover;
   const open = (1 - r.c) / (1 - r.base);                             // 1 = today's 25% gap, ~3.8 = fully up
-  const dim = 0.25 + 0.75 * lightF;
+  const dim = 1 + (1 - lightF) * 1.4;                                // lights off: the daylight through the window stands out much more
   // the light pours in through the whole open part of the window: the cone gets taller and the patch on the carpet longer as the blinds go up
   const openH = r.WIN_H * (1 - r.c), tn = Math.tan(r.dropAngle);
   r.shafts.forEach((sh, k) => {
@@ -702,7 +702,8 @@ function updateBlinds(dt) {
   r.shaft.material.opacity = Math.min(1, 0.4 + 0.2 * open) * dim;
   r.patch.material.opacity = Math.min(1, 0.5 + 0.5 * open) * dim;
   r.patch.position.x = -ROOM.halfW + tn * (WIN_SILL + openH / 2); r.patch.scale.set((tn * openH + FT(1.6)) / FT(3.2), 1, 1);
-  r.sun.intensity = 0.14 * open * lightF;
+  r.sun.intensity = 0.14 * open * (1 + (1 - lightF) * 1.5);
+  r.glow.material.opacity = (1 - lightF) * 0.9 * Math.min(1, 0.45 + 0.2 * open); r.glow.scale.set(IN(80) * (1 + 0.1 * open), IN(40) + (1 - r.c) * IN(30), 1);
 }
 // mirror: a springy tip. A tap rocks it forward off the wall; it swings back, clacks and settles.
 // 2nd tap cracks the glass; 3rd tap shatters it and the pieces rain down over the carpet.
@@ -713,9 +714,9 @@ function hitMirror() {
 }
 function breakMirror(level) {
   const m = mirrorRig;
-  if (level === 2) { m.glass.material = m.crackedMat; sfx.crack(); shake = Math.max(shake, reduceMotion ? 0.03 : 0.12); }
+  if (level === 2) { m.cracks.visible = true; sfx.crack(); shake = Math.max(shake, reduceMotion ? 0.03 : 0.12); }
   else if (level === 3) {
-    m.glass.visible = false; m.stuck.visible = true; sfx.shatter(); shake = Math.max(shake, reduceMotion ? 0.06 : 0.35);
+    m.glass.visible = false; m.cracks.visible = false; m.stuck.visible = true; sfx.shatter(); shake = Math.max(shake, reduceMotion ? 0.06 : 0.35);
     m.lean.updateMatrixWorld(true);
     for (const sh of m.shards) {
       sh.mesh.position.set((Math.random() - 0.5) * m.gw, m.gy + (Math.random() - 0.5) * m.gh, IN(0.8)); m.lean.localToWorld(sh.mesh.position);
@@ -746,7 +747,7 @@ function updateMirror(dt) {
 }
 function resetMirror() {
   const m = mirrorRig; if (!m) return;
-  m.hits = 0; m.pending = 0; m.glass.visible = true; m.glass.material = m.glassMat; m.stuck.visible = false;
+  m.hits = 0; m.pending = 0; m.glass.visible = true; m.cracks.visible = false; m.stuck.visible = false;
   for (const sh of m.shards) sh.mesh.visible = false;
 }
 // mini boxing gloves on strings under the sconce: idle sway, a big swing when batted
@@ -1341,7 +1342,9 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   patch.rotation.x = -Math.PI / 2; patch.position.set(-ROOM.halfW + Math.tan(dropAngle) * sy, 0.012, winZ); scene.add(patch);
   const sun = new THREE.PointLight(0xfff1d8, 0.14, 9, 2); sun.position.set(-ROOM.halfW + FT(1), WIN_SILL + openH, winZ); scene.add(sun);
   // blinds rig: c = fraction of the window the blind covers (0.75 = 25% open). A tap rolls it up; another rolls it down.
-  windowRig = { bl, rail, bt, blindH, WIN_H, c: 1 - OPEN, target: 1 - OPEN, shaft, shafts, shaftLen, dropAngle, winZ, patch, sun, base: 1 - OPEN };
+  const winGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xdfeaff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
+  winGlow.position.set(-ROOM.halfW + 0.35, WIN_SILL + WIN_H / 2, winZ); scene.add(winGlow);   // halo round the window in the dark
+  windowRig = { glow: winGlow, bl, rail, bt, blindH, WIN_H, c: 1 - OPEN, target: 1 - OPEN, shaft, shafts, shaftLen, dropAngle, winZ, patch, sun, base: 1 - OPEN };
   w.traverse(o => { if (o.isMesh) { o.userData.window = true; tapTargets.push(o); } });
 
   /* ---- tall grey-framed mirror (18" x 52") leaning back against the right wall, past the corner shelf ---- */
@@ -1354,13 +1357,14 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   for (const [bw, bh, x, y] of [[MIR_W - IN(2), IN(1), 0, MIR_H - IN(2)], [MIR_W - IN(2), IN(1), 0, IN(2)], [IN(1), MIR_H - IN(4), -MIR_W / 2 + IN(1.5), MIR_H / 2], [IN(1), MIR_H - IN(4), MIR_W / 2 - IN(1.5), MIR_H / 2]])
     box(bw, bh, IN(0.6), frameDark, x, y, IN(0.9), lean);                                        // raised panel moulding
   const GW = MIR_W - IN(5), GH = MIR_H - IN(5), glassMat = basic(0xffffff, { map: mirrorTex });
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), glassMat);
+  const glass = THREE.Reflector                                         // a real reflection of the room, like the mantle mirror
+    ? new THREE.Reflector(new THREE.PlaneGeometry(GW, GH), { clipBias: 0.003, textureWidth: 256, textureHeight: 512, color: 0xb9c2c6 })
+    : new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), glassMat);
   glass.position.set(0, MIR_H / 2, IN(0.8)); lean.add(glass);
   box(GW, GH, IN(0.2), lam(0x3b3e44), 0, MIR_H / 2, IN(0.6), lean);                            // dark backing board (seen once the glass is gone)
   // cracked glass: the same silver, with a spider-web of cracks spreading from where the paw hit
   const crackTex = canvasTex(128, 460, (g, w, h) => {
-    const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#c9d3d8'); gr.addColorStop(0.45, '#e9eef0'); gr.addColorStop(0.55, '#b9c4ca'); gr.addColorStop(1, '#a9b5bc');
-    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.clearRect(0, 0, w, h);                                           // (transparent: laid over the reflection)
     const cx = w * 0.46, cy = h * 0.72, rays = [];
     const line = (pts, dark) => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.strokeStyle = dark ? 'rgba(70,80,88,.85)' : 'rgba(255,255,255,.95)'; g.lineWidth = dark ? 1.3 : 1; g.stroke(); };
     for (let i = 0; i < 13; i++) {                                    // jagged rays out from the impact
@@ -1374,7 +1378,8 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
     }
     g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(cx, cy, 5, 0, 7); g.fill();
   }, 1, 1);
-  const crackedMat = basic(0xffffff, { map: crackTex });
+  const crackedMat = basic(0xffffff, { map: crackTex, transparent: true, depthWrite: false });
+  const cracks = new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), crackedMat); cracks.position.set(0, MIR_H / 2, IN(0.85)); cracks.visible = false; lean.add(cracks);
   // jagged bits left stuck in the frame once it shatters
   const stuck = new THREE.Group(); stuck.visible = false; lean.add(stuck);
   const shardMat = basic(0xdfe6ea, { side: THREE.DoubleSide }), shardMat2 = basic(0xaab6bd, { side: THREE.DoubleSide });
@@ -1386,18 +1391,18 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   const shardGeos = [0, 1, 2, 3, 4].map(i => { const r = IN(0.8 + i * 0.6), pts = []; const k = 3 + (i % 2); for (let j = 0; j < k; j++) { const a = j / k * Math.PI * 2 + Math.random() * 0.8; pts.push(new THREE.Vector2(Math.cos(a) * r * (0.5 + Math.random()), Math.sin(a) * r * (0.5 + Math.random()))); } return new THREE.ShapeGeometry(new THREE.Shape(pts)); });
   const shards = [];
   for (let i = 0; i < 46; i++) { const m = new THREE.Mesh(shardGeos[i % 5], i % 3 ? shardMat : shardMat2); m.visible = false; scene.add(m); shards.push({ mesh: m, v: new THREE.Vector3(), w: new THREE.Vector3(), down: false, lift: 0.002 * (i % 7) }); }
-  mirrorRig = { lean, base: -MIR_LEAN, tip: 0, vel: 0, glass, glassMat, crackedMat, stuck, shards, hits: 0, gw: GW * 0.9, gh: GH * 0.9, gy: MIR_H / 2 };
+  mirrorRig = { lean, base: -MIR_LEAN, tip: 0, vel: 0, glass, glassMat, crackedMat, cracks, stuck, shards, hits: 0, gw: GW * 0.9, gh: GH * 0.9, gy: MIR_H / 2 };
   lean.traverse(o => { if (o.isMesh) { o.userData.mirror = true; tapTargets.push(o); } });
 
   /* ---- dichroic acrylic side table (right-side up): stadium-oval top on four arched panel legs,
           tucked between the doorway and the right sofa, long side pointing into the room ---- */
   {
-    const irid = canvasTex(8, 128, (g, w, h) => {
-      const gr = g.createLinearGradient(0, 0, 0, h);
-      ['#ff6a3d', '#ffb13b', '#f5f24a', '#6dff6a', '#3de0ff', '#5a7dff'].forEach((c, i, a) => gr.addColorStop(i / (a.length - 1), c));
+    const irid = canvasTex(128, 8, (g, w, h) => {                    // colour runs sideways across the acrylic (horizontal bands)
+      const gr = g.createLinearGradient(0, 0, w, 0);
+      ['#ff4a1c', '#ff7a1e', '#ffb42a', '#e8e23a', '#9cf03a', '#3fd64a', '#2fbf8a'].forEach((c, i, a) => gr.addColorStop(i / (a.length - 1), c));   // orange → yellow → green, like the real acrylic
       g.fillStyle = gr; g.fillRect(0, 0, w, h);
     }, 1, 1);
-    const acrylic = basic(0xffffff, { map: irid, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
+    const acrylic = new THREE.MeshPhongMaterial({ color: 0xffffff, map: irid, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false, shininess: 90, specular: 0x666666 });   // lit by the room, so it goes dark with the lights
     const T_L = COUCH_DEPTH * 0.96, T_W = T_L * 0.6, T_H = IN(23);             // as long as the sofa arm is deep, as tall as the arm
     const TX = ROOM.halfW - T_L / 2 - IN(1.5), TZ = COUCH_RIGHT_Z0 - IN(7) - T_W / 2 - IN(5);   // tucked just before the sofa's arm
     const table = new THREE.Group(); table.position.set(TX, 0, TZ); scene.add(table);
@@ -1898,10 +1903,11 @@ const galaxyRig = (() => {
   const mk = (tex) => basic(0xffffff, { map: tex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
   const nebMat = mk(nebula), starMat = mk(stars), planes = [];
   const add = (w, h, pos, rotY, rotX) => { for (const m of [nebMat, starMat]) { const pl = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); pl.position.copy(pos); pl.rotation.set(rotX || 0, rotY || 0, 0); pl.visible = false; pl.renderOrder = 2; scene.add(pl); planes.push(pl); } };
-  add(ROOM.halfW * 2, 7, new THREE.Vector3(0, 5.2, 0.04));                                        // back wall
-  add(16, 7, new THREE.Vector3(-ROOM.halfW + 0.04, 5.2, 8), Math.PI / 2);                          // left wall
-  add(16, 7, new THREE.Vector3(ROOM.halfW - 0.04, 5.2, 8), -Math.PI / 2);                          // right wall
-  add(ROOM.halfW * 2, 16, new THREE.Vector3(0, 0.02, 8), 0, -Math.PI / 2);                         // stars across the carpet
+  const VD = ROOM.visDepth, WH = ROOM.wallH;                                                          // cover every visible surface, floor to ceiling, end to end
+  add(ROOM.halfW * 2, WH, new THREE.Vector3(0, WH / 2, 0.04));                                     // back wall
+  add(VD, WH, new THREE.Vector3(-ROOM.halfW + 0.04, WH / 2, VD / 2), Math.PI / 2);                  // left wall
+  add(VD, WH, new THREE.Vector3(ROOM.halfW - 0.04, WH / 2, VD / 2), -Math.PI / 2);                  // right wall
+  add(ROOM.halfW * 2, VD, new THREE.Vector3(0, 0.02, VD / 2), 0, -Math.PI / 2);                     // stars across the carpet
   // the projectors themselves: a little dark base and a translucent dome that lights up
   const domes = [];
   const projector = (pos) => {
@@ -2100,6 +2106,7 @@ const tailTex = (() => {
   for (const gr of [lump, heap]) gr.traverse(o => { if (o.isMesh) { o.userData.blanket = true; tapTargets.push(o); } });
 }
 const catTail = new THREE.Group(); catTail.position.set(BOX.w * 0.24, BOX.h * 0.5, -BOX.d * 0.12); catBox.add(catTail);
+const CAT_TAIL_Y = catTail.position.y; let catBounce = 0;
 const TAIL_W = 0.9, TAIL_H = 1.2;
 const tailGeo = new THREE.PlaneGeometry(TAIL_W, TAIL_H); tailGeo.translate(TAIL_W * (0.5 - 40 / 192), TAIL_H * 0.5 - TAIL_H * 10 / 256, 0);   // pivot at the tail's base
 const tailCard = new THREE.Mesh(tailGeo, new THREE.MeshBasicMaterial({ map: tailTex, transparent: true, alphaTest: 0.05, color: 0xf4efe8 }));
@@ -2305,6 +2312,7 @@ const catMat = new THREE.MeshBasicMaterial({ map: catTex, transparent: true, alp
 const catGeo = new THREE.PlaneGeometry(CAT_W, CAT_SPRITE.height); catGeo.translate(0, CAT_SPRITE.height / 2, 0);
 const cat = new THREE.Group(); cat.position.copy(CAT_POS); scene.add(cat);
 const catCard = new THREE.Mesh(catGeo, catMat); catCard.position.y = CAT_SPRITE.bottom - CAT_POS.y; cat.add(catCard);
+const CAT_CARD_Y = catCard.position.y;
 const catShadow = new THREE.Mesh(new THREE.CircleGeometry(CAT_W * 0.45, 20), basic(0x000000, { transparent: true, opacity: 0.22, depthWrite: false }));
 catShadow.rotation.x = -Math.PI / 2; catShadow.scale.set(1.05, 0.8, 1); catShadow.position.set(0.1, 0.005, 0.15); cat.add(catShadow);
 // swipe arm + paw (only shown mid-swipe), tinted to match the cat's pale grey-cream fur
@@ -2348,6 +2356,9 @@ function updateCat(dt, time, danger) {
   catCard.scale.x = 1 + Math.sin(time * (1.6 + danger * 3)) * 0.012;          // breathing; quicker when mice close in
   catFlinch = Math.max(0, catFlinch - dt);
   catCard.position.x = catFlinch > 0 ? Math.sin(catFlinch * 60) * 0.12 * catFlinch : 0;
+  const raveBeat = roomMode === 2 && actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 7) : 0;
+  catBounce += ((roomMode === 2 ? raveBeat * 0.22 : 0) - catBounce) * Math.min(1, dt * 20);   // hops in her box to the kick drum
+  catCard.position.y = CAT_CARD_Y + catBounce; catTail.position.y = CAT_TAIL_Y + catBounce;
   catMat.color.setHex(catFlinch > 0.25 ? 0x4a403a : CAT_BASE_HEX);
   // tail: lazy sway, big happy wag after saving a cheese
   tailWag = Math.max(0, tailWag - dt);
@@ -2359,7 +2370,7 @@ function updateCat(dt, time, danger) {
   _sh.set(CAT_POS.x + armSide * 0.5, BOX.h + 0.36, CAT_POS.z + BOX.d / 2 + 0.05);  // from the side of the cat's body, not its middle
   if (!swipe.active) { arm.visible = paw.visible = false; return; }
   swipe.t += dt;
-  const OUT = 0.1, HOLD = 0.06, BACK = 0.17, t = swipe.t;
+  const OUT = 0.1, HOLD = 0.24, BACK = 0.17, t = swipe.t;          // the paw lingers a beat at full reach (a new tap starts a fresh swipe straight away)
   if (t < OUT) { const k = 1 - (1 - t / OUT) ** 2; _pp.lerpVectors(_sh, swipe.target, k); _pp.y += Math.sin(k * Math.PI) * 0.6; }
   else if (t < OUT + HOLD) _pp.copy(swipe.target);
   else if (t < OUT + HOLD + BACK) { const k = (t - OUT - HOLD) / BACK; _pp.lerpVectors(swipe.target, _sh, k * k * (3 - 2 * k)); }
@@ -3036,9 +3047,10 @@ function updateCatCrown(dt) {
     catCrown.position.lerpVectors(crownFlight.from, crownFlight.to, e); catCrown.position.y += Math.sin(k * Math.PI) * 2.2;
     catCrown.rotation.set(0, k * Math.PI * 4, (1 - k) * 0.6);
     catCrown.scale.setScalar(THREE.MathUtils.lerp(2.4, 3.2, e));
-    if (k >= 1) { crownFlight = null; sfx.sparkle(); tailWag = 2; burst(catCrown.position.clone(), 0xf2c14a, 10, 1.5, 2, 0.5); }
+    if (k >= 1) { catCrown.userData.y = crownFlight.to.y; crownFlight = null; sfx.sparkle(); tailWag = 2; burst(catCrown.position.clone(), 0xf2c14a, 10, 1.5, 2, 0.5); }
   } else {                                                             // riding along on her head as she leans and flinches
     catCrown.rotation.set(0, Math.sin(clock * 0.8) * 0.15, -0.12 + Math.sin(clock * 1.7) * 0.03);   // sits a little jauntily, gently turning
+    catCrown.position.y = catCrown.userData.y + catBounce;
   }
 }
 function resetCatCrown() { if (catCrown) catCrown.visible = false; crownFlight = null; }
@@ -3735,11 +3747,15 @@ const CAM_VIEWS = [{ name: 'Auto view', el: null }, { name: 'Overhead', el: 70 }
 let camView = 0, camZoom = 1, camTilt = 0;
 try { const sv = JSON.parse(localStorage.getItem('catguard.cam') || '{}'); camView = sv.v | 0; camZoom = sv.z || 1; camTilt = sv.t || 0; } catch (e) {}
 const saveCam = () => { try { localStorage.setItem('catguard.cam', JSON.stringify({ v: camView, z: camZoom, t: camTilt })); } catch (e) {} };
+let camSqueeze = 1;
+{ const up = camera.updateProjectionMatrix.bind(camera);             // every projection update keeps the squeeze (raycasts use the same matrix)
+  camera.updateProjectionMatrix = function () { up(); if (camSqueeze !== 1) { this.projectionMatrix.elements[0] *= camSqueeze; this.projectionMatrixInverse.copy(this.projectionMatrix).invert(); } }; }
 const CAM_PULLBACK = 1.32, CAM_PULLBACK_PORTRAIT = 1.0;   // >1 = camera further back than the tightest fit (phones need less)                              // >1 = camera further back than the tightest fit
 function fitCamera() {
   const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
   renderer.setSize(w, h);
   camera.aspect = aspect;
+  camSqueeze = aspect < 0.75 ? 0.8 : 1;                               // portrait: see 25% more width, things drawn a little slimmer
   camera.fov = aspect < 0.75 ? 66 : aspect < 1 ? 48 : 40;   // phones: a wider lens so the camera can stand closer, down in the room
   camera.updateProjectionMatrix();
   camera.clearViewOffset();
