@@ -31,6 +31,13 @@
   /* ---------- HUD ---------- */
   .hud{position:fixed;top:0;left:0;right:0;z-index:5;pointer-events:none;display:flex;justify-content:center;
        padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 0}
+  .fire-btn{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);transform:translateX(-50%);pointer-events:auto;
+            display:flex;align-items:center;gap:8px;font:400 22px/1 var(--display);color:var(--ink);background:var(--cheese);
+            border:2.5px solid var(--ink);border-radius:999px;padding:10px 20px;box-shadow:0 4px 0 var(--ink);cursor:pointer;touch-action:manipulation}
+  .fire-btn:active{transform:translateX(-50%) translateY(3px);box-shadow:0 1px 0 var(--ink)}
+  .fire-btn svg{width:30px;height:19px}
+  .fire-btn b{background:var(--ink);color:var(--cheese);border-radius:999px;padding:3px 9px;font:800 16px/1 var(--body)}
+  .fire-btn:focus-visible{outline:3px solid var(--danger);outline-offset:3px}
   .hud-bar{width:100%;max-width:780px;background:var(--hud);border:1.5px solid rgba(251,241,220,.14);border-radius:16px;
            padding:8px 12px;display:grid;align-items:center;column-gap:0;row-gap:8px;
            grid-template-columns:auto auto 1fr minmax(96px,auto) auto;grid-template-areas:"score cheese lives heat pause"}
@@ -143,6 +150,10 @@
       <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="1" width="3.5" height="12" rx="1"/><rect x="8.5" y="1" width="3.5" height="12" rx="1"/></svg>
     </button>
   </div>
+  <button class="fire-btn" id="fireBtn" hidden aria-label="Fire the pistol">
+    <svg viewBox="0 0 32 20" aria-hidden="true"><path d="M2 3 H29 V8 H13 L11 18 H5 L7 8 H2 Z" fill="currentColor"/><path d="M12 8 Q12 13 16 12" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+    <span>Bang</span><b id="ammoCount">7</b>
+  </button>
 </div>
 
 <!-- Start -->
@@ -803,6 +814,23 @@ const mainDoors = credenza(MAIN_X0, MAIN_W, CAB_H, 5);
 /* Dresser doors: the three the cat's box doesn't block can swing open (tap the dresser near one).
    Each hides a stuffed cupboard: dark cavity, a shelf, folded blankets bulging out, papers and crumpled balls. */
 const dresserDoors = [];
+let cupboardPistol = null, pistolDoor = null;
+// a chunky cartoon pistol, barrel along +z: slide, frame, angled wooden grip, trigger guard, hammer, sights
+function makePistol() {
+  const g = new THREE.Group(), metal = new THREE.MeshPhongMaterial({ color: 0x2c2e33, shininess: 70, specular: 0x6a6a6a }), wood = lam(0x5a3a26);
+  box(IN(1), IN(1.3), IN(7), metal, 0, IN(1.1), IN(1.8), g);                                         // slide
+  box(IN(0.9), IN(0.6), IN(4.2), metal, 0, IN(0.25), IN(1.5), g);                                    // frame
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.33), IN(0.33), IN(0.7), 10), metal); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, IN(1.15), IN(5.55)); g.add(barrel);
+  const bore = new THREE.Mesh(new THREE.CircleGeometry(IN(0.2), 10), basic(0x050505)); bore.position.set(0, IN(1.15), IN(5.91)); g.add(bore);
+  const grip = box(IN(1.05), IN(3.6), IN(1.6), wood, 0, -IN(1.1), -IN(0.9), g); grip.rotation.x = -0.28;
+  const tgGeo = new THREE.TorusGeometry(IN(0.62), IN(0.13), 6, 14, Math.PI); tgGeo.rotateZ(Math.PI); tgGeo.rotateY(Math.PI / 2);
+  const tg = new THREE.Mesh(tgGeo, metal); tg.position.set(0, IN(0.05), IN(1.25)); g.add(tg);          // trigger guard
+  box(IN(0.22), IN(0.6), IN(0.22), metal, 0, -IN(0.15), IN(1.15), g);                               // trigger
+  box(IN(0.4), IN(0.5), IN(0.5), metal, 0, IN(1.8), -IN(1.8), g);                                   // hammer
+  box(IN(0.18), IN(0.3), IN(0.3), metal, 0, IN(1.9), IN(5), g);                                     // front sight
+  g.userData.muzzle = new THREE.Vector3(0, IN(1.15), IN(6.1));
+  return g;
+}
 {
   // The cupboards are shallow stages set just in front of the dresser face. Contents stay in the right-hand
   // middle 78% of the opening and no deeper than 3", and the door swings ~95°, so an open door never cuts
@@ -818,7 +846,7 @@ const dresserDoors = [];
       flap.position.set(w * 0.2, y - IN(1), IN(2.8)); flap.rotation.x = 0.5; g.add(flap);
       box(w * 0.5, IN(2.6), IN(2.4), lam(0xe9e2d5), IN(1), h / 2 - IN(3), IN(1.4), g);                      // spare pillowcase roll
     },
-    // 2) junk cupboard: stacked board-game boxes, magazines, papers, crumpled balls
+    // 2) games & toys cupboard: board-game boxes below the shelf, the cat's toys on top of it
     (g, w, h) => {
       const lids = [[0xc8322b, 0xf2d24b], [0x2e5fa8, 0xffffff], [0x3b8a4e, 0xf7e7c6]];
       let y = -h / 2 + IN(1);
@@ -827,26 +855,28 @@ const dresserDoors = [];
         box(bw * 0.9, IN(0.5), IN(0.15), lam(stripe), IN(0.8) + k * IN(0.3), y + bh / 2, IN(2.75), g);   // title band on the box side
         y += bh + IN(0.15);
       });
-      for (let k = 0; k < 5; k++) { box(w * 0.62, IN(0.3), IN(2.6), k % 2 ? papers : lam(0xd8e1ea), IN(1.2), h / 2 - IN(6.5) + k * IN(0.36), IN(1.4), g).rotation.y = (k - 2) * 0.03; }
-      const sheet = box(w * 0.4, IN(0.15), IN(3.2), papers, w * 0.12, h / 2 - IN(4.2), IN(2.2), g); sheet.rotation.x = -0.3;
-      const ball = new THREE.IcosahedronGeometry(IN(1.3), 0);
-      for (let k = 0; k < 2; k++) { const c = new THREE.Mesh(ball, papers); c.position.set(w * (0.05 + k * 0.25), h / 2 - IN(2.2), IN(1.6)); c.rotation.set(k, k * 2, 1); g.add(c); }
-    },
-    // 3) the cat's secret stash: yarn balls, a toy mouse, a treat bag, a feather wand, a jingle ball
-    (g, w, h) => {
       const yarn = (col, x, y, r) => {
         const b = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), lam(col)); b.position.set(x, y, IN(1.5)); g.add(b);
         for (let k = 0; k < 3; k++) { const t = new THREE.Mesh(new THREE.TorusGeometry(r * 1.01, r * 0.07, 4, 18), lam(col - 0x111111)); t.position.copy(b.position); t.rotation.set(k * 1.1, k * 0.7, 0); g.add(t); }
       };
-      yarn(0xe86a8f, IN(0.8), -h / 2 + IN(2.5), IN(2.2));
-      yarn(0x7cc3d9, w * 0.3, -h / 2 + IN(2.1), IN(1.8));
-      const bag = box(IN(4.2), IN(5.5), IN(2), lam(0xf0a33a), -w * 0.18, -h / 2 + IN(8.5), IN(1.2), g); bag.rotation.z = 0.12;      // treat bag
-      const fish = new THREE.Mesh(new THREE.CircleGeometry(IN(0.9), 3), basic(0xffffff)); fish.position.set(-w * 0.18, -h / 2 + IN(8.8), IN(2.25)); fish.rotation.z = Math.PI / 2; g.add(fish);
-      const mouse = new THREE.Mesh(new THREE.SphereGeometry(IN(1.2), 10, 8), lam(0x8d8d92)); mouse.scale.set(1.5, 0.8, 0.9); mouse.position.set(w * 0.25, h / 2 - IN(3.5), IN(1.6)); g.add(mouse);   // toy mouse
-      const tail = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.12), IN(0.12), IN(3), 4), lam(0xe29aa0)); tail.rotation.z = 1.2; tail.position.set(w * 0.25 + IN(2.2), h / 2 - IN(4.1), IN(1.6)); g.add(tail);
-      const wand = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.2), IN(0.2), h * 0.75, 5), lam(0xd9c16a)); wand.rotation.z = 0.35; wand.position.set(w * 0.05, IN(0.5), IN(2.4)); g.add(wand);
-      for (let k = 0; k < 3; k++) { const f = new THREE.Mesh(new THREE.ConeGeometry(IN(0.6), IN(3), 5), lam([0xe8453c, 0x44b0e0, 0xf5d547][k])); f.position.set(w * 0.05 - h * 0.37 * Math.sin(0.35) + (k - 1) * IN(0.6), IN(0.5) + h * 0.37 * Math.cos(0.35) + IN(1), IN(2.4)); f.rotation.z = 0.35 + (k - 1) * 0.4; g.add(f); }
-      const jingle = new THREE.Mesh(new THREE.SphereGeometry(IN(1), 10, 8), lam(0xe8c547, { emissive: 0x2a2000 })); jingle.position.set(-w * 0.25, h / 2 - IN(2.4), IN(1.6)); g.add(jingle);
+      const S = IN(0.4);                                                   // top of the mid shelf
+      yarn(0xe86a8f, -w * 0.22, S + IN(2), IN(2));
+      yarn(0x7cc3d9, w * 0.26, S + IN(1.6), IN(1.6));
+      const mouse = new THREE.Mesh(new THREE.SphereGeometry(IN(1.1), 10, 8), lam(0x8d8d92)); mouse.scale.set(1.5, 0.8, 0.9); mouse.position.set(w * 0.02, S + IN(0.9), IN(1.8)); g.add(mouse);   // toy mouse
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.12), IN(0.12), IN(2.6), 4), lam(0xe29aa0)); tail.rotation.z = 1.3; tail.position.set(w * 0.02 + IN(2.3), S + IN(0.5), IN(1.8)); g.add(tail);
+      const jingle = new THREE.Mesh(new THREE.SphereGeometry(IN(0.9), 10, 8), lam(0xe8c547, { emissive: 0x2a2000 })); jingle.position.set(w * 0.1, S + IN(4.4), IN(1.2)); g.add(jingle);
+      const wand = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.2), IN(0.2), h * 0.36, 5), lam(0xd9c16a)); wand.rotation.z = -0.5; wand.position.set(w * 0.3, S + h * 0.17, IN(0.8)); g.add(wand);
+      for (let k = 0; k < 3; k++) { const f = new THREE.Mesh(new THREE.ConeGeometry(IN(0.55), IN(2.6), 5), lam([0xe8453c, 0x44b0e0, 0xf5d547][k])); f.position.set(w * 0.3 - h * 0.18 * Math.sin(-0.5) + (k - 1) * IN(0.5), S + h * 0.17 + h * 0.18 * Math.cos(-0.5) + IN(0.8), IN(0.8)); f.rotation.z = -0.5 + (k - 1) * 0.4; g.add(f); }
+    },
+    // 3) the far-right cupboard: a pistol displayed on red velvet, a box of rounds on the shelf above
+    (g, w, h) => {
+      const velvet = box(w * 0.92, h * 0.42, IN(0.3), lam(0x7a1422), 0, -h / 4, IN(0.3), g);
+      const pistol = makePistol(); pistol.rotation.y = Math.PI / 2; pistol.scale.setScalar(1.35); pistol.position.set(-IN(1.5), -h / 4 + IN(0.4), IN(1.6)); g.add(pistol);
+      for (const hx of [-IN(2.5), IN(3.5)]) box(IN(0.5), IN(0.5), IN(1.2), lam(0xb08d4a), hx, -h / 4 - IN(0.7), IN(1), g);   // brass pegs it rests on
+      const ammo = box(IN(3.4), IN(2), IN(2.2), lam(0x2f5d3a), w * 0.12, IN(1.4), IN(1.4), g);
+      box(IN(3.2), IN(0.7), IN(0.1), lam(0xe8c547), w * 0.12, IN(1.6), IN(2.55), g);                    // label band
+      cupboardPistol = pistol;
+      [pistol, velvet].forEach(o => o.traverse(m => { if (m.isMesh) m.userData.pistol = true; }));
     },
   ];
   mainDoors.forEach(d => {
@@ -861,6 +891,7 @@ const dresserDoors = [];
     const stage = new THREE.Group(); inside.add(stage);                                                   // contents kept to the middle 78%: clear of both door swings
     stages[n % stages.length](stage, d.w * 0.78, d.h);
     const rig = { hinge, inside, angle: 0, target: 0, x: hinge.position.x + d.w / 2, center: new THREE.Vector3(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.1) };
+    if (n === 2) { pistolDoor = rig; stage.traverse(o => { if (o.isMesh && o.userData.pistol) tapTargets.push(o); }); }
     m.userData.dresserDoor = rig; tapTargets.push(m);
     dresserDoors.push(rig);
   });
@@ -888,11 +919,22 @@ const staticCtx = staticCanvas.getContext('2d'), staticImg = staticCtx.createIma
 const staticTex = new THREE.CanvasTexture(staticCanvas); staticTex.magFilter = THREE.NearestFilter;
 const tvOffMat = screen.material, tvStaticMat = basic(0xffffff, { map: staticTex });
 const tvLight = new THREE.PointLight(0xd6e4ff, 0, 7, 2); tvLight.position.set(MAIN_CX, CAB_H + FT(2), IN(34)); scene.add(tvLight);
-let tvOn = false, staticTick = 0;
+let tvOn = false, staticTick = 0, tvBroken = false;
+const tvBrokenMat = lam(0xffffff, { map: canvasTex(192, 108, (g, w, h) => {      // shot-out screen: a bullet hole and a spiderweb of cracks
+  g.fillStyle = '#0b0b0d'; g.fillRect(0, 0, w, h);
+  const cx = w * 0.62, cy = h * 0.42, rays = [];
+  const line = (pts, a) => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.strokeStyle = `rgba(220,228,236,${a})`; g.lineWidth = 1; g.stroke(); };
+  for (let i = 0; i < 16; i++) { let a = i / 16 * Math.PI * 2 + Math.random() * 0.3, x = cx, y = cy; const pts = [[x, y]]; for (let d = 0; d < 40 + Math.random() * 110; d += 8) { a += (Math.random() - 0.5) * 0.4; x += Math.cos(a) * 8; y += Math.sin(a) * 8; pts.push([x, y]); } rays.push(pts); line(pts, 0.75); }
+  for (const r of [2, 4, 7]) { const pts = rays.map(p => p[Math.min(p.length - 1, r)]); pts.push(pts[0]); line(pts, 0.5); }
+  g.fillStyle = 'rgba(200,210,220,.12)'; for (let i = 0; i < 6; i++) { const p = rays[i * 2]; g.beginPath(); g.moveTo(cx, cy); g.lineTo(...p[Math.min(p.length - 1, 5)]); g.lineTo(...rays[i * 2 + 1][Math.min(rays[i * 2 + 1].length - 1, 5)]); g.fill(); }
+  g.fillStyle = '#000'; g.beginPath(); g.arc(cx, cy, 3.2, 0, 7); g.fill(); g.strokeStyle = 'rgba(235,240,245,.9)'; g.lineWidth = 1.2; g.beginPath(); g.arc(cx, cy, 4.5, 0, 7); g.stroke();
+}, 1, 1) });
 screen.userData.tv = true; tapTargets.push(screen);
 tv.children.forEach(c => { if (c.isMesh && c !== screen) { c.userData.tv = true; tapTargets.push(c); } });
-function setTV(on) { tvOn = on; screen.material = on ? tvStaticMat : tvOffMat; }
+function setTV(on) { if (tvBroken) { tvOn = false; screen.material = tvBrokenMat; return; } tvOn = on; screen.material = on ? tvStaticMat : tvOffMat; }
+function tvSpark(quiet) { const p = screen.getWorldPosition(new THREE.Vector3()); p.x += (Math.random() - 0.3) * 0.6; p.y += (Math.random() - 0.4) * 0.4; p.z += 0.08; burst(p, 0xfff0a0, quiet ? 3 : 7, 1.6, 1.4, 0.3); quiet ? noise(0.06, 0.03, 8000) : sfx.fizz(); }
 function updateTV(dt) {
+  if (tvBroken) { tvLight.intensity = 0; if (Math.random() < dt * 0.5) tvSpark(true); return; }   // broken: the odd little spark
   if (!tvOn) { tvLight.intensity = 0; return; }
   if ((staticTick = (staticTick + 1) % 2) === 0) {
     const d = staticImg.data;
@@ -2258,7 +2300,12 @@ function interact(o, point, face) {
     const n = face.normal.clone().transformDirection(o.matrixWorld);
     startSwipe(point, true); setTimeout(() => scratchCouch(o.userData.couch, point, n), 90); tapShake(); return true;
   }
-  if (o.userData.tv) { startSwipe(point, true); setTV(!tvOn); sfx.tvStatic(tvOn); tapShake(); return true; }
+  if (o.userData.pistol) {                                           // the cat grabs the pistol out of the open cupboard
+    if (gunRig.state === 'cupboard' && pistolDoor && pistolDoor.inside.visible) { startSwipe(point, true); setTimeout(takeGun, 90); return true; }
+    if (!pistolDoor || !pistolDoor.inside.visible) { startSwipe(point, true); setTimeout(() => toggleDresserDoor(pistolDoor ? pistolDoor.x : point.x), 90); tapShake(); return true; }
+    return false;
+  }
+  if (o.userData.tv) { startSwipe(point, true); if (tvBroken) tvSpark(); else { setTV(!tvOn); sfx.tvStatic(tvOn); } tapShake(); return true; }
   if (o.userData.star) { startSwipe(point, true); setTimeout(nudgeStar, 90); tapShake(); return true; }
   if (o.userData.dresserDoor || o.userData.dresser) { startSwipe(point, true); setTimeout(() => toggleDresserDoor(o.userData.dresserDoor ? o.userData.dresserDoor.x : point.x), 90); tapShake(); return true; }
   if (o.userData.blanket) { if (!blanketRig || blanketRig.state === 'flying') return false; startSwipe(point, true); setTimeout(() => blanketToCat(point.clone()), 90); return true; }
@@ -2302,6 +2349,106 @@ function whack(m) {
   vibrate(18);
   updateHud();
 }
+
+/* ---------- the pistol: tap it in the open far-right cupboard and the cat takes it. 7 rounds; each shot (BANG button)
+   takes out every mouse on screen at once. The 7th round ricochets off the floor and puts a hole in the TV. ---------- */
+const GUN_ROUNDS = 7;
+const gunRig = (() => {
+  const held = makePistol(); held.scale.setScalar(1.8); held.visible = false; scene.add(held);
+  const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xfff1b0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  flash.position.copy(held.userData.muzzle).z += IN(1.2); flash.scale.setScalar(IN(9)); flash.visible = false; held.add(flash);
+  const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe07a, transparent: true, opacity: 0 });
+  const tracers = Array.from({ length: 12 }, () => { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), tracerMat.clone()); l.visible = false; l.frustumCulled = false; scene.add(l); return { l, life: 0 }; });
+  return { state: 'cupboard', ammo: 0, held, flash, flashT: 0, recoil: 0, tracers, aim: new THREE.Vector3(CAT_POS.x, 0.3, CAT_POS.z + 5),
+           hand: new THREE.Vector3(CAT_POS.x + 0.42, BOX.h + 0.3, CAT_POS.z + BOX.d / 2 + 0.12), v: new THREE.Vector3(), w: new THREE.Vector3() };
+})();
+const fireBtn = document.getElementById('fireBtn'), ammoCount = document.getElementById('ammoCount');
+function showFireBtn() { fireBtn.hidden = gunRig.state !== 'cat'; ammoCount.textContent = gunRig.ammo; }
+function takeGun() {
+  const gr = gunRig; if (gr.state !== 'cupboard' || state !== 'playing') return;
+  gr.state = 'cat'; gr.ammo = GUN_ROUNDS; cupboardPistol.visible = false; gr.held.visible = true; gr.held.position.copy(gr.hand); gr.held.rotation.set(0, 0, 0);
+  sfx.cock(); tailWag = 1.4; floatText(gr.hand.clone().setY(BOX.h + 1.3), `Locked & loaded ×${GUN_ROUNDS}`, 'clutch');
+  toggleDresserDoor(pistolDoor.x);                                  // cupboard swings shut behind her
+  showFireBtn();
+}
+function tracer(a, b, delay) {
+  const t = gunRig.tracers.find(t => t.life <= 0); if (!t) return;
+  setTimeout(() => { t.l.geometry.setFromPoints([a, b]); t.l.visible = true; t.life = 0.14; }, delay || 0);
+}
+function onScreen(p) { const v = p.clone().project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1 && v.z < 1; }
+function shootMouse(m) {
+  if (!m.active || !m.hittable) return;
+  if (m.isBomb) {                                                   // shot bombs just fizzle out: no life lost
+    burst(m.center.clone().setY(0.4), 0x3a3434, 8, 2, 2.5, 1.2); floatText(m.center.clone().setY(0.9), 'Defused!', ''); m.release(); return;
+  }
+  const saved = m.state === 'carry' || m.state === 'grab';
+  if (saved) { m.dropCheese(); tailWag = 1.4; }
+  combo++;
+  const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP)), pts = CFG.SCORE_WHACK * mult;
+  score += pts; whackedCount++;
+  m.setState('whacked');
+  burst(m.center.clone().setY(0.4), 0xffe07a, 7, 2.2, 3.2, 0.9);
+  floatText(m.center.clone().setY(0.9), saved ? `Dropped! +${pts}` : `Bang! +${pts}`, '');
+  updateHud();
+}
+function fireGun() {
+  const gr = gunRig; if (gr.state !== 'cat' || gr.ammo <= 0 || state !== 'playing') return;
+  gr.ammo--; gr.recoil = 1; gr.flash.visible = true; gr.flashT = 0.07; catFlinch = Math.max(catFlinch, 0.2);
+  sfx.gunshot(); shake = Math.max(shake, reduceMotion ? 0.05 : 0.3); vibrate(40);
+  const targets = mice.filter(m => m.active && m.hittable && onScreen(m.center));
+  if (targets.length) gr.aim.copy(targets[0].center); else gr.aim.set(CAT_POS.x + (Math.random() - 0.5) * 3, 0.3, CAT_POS.z + 5);
+  gr.held.lookAt(gr.aim); gr.held.updateMatrixWorld(true);
+  const muzzle = gr.held.localToWorld(gr.held.userData.muzzle.clone());
+  targets.forEach((m, i) => { tracer(muzzle, m.center.clone(), i * 25); setTimeout(() => shootMouse(m), 40 + i * 25); });
+  if (gr.ammo === 0) {                                              // last round: off the floor and into the TV
+    const bounce = new THREE.Vector3(CAT_POS.x + (Math.random() < 0.5 ? -1.6 : 1.6), 0.02, CAT_POS.z + 2.6);
+    const hole = screen.getWorldPosition(new THREE.Vector3()); hole.x += IN(8); hole.y += IN(3); hole.z += 0.05;
+    tracer(muzzle, bounce, 0); setTimeout(() => { burst(bounce.clone().setY(0.08), 0xfff0a0, 6, 2, 2, 0.35); sfx.ricochet(); }, 60);
+    tracer(bounce, hole, 260); setTimeout(breakTV, 330);
+    setTimeout(tossGun, 900);
+  }
+  showFireBtn();
+}
+function breakTV() {
+  tvBroken = true; setTV(false); tvLight.intensity = 0;
+  const p = screen.getWorldPosition(new THREE.Vector3()); p.z += 0.1;
+  burst(p, 0xfff2a0, 14, 3, 2, 0.5); burst(p, 0x2a2a2a, 8, 1.6, 2, 0.9);
+  sfx.shatter(); sfx.fizz(); shake = Math.max(shake, reduceMotion ? 0.05 : 0.35);
+  floatText(p.clone().setY(p.y + 0.8), 'Ricochet! RIP TV', 'bad');
+  setTimeout(() => sfx.angryMeow(), 350);
+}
+function tossGun() {                                                 // empty: she flings it away
+  const gr = gunRig; if (gr.state !== 'cat') return;
+  gr.state = 'tossed'; sfx.dryFire(); gr.v.set((Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random()), 2.4, 1.6); gr.w.set(6, 9, 4);
+  showFireBtn();
+}
+function updateGun(dt) {
+  const gr = gunRig;
+  for (const t of gr.tracers) if (t.life > 0) { t.life -= dt; t.l.material.opacity = Math.max(0, t.life / 0.14); if (t.life <= 0) t.l.visible = false; }
+  if (gr.flashT > 0) { gr.flashT -= dt; if (gr.flashT <= 0) gr.flash.visible = false; }
+  if (gr.state === 'cat') {
+    gr.recoil = Math.max(0, gr.recoil - dt * 6);
+    const idle = mice.find(m => m.active && m.hittable && onScreen(m.center));   // keeps a bead on the nearest threat
+    if (idle && gr.recoil <= 0) gr.aim.lerp(idle.center, Math.min(1, dt * 6));
+    gr.held.position.copy(gr.hand); gr.held.lookAt(gr.aim);
+    gr.held.rotateX(-gr.recoil * 0.5); gr.held.translateZ(-gr.recoil * 0.12);
+  } else if (gr.state === 'tossed') {
+    const o = gr.held; gr.v.y -= 9.8 * dt; o.position.addScaledVector(gr.v, dt);
+    o.rotation.x += gr.w.x * dt; o.rotation.y += gr.w.y * dt; o.rotation.z += gr.w.z * dt;
+    if (o.position.y <= IN(1.2) && gr.v.y < 0) {
+      o.position.y = IN(1.2);
+      if (gr.v.y < -2.5) { gr.v.y *= -0.3; gr.v.x *= 0.5; gr.v.z *= 0.5; sfx.clack(); } else { gr.state = 'floor'; o.rotation.set(0, Math.random() * 6, Math.PI / 2); }
+    }
+  }
+}
+function resetGun() {
+  const gr = gunRig; gr.state = 'cupboard'; gr.ammo = 0; gr.held.visible = false; gr.flash.visible = false;
+  if (cupboardPistol) cupboardPistol.visible = true;
+  for (const t of gr.tracers) { t.life = 0; t.l.visible = false; }
+  tvBroken = false; showFireBtn();
+}
+fireBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fireGun(); });
+fireBtn.addEventListener('click', e => { if (e.detail === 0) fireGun(); });   // keyboard
 
 function onCheeseGrabbed(m, c) {
   if (state !== 'playing' && state !== 'ending') return;
@@ -2415,7 +2562,7 @@ function clearField() { for (const m of mice) m.release(); }
 function resetGame() {
   clearField();
   cheeses.forEach(c => c.reset());
-  resetProps(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff();
+  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -2437,7 +2584,7 @@ function resumeGame() {
   state = 'playing'; ui.pause.hidden = true;
 }
 function quitToTitle() {
-  clearField(); cheeses.forEach(c => c.reset()); resetProps(); clearFluff(); setTV(false); starSpin.target = starSpin.home;
+  clearField(); cheeses.forEach(c => c.reset()); resetProps(); clearFluff(); resetGun(); setTV(false); starSpin.target = starSpin.home;
   state = 'menu'; ui.pause.hidden = true; ui.hud.hidden = true; ui.start.hidden = false; showBestOnStart();
 }
 function showGameOver() {
@@ -2592,6 +2739,17 @@ const sfx = {
     glassGrain(t0, 0.05, 0.5, 3200, 1.2); tone(1900, 1500, 0.04, 'square', 0.025);
     for (let i = 0; i < 7; i++) glassGrain(t0 + 0.02 + Math.random() * 0.22, 0.01 + Math.random() * 0.02, 0.1 + Math.random() * 0.1, 3000 + Math.random() * 5000, 16);
   },
+  gunshot: () => { noise(0.2, 0.6, 6000); tone(190, 45, 0.2, 'sine', 0.38); noise(0.6, 0.12, 900); },   // crack + thump + room tail
+  cock: () => { noise(0.03, 0.25, 6000); tone(2400, 1700, 0.03, 'square', 0.04); setTimeout(() => { noise(0.04, 0.3, 5000); tone(1500, 1100, 0.04, 'square', 0.04); }, 140); },   // chk-chk
+  ricochet: () => {                                                  // "pyeeeww"
+    if (!actx || !soundOn) return;
+    const t = actx.currentTime + 0.005, o = actx.createOscillator(), g = actx.createGain(), v = actx.createOscillator(), vg = actx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(3600, t); o.frequency.exponentialRampToValueAtTime(700, t + 0.55); v.frequency.value = 38; vg.gain.value = 90; v.connect(vg); vg.connect(o.frequency);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    o.connect(g); g.connect(actx.destination); o.start(t); v.start(t); o.stop(t + 0.65); v.stop(t + 0.65); noise(0.04, 0.25, 7000);
+  },
+  dryFire: () => tone(2100, 1600, 0.03, 'square', 0.05),
+  fizz: () => { noise(0.3, 0.1, 8000); tone(120, 110, 0.25, 'sawtooth', 0.02); },   // electrical crackle
   rattle: () => { for (let i = 0; i < 6; i++) tone(900 + Math.random() * 500, 700, 0.03, 'square', 0.02, i * 0.045); },   // blind slats
   whoosh: () => noise(0.25, 0.06, 1400),                           // mirror tipping
   clack: () => { tone(520, 260, 0.07, 'triangle', 0.06); noise(0.05, 0.1, 2500); },   // mirror back against the wall
@@ -2758,6 +2916,7 @@ function frame(now) {
   updateParticles(dt);
   updateProps(dt);
   updateTV(dt);
+  updateGun(dt);
   updateStar(dt);
   updateMirror(dt);
   updateBlinds(dt);
