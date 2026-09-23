@@ -301,7 +301,8 @@ const ROOM = { halfW: 5.2, depth: 13, wallH: 18, visDepth: 24 };  // depth = pla
 /* ACCESS POINTS — where mice come in and go home.
    kind 'couch': out from under a sofa · 'wall': a mouse hole · 'door': through the doorway from the hall.
    x/z is the point on the edge, n is the direction the mouse walks out. */
-const COUCH_DEPTH = 2.1, COUCH_LEFT_Z0 = 3.47, COUCH_RIGHT_Z0 = 8.12;   // left sofa + fireplace sit further down their wall; right sofa pushed down to make room for the acrylic table
+const FIRE_END = 13.3 + (58 + 4) / 15.6 / 2;                              // front edge of the fireplace hearth (see FIRE below)
+const COUCH_DEPTH = 2.1, COUCH_LEFT_Z0 = 3.47, COUCH_RIGHT_Z0 = FIRE_END - 2.85 * 3 / 1.3 - 7 / 15.6;   // its far arm lines up with the hearth   // left sofa + fireplace sit further down their wall; right sofa pushed down to make room for the acrylic table
 const FIRE = { z: 13.3, w: 58 / 15.6, d: 7 / 15.6, h: 46 / 15.6 };   // built in: only 7" proud of the wall   // stone fireplace on the left wall (58" wide, 15" deep, 44" to the mantle)
 const HOLES = [
   { kind: 'couch', x: -ROOM.halfW + COUCH_DEPTH, z: COUCH_LEFT_Z0 + 1.6, n: [1, 0] },   // under the left sofa
@@ -1474,6 +1475,24 @@ const blanketBlackMat = lam(0xffffff, { map: blanketBlackTex }), blanketFuzzMat 
   corner.rotation.x = -Math.PI / 2; corner.position.set(W / 2 - IN(0.2), y + IN(0.35), L / 2 - IN(0.2)); fold.add(corner);
   const crease = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.35), IN(0.35), Math.hypot(CW, CH), 10), blanketBlackMat);
   crease.position.set(W / 2 - IN(0.2) - CW / 2, y + IN(0.2), L / 2 - IN(0.2) - CH / 2); crease.rotation.set(Math.PI / 2, 0, 0); crease.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.atan2(-CW, CH)); fold.add(crease);
+  // the top layer's end runs off the stack, up over the sofa arm and hangs down its outside, the fleece curling out at the hem
+  {
+    const armIn = L / 2 + IN(2.1), armOut = armIn + IN(7), armTop = IN(23) - SEAT_TOP + IN(0.5);
+    const path = [[L / 2 - IN(4), y], [L / 2 + IN(0.5), y + IN(0.3)], [armIn, armTop], [armOut - IN(1), armTop + IN(0.2)], [armOut + IN(0.5), armTop - IN(1)],
+                  [armOut + IN(0.7), armTop - IN(6)], [armOut + IN(0.9), armTop - IN(11)], [armOut + IN(2.2), armTop - IN(13)]];
+    const seg = [0]; for (let i = 1; i < path.length; i++) seg.push(seg[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+    const at = d => { let i = 1; while (i < path.length - 1 && seg[i] < d) i++; const k = (d - seg[i - 1]) / (seg[i] - seg[i - 1]); return [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * k, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * k]; };
+    const DW = W * 0.86, total = seg[seg.length - 1], gg = new THREE.PlaneGeometry(1, 1, 14, 40), q = gg.attributes.position;
+    for (let i = 0; i < q.count; i++) {
+      const u = q.getX(i), v = q.getY(i) + 0.5, d = v * total, [zz, yy] = at(d), hang = Math.max(0, (d - seg[4]) / (total - seg[4]));
+      q.setXYZ(i, u * DW * (1 + hang * 0.12) + Math.sin(u * 9 + d * 20) * IN(0.25) * hang, yy + Math.sin(u * 11) * IN(0.3) * hang, zz + Math.sin(u * 7 + 1) * IN(0.6) * hang);   // folds and a flared hem as it hangs
+    }
+    gg.computeVertexNormals();
+    const up = gg.attributes.normal.getY(Math.floor(q.count / 2 / 41) * 41 + 5) > 0;   // a vertex on the flat top run: its black face points up
+    for (const [mat, side] of [[blanketBlackMat, up ? THREE.FrontSide : THREE.BackSide], [blanketFuzzMat, up ? THREE.BackSide : THREE.FrontSide]]) {
+      const m = new THREE.Mesh(gg, mat.clone()); m.material.side = side; fold.add(m);
+    }
+  }
   blanketDrape = fold;
   fold.traverse(o => { if (o.isMesh) { o.userData.blanket = true; tapTargets.push(o); } });
 }
@@ -1599,6 +1618,92 @@ const blanketBlackMat = lam(0xffffff, { map: blanketBlackTex }), blanketFuzzMat 
     g.rotation.z = 0.12;                                                    // leans back against the mirror
     registerProp(g, { restHalf: IN(0.5), restQuat: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.random() * 6, -Math.PI / 2, 'YXZ')), onKnock: knock() });
   }
+}
+
+/* ---------- white tower fan standing between the sofa and the fireplace. Tap: it switches on and swivels side to side.
+   Tap again: full speed, rattling. Third tap: it topples forward onto the carpet and breaks. ---------- */
+let fanRig = null;
+{
+  const FX = -ROOM.halfW + IN(9), FZ = (COUCH_LEFT_Z0 + FT(2.85) * 3 + IN(7) + FIRE.z - FIRE.w / 2) / 2, CH = IN(36), BR = IN(5.5);
+  const white = new THREE.MeshPhongMaterial({ color: 0xf3f3f1, shininess: 70, specular: 0x444444 }), grey = lam(0xcfd1d3);
+  const tip = new THREE.Group(); tip.position.set(FX + BR, 0, FZ); scene.add(tip);                        // hinge on the base's front edge: it falls into the room
+  const body = new THREE.Group(); body.position.x = -BR; tip.add(body);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(BR, BR * 1.05, IN(1.3), 32), white); base.position.y = IN(0.65); body.add(base);
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(IN(3.3), IN(3.3), IN(0.4), 24), grey); ring.position.y = IN(1.45); body.add(ring);
+  const osc = new THREE.Group(); body.add(osc);                                                          // the column swivels on the base
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.7), IN(3.1), CH, 32), white); col.scale.x = 0.8; col.position.y = IN(1.6) + CH / 2; osc.add(col);
+  const cap = new THREE.Group(); cap.position.y = IN(1.6) + CH; osc.add(cap);
+  cap.add(new THREE.Mesh(new THREE.CylinderGeometry(IN(2.75), IN(2.7), IN(1), 32), grey)).position.y = IN(0.5);
+  const led = new THREE.Mesh(new THREE.SphereGeometry(IN(0.3), 8, 6), basic(0x5a6068)); led.position.set(IN(1.3), IN(1.05), 0); cap.add(led);
+  for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.35), IN(0.35), IN(0.2), 10), lam(0x9aa0a6)); b.position.set(IN(0.2), IN(1.05), IN(-1 + i)); cap.add(b); }   // buttons
+  const rotorTex = canvasTex(16, 64, (g, w, h) => { for (let y = 0; y < h; y++) { const v = 40 + 30 * Math.sin(y / h * Math.PI * 6) | 0; g.fillStyle = `rgb(${v},${v + 2},${v + 5})`; g.fillRect(0, y, w, 1); } }, 1, 5);
+  const slatTex = canvasTex(32, 8, (g, w, h) => { g.clearRect(0, 0, w, h); g.fillStyle = '#f3f3f1'; for (let x = 0; x < w; x += 8) g.fillRect(x, 0, 4, h); }, 7, 1);
+  const GW = IN(3.4), GH = CH - IN(8), gy = IN(1.6) + CH / 2 + IN(1), gx = IN(2.7) * 0.8 + IN(0.05);
+  const rotor = new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), basic(0xffffff, { map: rotorTex })); rotor.rotation.y = Math.PI / 2; rotor.position.set(gx, gy, 0); osc.add(rotor);   // spinning blower behind the grille
+  const slats = new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), basic(0xffffff, { map: slatTex, transparent: true })); slats.rotation.y = Math.PI / 2; slats.position.set(gx + IN(0.08), gy, 0); osc.add(slats);
+  const shards = Array.from({ length: 8 }, (_, i) => { const m = new THREE.Mesh(new THREE.BoxGeometry(IN(1 + (i % 3)), IN(0.25), IN(0.8 + (i % 2))), white); m.visible = false; scene.add(m); return { m, v: new THREE.Vector3(), down: false }; });
+  fanRig = { tip, osc, cap, led, rotorTex, slats, shards, state: 'off', hits: 0, speed: 0, angle: 0, av: 0, capV: new THREE.Vector3(), capHome: cap.position.clone(), rattle: 0 };
+  tip.traverse(o => { if (o.isMesh) { o.userData.fan = true; tapTargets.push(o); } });
+}
+let fanHum = null, fanHumGain = null;
+function hitFan() {
+  const f = fanRig; if (!f || f.state === 'falling' || f.state === 'broken') return;
+  f.hits++; f.rattle = 1; sfx.fanClick();
+  if (f.hits === 1) { f.state = 'on'; f.speed = 1; f.led.material.color.setHex(0x4fb6ff); }
+  else if (f.hits === 2) { f.speed = 1.9; }
+  else { f.state = 'falling'; f.av = 0.4; }
+}
+function updateFan(dt) {
+  const f = fanRig; if (!f) return;
+  const running = f.state === 'on';
+  if (running) {
+    f.osc.rotation.y = Math.sin(clock * 0.7) * 0.75;                  // swivels left and right
+    f.rotorTex.offset.y -= dt * f.speed * 7;
+    f.rattle = Math.max(0, f.rattle - dt * 2);
+    f.tip.rotation.x = (f.speed > 1.5 ? Math.sin(clock * 38) * 0.006 : 0) + Math.sin(clock * 30) * 0.02 * f.rattle;   // shudders on high
+  }
+  if (f.state === 'falling') {                                         // topples forward, faster and faster, onto the carpet
+    f.av += (3 + 9 * Math.sin(f.angle)) * dt; f.angle += f.av * dt; f.tip.rotation.z = -f.angle;
+    if (f.angle >= Math.PI / 2 - 0.12) {
+      f.angle = Math.PI / 2 - 0.12; f.tip.rotation.z = -f.angle; f.state = 'broken'; f.led.material.color.setHex(0x5a6068);
+      f.tip.updateMatrixWorld(true);
+      const top = f.cap.getWorldPosition(new THREE.Vector3());
+      f.osc.remove(f.cap); f.cap.position.copy(top); f.cap.rotation.set(0, 0, -Math.PI / 2); scene.add(f.cap); f.capV.set(1.6, 1.2, (Math.random() - 0.5) * 1.2);   // top pops off
+      f.slats.rotation.x = 0.25; f.slats.position.x += IN(0.6);                                            // grille knocked loose
+      for (const sh of f.shards) { sh.m.visible = true; sh.down = false; sh.m.position.copy(top).setY(0.15); sh.m.position.x -= Math.random() * 1.2; sh.v.set((Math.random() - 0.3) * 2.4, 1 + Math.random() * 1.6, (Math.random() - 0.5) * 2.4); }
+      burst(top.clone().setY(0.2), 0xf3f3f1, 10, 2.2, 2, 0.5);
+      sfx.fanCrash(); shake = Math.max(shake, reduceMotion ? 0.05 : 0.35);
+    }
+  }
+  if (f.state === 'broken') {
+    if (f.cap.parent === scene && f.capV.lengthSq() > 0) {
+      f.capV.y -= 9.8 * dt; f.cap.position.addScaledVector(f.capV, dt); f.cap.rotation.x += dt * 6;
+      if (f.cap.position.y <= IN(2.8)) { f.cap.position.y = IN(2.8); if (f.capV.y < -2) { f.capV.y *= -0.3; f.capV.x *= 0.5; f.capV.z *= 0.5; sfx.clack(); } else f.capV.set(0, 0, 0); }
+    }
+    for (const sh of f.shards) {
+      if (sh.down) continue; sh.v.y -= 9.8 * dt; sh.m.position.addScaledVector(sh.v, dt); sh.m.rotation.x += dt * 8; sh.m.rotation.z += dt * 5;
+      if (sh.m.position.y <= IN(0.2)) { sh.m.position.y = IN(0.2); sh.m.rotation.set(0, Math.random() * 6, 0); sh.down = true; }
+    }
+  }
+  // motor hum while it runs
+  if (!actx) return;
+  if (!fanHum) {
+    const n = actx.sampleRate * 2, b = actx.createBuffer(1, n, actx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * 0.6 + Math.sin(i / actx.sampleRate * Math.PI * 2 * 110) * 0.25;
+    const src = actx.createBufferSource(), lp = actx.createBiquadFilter(); fanHumGain = actx.createGain();
+    src.buffer = b; src.loop = true; lp.type = 'lowpass'; lp.frequency.value = 900; fanHumGain.gain.value = 0;
+    src.connect(lp); lp.connect(fanHumGain); fanHumGain.connect(actx.destination); src.start(); fanHum = src;
+  }
+  const want = running && (state === 'playing' || state === 'debug') ? 0.03 + 0.03 * (f.speed - 1) : 0;
+  fanHumGain.gain.value += (want - fanHumGain.gain.value) * Math.min(1, dt * 5);
+}
+function resetFan() {
+  const f = fanRig; if (!f) return;
+  if (f.cap.parent !== f.osc) { scene.remove(f.cap); f.osc.add(f.cap); }
+  f.cap.position.copy(f.capHome); f.cap.rotation.set(0, 0, 0); f.capV.set(0, 0, 0);
+  f.slats.rotation.x = 0; f.slats.position.x = IN(2.7) * 0.8 + IN(0.13);
+  f.state = 'off'; f.hits = 0; f.speed = 0; f.angle = 0; f.av = 0; f.tip.rotation.set(0, 0, 0); f.osc.rotation.y = 0; f.led.material.color.setHex(0x5a6068);
+  for (const sh of f.shards) sh.m.visible = false;
 }
 
 /* ---------- half disco balls glued, scattered, on the right wall above the sofa ---------- */
@@ -2521,6 +2626,7 @@ function interact(o, point, face) {
   if (o.userData.window) { startSwipe(point, true); setTimeout(toggleBlinds, 90); tapShake(); return true; }
   if (o.userData.mirror) { startSwipe(point, true); setTimeout(hitMirror, 90); tapShake(); return true; }
   if (o.userData.gloves) { startSwipe(point, true); setTimeout(hitGloves, 90); tapShake(); return true; }
+  if (o.userData.fan) { if (fanRig.state === 'falling' || fanRig.state === 'broken') return false; startSwipe(point, true); setTimeout(hitFan, 90); tapShake(); return true; }
   if (o.userData.prop) { const pr = o.userData.prop; startSwipe(point, true); setTimeout(() => knockProp(pr), 90); tapShake(); return true; }
   return false;
 }
@@ -2777,7 +2883,7 @@ function clearField() { for (const m of mice) m.release(); }
 function resetGame() {
   clearField();
   cheeses.forEach(c => c.reset());
-  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff();
+  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -2970,6 +3076,8 @@ const sfx = {
   },
   dryFire: () => tone(2100, 1600, 0.03, 'square', 0.05),
   fizz: () => { noise(0.3, 0.1, 8000); tone(120, 110, 0.25, 'sawtooth', 0.02); },   // electrical crackle
+  fanClick: () => { tone(1800, 1400, 0.03, 'square', 0.04); noise(0.03, 0.12, 3000); },   // fan button
+  fanCrash: () => { noise(0.3, 0.45, 2600); tone(170, 60, 0.22, 'square', 0.08); setTimeout(() => { noise(0.08, 0.2, 3500); tone(900, 700, 0.05, 'triangle', 0.05); }, 140); setTimeout(() => noise(0.06, 0.15, 3000), 300); },   // plastic tower hitting the floor
   rattle: () => { for (let i = 0; i < 6; i++) tone(900 + Math.random() * 500, 700, 0.03, 'square', 0.02, i * 0.045); },   // blind slats
   whoosh: () => noise(0.25, 0.06, 1400),                           // mirror tipping
   clack: () => { tone(520, 260, 0.07, 'triangle', 0.06); noise(0.05, 0.1, 2500); },   // mirror back against the wall
@@ -3152,6 +3260,7 @@ function frame(now) {
   updateGloves(dt, clock);
   updateSteam(clock);
   updateBoom(dt);
+  updateFan(dt);
   updateBombFx(dt);
 
   shake = Math.max(0, shake - dt * 1.4);
