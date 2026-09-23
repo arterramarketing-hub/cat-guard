@@ -278,10 +278,10 @@ function getDifficulty(t) {
 /* =====================================================================
    WORLD LAYOUT  (x: left/right, z: back wall = 0 → toward camera)
    ===================================================================== */
-const ROOM = { halfW: 4.5, depth: 13, wallH: 18, visDepth: 24 };  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
+const ROOM = { halfW: 5.2, depth: 13, wallH: 18, visDepth: 24 };  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
 const HOLES = [
-  { x: -4.5, z: 4.2,  n: [1, 0]  }, { x: -4.5, z: 7.6, n: [1, 0] }, { x: -4.5, z: 11.0, n: [1, 0] }, // left wall
-  { x:  4.5, z: 4.9,  n: [-1, 0] }, { x: 4.5, z: 6.4, n: [-1, 0] }, { x: 4.5, z: 9.8, n: [-1, 0] },  // right wall
+  { x: -ROOM.halfW, z: 4.2,  n: [1, 0]  }, { x: -ROOM.halfW, z: 7.6, n: [1, 0] }, { x: -ROOM.halfW, z: 11.0, n: [1, 0] }, // left wall
+  { x:  ROOM.halfW, z: 4.9,  n: [-1, 0] }, { x: ROOM.halfW, z: 6.4, n: [-1, 0] }, { x: ROOM.halfW, z: 9.8, n: [-1, 0] },  // right wall
 ];
 const CHEESE_SPOTS = [ { x: -1.4, z: 5.0 }, { x: 1.6, z: 7.4 }, { x: -0.3, z: 10.0 } ];
 const CAT_POS = new THREE.Vector3(0, 0.34, 2.7);   // cat guards from the top of the screen, swiping down
@@ -451,7 +451,7 @@ for (const [x, z, r, h] of [[MAIN_X0 + IN(10), IN(9), IN(2), IN(12)], [LEFT_X0 +
 const diff = new THREE.Mesh(new THREE.SphereGeometry(IN(3.5), 12, 8), lam(0xf6f4ef)); diff.scale.y = 1.3; diff.position.set(MAIN_X0 + MAIN_W - IN(6), CAB_H + IN(4.5), IN(9)); scene.add(diff);
 box(IN(4), IN(4), IN(4), lam(0xf0b8a0), MAIN_X0 + IN(22), CAB_H + IN(2), IN(10));
 // right-corner black shelf (~4' tall, 14" wide) with a plant, and the paper star lamp (2' star on a 5' pole)
-const SHELF_W = ROOM.halfW - (MAIN_X0 + MAIN_W) - IN(1), SHELF_X = ROOM.halfW - SHELF_W / 2;
+const SHELF_W = IN(16), SHELF_X = MAIN_X0 + MAIN_W + IN(2) + SHELF_W / 2;          // leaves the far-right corner open
 box(SHELF_W, FT(4), IN(14), lam(0x1c1c1e), SHELF_X, FT(2), IN(7) + 0.02);
 const pot = new THREE.Mesh(new THREE.CylinderGeometry(IN(3.5), IN(2.8), IN(5), 10), lam(0xe9e4da)); pot.position.set(SHELF_X, FT(4) + IN(2.5), IN(7)); scene.add(pot);
 const leafMat = lam(0x3f8a45);
@@ -606,51 +606,132 @@ function nearestCheese(pos) {
 /* =====================================================================
    CAT
    ===================================================================== */
-// Grumpy colorpoint cat: cream body, brown-grey mask and back, ice-blue eyes,
-// heavy slanted brows and a permanent frown. Sits facing the player.
-const furMat = lam(0xf1e9df), pointMat = lam(0x7d6453), backMat = lam(0x8f7a69), pinkMat = lam(0xe8a0a0);
-const darkMat = lam(0x3a2a22), FUR_HEX = 0xf1e9df;
+// Long-haired colourpoint cat with a split "tortie" face: the viewer's left half
+// is mottled tan, the right half near-black. Flat Persian face, sleepy half-lidded
+// blue-grey eyes, small dark nose, small wide-set ears, big cream chest ruff.
+// soft directional fur strokes, tinted by each material's colour
+const furTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = '#f2f2f2'; g.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 900; i++) {
+    const x = Math.random() * 128, y = Math.random() * 128, l = 5 + Math.random() * 9;
+    g.strokeStyle = Math.random() < 0.5 ? 'rgba(255,255,255,.35)' : 'rgba(120,105,90,.1)';
+    g.lineWidth = 1 + Math.random(); g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 3, y + l); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); return t;
+})();
+// Merge many soft, elongated fur clumps into ONE mesh so the fluff costs a single draw call.
+let tuftSeed = 7;
+const rnd = () => { tuftSeed = (tuftSeed * 16807) % 2147483647; return tuftSeed / 2147483647; };
+function tuftMesh(tufts, mat) {
+  const pos = [], nor = [], up = new THREE.Vector3(0, 1, 0), m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), at = new THREE.Vector3();
+  const blob = new THREE.SphereGeometry(1, 10, 8).toNonIndexed();
+  for (const t of tufts) {
+    const g = blob.clone();
+    q.setFromUnitVectors(up, t.dir.normalize());
+    at.copy(t.pos).addScaledVector(t.dir, t.len * 0.35);            // clump leans out along its direction
+    g.applyMatrix4(m.compose(at, q, sc.set(t.r * 1.5, t.len * 0.6, t.r * 1.5)));
+    pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  return new THREE.Mesh(geo, mat);
+}
+// tufts scattered over an ellipsoid (centre c, radii r), pointing outward with a bias
+function ellipsoidTufts(n, c, r, filter, bias, len, rad) {
+  const out = [];
+  for (let i = 0; i < n * 4 && out.length < n; i++) {
+    const u = rnd() * 2 - 1, a = rnd() * Math.PI * 2, k = Math.sqrt(1 - u * u);
+    const nrm = new THREE.Vector3(k * Math.cos(a), u, k * Math.sin(a));
+    if (!filter(nrm)) continue;
+    out.push({ pos: new THREE.Vector3(c.x + nrm.x * r.x * 0.92, c.y + nrm.y * r.y * 0.92, c.z + nrm.z * r.z * 0.92),
+               dir: nrm.clone().add(bias), len: len[0] + rnd() * (len[1] - len[0]), r: rad[0] + rnd() * (rad[1] - rad[0]) });
+  }
+  return out;
+}
+const furMat = lam(0xf0e7da, { map: furTex }), backMat = lam(0xdcc8ad, { map: furTex }), ruffMat = lam(0xf7f0e6, { map: furTex }), ruffTuftMat = lam(0xeee4d4);
+const tanMat = lam(0xbf9f7e), darkMat = lam(0x2e2522), FUR_HEX = 0xf0e7da;
+// Face painted onto the head sphere (equirectangular: u = 0.25 is straight ahead,
+// smaller u = viewer's left, larger u = viewer's right; v runs top → chin).
+const faceTex = (() => {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const g = c.getContext('2d'), CX = 128;
+  const blot = (x, y, r, col) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, col); gr.addColorStop(1, col.replace(/[\d.]+\)$/, '0)')); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
+  g.fillStyle = '#dcc8ad'; g.fillRect(0, 0, 512, 256);                       // fawn head fur
+  g.fillStyle = '#efe5d6'; g.fillRect(0, 175, 512, 81);                      // cream under the chin
+  for (let i = 0; i < 40; i++) blot(CX - 20 - Math.random() * 90, 30 + Math.random() * 140, 14 + Math.random() * 16, 'rgba(196,164,126,.9)'); // tan left cheek
+  // near-black right half: one smooth path with a gently wandering centre line
+  g.fillStyle = '#28201d';
+  g.beginPath(); g.moveTo(CX - 4, 0);
+  for (let y = 0; y <= 180; y += 6) g.lineTo(CX - 4 + Math.sin(y * 0.05) * 7 - (y > 95 && y < 150 ? Math.sin((y - 95) / 55 * Math.PI) * 12 : 0), y);
+  g.quadraticCurveTo(CX + 30, 205, CX + 120, 175); g.lineTo(CX + 120, 0); g.closePath(); g.fill();
+  for (let i = 0; i < 18; i++) blot(CX + 25 + Math.random() * 85, 20 + Math.random() * 150, 14 + Math.random() * 14, 'rgba(70,56,48,.35)');   // soft sheen
+  for (let i = 0; i < 12; i++) blot(CX - 4 - Math.random() * 14, 40 + Math.random() * 120, 8 + Math.random() * 8, 'rgba(40,32,29,.55)');  // soft bleed over the line
+  // subtle tortie mottling on the tan side (soft, not spotty)
+  for (let i = 0; i < 26; i++) blot(CX - 15 - Math.random() * 90, 30 + Math.random() * 140, 8 + Math.random() * 10, Math.random() < 0.55 ? 'rgba(92,72,60,.35)' : 'rgba(176,128,82,.4)');
+  blot(CX - 48, 108, 20, 'rgba(70,54,46,.55)');
+  // pale mouth/chin
+  blot(CX - 6, 168, 30, 'rgba(236,226,212,.95)');
+  blot(CX - 2, 186, 26, 'rgba(240,232,220,.95)');
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+})();
 const cat = new THREE.Group(); cat.position.copy(CAT_POS); cat.scale.setScalar(1.25); scene.add(cat);
 const catBody = new THREE.Group(); cat.add(catBody);
-const head = new THREE.Group(); head.position.set(0, 1.5, 0.62); head.rotation.x = -0.9; head.scale.setScalar(1.45);
+const head = new THREE.Group(); head.position.set(0, 1.5, 0.6); head.rotation.x = -0.9; head.scale.setScalar(1.5);
 catBody.add(head);
 (() => {
   const sph = r => new THREE.SphereGeometry(r, 14, 10);
   const mk = (parent, geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (sx) m.scale.set(sx, sy, sz); parent.add(m); return m; };
-  // body
-  mk(catBody, sph(0.7), furMat, 0, 0.62, 0, 1, 0.85, 1.2);
-  mk(catBody, sph(0.58), backMat, 0, 0.74, -0.42, 0.95, 0.7, 0.95);
-  mk(catBody, sph(0.38), furMat, -0.45, 0.36, -0.38); mk(catBody, sph(0.38), furMat, 0.45, 0.36, -0.38);
-  mk(catBody, sph(0.36), furMat, 0, 0.86, 0.62, 1.15, 1.2, 0.75);
+  // fluffy loaf body
+  mk(catBody, sph(0.72), furMat, 0, 0.62, 0, 1.05, 0.85, 1.2);
+  mk(catBody, sph(0.6), backMat, 0, 0.74, -0.4, 1.0, 0.72, 0.95);
+  mk(catBody, sph(0.4), furMat, -0.48, 0.38, -0.38); mk(catBody, sph(0.4), furMat, 0.48, 0.38, -0.38);
+  // big cream chest ruff
+  mk(catBody, sph(0.42), ruffMat, 0, 0.9, 0.62, 1.3, 1.1, 0.75);
+  catBody.add(tuftMesh(ellipsoidTufts(70, new THREE.Vector3(0, 0.9, 0.62), new THREE.Vector3(0.55, 0.46, 0.32),
+    n => n.z > -0.1, new THREE.Vector3(0, -0.6, 0.25), [0.2, 0.32], [0.09, 0.13]), ruffTuftMat));           // chest ruff
+  catBody.add(tuftMesh(ellipsoidTufts(90, new THREE.Vector3(0, 0.62, 0), new THREE.Vector3(0.76, 0.61, 0.86),
+    n => n.y > -0.2, new THREE.Vector3(0, -0.4, -0.2), [0.14, 0.24], [0.08, 0.12]), lam(0xebdfcf)));      // long body fur
   mk(catBody, sph(0.17), furMat, -0.32, 0.13, 0.84, 1, 0.8, 1.2);
-  // head
-  mk(head, sph(0.52), furMat, 0, 0, 0, 1.1, 0.95, 1);
-  mk(head, sph(0.47), pointMat, 0, 0.0, 0.13, 1.06, 0.92, 0.9);
-  mk(head, new THREE.BoxGeometry(0.08, 0.34, 0.06), furMat, 0, 0.14, 0.55).rotation.x = -0.2;   // white blaze
-  mk(head, sph(0.17), furMat, -0.11, -0.18, 0.47, 1, 0.85, 0.8);                                   // muzzle
-  mk(head, sph(0.17), furMat, 0.11, -0.18, 0.47, 1, 0.85, 0.8);
-  mk(head, sph(0.14), furMat, 0, -0.31, 0.4, 1.1, 0.8, 0.9);                                       // chin
-  mk(head, new THREE.SphereGeometry(0.055, 8, 6), pinkMat, 0, -0.08, 0.62, 1.2, 0.8, 0.7);         // nose
-  const frown = mk(head, new THREE.TorusGeometry(0.1, 0.02, 4, 12, Math.PI), darkMat, 0, -0.29, 0.58);
-  frown.scale.set(1, 0.55, 1);
-  const eyeM = new THREE.MeshBasicMaterial({ color: 0x8ec9ef }), pupilM = new THREE.MeshBasicMaterial({ color: 0x14100e });
+  // head: flat Persian face, split mask painted on
+  mk(head, new THREE.SphereGeometry(0.5, 32, 20), lam(0xffffff, { map: faceTex }), 0, 0, 0, 1.14, 0.98, 0.88);
+  // fluffy cheeks & jaw: tufts fanning out from the lower half of the face
+  const cheek = [];
+  for (let i = 0; i < 46; i++) {
+    const a = Math.PI * (0.95 + rnd() * 1.1), rr = 0.5 + rnd() * 0.06;
+    cheek.push({ pos: new THREE.Vector3(Math.cos(a) * rr * 1.08, Math.sin(a) * rr * 0.9, 0.05 + rnd() * 0.18),
+                 dir: new THREE.Vector3(Math.cos(a), Math.sin(a) - 0.25, 0.25), len: 0.14 + rnd() * 0.12, r: 0.06 + rnd() * 0.035 });
+  }
+  head.add(tuftMesh(cheek, ruffTuftMat));
+  // sleepy blue-grey eyes with heavy upper lids (outer corners droop)
+  const eyeM = basic(0x9fb2c0), pupilM = basic(0x14100e);
+  const lidGeo = new THREE.SphereGeometry(0.1, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
   for (const s of [-1, 1]) {
-    mk(head, new THREE.SphereGeometry(0.09, 10, 8), eyeM, s * 0.19, 0.05, 0.49, 1, 0.72, 0.6);
-    mk(head, new THREE.SphereGeometry(0.045, 8, 6), pupilM, s * 0.19, 0.04, 0.55, 1, 1, 0.5);
-    const brow = mk(head, new THREE.BoxGeometry(0.24, 0.07, 0.08), pointMat, s * 0.19, 0.11, 0.53);
-    brow.rotation.z = s * 0.38;                                                                      // inner ends droop = grumpy
-    const ear = mk(head, new THREE.ConeGeometry(0.19, 0.36, 4), pointMat, s * 0.31, 0.44, -0.02); ear.rotation.z = -s * 0.35;
-    const inner = mk(head, new THREE.ConeGeometry(0.1, 0.22, 4), pinkMat, s * 0.3, 0.41, 0.06); inner.rotation.z = -s * 0.35;
-    for (const a of [0.12, -0.08]) {
-      const w = mk(head, new THREE.BoxGeometry(0.4, 0.012, 0.012), furMat, s * 0.36, -0.2 + a * 0.3, 0.46);
-      w.rotation.z = s * a; w.rotation.y = -s * 0.35;
+    const side = s < 0 ? tanMat : darkMat;
+    mk(head, new THREE.SphereGeometry(0.085, 12, 8), eyeM, s * 0.19, 0.02, 0.39, 1.1, 0.8, 0.6);
+    mk(head, new THREE.SphereGeometry(0.032, 8, 6), pupilM, s * 0.19, -0.01, 0.43, 1, 1, 0.5);
+    const lid = mk(head, lidGeo, side, s * 0.19, 0.005, 0.39, 1.12, 1, 0.66);
+    lid.rotation.set(0.5, 0, s * 0.42);                    // inner corners pulled down = scowl
+    const brow = mk(head, new THREE.BoxGeometry(0.2, 0.035, 0.05), s < 0 ? lam(0x7d5f48) : lam(0x140f0d), s * 0.17, 0.085, 0.445); brow.rotation.z = s * 0.5;  // furrowed brow
+    // small, wide-set rounded ears: tan on the left, dark on the right
+    const ear = mk(head, new THREE.ConeGeometry(0.15, 0.24, 6), side, s * 0.38, 0.36, 0.02); ear.rotation.z = -s * 0.6;
+    const inner = mk(head, new THREE.ConeGeometry(0.08, 0.15, 6), lam(0xd9b7a6), s * 0.37, 0.34, 0.08); inner.rotation.z = -s * 0.6;
+    // muzzle puffs follow the split
+    mk(head, sph(0.1), s < 0 ? tanMat : darkMat, s * 0.065, -0.155, 0.39, 1, 0.75, 0.55);
+    // long white whiskers
+    for (const a of [0.14, 0, -0.12]) {
+      const w = mk(head, new THREE.BoxGeometry(0.6, 0.008, 0.008), ruffMat, s * 0.42, -0.17 + a * 0.3, 0.36);
+      w.rotation.z = s * a; w.rotation.y = -s * 0.3;
     }
   }
+  mk(head, new THREE.SphereGeometry(0.034, 8, 6), lam(0x2a2220), 0, -0.1, 0.45, 1.3, 0.75, 0.6);   // small dark nose
+  const mouth = mk(head, new THREE.TorusGeometry(0.075, 0.014, 4, 12, Math.PI), darkMat, 0, -0.225, 0.43); mouth.scale.set(1, 0.75, 1);   // downturned frown
 })();
 const tailPivot = new THREE.Group(); tailPivot.position.set(0, 0.42, -0.8); catBody.add(tailPivot);
 tailPivot.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
   new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.4, 0.05, -0.35), new THREE.Vector3(0.85, 0.2, -0.2), new THREE.Vector3(1.05, 0.5, 0.1)
-]), 12, 0.1, 6), backMat));
+]), 12, 0.17, 7), backMat));
 // swipe arm + paw live in world space so they can stretch across the room
 const armGeo = new THREE.CylinderGeometry(0.12, 0.15, 1, 7); armGeo.translate(0, 0.5, 0);
 const arm = new THREE.Mesh(armGeo, furMat); scene.add(arm);
@@ -1314,7 +1395,7 @@ function fitCamera() {
   camera.fov = aspect < 1 ? 48 : 40;
   camera.updateProjectionMatrix();
   camera.clearViewOffset();
-  const el = THREE.MathUtils.degToRad(aspect < 0.75 ? 66 : aspect < 1.3 ? 56 : 46);
+  const el = THREE.MathUtils.degToRad(aspect < 0.75 ? 56 : aspect < 1.3 ? 48 : 40);   // camera tilt: lower = more 'standing in the room'
   const dir = new THREE.Vector3(0, Math.sin(el), Math.cos(el));
   const topLimit = aspect < 1 ? 0.66 : 0.74;   // leave room for the HUD
   const bottom = -0.97, v = new THREE.Vector3();
