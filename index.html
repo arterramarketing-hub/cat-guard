@@ -143,7 +143,7 @@
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="16" cy="20" r="10" fill="#1f1712"/><path d="M20 11 q3 -5 7 -4" stroke="#8a6a45" stroke-width="2" fill="none"/><circle cx="27" cy="7" r="3.5" fill="#ffb02e"/><circle cx="27" cy="7" r="1.6" fill="#fff4c2"/></svg>
-        <span><b>Leave bomb mice alone.</b> Dark fur, lit fuse. Tapping one costs the cat a life. Ignore them and they slink back into their hole.</span>
+        <span><b>Leave bomb mice alone.</b> Dark fur, lit fuse. Tapping one costs the cat a life. They only taunt you from their hole, then slink back in if you leave them be.</span>
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><path d="M3 27 L31 27 L3 9 Z" fill="#f4c13d" stroke="#1f1712" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="20" r="2" fill="#c98e12"/><circle cx="15" cy="23" r="1.5" fill="#c98e12"/></svg>
@@ -398,7 +398,7 @@ scene.add(floor);
 const backWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, ROOM.wallH), lam(0xffffff, { map: panelTex }));
 backWall.position.set(0, ROOM.wallH / 2, 0);
 scene.add(backWall);
-for (const side of [-1, 1]) {
+for (const side of [-1]) {   // right wall is built later with the doorway cut out
   const w = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.visDepth, ROOM.wallH), lam(0xf2efe8, { map: panelTexSide }));
   w.rotation.y = -side * Math.PI / 2;
   w.position.set(side * ROOM.halfW, ROOM.wallH / 2, ROOM.visDepth / 2);
@@ -407,7 +407,6 @@ for (const side of [-1, 1]) {
 const trimMat = lam(0xf4f1ea);
 box(ROOM.halfW * 2, 0.26, 0.05, trimMat, 0, 0.13, 0.025);                 // 4" baseboards
 box(0.05, 0.26, ROOM.visDepth, trimMat, -ROOM.halfW + 0.025, 0.13, ROOM.visDepth / 2);
-box(0.05, 0.26, ROOM.visDepth, trimMat, ROOM.halfW - 0.025, 0.13, ROOM.visDepth / 2);
 
 /* ---------- back of the room: carved credenzas, TV, blankets, candles, star lamp ----------
    REAL-WORLD SCALE: 1 world unit = 1.3 ft, so the 9-unit room is ~11.7 ft wide.
@@ -451,8 +450,9 @@ screen.position.set(0, IN(4) + IN(14.25), IN(0.65)); tv.add(screen);
 box(IN(36), IN(2.5), IN(4), lam(0x2a2a2a), 0, IN(1.25), IN(6), tv);                            // soundbar
 // pillar candles, 3–4" wide, 6–12" tall (flicker in the main loop)
 const candleMat = lam(0xf1ead6), flames = [], candleGlows = [];
-for (const [x, z, r, h] of [[MAIN_X0 + IN(10), IN(9), IN(2), IN(12)], [LEFT_X0 + LEFT_W - IN(6), IN(10), IN(1.75), IN(8)],
-                            [MAIN_X0 + MAIN_W - IN(22), IN(8), IN(2), IN(9)], [MAIN_X0 + MAIN_W - IN(15), IN(12), IN(1.75), IN(6)]]) {
+const TV_L = MAIN_CX - IN(26), TV_R = MAIN_CX + IN(26);                 // keep décor clear of the TV (+2" margin)
+for (const [x, z, r, h] of [[MAIN_X0 + IN(4), IN(9), IN(2), IN(12)], [LEFT_X0 + LEFT_W - IN(6), IN(10), IN(1.75), IN(8)],
+                            [TV_R + IN(3), IN(8), IN(2), IN(9)], [TV_R + IN(8), IN(12), IN(1.75), IN(6)]]) {
   const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 12), candleMat); c.position.set(x, CAB_H + h / 2, z); scene.add(c);
   const f = new THREE.Mesh(new THREE.SphereGeometry(IN(0.6), 6, 5), basic(0xffc15a)); f.position.set(x, CAB_H + h + IN(0.9), z); f.scale.y = 1.7; scene.add(f); flames.push(f);
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
@@ -460,8 +460,8 @@ for (const [x, z, r, h] of [[MAIN_X0 + IN(10), IN(9), IN(2), IN(12)], [LEFT_X0 +
 }
 const candleLight = new THREE.PointLight(0xffb45a, 0.32, 6, 2); candleLight.position.set(0.2, CAB_H + FT(1.2), IN(30)); scene.add(candleLight);
 // white diffuser (~7") + pink salt lamp
-const diff = new THREE.Mesh(new THREE.SphereGeometry(IN(3.5), 12, 8), lam(0xf6f4ef)); diff.scale.y = 1.3; diff.position.set(MAIN_X0 + MAIN_W - IN(6), CAB_H + IN(4.5), IN(9)); scene.add(diff);
-box(IN(4), IN(4), IN(4), lam(0xf0b8a0), MAIN_X0 + IN(22), CAB_H + IN(2), IN(10));
+const diff = new THREE.Mesh(new THREE.SphereGeometry(IN(3.5), 12, 8), lam(0xf6f4ef)); diff.scale.y = 1.3; diff.position.set(MAIN_X0 + MAIN_W - IN(5), CAB_H + IN(4.5), IN(11)); scene.add(diff);
+box(IN(4), IN(4), IN(4), lam(0xf0b8a0), TV_L - IN(4), CAB_H + IN(2), IN(10));
 // right-corner black shelf (~4' tall, 14" wide) with a plant, and the paper star lamp (2' star on a 5' pole)
 const SHELF_W = IN(16), SHELF_X = MAIN_X0 + MAIN_W + IN(2) + SHELF_W / 2;          // leaves the far-right corner open
 box(SHELF_W, FT(4), IN(14), lam(0x1c1c1e), SHELF_X, FT(2), IN(7) + 0.02);
@@ -471,35 +471,80 @@ for (let i = 0; i < 7; i++) { const l = new THREE.Mesh(new THREE.SphereGeometry(
 (() => {
   const s = new THREE.Shape(), R = FT(1), r = FT(0.4);
   for (let i = 0; i < 10; i++) { const rr = i % 2 ? r : R, a = Math.PI / 2 + i * Math.PI / 5; (i ? s.lineTo : s.moveTo).call(s, Math.cos(a) * rr, Math.sin(a) * rr); }
-  const sx = MAIN_X0 + MAIN_W - IN(4);
+  const sx = MAIN_X0 + MAIN_W - IN(3);
   const star = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: IN(3), bevelEnabled: false }), lam(0xf1f1ee, { emissive: 0x303030 }));
   star.position.set(sx, FT(5), IN(4)); star.rotation.set(0.1, -0.35, 0.15); scene.add(star);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.5), IN(0.5), FT(4.5), 6), lam(0xd9d6cf)); pole.position.set(sx, FT(2.25), IN(6)); scene.add(pole);
 })();
-// left wall: window with blinds, 42" wide x 30" tall, sill at 4' (basement-style, high up)
-// right wall: interior doorway, 32" x 80" opening with 3" casing
-const WIN_W = IN(66), WIN_H = IN(30), WIN_SILL = FT(4), CASING = IN(3);
+// right wall: 32" x 80" doorway cut right through the wall, with a dim hallway behind it
+// left wall: 66" x 30" window starting at the same distance from the back wall as the door,
+//            blinds drawn 75% so daylight spills in through the bottom quarter
+const WIN_W = IN(66), WIN_H = IN(30), WIN_SILL = FT(4), CASING = IN(3), WALL_T = IN(5);
 const DOOR_W = IN(32), DOOR_H = IN(80), DOOR_Z = FT(5.4);
+const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // opening edges along the wall
 (() => {
-  const w = new THREE.Group(); w.position.set(-ROOM.halfW + 0.02, WIN_SILL + WIN_H / 2, FT(3.4)); w.rotation.y = Math.PI / 2; scene.add(w);
-  box(WIN_W + CASING * 2, WIN_H + CASING * 2, IN(1), trimMat, 0, 0, 0, w);
-  const bl = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W, WIN_H), lam(0xffffff, { map: blindsTex })); bl.position.z = IN(0.6); w.add(bl);
-  box(WIN_W + CASING * 2 + IN(2), IN(1.5), IN(3), trimMat, 0, -WIN_H / 2 - CASING, IN(1.5), w);   // sill
+  /* ---- right wall with the door opening notched out ---- */
+  const L = ROOM.visDepth, Hh = ROOM.wallH, ox = L / 2, oy = Hh / 2;   // shape coords are centred like a plane
+  const s = new THREE.Shape();
+  s.moveTo(-ox, -oy); s.lineTo(DOOR_Z0 - ox, -oy); s.lineTo(DOOR_Z0 - ox, DOOR_H - oy); s.lineTo(DOOR_Z1 - ox, DOOR_H - oy);
+  s.lineTo(DOOR_Z1 - ox, -oy); s.lineTo(ox, -oy); s.lineTo(ox, oy); s.lineTo(-ox, oy); s.lineTo(-ox, -oy);
+  const wt = panelTexSide.clone(); wt.needsUpdate = true; wt.repeat.set(1 / (IN(8) * 4), 1 / Hh);   // shape UVs are in world units
+  const rw = new THREE.Mesh(new THREE.ShapeGeometry(s), lam(0xf2efe8, { map: wt }));
+  rw.rotation.y = -Math.PI / 2; rw.position.set(ROOM.halfW, oy, L / 2); scene.add(rw);
+  box(0.05, 0.26, DOOR_Z0 - CASING, trimMat, ROOM.halfW - 0.025, 0.13, (DOOR_Z0 - CASING) / 2);                  // baseboard, split at the door
+  box(0.05, 0.26, L - DOOR_Z1 - CASING, trimMat, ROOM.halfW - 0.025, 0.13, (L + DOOR_Z1 + CASING) / 2);
+  // jambs + header give the opening its thickness
+  const jambMat = lam(0xe4e0d8);
+  box(WALL_T, DOOR_H, 0.03, jambMat, ROOM.halfW + WALL_T / 2, DOOR_H / 2, DOOR_Z0);
+  box(WALL_T, DOOR_H, 0.03, jambMat, ROOM.halfW + WALL_T / 2, DOOR_H / 2, DOOR_Z1);
+  box(WALL_T, 0.03, DOOR_W, jambMat, ROOM.halfW + WALL_T / 2, DOOR_H, DOOR_Z);
+  // the hallway beyond: dim blue-grey walls, darker floor, a far wall with a lit doorway
+  const HALL_D = FT(9), HALL_W = FT(6), hx = ROOM.halfW + WALL_T, hz0 = DOOR_Z - HALL_W / 2;
+  const hallWall = basic(0x3c4c57), hallFloor = basic(0x2e2c2a);
+  const hf = new THREE.Mesh(new THREE.PlaneGeometry(HALL_D, HALL_W), hallFloor); hf.rotation.x = -Math.PI / 2; hf.position.set(hx + HALL_D / 2, 0.005, DOOR_Z); scene.add(hf);
+  const far = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, FT(9)), basic(0x33424c)); far.rotation.y = -Math.PI / 2; far.position.set(hx + HALL_D, FT(4.5), DOOR_Z); scene.add(far);
+  for (const z of [hz0, hz0 + HALL_W]) {
+    const sw = new THREE.Mesh(new THREE.PlaneGeometry(HALL_D, FT(9)), hallWall);
+    sw.rotation.y = z === hz0 ? 0 : Math.PI; sw.position.set(hx + HALL_D / 2, FT(4.5), z); scene.add(sw);
+  }
+  const lit = new THREE.Mesh(new THREE.PlaneGeometry(IN(30), IN(78)), basic(0x8fa3ad)); lit.rotation.y = -Math.PI / 2; lit.position.set(hx + HALL_D - 0.01, IN(39), DOOR_Z + FT(1.2)); scene.add(lit);
+  const spill = new THREE.Mesh(new THREE.PlaneGeometry(FT(3), IN(30)), basic(0x5b6c75)); spill.rotation.x = -Math.PI / 2; spill.position.set(hx + HALL_D - FT(1.5), 0.01, DOOR_Z + FT(1.2)); scene.add(spill);
+  // casing on the room side
   const d = new THREE.Group(); d.position.set(ROOM.halfW - 0.02, 0, DOOR_Z); d.rotation.y = -Math.PI / 2; scene.add(d);
-  const gap = new THREE.Mesh(new THREE.PlaneGeometry(DOOR_W, DOOR_H), basic(0x2b3a44)); gap.position.set(0, DOOR_H / 2, IN(0.4)); d.add(gap);
   box(CASING, DOOR_H + CASING, IN(0.8), trimMat, -DOOR_W / 2 - CASING / 2, (DOOR_H + CASING) / 2, IN(0.4), d);
   box(CASING, DOOR_H + CASING, IN(0.8), trimMat, DOOR_W / 2 + CASING / 2, (DOOR_H + CASING) / 2, IN(0.4), d);
   box(DOOR_W + CASING * 2, CASING, IN(0.8), trimMat, 0, DOOR_H + CASING / 2, IN(0.4), d);
-  // wall sconce beside the door, like the photo
-  const sc = new THREE.Mesh(new THREE.SphereGeometry(IN(3), 10, 8), basic(0xfff1d6)); sc.scale.y = 1.4; sc.position.set(-DOOR_W / 2 - IN(14), FT(5.3), IN(4)); d.add(sc);
-  // tall grey-framed mirror (22" x 64") leaning against the right wall, back corner
-  const MIR_W = IN(22), MIR_H = IN(64), MIR_LEAN = Math.asin(IN(10) / MIR_H);
-  const mir = new THREE.Group(); mir.position.set(ROOM.halfW - IN(10) - 0.02, 0, FT(1.9)); mir.rotation.y = -Math.PI / 2; scene.add(mir);
+  const sc = new THREE.Mesh(new THREE.SphereGeometry(IN(3), 10, 8), basic(0xfff1d6)); sc.scale.y = 1.4; sc.position.set(-DOOR_W / 2 - IN(14), FT(5.3), IN(4)); d.add(sc);   // wall sconce
+
+  /* ---- window: starts where the door starts ---- */
+  const winZ = DOOR_Z0 + WIN_W / 2;
+  const w = new THREE.Group(); w.position.set(-ROOM.halfW + 0.02, WIN_SILL + WIN_H / 2, winZ); w.rotation.y = Math.PI / 2; scene.add(w);
+  box(WIN_W + CASING * 2, WIN_H + CASING * 2, IN(1), trimMat, 0, 0, 0, w);
+  const OPEN = 0.25, blindH = WIN_H * (1 - OPEN), openH = WIN_H * OPEN;
+  const sky = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W, WIN_H), basic(0xfdf7e8)); sky.position.z = IN(0.55); w.add(sky);          // bright daylight
+  const bt = blindsTex.clone(); bt.needsUpdate = true; bt.repeat.set(1, 3 * (1 - OPEN));
+  const bl = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W, blindH), lam(0xffffff, { map: bt })); bl.position.set(0, WIN_H / 2 - blindH / 2, IN(0.7)); w.add(bl);
+  box(WIN_W, IN(1.2), IN(1), lam(0xe8e5df), 0, WIN_H / 2 - blindH, IN(0.9), w);                                              // bottom rail
+  box(WIN_W + CASING * 2 + IN(2), IN(1.5), IN(3), trimMat, 0, -WIN_H / 2 - CASING, IN(1.5), w);                              // sill
+  // light coming in: a soft shaft from the open strip down onto the carpet, plus real light
+  const shaftTex = canvasTex(4, 64, (g, cw, ch) => { const gr = g.createLinearGradient(0, 0, 0, ch); gr.addColorStop(0, 'rgba(255,246,222,.3)'); gr.addColorStop(1, 'rgba(255,246,222,0)'); g.fillStyle = gr; g.fillRect(0, 0, cw, ch); }, 1, 1);
+  const shaftLen = FT(6.5), shaft = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W, shaftLen), basic(0xffffff, { map: shaftTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  const sy = WIN_SILL + openH / 2, dropAngle = 0.62;                                   // sun comes in and down
+  shaft.position.set(-ROOM.halfW + Math.sin(dropAngle) * shaftLen / 2, sy - Math.cos(dropAngle) * shaftLen / 2, winZ);
+  shaft.rotation.set(0, Math.PI / 2, 0); shaft.rotateX(-dropAngle);            // top at the window, foot out on the carpet scene.add(shaft);
+  const patchTex = canvasTex(64, 64, (g, cw, ch) => { const gr = g.createRadialGradient(32, 32, 4, 32, 32, 32); gr.addColorStop(0, 'rgba(255,244,215,.28)'); gr.addColorStop(1, 'rgba(255,244,215,0)'); g.fillStyle = gr; g.fillRect(0, 0, cw, ch); }, 1, 1);
+  const patch = new THREE.Mesh(new THREE.PlaneGeometry(FT(3.2), WIN_W * 1.1), basic(0xffffff, { map: patchTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  patch.rotation.x = -Math.PI / 2; patch.position.set(-ROOM.halfW + Math.tan(dropAngle) * sy, 0.012, winZ); scene.add(patch);
+  const sun = new THREE.PointLight(0xfff1d8, 0.25, 9, 2); sun.position.set(-ROOM.halfW + FT(1), WIN_SILL + openH, winZ); scene.add(sun);
+
+  /* ---- tall grey-framed mirror (18" x 52") leaning against the right wall, back corner ---- */
+  const MIR_W = IN(18), MIR_H = IN(52), MIR_LEAN = Math.asin(IN(8) / MIR_H);
+  const mir = new THREE.Group(); mir.position.set(ROOM.halfW - IN(8) - 0.02, 0, FT(1.8)); mir.rotation.y = -Math.PI / 2; scene.add(mir);
   const lean = new THREE.Group(); lean.rotation.x = -MIR_LEAN; mir.add(lean);                  // top rests on the wall
   const frameMat = lam(0x8f9296), frameDark = lam(0x72757a);
   box(MIR_W, MIR_H, IN(1.5), frameMat, 0, MIR_H / 2, 0, lean);
-  for (const [w, h, x, y] of [[MIR_W - IN(2), IN(1), 0, MIR_H - IN(2)], [MIR_W - IN(2), IN(1), 0, IN(2)], [IN(1), MIR_H - IN(4), -MIR_W / 2 + IN(1.5), MIR_H / 2], [IN(1), MIR_H - IN(4), MIR_W / 2 - IN(1.5), MIR_H / 2]])
-    box(w, h, IN(0.6), frameDark, x, y, IN(0.9), lean);                                          // raised panel moulding
+  for (const [bw, bh, x, y] of [[MIR_W - IN(2), IN(1), 0, MIR_H - IN(2)], [MIR_W - IN(2), IN(1), 0, IN(2)], [IN(1), MIR_H - IN(4), -MIR_W / 2 + IN(1.5), MIR_H / 2], [IN(1), MIR_H - IN(4), MIR_W / 2 - IN(1.5), MIR_H / 2]])
+    box(bw, bh, IN(0.6), frameDark, x, y, IN(0.9), lean);                                        // raised panel moulding
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(MIR_W - IN(5), MIR_H - IN(5)), basic(0xffffff, { map: mirrorTex }));
   glass.position.set(0, MIR_H / 2, IN(0.8)); lean.add(glass);
 })();
@@ -760,6 +805,7 @@ const MG = {
   fuse: new THREE.CylinderGeometry(0.022, 0.022, 0.22, 4),
   spark: new THREE.SphereGeometry(0.07, 6, 4),
   band: new THREE.TorusGeometry(0.19, 0.05, 5, 12),
+  xBar: new THREE.BoxGeometry(0.2, 0.045, 0.02),
 };
 const MM = {
   fur: lam(0x9b8f86), ear: lam(0xe7a3a0, { side: THREE.DoubleSide }), eye: new THREE.MeshBasicMaterial({ color: 0x111111 }),
@@ -767,6 +813,7 @@ const MM = {
   bombFur: lam(0x3b3538), bombEar: lam(0x6d4a4f, { side: THREE.DoubleSide }), bombEye: new THREE.MeshBasicMaterial({ color: 0xff3a24 }),
   bomb: lam(0x1b1a1c), fuse: lam(0x8a6a45), band: lam(0xd8402b),
   shadow: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }),
+  xEye: new THREE.MeshBasicMaterial({ color: 0x141010 }),
 };
 const RING_FAR = new THREE.Color(0xf6d56a), RING_NEAR = new THREE.Color(0xff3320);
 const easeBack = k => { const c = 1.9; return 1 + (c + 1) * (k - 1) ** 3 + c * (k - 1) ** 2; };
@@ -793,6 +840,12 @@ class Mouse {
     this.shadow = new THREE.Mesh(MG.shadow, MM.shadow); this.shadow.rotation.x = -Math.PI / 2; this.shadow.position.y = 0.012; this.root.add(this.shadow);
     this.ringMat = new THREE.MeshBasicMaterial({ color: 0xf6d56a, transparent: true, opacity: 0, depthWrite: false });
     this.ring = new THREE.Mesh(MG.ring, this.ringMat); this.ring.rotation.x = -Math.PI / 2; this.ring.position.y = 0.02; this.root.add(this.ring);
+    // cartoon X eyes for the knock-out; they sit on the root (not the squashed model) and face the camera
+    this.xEyes = new THREE.Group(); this.xEyes.visible = false; this.root.add(this.xEyes);
+    for (const sx of [-1, 1]) for (const a of [0.785, -0.785]) {
+      const bar = new THREE.Mesh(MG.xBar, MM.xEye); bar.position.set(sx * 0.13, 0, 0); bar.rotation.z = a; this.xEyes.add(bar);
+    }
+    this.xEyes.rotation.x = -1.05;
     this.active = false;
     this.center = new THREE.Vector3();
     scene.add(this.root);
@@ -816,6 +869,8 @@ class Mouse {
     for (const e of this.ears) e.material = isBomb ? MM.bombEar : MM.ear;
     for (const e of this.eyes) e.material = isBomb ? MM.bombEye : MM.eye;
     this.bombRig.visible = isBomb;
+    this.xEyes.visible = false;
+    for (const e of this.eyes) e.visible = true;
     this.ring.visible = !isBomb;   // no threat ring on bombs: "no ring = hands off"
     this.ringMat.opacity = 0;
     this.setState('emerge');
@@ -825,7 +880,7 @@ class Mouse {
   dropCheese() { if (this.target && this.target.claimant === this) this.target.drop(); }
   get hittable() {
     if (!this.active) return false;
-    if (this.isBomb) return this.age >= CFG.BOMB_TELEGRAPH && (this.state === 'emerge' || this.state === 'peek' || this.state === 'run' || this.state === 'loiter' || this.state === 'home');
+    if (this.isBomb) return this.age >= CFG.BOMB_TELEGRAPH && (this.state === 'emerge' || this.state === 'peek' || this.state === 'run' || this.state === 'loiter' || this.state === 'taunt' || this.state === 'home');
     if (this.state === 'retreat') return this.t < 0.18;
     return this.state === 'emerge' || this.state === 'peek' || this.state === 'run' || this.state === 'grab' || this.state === 'carry' || this.state === 'home';
   }
@@ -867,7 +922,8 @@ class Mouse {
         this.model.rotation.y = Math.sin(time * 5 + this.hole.x) * 0.3;
         if (this.t >= this.pauseTime) {
           this.model.rotation.set(0, 0, 0);
-          if (this.willRetreat) this.setState('retreat');
+          if (this.isBomb && !this.attract) this.setState('taunt');     // bombs never go for the cheese
+          else if (this.willRetreat) this.setState('retreat');
           else { this.target = nearestCheese(p); this.setState(this.target ? 'run' : 'retreat'); }
         }
         break;
@@ -904,6 +960,14 @@ class Mouse {
         } else { p.copy(h); onCheeseStolen(this, c); this.setState('retreat'); }
         break;
       }
+      case 'taunt': {  // bomb mouse dances at the mouth of its hole, daring the cat to swipe
+        const h = this.hole, out = 0.25 + 0.25 * (0.5 + 0.5 * Math.sin(this.t * 3.2));
+        const side = Math.sin(this.t * 5.5) * 0.28, nx = h.normal.x, nz = h.normal.z;
+        p.set(h.mouthOut.x + nx * out - nz * side, 0, h.mouthOut.z + nz * out + nx * side);
+        this.root.rotation.y = Math.atan2(nx, nz) + Math.sin(this.t * 5.5) * 0.5;
+        bob = Math.abs(Math.sin(this.t * 7)) * 0.12;                     // little hops
+        break;
+      }
       case 'loiter': {
         this.model.rotation.y = Math.sin(time * 4) * 0.4;
         break;
@@ -931,10 +995,13 @@ class Mouse {
         break;
       }
       case 'whacked': {
+        if (!this.xEyes.visible) { this.xEyes.visible = true; for (const e of this.eyes) e.visible = false; }
+        this.xEyes.position.set(0, 0.2 * this.pop * this.visScale, 0.42 * this.pop * this.visScale);
+        this.xEyes.scale.setScalar(Math.max(0.001, this.pop * this.visScale));
         const k = Math.min(1, this.t / 0.09);
         this.sqY = 1 - 0.85 * k; this.sqXZ = 1 + 0.5 * k;
-        if (this.t > 0.35) this.pop = Math.max(0, 1 - (this.t - 0.35) / 0.2);
-        if (this.t > 0.55) this.release();
+        if (this.t > 0.55) this.pop = Math.max(0, 1 - (this.t - 0.55) / 0.2);   // hold the X-eyed pose a beat
+        if (this.t > 0.75) this.release();
         break;
       }
     }
