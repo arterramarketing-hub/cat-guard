@@ -6,7 +6,7 @@
 <title>Princess Kitty Defender</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Permanent+Marker&family=Figtree:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Pacifico&family=Permanent+Marker&family=Figtree:wght@500;700;800&display=swap">
 <style>
   /* Single deliberate look: a lamplit living room at night, cartoon "sticker" UI on top. */
   :root{
@@ -33,10 +33,10 @@
        padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 0}
   .hud-bar{width:100%;max-width:780px;background:var(--hud);border:1.5px solid rgba(251,241,220,.14);border-radius:16px;
            padding:8px 12px;display:grid;align-items:center;column-gap:0;row-gap:8px;
-           grid-template-columns:auto auto 1fr minmax(96px,auto) auto;grid-template-areas:"score cheese lives heat pause"}
+           grid-template-columns:auto auto auto 1fr minmax(84px,auto) auto;grid-template-areas:"score time cheese lives heat pause"}
   .hud-cell{display:grid;gap:3px;padding:0 14px;border-left:1px solid rgba(251,241,220,.12);min-width:0}
   .c-score{grid-area:score;padding-left:2px;border-left:0}
-  .c-cheese{grid-area:cheese}.c-lives{grid-area:lives}.c-heat{grid-area:heat}
+  .c-time{grid-area:time}.c-cheese{grid-area:cheese}.c-lives{grid-area:lives}.c-heat{grid-area:heat}
   .c-pause{grid-area:pause;margin-left:6px}
   .val-row{display:flex;align-items:center;gap:6px}
   .lbl-split{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -44,33 +44,33 @@
   .stack{display:grid;gap:2px}
   .score-val{font-family:var(--display);font-size:26px;line-height:1;color:var(--cheese);font-variant-numeric:tabular-nums;min-width:3ch}
   .combo{font-weight:800;font-size:13px;color:var(--paper);background:var(--danger);border-radius:6px;padding:1px 6px;align-self:center}
-  .lives{display:grid;grid-template-columns:repeat(9,13px);gap:2px}
-  .pip{width:13px;height:13px;color:var(--paper);transition:opacity .25s,transform .25s}
-  .pip.lost{opacity:.16;transform:scale(.8)}
+  .lives{display:grid;grid-template-columns:repeat(9,17px);gap:2px}
+  .pip{width:17px;height:17px;color:var(--paper);transition:color .25s}
+  .pip.lost{color:#6b635b}
   .lives.hurt .pip:not(.lost){color:#ffb4a4}
   .cheeses{display:flex;gap:6px}
   .wedge{width:34px;height:23px;display:block}
   .wedge path{fill:var(--cheese);stroke:var(--cheese-deep);stroke-width:1.4;stroke-linejoin:round;transition:fill .2s}
   .wedge.moved path{fill:#f0983a}
   .wedge.carried path{fill:var(--danger);animation:blink .35s infinite alternate}
-  .wedge.gone path{fill:transparent;stroke:rgba(251,241,220,.3);stroke-dasharray:2 2}
+  .wedge.gone path{fill:#6b635b;stroke:#4a443f}
   @keyframes blink{to{opacity:.35}}
-  .time{font-variant-numeric:tabular-nums;font-weight:800;font-size:13px;letter-spacing:0;text-transform:none;color:var(--paper);min-width:4ch;text-align:right}
+  .time{font-variant-numeric:tabular-nums;font-weight:800;font-size:19px;line-height:1;letter-spacing:0;text-transform:none;color:var(--paper);min-width:4ch}
   .heat{width:100%;min-width:72px;height:6px;border-radius:3px;background:rgba(251,241,220,.16);overflow:hidden}
   .heat i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cheese),var(--danger));transition:width .5s}
   @media (max-width:560px){
-    .hud-bar{grid-template-columns:auto auto 1fr auto auto;grid-template-areas:"score cheese lives heat pause";padding:6px 8px;border-radius:13px}   /* one compact row on phones */
-    .hud-cell{padding:0 6px;gap:2px}
+    .hud-bar{grid-template-columns:auto auto auto 1fr auto auto;grid-template-areas:"score time cheese lives heat pause";padding:6px 7px;border-radius:13px}   /* one compact row on phones */
+    .hud-cell{padding:0 5px;gap:2px}
     .c-score{padding-left:0}
     .lbl{font-size:7.5px;letter-spacing:.08em}
     .score-val{font-size:19px;min-width:2ch}
     .combo{font-size:10px;padding:0 4px}
     .wedge{width:20px;height:14px}
     .cheeses{gap:2px}
-    .lives{grid-template-columns:repeat(9,8px);gap:1px}
-    .pip{width:8px;height:8px}
-    .heat{min-width:38px}
-    .time{font-size:10px;min-width:3ch}
+    .lives{grid-template-columns:repeat(9,10px);gap:1px}
+    .pip{width:10px;height:10px}
+    .heat{min-width:30px}
+    .time{font-size:13px;min-width:3.4ch}
     .lbl-split{gap:4px}
     .c-pause{margin-left:4px}
     .hud .icon-btn{width:28px;height:28px;border-radius:8px}
@@ -98,6 +98,12 @@
   h1,h2{font-family:var(--display);font-weight:400;margin:0;line-height:.9;text-wrap:balance}
   h1{font-size:clamp(38px,11vw,56px);letter-spacing:-.01em}
   h1 .g{color:var(--cheese);-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;display:inline-block;transform:rotate(-3deg)}
+  /* feminine title: a little jewelled crown, a pink script "Princess Kitty", and a pastel-pink bubbly "Defender" */
+  .title{display:grid;justify-items:center;text-align:center;gap:2px}
+  .title .crown{width:54px;height:30px;margin-bottom:-6px;filter:drop-shadow(0 2px 0 var(--ink))}
+  .title .pk{font-family:"Pacifico",cursive;font-size:clamp(34px,10vw,48px);line-height:1.15;color:#ff5fa2;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;text-shadow:0 3px 0 var(--ink)}
+  .title .g{color:#ffc2dc;font-size:clamp(34px,10vw,50px);-webkit-text-stroke:3px var(--ink);text-shadow:0 4px 0 var(--ink);transform:rotate(-2deg)}
+  .title .g::before,.title .g::after{content:"♥";font-size:.42em;color:#ff5fa2;vertical-align:middle;margin:0 .18em;-webkit-text-stroke:1.5px var(--ink)}
   h2{font-size:clamp(32px,10vw,42px)}
   .rules{list-style:none;margin:0;padding:0;display:grid;gap:10px}
   .rules li{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;font-size:14.5px;line-height:1.35}
@@ -117,7 +123,9 @@
   .pick:focus-visible{outline:3px solid var(--danger);outline-offset:2px}
   .wedge.mush .cap{fill:#d23a3a;stroke:#6e1b1b}
   .wedge.mush .stem{fill:#ecdfc4;stroke:#a8977a}
-  .wedge.gone circle{opacity:.15}
+  .wedge.gone circle{fill:#8f877f}
+  .wedge.mush.gone .cap{fill:#6b635b;stroke:#4a443f}
+  .wedge.mush.gone .stem{fill:#857d75;stroke:#4a443f}
   .link-btn{appearance:none;background:none;border:none;font:inherit;color:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:4px 0}
   .reason{margin:0;font-size:15px;color:#5a4633}
   .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0}
@@ -154,9 +162,10 @@
 <div class="hud" id="hud" hidden>
   <div class="hud-bar">
     <div class="hud-cell c-score"><span class="lbl">Score</span><div class="val-row"><span class="score-val" id="score">0</span><span class="combo" id="combo" hidden>x2</span></div></div>
+    <div class="hud-cell c-time"><span class="lbl">Time</span><span class="time" id="time">0:00</span></div>
     <div class="hud-cell c-cheese"><span class="lbl" id="prizeLabel">Cheese</span><div class="cheeses" id="cheeses"></div></div>
     <div class="hud-cell c-lives"><span class="lbl">Lives</span><div class="lives" id="lives"></div></div>
-    <div class="hud-cell c-heat"><span class="lbl lbl-split"><span>Heat</span><span class="time" id="time">0:00</span></span><div class="heat"><i id="heat"></i></div></div>
+    <div class="hud-cell c-heat"><span class="lbl">Heat</span><div class="heat"><i id="heat"></i></div></div>
     <button class="icon-btn c-pause" id="pauseBtn" aria-label="Pause">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="1" width="3.5" height="12" rx="1"/><rect x="8.5" y="1" width="3.5" height="12" rx="1"/></svg>
     </button>
@@ -166,22 +175,25 @@
 <!-- Start -->
 <section class="screen" id="startScreen">
   <div class="card">
-    <h1>Princess Kitty <span class="g">Defender</span></h1>
+    <h1 class="title" aria-label="Princess Kitty Defender">
+      <svg class="crown" viewBox="0 0 54 30" aria-hidden="true"><path d="M4 27 L2 8 L15 17 L27 3 L39 17 L52 8 L50 27 Z" fill="#f7c948" stroke="#1f1712" stroke-width="2.4" stroke-linejoin="round"/><circle cx="27" cy="18" r="3.4" fill="#ff5fa2" stroke="#1f1712" stroke-width="1.5"/><circle cx="14" cy="21" r="2.3" fill="#7fd3f7" stroke="#1f1712" stroke-width="1.2"/><circle cx="40" cy="21" r="2.3" fill="#7fd3f7" stroke="#1f1712" stroke-width="1.2"/></svg>
+      <span class="pk">Princess Kitty</span><span class="g">Defender</span>
+    </h1>
     <ul class="rules">
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><ellipse cx="17" cy="24" rx="14" ry="6" fill="none" stroke="#e2452c" stroke-width="3"/><ellipse cx="17" cy="19" rx="7" ry="6" fill="#9b8f86" stroke="#1f1712" stroke-width="1.5"/><circle cx="12" cy="12" r="3.5" fill="#e7a3a0" stroke="#1f1712" stroke-width="1.5"/><circle cx="22" cy="12" r="3.5" fill="#e7a3a0" stroke="#1f1712" stroke-width="1.5"/></svg>
-        <span><b>Swipe mice before they haul the <span class="pw-one">cheese</span> home.</b> The bigger a mouse looks, the closer it is to stealing.</span>
+        <span><b>Tap the mice</b> before they steal your mushrooms.</span>
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="16" cy="20" r="10" fill="#1f1712"/><path d="M20 11 q3 -5 7 -4" stroke="#8a6a45" stroke-width="2" fill="none"/><circle cx="27" cy="7" r="3.5" fill="#ffb02e"/><circle cx="27" cy="7" r="1.6" fill="#fff4c2"/></svg>
-        <span><b>Leave bomb mice alone.</b> A shade darker, carrying a lit bomb. Tapping one costs the cat a life. They taunt from their hideouts, and guard the very last <span class="pw-one">cheese</span>.</span>
+        <span><b>Don’t tap bomb mice.</b> It costs a life.</span>
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><path d="M13 17 L21 17 Q23.5 27 22.5 30 L11.5 30 Q10.5 27 13 17 Z" fill="#ecdfc4" stroke="#1f1712" stroke-width="1.8"/><path d="M3 18 Q3 4 17 4 Q31 4 31 18 Z" fill="#d23a3a" stroke="#1f1712" stroke-width="2"/><circle cx="10" cy="11" r="2.2" fill="#fff"/><circle cx="18" cy="8" r="2" fill="#fff"/><circle cx="25" cy="12" r="2" fill="#fff"/></svg>
-        <span>Swipe a thief and it <b>drops the <span class="pw-one">cheese</span> where it stands</b>, often nearer a hole. Lose all three <span class="pw-many">cheeses</span>, or all <b>9 lives</b>, and it's over.</span>
+        <span>Lose all <b>3 mushrooms</b> or <b>9 lives</b> and it’s over.</span>
       </li>
     </ul>
-    <button class="btn" id="startBtn">Protect your home</button>
+    <button class="btn" id="startBtn">Start your mission</button>
     <div class="foot"><span>Best: <span id="bestStart">—</span></span><span class="foot-btns"><button class="link-btn" id="musicBtn">Music: on</button></span></div>
   </div>
 </section>
@@ -595,7 +607,7 @@ function updateBlanket(dt, time) {
         b.heap.visible = false; b.heap.scale.setScalar(1);
         b.burrito.position.set(b.to.x, 0, b.to.z); b.burrito.rotation.set(0, Math.random() * 6, 0); b.burrito.visible = true; b.roll.rotation.set(0, 0, 0);
         if (b.victim && b.victim.active) burritoMouse(b.victim);
-        b.state = 'burrito'; b.bt = 0; sfx.padThud(0.9); sfx.squeak(3);
+        b.state = 'burrito'; b.bt = 0.7; sfx.padThud(0.9); sfx.squeak(3);   // (skips the wriggle: rolls away at once)
       } else if (b.dest === 'cat') {                                         // lands on the cat
         b.heap.visible = false; b.lump.visible = true; b.lump.position.set(CAT_POS.x, BOX.h - 0.12, CAT_POS.z);
         catCard.visible = catTail.visible = false; b.state = 'cat'; b.rumbleT = 0; sfx.wail(); shake = Math.max(shake, 0.1);
@@ -610,9 +622,9 @@ function updateBlanket(dt, time) {
       b.roll.scale.set(1 + Math.sin(b.bt * 40) * 0.06, 1 + Math.cos(b.bt * 33) * 0.08, 1 + Math.sin(b.bt * 27) * 0.06); b.roll.rotation.y = Math.sin(b.bt * 25) * 0.12;
       if (Math.random() < dt * 6) sfx.rumble();
     } else {                                                           // ...then roll away off the bottom of the screen
-      if (!b.dir.lengthSq()) { const p = b.burrito.position; b.dir.set(-p.x * 0.28, 0, 1).normalize();   // down the open middle of the room, clear of the sofas b.burrito.rotation.set(0, Math.atan2(b.dir.x, b.dir.z), 0); sfx.whoosh(); }
+      if (!b.dir.lengthSq()) { const p = b.burrito.position; b.dir.set(-p.x * 0.28, 0, 1).normalize(); /* down the open middle of the room, clear of the sofas */ b.burrito.rotation.set(0, Math.atan2(b.dir.x, b.dir.z), 0); sfx.whoosh(); }
       b.roll.scale.set(1, 1, 1); b.roll.rotation.y = 0;
-      const sp = Math.min(6, (b.bt - 0.7) * 9);
+      const sp = Math.min(6, 3.5 + (b.bt - 0.7) * 9);
       b.burrito.position.addScaledVector(b.dir, sp * dt); b.roll.rotation.x += sp * dt / 0.3;
       b.burrito.position.x = Math.max(-ROOM.halfW + 0.4, Math.min(ROOM.halfW - 0.4, b.burrito.position.x));
       if (b.bt > 1.2 && !onScreen(b.burrito.position)) { b.burrito.visible = false; b.dir.set(0, 0, 0); b.state = 'sofa'; if (blanketDrape) blanketDrape.visible = true; }   // back on the sofa
@@ -761,16 +773,20 @@ const stuffMats = [0, 1, 2].map(v => new THREE.SpriteMaterial({ transparent: tru
   g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 0.7;                // loose fibres pulling out of it
   for (let i = 0; i < 40; i++) { const a = Math.random() * 6.28, r0 = 6 + Math.random() * 8, r1 = r0 + 6 + Math.random() * 12; g.beginPath(); g.moveTo(32 + Math.cos(a) * r0, 32 + Math.sin(a) * r0); g.quadraticCurveTo(32 + Math.cos(a + 0.4) * (r0 + r1) / 2, 32 + Math.sin(a + 0.4) * (r0 + r1) / 2, 32 + Math.cos(a) * r1, 32 + Math.sin(a) * r1); g.stroke(); }
 }, 1, 1) }));
+function spawnStuffing(at, n, out) {                                 // a burst of wispy stuffing (out: optional push direction)
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Sprite(stuffMats[i % 3]), sz = IN(0.8 + Math.random() * 1.9);
+    m.scale.set(sz * (3.1 + Math.random() * 1.2), sz * (2.3 + Math.random() * 0.7), 1);
+    m.position.copy(at); scene.add(m);
+    const a = Math.random() * Math.PI * 2, sp = 0.5 + Math.random() * 2.4;
+    const v = new THREE.Vector3(Math.cos(a) * sp, 1.4 + Math.random() * 2.6, Math.sin(a) * sp); if (out) v.addScaledVector(out, 1.5 + Math.random() * 1.5);
+    fluff.push({ m, v, drag: 0.6 + Math.random() * 1.8, down: false, rest: sz * 1.05, spin: (Math.random() - 0.5) * 6 });
+  }
+}
 function ripPillow(p) {
   const o = p.obj; o.scale.x = 0.35; o.position.y = groundY(o.position.x, o.position.z) + IN(1.2);   // the empty casing goes flat
   sfx.scratch(3); noise(0.35, 0.12, 900); shake = Math.max(shake, reduceMotion ? 0.03 : 0.12);
-  for (let i = 0; i < 40; i++) {
-    const m = new THREE.Sprite(stuffMats[i % 3]), sz = IN(0.8 + Math.random() * 1.9);
-    m.scale.set(sz * (3.1 + Math.random() * 1.2), sz * (2.3 + Math.random() * 0.7), 1);
-    m.position.copy(o.position).setY(o.position.y + IN(1)); scene.add(m);
-    const a = Math.random() * Math.PI * 2, sp = 0.5 + Math.random() * 2.4;
-    fluff.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, 1.4 + Math.random() * 2.6, Math.sin(a) * sp), drag: 0.6 + Math.random() * 1.8, down: false, rest: sz * 1.05, spin: (Math.random() - 0.5) * 6 });
-  }
+  spawnStuffing(o.position.clone().setY(o.position.y + IN(1)), 40);
 }
 function updateFluff(dt) {
   for (const f of fluff) {
@@ -1462,8 +1478,9 @@ function scratchCouch(side, point, normal) {
   }
   mark.userData.level = Math.min(3, mark.userData.level + 1);
   mark.material = scratchMats[mark.userData.level - 1];
-  if (mark.userData.level === 3 && !mark.userData.stuffed) {            // shredded: stuffing pokes out of this spot
+  if (mark.userData.level === 3 && !mark.userData.stuffed) {            // shredded: stuffing pokes out of this spot and bursts all over
     mark.userData.stuffed = true;
+    spawnStuffing(point.clone().addScaledVector(normal, 0.06), 28, normal.clone().setY(0).normalize());
     for (let k = 0; k < 4; k++) {
       const f = new THREE.Mesh(fluffGeo, fluffMat); f.position.copy(point).addScaledVector(normal, 0.03 + Math.random() * 0.04);
       f.position.x += (Math.random() - 0.5) * 0.3; f.position.z += (Math.random() - 0.5) * 0.3; f.position.y += (Math.random() - 0.5) * 0.2;
