@@ -167,7 +167,8 @@
   .float.hearts{color:#ff4f7a;font-size:12px;letter-spacing:1px}
   .float.chaos{color:#c9a8ff;font-size:17px}
   .float.shot{color:#ff2a2a;font-size:24px}
-  .alt-mode{display:flex;justify-content:center;margin-top:-4px;font-size:14px;font-weight:700;color:#8a4a70}
+  .foot-3{display:grid;grid-template-columns:1fr auto 1fr;gap:8px}.foot-3>:last-child{justify-self:end}   /* Best | Chaos mode | Music, chaos dead centre */
+  .chaos-link{color:#7a3fb8}
   .float.bad{color:var(--danger);font-size:26px}
   .float.warn{color:#ffd3e8;font-size:17px;animation-duration:1.6s}
   @keyframes rise{0%{opacity:0;transform:translate(-50%,-30%) scale(.5)}15%{opacity:1;transform:translate(-50%,-70%) scale(1.12)}100%{opacity:0;transform:translate(-50%,-180%) scale(1)}}
@@ -226,8 +227,7 @@
       </li>
     </ul>
     <button class="btn" id="startBtn">Start your mission</button>
-    <div class="alt-mode"><button class="link-btn" id="chaosBtn">Chaos mode</button></div>
-    <div class="foot"><span>Best: <span id="bestStart">—</span></span><span class="foot-btns"><button class="link-btn" id="musicBtn">Music: on</button></span></div>
+    <div class="foot foot-3"><span>Best: <span id="bestStart">—</span></span><button class="link-btn chaos-link" id="chaosBtn">Chaos mode</button><span class="foot-btns"><button class="link-btn" id="musicBtn">Music: on</button></span></div>
   </div>
 </section>
 
@@ -304,7 +304,6 @@ const CFG = {
   runSpeed:        [2.2, 4.4],  // world units per second toward the cheese
   grabTime:        [0.7, 0.35], // seconds a mouse tugs at the cheese before hauling it off
   CARRY_SPEED:     0.6,         // carrying speed as a fraction of runSpeed
-  CARRY_LIFT:      0.42,        // how high a carried mushroom is hoisted over the mouse's head
   SPEED_VARIANCE:  0.15,        // ± per-mouse speed randomness
 
   // ---- Threat readability ------------------------------------------
@@ -362,7 +361,7 @@ function getDifficulty(t) {
    WORLD LAYOUT  (x: left/right, z: back wall = 0 → toward camera)
    ===================================================================== */
 const ROOM = { halfW: 5.2, depth: 13, wallH: 18, visDepth: 18.4 };  // visDepth: the room ends about 4 ft past the fireplace
-const CEIL_H = 8 / 1.3;                                             // a real 8 ft ceiling (1 unit = 1.3 ft)  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
+const CEIL_H = 5.65;                                                // low ceiling, ~7.3 ft (1 unit = 1.3 ft): just clears the mantle mirror  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
 /* ACCESS POINTS — where mice come in and go home.
    kind 'couch': out from under a sofa · 'wall': a mouse hole · 'door': through the doorway from the hall.
    x/z is the point on the edge, n is the direction the mouse walks out. */
@@ -1029,13 +1028,38 @@ function makePistol() {
     dresserDoors.push(rig);
   });
 }
-// folded blanket stack (~20") with the striped blanket on top
+// three zip-up fabric blanket organizers stacked on the cabinet, clear vinyl windows showing the blankets inside;
+// the top one has a clear lid, so you can see the striped blanket's four lines of colour from above
 const blankX = LEFT_X0 + LEFT_W * 0.45;
-[0x9a9ca0, 0xc9c6bf, 0x7f8388, 0xb5b3ad, 0xa7a49d].forEach((c, i) =>
-  box(FT(2.6) - i * IN(1), IN(3), IN(15), lam(c), blankX + (i % 2) * IN(1), CAB_H + IN(1.5) + i * IN(3), IN(9)));
-const striped = box(FT(2.8), IN(7), IN(17), lam(0xffffff, { map: stripeTex }), blankX, CAB_H + IN(15) + IN(3.5), IN(9.5));
-striped.rotation.z = 0.04;
-box(IN(7), IN(4), IN(4), lam(0x1b1b1b), blankX + IN(4), CAB_H + IN(22.5), IN(7));               // little speaker
+{
+  const fabricTex = canvasTex(64, 64, (g, w, h) => {                  // heathered linen-look fabric
+    g.fillStyle = '#d9d4cc'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 700; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(90,80,70,.10)' : 'rgba(255,255,255,.25)'; g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1); }
+  }, 3, 2);
+  const foldTex = (cols) => canvasTex(64, 64, (g, w, h) => {          // folded blankets seen edge-on: soft stacked bands
+    cols.forEach((c, i) => { g.fillStyle = c; g.fillRect(0, i * h / cols.length, w, h / cols.length); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, (i + 1) * h / cols.length - 2, w, 2); });
+  }, 1, 1);
+  const fabric = lam(0xffffff, { map: fabricTex }), trim = lam(0x6b645c), strap = lam(0x4a443e);
+  const vinyl = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, shininess: 120, specular: 0xffffff, depthWrite: false });
+  const insides = [lam(0xffffff, { map: foldTex(['#9a9ca0', '#c9c6bf', '#7f8388', '#b5b3ad']) }), lam(0xffffff, { map: foldTex(['#b9a88f', '#2f6f73', '#c9c6bf', '#8d8f93']) }), lam(0xffffff, { map: stripeTex })];
+  const OW = FT(2.2), OD = IN(15), OH = IN(9.5), z = IN(9.5);
+  for (let i = 0; i < 3; i++) {
+    const x = blankX + (i % 2 ? IN(0.7) : 0), y0 = CAB_H + i * OH;
+    box(OW, OH - IN(0.2), OD, fabric, x, y0 + OH / 2, z);                                               // the fabric box
+    box(OW + IN(0.2), IN(0.35), OD + IN(0.2), trim, x, y0 + OH - IN(0.9), z);                         // zip line round the top
+    for (const sx of [-1, 1]) box(IN(0.5), IN(1.2), IN(4.5), strap, x + sx * (OW / 2 + IN(0.2)), y0 + OH * 0.62, z);   // carry handles
+    const fw = OW * 0.78, fh = OH * 0.56, fy = y0 + OH * 0.44, fz = z + OD / 2;
+    box(fw + IN(1), fh + IN(1), IN(0.2), trim, x, fy, fz);                                             // window binding
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), insides[i]); win.position.set(x, fy, fz + IN(0.12)); scene.add(win);
+    const gloss = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), vinyl); gloss.position.set(x, fy, fz + IN(0.16)); scene.add(gloss);
+    if (i === 2) {                                                    // clear lid: the striped blanket, folded flat, seen from above
+      const tw = OW * 0.84, td = OD * 0.78, ty = y0 + OH - IN(0.1);
+      box(tw + IN(1), IN(0.2), td + IN(1), trim, x, ty, z);
+      const top = new THREE.Mesh(new THREE.PlaneGeometry(tw, td), lam(0xffffff, { map: stripeTex })); top.rotation.x = -Math.PI / 2; top.position.set(x, ty + IN(0.12), z); scene.add(top);
+      const lid = new THREE.Mesh(new THREE.PlaneGeometry(tw, td), vinyl); lid.rotation.x = -Math.PI / 2; lid.position.set(x, ty + IN(0.16), z); scene.add(lid);
+    }
+  }
+}
 // 55" TV (48" x 28"), switched off
 const MAIN_CX = MAIN_X0 + MAIN_W * 0.46;
 const TV_SCALE = 65 / 55;                                                  // 65" TV (57" x 32")
@@ -1739,18 +1763,46 @@ let fireRig = null, mantleMirror = null;
   // plants: a tall leafy one in a ribbed grey pot (the photo's) and a little trailing one
   const potMat = lam(0x55585d), leafMat2 = lam(0x3e7a3c), leafMat3 = lam(0x5a9a4a);
   const leafGeo = new THREE.ConeGeometry(IN(0.9), IN(14), 4); leafGeo.translate(0, IN(7), 0); leafGeo.scale(1, 1, 0.25);
+  const dirtMat = lam(0x3a2a1c), dirtMat2 = lam(0x52402c);
+  // a knocked-off plant smashes on the carpet: broken pot, a mound of soil, crumbs flung everywhere, leaves splayed out
+  const plantSmash = (g, potM, potR, size) => {
+    const wreck = new THREE.Group(); wreck.visible = false; scene.add(wreck);
+    const mound = new THREE.Mesh(new THREE.SphereGeometry(potR * 1.5, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), dirtMat); mound.scale.y = 0.35; wreck.add(mound);
+    for (let i = 0; i < 34; i++) {
+      const c = new THREE.Mesh(new THREE.SphereGeometry(IN(0.5 + Math.random() * 0.9), 5, 4), i % 3 ? dirtMat : dirtMat2);
+      const a = Math.random() * 6.28, d = potR + Math.random() * 0.8 * size; c.position.set(Math.cos(a) * d, IN(0.2), Math.sin(a) * d); c.scale.y = 0.5; wreck.add(c);
+    }
+    for (let i = 0; i < 5; i++) {                                     // curved pot shards
+      const sh = new THREE.Mesh(new THREE.CylinderGeometry(potR, potR * 0.85, IN(2 + Math.random() * 2.5), 8, 1, true, 0, 0.9 + Math.random() * 0.6), potM.clone()); sh.material.side = THREE.DoubleSide;
+      const a = i / 5 * 6.28 + Math.random(), d = potR * 1.6 + Math.random() * 0.35 * size; sh.position.set(Math.cos(a) * d, IN(0.8), Math.sin(a) * d); sh.rotation.set(Math.PI / 2, Math.random() * 6, Math.random() * 6); wreck.add(sh);
+    }
+    for (let i = 0; i < 8; i++) {                                     // leaves lying splayed out of the soil
+      const lg = new THREE.Group(); lg.rotation.y = i * 0.8 + Math.random() * 0.4; wreck.add(lg);
+      const l = new THREE.Mesh(leafGeo, i % 2 ? leafMat2 : leafMat3); l.rotation.x = Math.PI / 2 - 0.12; l.position.y = IN(0.6); l.scale.setScalar(0.7 * size); lg.add(l);
+    }
+    return {
+      onLand: p => {
+        p.broken = true; p.state = 'down'; g.visible = false;
+        wreck.position.set(g.position.x, 0.01, g.position.z); wreck.rotation.y = Math.random() * 6; wreck.visible = true;
+        burst(g.position.clone().setY(0.2), 0x4a3625, 18, 2.2, 1.8, 0.6); burst(g.position.clone().setY(0.2), 0x6a6d72, 6, 1.6, 1.4, 0.4);
+        sfx.shatter(); sfx.padThud(1); shake = Math.max(shake, reduceMotion ? 0.03 : 0.15);
+        bonus(60, g.position, 'Smashed!');
+      },
+      onReset: () => { g.visible = true; wreck.visible = false; },
+    };
+  };
   {
     const g = new THREE.Group(); onMantle(g, W * 0.36, IN(6)); g.position.y += IN(3);
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(IN(3.4), IN(2.6), IN(6), 16), potMat));
     for (let i = 0; i < 16; i++) { const rib = new THREE.Mesh(new THREE.BoxGeometry(IN(0.35), IN(5.8), IN(0.35)), lam(0x6a6d72)); const a = i / 16 * Math.PI * 2; rib.position.set(Math.cos(a) * IN(3.05), 0, Math.sin(a) * IN(3.05)); rib.rotation.set(Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12); g.add(rib); }
     for (let i = 0; i < 11; i++) { const l = new THREE.Mesh(leafGeo, i % 2 ? leafMat2 : leafMat3); const a = i * 2.4; l.position.y = IN(2.5); l.rotation.set(Math.sin(a) * (0.25 + (i % 3) * 0.15), a, Math.cos(a) * (0.25 + (i % 3) * 0.15)); l.scale.setScalar(0.8 + (i % 4) * 0.12); g.add(l); }
-    registerProp(g, { restHalf: IN(3), restQuat: yawRest(Math.PI / 2, 0), onKnock: knock() });
+    registerProp(g, { restHalf: IN(3), restQuat: yawRest(Math.PI / 2, 0), onKnock: knock(), ...plantSmash(g, potMat, IN(3.2), 1) });
   }
   {
     const g = new THREE.Group(); onMantle(g, -W * 0.44, IN(6)); g.position.y += IN(2);
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(IN(2.2), IN(1.8), IN(4), 12), lam(0xe8e2d8)));
     for (let i = 0; i < 9; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(IN(1.3), 7, 5), i % 2 ? leafMat2 : leafMat3); const a = i * 0.7; b.position.set(Math.cos(a) * IN(1.6), IN(2.2) - (i > 5 ? IN(2.5) : 0), Math.sin(a) * IN(1.6) + (i > 5 ? IN(1.8) : 0)); g.add(b); }
-    registerProp(g, { restHalf: IN(2), restQuat: yawRest(Math.PI / 2, 0), onKnock: knock() });
+    registerProp(g, { restHalf: IN(2), restQuat: yawRest(Math.PI / 2, 0), onKnock: knock(), ...plantSmash(g, lam(0xe8e2d8), IN(2.1), 0.7) });
   }
   // glass jars and a little teal bottle
   const glassMat = lam(0xdfeaf0, { transparent: true, opacity: 0.45 });
@@ -2007,7 +2059,7 @@ function updateRoomFx(dt) {
     l.intensity = roomMode === 2 ? 0.9 + 1.6 * beat : Math.max(0, l.intensity - dt * 4);
   });
 }
-/* ---------- 8 ft ceiling with three frosted dome lights, and the end wall 4 ft past the fireplace. Both face into
+/* ---------- low ceiling with three frosted dome lights, and the end wall 4 ft past the fireplace. Both face into
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
@@ -2033,7 +2085,7 @@ const _fv = new THREE.Vector3();
 function sendEmber(from) {
   const f = fireRig; if (!f || f.target > 0 || f.fly || from.distanceTo(f.center) > 5) return;
   f.fly = { t: 0, from: from.clone().setY(from.y + 0.1), to: f.center.clone().setY(f.center.y + 0.1) };
-  f.ember.visible = true; sfx.fizz();
+  f.ember.visible = true; noise(0.25, 0.03, 5000);                  // a soft sizzle as it flicks off the wick
 }
 function igniteFire() {
   const f = fireRig; f.target = 1; f.blow = 0;
@@ -2143,7 +2195,7 @@ const discoGlints = [], DISCO_ZONE = { z0: 0, z1: 0, y0: 0, y1: 0 };
   // even, organic scatter: random "darts" that must keep a minimum distance from every ball already placed
   // (blue-noise), so there are no rows and no clumps. From just past the door casing to the end of the sofa.
   // only on the plain run of wall above the sofa, none on the panelled wallpaper
-  const Z0 = COUCH_RIGHT_Z0 - IN(7) + 0.3, Z1 = COUCH_RIGHT_Z0 + FT(2.85) * 3 - 0.2, Y0 = 3.0, Y1 = DOOR_H + 0.55, COUNT = Math.round(22 * (Z1 - Z0) / (Z1 - (DOOR_Z1 + CASING + 0.35)));
+  const Z0 = COUCH_RIGHT_Z0 - IN(7) + 0.3, Z1 = COUCH_RIGHT_Z0 + FT(2.85) * 3 - 0.2, Y0 = 3.0, Y1 = DOOR_H + 0.12, COUNT = Math.round(22 * (Z1 - Z0) / (Z1 - (DOOR_Z1 + CASING + 0.35)));
   Object.assign(DISCO_ZONE, { z0: Z0 - 0.4, z1: Z1 + 0.4, y0: Y0 - 0.6, y1: Y1 + 0.6 });
   const spots = [];
   for (let minD = 0.95; spots.length < COUNT && minD > 0.3; minD *= 0.93) {
@@ -3310,7 +3362,7 @@ function whack(m) {
   startSwipe(m.root.position);
   if (m.isBomb) {
     explode(m.root.position);
-    if (m.hole && m.hole.kind === 'fire') setTimeout(blastMantleMirror, 60);   // blown up at the fireplace: the mirror above comes off the wall
+    if (m.hole && m.hole.kind === 'fire' && m.root.position.distanceTo(m.hole.mouthOut) < 2.5) setTimeout(blastMantleMirror, 60);   // blown up at the fireplace: the mirror above comes off the wall
     m.release();
     lives--; combo = 0; catFlinch = 0.6;
     floatText(m.center.clone().setY(1), '−1 life', 'bad');
@@ -3657,7 +3709,7 @@ function startGame(mode) {
   ui.start.hidden = true; ui.over.hidden = true; ui.pause.hidden = true; ui.hud.hidden = false;
   state = 'playing';
   resetChaosCam();
-  if (gameMode === 'chaos') showBanner('Chaos! Two fingers to explore');
+  if (gameMode === 'chaos') { showBanner('Chaos mode!'); camToast('Two fingers: pinch · twist · drag to explore', 3500); }
 }
 function pauseGame() {
   if (state !== 'playing') return;
@@ -4020,7 +4072,7 @@ const FIT_POINTS = [
 const ESSENTIAL_POINTS = [...HOLES.map(h => h.mouthOut.clone()), ...CHEESE_SPOTS.map(c => new THREE.Vector3(c.x, 0.3, c.z)), new THREE.Vector3(CAT_POS.x, 1.3, CAT_POS.z)];
 // camera views (the 📷 button cycles them) and the player's own pinch zoom / two-finger tilt, remembered on this device
 const CAM_VIEWS = [{ name: 'Auto view', el: null }, { name: 'Overhead', el: 70 }, { name: 'Angled', el: 44 }, { name: 'Low', el: 24 }];
-let camView = 0, camZoom = 1, camTilt = 0, camYaw = 0, camFocus = null, chaosFree = false;   // chaos: free look (yaw + focus point)
+let camView = 0, camZoom = 1, camTilt = 0, camYaw = 0, camFocus = null, chaosFree = false, baseCamDist = 20;   // chaos: free look (yaw + focus point)
 try { const sv = JSON.parse(localStorage.getItem('catguard.cam') || '{}'); camView = sv.v | 0; camZoom = sv.z || 1; camTilt = sv.t || 0; } catch (e) {}
 const saveCam = () => { try { localStorage.setItem('catguard.cam', JSON.stringify({ v: camView, z: camZoom, t: camTilt })); } catch (e) {} };
 let camSqueeze = 1;
@@ -4038,7 +4090,8 @@ function fitCamera() {
   const phoneLand = aspect > 1.3 && h < 520;                           // phone on its side
   const pre = CAM_VIEWS[camView].el;                                  // chosen view (Auto = the device's default angle)
   const free = gameMode === 'chaos' && chaosFree;
-  const el = THREE.MathUtils.degToRad(THREE.MathUtils.clamp((pre != null ? pre : (aspect < 0.75 ? 30 : phoneLand ? 17 : aspect < 1.3 ? 46 : 40)) + camTilt, free ? 3 : 12, 82));   // phones: a low 30° view down the room towards the cat   // camera tilt: lower = more 'standing in the room'
+  const autoTilt = free ? (camZoom < 1 ? -34 * (1 - camZoom) / 0.9 : 12 * (camZoom - 1) / 0.7) : 0;   // free look: zoom in = lower, eye-level view
+  const el = THREE.MathUtils.degToRad(THREE.MathUtils.clamp((pre != null ? pre : (aspect < 0.75 ? 30 : phoneLand ? 17 : aspect < 1.3 ? 46 : 40)) + camTilt + autoTilt, free ? 3 : 12, 82));   // phones: a low 30° view down the room towards the cat   // camera tilt: lower = more 'standing in the room'
   const dir = new THREE.Vector3(0, Math.sin(el), Math.cos(el));
   const topLimit = aspect < 0.75 ? 0.97 : phoneLand ? 0.6 : aspect < 1 ? 0.66 : 0.74;   // phones: the HUD sits at the bottom, so the room can use the full top   // leave room for the HUD
   const bottom = aspect < 0.75 ? -0.8 : -0.97, v = new THREE.Vector3();   // (phones leave room for the bottom HUD)
@@ -4059,7 +4112,7 @@ function fitCamera() {
   if (phoneLand) dist *= 1.0;                                         // phone on its side: tight fit, no extra breathing room
   else dist *= aspect < 0.75 ? CAM_PULLBACK_PORTRAIT : CAM_PULLBACK;
   // pinch zoom: closer or further, but never so close that a hole, a mushroom or the cat drops off screen
-  const baseDist = dist;
+  const baseDist = dist; baseCamDist = dist;
   const custom = !free && (camZoom !== 1 || camTilt !== 0);
   if (custom) {
     dist *= camZoom;
@@ -4089,13 +4142,13 @@ function fitCamera() {
 }
 window.addEventListener('resize', fitCamera);
 fitCamera();
-function camToast(text) { document.querySelectorAll('.cam-toast').forEach(e => e.remove()); const el = document.createElement('div'); el.className = 'cam-toast'; el.textContent = text; document.body.appendChild(el); setTimeout(() => el.remove(), 1500); }
+function camToast(text, ms) { document.querySelectorAll('.cam-toast').forEach(e => e.remove()); const el = document.createElement('div'); el.className = 'cam-toast'; el.textContent = text; if (ms) el.style.animationDuration = (ms - 100) / 1000 + 's'; document.body.appendChild(el); setTimeout(() => el.remove(), ms || 1500); }
 $('camBtn').addEventListener('click', e => {                          // cycle views; switching view also clears any pinch/tilt
   camView = (camView + 1) % CAM_VIEWS.length; camZoom = 1; camTilt = 0; camYaw = 0; camFocus = null; chaosFree = false; saveCam(); fitCamera(); camToast(CAM_VIEWS[camView].name); e.currentTarget.blur();
 });
 // two fingers on the game: pinch to zoom, drag up/down together to tilt the camera
 const touches = new Map(); let gesture = null, gestureQueued = false;
-const gestureInfo = () => { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), y: (a.y + b.y) / 2, x: (a.x + b.x) / 2 }; };
+const gestureInfo = () => { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), y: (a.y + b.y) / 2, x: (a.x + b.x) / 2, a: Math.atan2(b.y - a.y, b.x - a.x) }; };
 // the world point under a screen position (what you're pinching / scrolling toward)
 const _pickRay = new THREE.Raycaster(), _pickN = new THREE.Vector2();
 function pickPoint(cx, cy) {
@@ -4112,23 +4165,32 @@ function chaosZoomTo(z, at) {
   else if (camZoom > z0) camFocus = from.lerp(camTarget, THREE.MathUtils.clamp((camZoom - z0) / Math.max(0.05, 1 - z0), 0, 1));
 }
 function resetChaosCam() {
-  camYaw = 0; camFocus = null; chaosFree = false;
+  camYaw = 0; camFocus = null; chaosFree = false;   // (camTilt is reloaded below)
   try { const sv = JSON.parse(localStorage.getItem('catguard.cam') || '{}'); camZoom = sv.z || 1; camTilt = sv.t || 0; } catch (e) { camZoom = 1; camTilt = 0; }
   fitCamera();
 }
 renderer.domElement.addEventListener('pointerdown', e => {
   touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (touches.size === 2) { const gi = gestureInfo(); gesture = { ...gi, z: camZoom, t: camTilt, yaw: camYaw, at: gameMode === 'chaos' ? pickPoint(gi.x, gi.y) : null, lastZ: camZoom }; }
+  if (touches.size === 2) { const gi = gestureInfo(); gesture = { ...gi, z: camZoom, t: camTilt, yaw: camYaw, at: gameMode === 'chaos' ? pickPoint(gi.x, gi.y) : null, lastD: gi.d, lastA: gi.a, lastX: gi.x, lastY: gi.y }; }
 });
 renderer.domElement.addEventListener('pointermove', e => {
   if (!touches.has(e.pointerId)) return; touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!gesture || touches.size < 2) return;
   const g = gestureInfo();
   if (gameMode === 'chaos') {                                         // chaos: pinch to zoom in on anything, drag sideways to walk round, up/down to tilt
+    // map-style: pinch = zoom toward your fingers, twist = turn, drag = slide across the room (all at once, like a maps app)
     chaosFree = true;
-    chaosZoomTo(gesture.z * gesture.d / Math.max(20, g.d), gesture.at);
-    camTilt = THREE.MathUtils.clamp(gesture.t + (g.y - gesture.y) * 0.15, -40, 45);
-    camYaw = gesture.yaw - (g.x - gesture.x) * 0.009;
+    const dZ = gesture.lastD / Math.max(20, g.d);                     // incremental: each move applies only what changed since the last
+    if (Math.abs(dZ - 1) > 0.002) chaosZoomTo(camZoom * dZ, gesture.at);
+    let dA = g.a - gesture.lastA; dA = Math.atan2(Math.sin(dA), Math.cos(dA));
+    camYaw += dA;
+    const k = baseCamDist * camZoom / window.innerHeight * 1.4, dx = g.x - gesture.lastX, dy = g.y - gesture.lastY;
+    const f = (camFocus || camTarget).clone();
+    f.x += (-Math.cos(camYaw) * dx - Math.sin(camYaw) * dy) * k;      // drag the room under your fingers
+    f.z += (Math.sin(camYaw) * dx - Math.cos(camYaw) * dy) * k;
+    f.x = THREE.MathUtils.clamp(f.x, -ROOM.halfW + 0.3, ROOM.halfW - 0.3); f.z = THREE.MathUtils.clamp(f.z, 0.3, ROOM.visDepth - 0.3);
+    camFocus = f;
+    Object.assign(gesture, { lastD: g.d, lastA: g.a, lastX: g.x, lastY: g.y });
   } else {
   camZoom = THREE.MathUtils.clamp(gesture.z * gesture.d / Math.max(20, g.d), 0.45, 1.7);
   camTilt = THREE.MathUtils.clamp(gesture.t + (g.y - gesture.y) * 0.12, -30, 40);
