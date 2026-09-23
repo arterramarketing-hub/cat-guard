@@ -46,6 +46,9 @@
   .c-score{grid-area:score;padding-left:2px;border-left:0}
   .c-time{grid-area:time}.c-cheese{grid-area:cheese}.c-lives{grid-area:lives}.c-heat{grid-area:heat}
   .c-pause{grid-area:pause;margin-left:6px}
+  .hud-btns{display:flex;gap:6px;pointer-events:none}
+  .cam-toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:8;pointer-events:none;background:var(--hud);color:var(--paper);border:1.5px solid rgba(255,244,248,.25);border-radius:999px;padding:7px 16px;font:800 14px var(--body);letter-spacing:.04em;animation:toast 1.4s ease forwards}
+  @keyframes toast{0%{opacity:0;transform:translate(-50%,6px)}12%,75%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
   .val-row{display:flex;align-items:center;gap:6px}
   .lbl-split{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
   .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--label);font-weight:800}
@@ -71,16 +74,17 @@
   .heat i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cheese),var(--lilac));transition:width .5s}
   @media (max-width:560px){
     .hud-bar{grid-template-columns:auto auto auto 1fr auto auto;grid-template-areas:"score time cheese lives heat pause";padding:6px 7px;border-radius:13px}   /* one compact row on phones */
-    .hud-cell{padding:0 4px;gap:2px}
+    .hud-cell{padding:0 3px;gap:2px}
     .c-score{padding-left:0}
     .lbl{font-size:7.5px;letter-spacing:.08em}
     .score-val{font-size:19px;min-width:2ch}
     .combo{font-size:10px;padding:0 4px}
-    .wedge{width:18px;height:12px}
+    .wedge{width:16px;height:11px}
     .cheeses{gap:2px}
-    .lives{grid-template-columns:repeat(9,12px);gap:1px}
-    .pip{width:12px;height:12px}
-    .heat{min-width:26px}
+    .lives{grid-template-columns:repeat(9,11px);gap:1px}
+    .pip{width:11px;height:11px}
+    .heat{min-width:22px}
+    .hud-btns{gap:4px}
     .time{font-size:13px;min-width:3.4ch}
     .lbl-split{gap:4px}
     .c-pause{margin-left:4px}
@@ -187,9 +191,12 @@
     <div class="hud-cell c-cheese"><span class="lbl" id="prizeLabel">Cheese</span><div class="cheeses" id="cheeses"></div></div>
     <div class="hud-cell c-lives"><span class="lbl">Lives</span><div class="lives" id="lives"></div></div>
     <div class="hud-cell c-heat"><span class="lbl">Heat</span><div class="heat"><i id="heat"></i></div></div>
-    <button class="icon-btn c-pause" id="pauseBtn" aria-label="Pause">
+    <div class="c-pause hud-btns">
+      <button class="icon-btn" id="camBtn" aria-label="Change camera view"><svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M1.5 4.5h3l1.3-2h4.4l1.3 2h3v8h-13z"/><circle cx="8" cy="8.3" r="2.6"/></svg></button>
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="1" width="3.5" height="12" rx="1"/><rect x="8.5" y="1" width="3.5" height="12" rx="1"/></svg>
     </button>
+    </div>
   </div>
 </div>
 
@@ -1911,7 +1918,7 @@ const galaxyRig = (() => {
   const rave = [0xff2fb4, 0x28e0ff, 0x9b4bff].map(c => { const l = new THREE.PointLight(c, 0, 14, 1.6); scene.add(l); return l; });
   return { nebula, stars, nebMat, starMat, planes, domes, rave, level: 0 };
 })();
-let raveKick = -1, remoteLed = null;
+let raveKick = -1, remoteLed = null, danceUntil = 0;
 function setRoomMode(m) {
   roomMode = m;
   lightTarget = m === 0 ? 1 : m === 1 ? 0.16 : 0.1;
@@ -1921,7 +1928,7 @@ function setRoomMode(m) {
 function hitRemote() {
   sfx.remoteClick();
   if (roomMode === 0) { setRoomMode(1); sfx.powerDown(); }
-  else if (roomMode === 1) { setRoomMode(2); sfx.bassDrop(); showBanner('Rave mode!'); }
+  else if (roomMode === 1) { setRoomMode(2); sfx.bassDrop(); showBanner('Rave mode!'); danceUntil = clock + 10; }   // every mouse drops what it's doing and dances for 10 s
   else { setRoomMode(0); sfx.powerUp(); }
 }
 function updateRoomFx(dt) {
@@ -1942,7 +1949,7 @@ function updateRoomFx(dt) {
     l.intensity = roomMode === 2 ? 0.9 + 1.6 * beat : Math.max(0, l.intensity - dt * 4);
   });
 }
-function resetRoomFx() { setRoomMode(0); lightF = 1; }
+function resetRoomFx() { setRoomMode(0); lightF = 1; danceUntil = 0; }
 { // the TV remote, lying on the right sofa's seat
   const rm = new THREE.Group(); rm.position.set(ROOM.halfW - COUCH_DEPTH + IN(9), IN(18.3), COUCH_RIGHT_Z0 + FT(2.85) * 1.5); rm.rotation.y = 0.5; rm.scale.setScalar(1.7); scene.add(rm);   // middle cushion, near the front
   { const body = new THREE.Mesh(new THREE.BoxGeometry(IN(2), IN(0.8), IN(7)), lam(0x1d1d22)); body.position.y = IN(0.4); rm.add(body); }
@@ -2606,6 +2613,20 @@ class Mouse {
     this.root.rotation.y += diff * Math.min(1, dt * 12);
   }
   update(dt, time) {
+    // rave mode: everyone on screen stands up on their hind legs and dances to the beat for a while
+    if (danceUntil > clock && this.state !== 'whacked' && this.state !== 'emerge' && this.state !== 'home' && !this.attract) {
+      if (!this.dancing) { this.dancing = true; this.dancePhase = Math.random() * 6; }
+      const beat = actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 6) : Math.abs(Math.sin(clock * 8.1));
+      const ph = this.dancePhase, s = this.model.scale.y || 1;
+      this.model.rotation.set(-1.2 + Math.sin(clock * 8.1 + ph) * 0.12, Math.sin(clock * 1.9 + ph) * 1.1, Math.sin(clock * 4.05 + ph) * 0.3);   // upright, twisting and swaying
+      this.model.position.y = (0.34 + beat * 0.14) * s;                      // bounces on every kick
+      this.feet[0].position.x = this.feet[0].userData.home.x - 0.06 + Math.sin(clock * 8.1 + ph) * 0.08;      // front paws up in the air, waving
+      this.feet[1].position.x = this.feet[1].userData.home.x + 0.06 - Math.sin(clock * 8.1 + ph) * 0.08;
+      this.feet[0].position.y = this.feet[1].position.y = 0.05 + beat * 0.06;
+      this.tailPivot.rotation.y = Math.sin(clock * 12 + ph) * 0.6;
+      return;
+    }
+    if (this.dancing) { this.dancing = false; this.model.rotation.set(0, 0, 0); this.model.position.y = 0; }
     this.t += dt; this.age += dt;
     const p = this.root.position;
     let bob = 0;
@@ -3393,6 +3414,7 @@ window.addEventListener('keydown', e => {
 
 renderer.domElement.addEventListener('pointerdown', e => {
   if (state !== 'playing') return;
+  if (!e.isPrimary) return;                                            // second finger = camera gesture, not a swipe
   e.preventDefault();
   handleTap(e.clientX, e.clientY);
 }, { passive: false });
@@ -3706,6 +3728,13 @@ const FIT_POINTS = [
   new THREE.Vector3(-ROOM.halfW + COUCH_DEPTH, 0.4, COUCH_LEFT_Z0), new THREE.Vector3(-ROOM.halfW + COUCH_DEPTH, 0.4, COUCH_LEFT_Z0 + FT(2.85) * 3),
   new THREE.Vector3(ROOM.halfW - COUCH_DEPTH, 0.4, COUCH_RIGHT_Z0), new THREE.Vector3(ROOM.halfW - COUCH_DEPTH, 0.4, COUCH_RIGHT_Z0 + FT(2.85) * 3),
 ];
+// what must always stay on screen when the player zooms/tilts: every hole, every mushroom and the cat
+const ESSENTIAL_POINTS = [...HOLES.map(h => h.mouthOut.clone()), ...CHEESE_SPOTS.map(c => new THREE.Vector3(c.x, 0.3, c.z)), new THREE.Vector3(CAT_POS.x, 1.3, CAT_POS.z)];
+// camera views (the 📷 button cycles them) and the player's own pinch zoom / two-finger tilt, remembered on this device
+const CAM_VIEWS = [{ name: 'Auto view', el: null }, { name: 'Overhead', el: 70 }, { name: 'Angled', el: 44 }, { name: 'Low', el: 24 }];
+let camView = 0, camZoom = 1, camTilt = 0;
+try { const sv = JSON.parse(localStorage.getItem('catguard.cam') || '{}'); camView = sv.v | 0; camZoom = sv.z || 1; camTilt = sv.t || 0; } catch (e) {}
+const saveCam = () => { try { localStorage.setItem('catguard.cam', JSON.stringify({ v: camView, z: camZoom, t: camTilt })); } catch (e) {} };
 const CAM_PULLBACK = 1.32, CAM_PULLBACK_PORTRAIT = 1.0;   // >1 = camera further back than the tightest fit (phones need less)                              // >1 = camera further back than the tightest fit
 function fitCamera() {
   const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
@@ -3715,7 +3744,8 @@ function fitCamera() {
   camera.updateProjectionMatrix();
   camera.clearViewOffset();
   const phoneLand = aspect > 1.3 && h < 520;                           // phone on its side
-  const el = THREE.MathUtils.degToRad(aspect < 0.75 ? 30 : phoneLand ? 17 : aspect < 1.3 ? 46 : 40);   // phones: a low 30° view down the room towards the cat   // camera tilt: lower = more 'standing in the room'
+  const pre = CAM_VIEWS[camView].el;                                  // chosen view (Auto = the device's default angle)
+  const el = THREE.MathUtils.degToRad(THREE.MathUtils.clamp((pre != null ? pre : (aspect < 0.75 ? 30 : phoneLand ? 17 : aspect < 1.3 ? 46 : 40)) + camTilt, 12, 82));   // phones: a low 30° view down the room towards the cat   // camera tilt: lower = more 'standing in the room'
   const dir = new THREE.Vector3(0, Math.sin(el), Math.cos(el));
   const topLimit = aspect < 0.75 ? 0.97 : phoneLand ? 0.6 : aspect < 1 ? 0.66 : 0.74;   // phones: the HUD sits at the bottom, so the room can use the full top   // leave room for the HUD
   const bottom = aspect < 0.75 ? -0.8 : -0.97, v = new THREE.Vector3();   // (phones leave room for the bottom HUD)
@@ -3735,17 +3765,48 @@ function fitCamera() {
   // pull back a little past the tight fit so the level has breathing room
   if (phoneLand) dist *= 1.0;                                         // phone on its side: tight fit, no extra breathing room
   else dist *= aspect < 0.75 ? CAM_PULLBACK_PORTRAIT : CAM_PULLBACK;
+  // pinch zoom: closer or further, but never so close that a hole, a mushroom or the cat drops off screen
+  const custom = camZoom !== 1 || camTilt !== 0;
+  if (custom) {
+    dist *= camZoom;
+    const pts = custom ? ESSENTIAL_POINTS : FIT_POINTS;
+    for (let i = 0; i < 200; i++) {
+      camera.position.copy(camTarget).addScaledVector(dir, dist); camera.lookAt(camTarget); camera.updateMatrixWorld();
+      let lo = Infinity, hi = -Infinity, ok = true;
+      for (const p of pts) { v.copy(p).project(camera); if (Math.abs(v.x) > 0.97) ok = false; lo = Math.min(lo, v.y); hi = Math.max(hi, v.y); }
+      if (ok && hi - lo <= topLimit - bottom - 0.04) break;
+      dist *= 1.02;
+    }
+  }
   camera.position.copy(camTarget).addScaledVector(dir, dist); camera.lookAt(camTarget); camera.updateMatrixWorld();
   minY = Infinity; maxY = -Infinity;
-  for (const p of FIT_POINTS) { v.copy(p).project(camera); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); }
-  // pin the top of the play area (TV + dresser) just under the HUD; any spare height goes to floor at the bottom
-  const shift = aspect < 0.75 ? (topLimit + bottom) / 2 - (maxY + minY) / 2 : topLimit - maxY;   // phones: room centred above the bottom HUD
+  for (const p of (custom ? ESSENTIAL_POINTS : FIT_POINTS)) { v.copy(p).project(camera); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); }
+  // pin the top of the play area (TV + dresser) just under the HUD; phones and custom views centre it instead
+  const shift = aspect < 0.75 || custom ? (topLimit + bottom) / 2 - (maxY + minY) / 2 : topLimit - maxY;
   camera.setViewOffset(w, h, 0, shift * h / 2, w, h);
   catCard.scale.y = Math.min(2.2, 1 / Math.cos(el));   // undo the downward view's squash on the cat photo
   camBase.copy(camera.position);
 }
 window.addEventListener('resize', fitCamera);
 fitCamera();
+function camToast(text) { document.querySelectorAll('.cam-toast').forEach(e => e.remove()); const el = document.createElement('div'); el.className = 'cam-toast'; el.textContent = text; document.body.appendChild(el); setTimeout(() => el.remove(), 1500); }
+$('camBtn').addEventListener('click', e => {                          // cycle views; switching view also clears any pinch/tilt
+  camView = (camView + 1) % CAM_VIEWS.length; camZoom = 1; camTilt = 0; saveCam(); fitCamera(); camToast(CAM_VIEWS[camView].name); e.currentTarget.blur();
+});
+// two fingers on the game: pinch to zoom, drag up/down together to tilt the camera
+const touches = new Map(); let gesture = null, gestureQueued = false;
+const gestureInfo = () => { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), y: (a.y + b.y) / 2 }; };
+renderer.domElement.addEventListener('pointerdown', e => { touches.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (touches.size === 2) gesture = { ...gestureInfo(), z: camZoom, t: camTilt }; });
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!touches.has(e.pointerId)) return; touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!gesture || touches.size < 2) return;
+  const g = gestureInfo();
+  camZoom = THREE.MathUtils.clamp(gesture.z * gesture.d / Math.max(20, g.d), 0.45, 1.7);
+  camTilt = THREE.MathUtils.clamp(gesture.t + (g.y - gesture.y) * 0.12, -30, 40);
+  if (!gestureQueued) { gestureQueued = true; requestAnimationFrame(() => { gestureQueued = false; fitCamera(); }); }
+});
+const endTouch = e => { touches.delete(e.pointerId); if (touches.size < 2 && gesture) { gesture = null; saveCam(); } };
+renderer.domElement.addEventListener('pointerup', endTouch); renderer.domElement.addEventListener('pointercancel', endTouch);
 
 /* =====================================================================
    MAIN LOOP
