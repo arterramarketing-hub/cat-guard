@@ -1,0 +1,1230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cat Guard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Figtree:wght@500;700;800&display=swap">
+<style>
+  /* Single deliberate look: a lamplit living room at night, cartoon "sticker" UI on top. */
+  :root{
+    --ink:#1f1712;
+    --paper:#fbf1dc;
+    --paper-2:#efdfbd;
+    --cheese:#f4c13d;
+    --cheese-deep:#c98e12;
+    --danger:#e2452c;
+    --night:#16211e;
+    --label:#d6c39c;
+    --hud:rgba(22,17,12,.74);
+    --display:"Bagel Fat One","Arial Rounded MT Bold","Trebuchet MS",system-ui,sans-serif;
+    --body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  [hidden]{display:none!important}
+  html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var(--paper);touch-action:none;overscroll-behavior:none}
+  body{font:500 15px/1.45 var(--body);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+  #stage{position:fixed;inset:0}
+  #stage canvas{display:block;width:100%;height:100%;touch-action:none}
+
+  /* ---------- HUD ---------- */
+  .hud{position:fixed;top:0;left:0;right:0;z-index:5;pointer-events:none;
+       padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 0;display:grid;gap:6px}
+  .hud-row{display:flex;justify-content:space-between;align-items:stretch;gap:8px}
+  .chip{background:var(--hud);border:1.5px solid rgba(251,241,220,.14);border-radius:12px;padding:6px 10px;display:flex;align-items:center;gap:8px}
+  .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--label);font-weight:800}
+  .stack{display:grid;gap:2px}
+  .score-val{font-family:var(--display);font-size:26px;line-height:1;color:var(--cheese);font-variant-numeric:tabular-nums;min-width:3ch}
+  .combo{font-weight:800;font-size:13px;color:var(--paper);background:var(--danger);border-radius:6px;padding:1px 6px;align-self:center}
+  .lives{display:grid;grid-template-columns:repeat(9,13px);gap:2px}
+  .pip{width:13px;height:13px;color:var(--paper);transition:opacity .25s,transform .25s}
+  .pip.lost{opacity:.16;transform:scale(.8)}
+  .lives.hurt .pip:not(.lost){color:#ffb4a4}
+  .cheeses{display:flex;gap:6px}
+  .wedge{width:34px;height:23px;display:block}
+  .wedge .bite{fill:var(--cheese);stroke:var(--cheese-deep);stroke-width:1.2;transition:fill .2s}
+  .wedge .bite.gone{fill:transparent;stroke:rgba(251,241,220,.3);stroke-dasharray:2 2}
+  .wedge.hit .bite:not(.gone){fill:var(--danger)}
+  .meta{display:flex;align-items:center;gap:10px}
+  .time{font-variant-numeric:tabular-nums;font-weight:800;font-size:16px;min-width:4ch;text-align:right}
+  .heat{width:52px;height:6px;border-radius:3px;background:rgba(251,241,220,.16);overflow:hidden}
+  .heat i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cheese),var(--danger));transition:width .5s}
+  .icon-btn{pointer-events:auto;appearance:none;border:1.5px solid rgba(251,241,220,.25);background:rgba(251,241,220,.08);color:var(--paper);
+            width:34px;height:34px;border-radius:10px;display:grid;place-items:center;cursor:pointer;padding:0}
+  .icon-btn:focus-visible{outline:2px solid var(--cheese);outline-offset:2px}
+
+  /* ---------- Screens ---------- */
+  .screen{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;overflow-y:auto;
+          padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 16px);
+          background:radial-gradient(ellipse at 50% 45%,rgba(22,33,30,.25),rgba(10,14,12,.8))}
+  .card{width:100%;max-width:380px;background:var(--paper);color:var(--ink);border:3px solid var(--ink);border-radius:22px;
+        box-shadow:7px 8px 0 var(--ink);padding:22px 20px 20px;display:grid;gap:14px;animation:drop .45s cubic-bezier(.2,1.4,.4,1) both}
+  @keyframes drop{from{transform:translateY(-18px) rotate(-2deg);opacity:0}to{transform:none;opacity:1}}
+  .eyebrow{margin:0;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#8a5a2c}
+  h1,h2{font-family:var(--display);font-weight:400;margin:0;line-height:.9;text-wrap:balance}
+  h1{font-size:clamp(46px,14vw,66px);letter-spacing:-.01em}
+  h1 .g{color:var(--cheese);-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;display:inline-block;transform:rotate(-3deg)}
+  h2{font-size:clamp(32px,10vw,42px)}
+  .rules{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+  .rules li{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;font-size:14.5px;line-height:1.35}
+  .rules svg{width:34px;height:34px;display:block}
+  .btn{appearance:none;font-family:var(--display);font-size:22px;background:var(--cheese);color:var(--ink);border:3px solid var(--ink);
+       border-radius:14px;padding:12px 16px;box-shadow:0 5px 0 var(--ink);cursor:pointer;transition:transform .06s,box-shadow .06s;width:100%}
+  .btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+  .btn:focus-visible{outline:3px solid var(--danger);outline-offset:3px}
+  .foot{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:#6e5a43}
+  .link-btn{appearance:none;background:none;border:none;font:inherit;color:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:4px 0}
+  .reason{margin:0;font-size:15px;color:#5a4633}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0}
+  .stats div{background:var(--paper-2);border-radius:12px;padding:10px 12px}
+  .stats dt{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#8a6a45}
+  .stats dd{margin:2px 0 0;font-family:var(--display);font-size:26px;line-height:1.05;font-variant-numeric:tabular-nums}
+  .stats .new{color:var(--danger)}
+
+  /* ---------- FX ---------- */
+  #fx{position:fixed;inset:0;pointer-events:none;z-index:4;overflow:hidden}
+  .float{position:absolute;transform:translate(-50%,-50%);font-family:var(--display);font-size:22px;color:var(--cheese);white-space:nowrap;
+         -webkit-text-stroke:4px var(--ink);paint-order:stroke fill;animation:rise .85s ease-out forwards}
+  .float.clutch{color:#fff}
+  .float.bad{color:var(--danger);font-size:26px}
+  .float.warn{color:#ffc9b8;font-size:17px;animation-duration:1.6s}
+  @keyframes rise{0%{opacity:0;transform:translate(-50%,-30%) scale(.5)}15%{opacity:1;transform:translate(-50%,-70%) scale(1.12)}100%{opacity:0;transform:translate(-50%,-180%) scale(1)}}
+  #flash{position:fixed;inset:0;background:#ffd79a;opacity:0;pointer-events:none;z-index:3}
+  #flash.on{animation:flash .4s ease-out}
+  @keyframes flash{0%{opacity:.75}100%{opacity:0}}
+  @media (prefers-reduced-motion: reduce){
+    .card{animation:none}
+    .float{animation-duration:.6s}
+    #flash.on{animation-duration:.15s}
+  }
+</style>
+
+<div id="stage"></div>
+<div id="flash"></div>
+<div id="fx"></div>
+
+<!-- HUD -->
+<div class="hud" id="hud" hidden>
+  <div class="hud-row">
+    <div class="chip">
+      <div class="stack"><span class="lbl">Score</span><span class="score-val" id="score">0</span></div>
+      <span class="combo" id="combo" hidden>x2</span>
+    </div>
+    <div class="chip">
+      <div class="stack"><span class="lbl">Lives</span><div class="lives" id="lives"></div></div>
+    </div>
+  </div>
+  <div class="hud-row">
+    <div class="chip">
+      <div class="stack"><span class="lbl">Cheese</span><div class="cheeses" id="cheeses"></div></div>
+    </div>
+    <div class="chip meta">
+      <div class="stack"><span class="lbl">Heat</span><div class="heat"><i id="heat"></i></div></div>
+      <span class="time" id="time">0:00</span>
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="1" width="3.5" height="12" rx="1"/><rect x="8.5" y="1" width="3.5" height="12" rx="1"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Start -->
+<section class="screen" id="startScreen">
+  <div class="card">
+    <p class="eyebrow">Three cheeses · eight holes · one cat</p>
+    <h1>Cat <span class="g">Guard</span></h1>
+    <ul class="rules">
+      <li>
+        <svg viewBox="0 0 34 34" aria-hidden="true"><ellipse cx="17" cy="24" rx="14" ry="6" fill="none" stroke="#e2452c" stroke-width="3"/><ellipse cx="17" cy="19" rx="7" ry="6" fill="#9b8f86" stroke="#1f1712" stroke-width="1.5"/><circle cx="12" cy="12" r="3.5" fill="#e7a3a0" stroke="#1f1712" stroke-width="1.5"/><circle cx="22" cy="12" r="3.5" fill="#e7a3a0" stroke="#1f1712" stroke-width="1.5"/></svg>
+        <span><b>Tap mice before they reach the cheese.</b> A bigger mouse with a red ring is about to take a bite.</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="16" cy="20" r="10" fill="#1f1712"/><path d="M20 11 q3 -5 7 -4" stroke="#8a6a45" stroke-width="2" fill="none"/><circle cx="27" cy="7" r="3.5" fill="#ffb02e"/><circle cx="27" cy="7" r="1.6" fill="#fff4c2"/></svg>
+        <span><b>Leave bomb mice alone.</b> Dark fur, lit fuse. Tapping one costs the cat a life. Ignore them and they slink back into their hole.</span>
+      </li>
+      <li>
+        <svg viewBox="0 0 34 34" aria-hidden="true"><path d="M3 27 L31 27 L3 9 Z" fill="#f4c13d" stroke="#1f1712" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="20" r="2" fill="#c98e12"/><circle cx="15" cy="23" r="1.5" fill="#c98e12"/></svg>
+        <span>Each cheese survives <b>3 bites</b>. Lose all three cheeses, or all <b>9 lives</b>, and the house is overrun.</span>
+      </li>
+    </ul>
+    <button class="btn" id="startBtn">Start guarding</button>
+    <div class="foot"><span>Best: <span id="bestStart">—</span></span><button class="link-btn" id="soundBtn">Sound: on</button></div>
+  </div>
+</section>
+
+<!-- Pause -->
+<section class="screen" id="pauseScreen" hidden>
+  <div class="card">
+    <p class="eyebrow">The mice are waiting</p>
+    <h2>Paused</h2>
+    <button class="btn" id="resumeBtn">Resume</button>
+    <div class="foot"><button class="link-btn" id="quitBtn">Quit to title</button><button class="link-btn" id="soundBtn2">Sound: on</button></div>
+  </div>
+</section>
+
+<!-- Game over -->
+<section class="screen" id="overScreen" hidden>
+  <div class="card">
+    <p class="eyebrow" id="overEyebrow">Game over</p>
+    <h2 id="overTitle">The cheese is gone</h2>
+    <p class="reason" id="overReason"></p>
+    <dl class="stats">
+      <div><dt>Score</dt><dd id="oScore">0</dd></div>
+      <div><dt>Survived</dt><dd id="oTime">0:00</dd></div>
+      <div><dt>Mice whacked</dt><dd id="oWhacked">0</dd></div>
+      <div><dt>Best</dt><dd id="oBest">0</dd></div>
+    </dl>
+    <button class="btn" id="againBtn">Play again</button>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+
+/* =====================================================================
+   TUNING — every gameplay number lives here.
+   Pairs written as [start, end] are interpolated by the difficulty
+   value d (0 → 1) computed in getDifficulty() below.
+   ===================================================================== */
+const CFG = {
+  // ---- Difficulty ramp ----------------------------------------------
+  RAMP_SECONDS: 170,        // seconds of play until full difficulty (d = 1)
+  RAMP_CURVE: 1.2,          // >1 = gentler start, steeper late game; 1 = linear
+
+  // ---- Spawning (interpolated by d) --------------------------------
+  spawnInterval:   [2.1, 0.55], // seconds between spawn events
+  spawnJitter:     0.3,         // ± fraction of randomness applied to each interval
+  maxActive:       [1, 7.99],   // cap on mice on the field (floored → 1..7)
+  multiSpawnChance:[0.0, 0.4],  // chance a spawn event releases 2 mice at once
+  FIRST_SPAWN_DELAY: 1.2,       // grace period at the start of a run
+
+  // ---- Bombs --------------------------------------------------------
+  bombRatio:       [0.10, 0.34],// probability any given spawn is a bomb mouse
+  SAFE_OPENING_MICE: 3,         // the first N mice of a run are never bombs
+  MAX_BOMB_STREAK: 2,           // never more than this many bombs in a row
+  BOMB_FIELD_SHARE: 0.5,        // bombs can't exceed this share of maxActive
+  BOMB_TELEGRAPH: 0.5,          // seconds after emerging when a bomb is NOT tappable (fuse lights up)
+  bombLifetime:    [5.0, 3.8],  // seconds a bomb mouse roams before heading back into its hole (harmless if left alone)
+  BOMB_TAP_PENALTY: 0.35,       // tap tie-break: when a bomb and a normal mouse overlap, favour the normal one
+
+  // ---- Mouse behaviour (interpolated by d) --------------------------
+  pauseTime:       [1.15, 0.45],// how long a mouse peeks out of its hole before deciding
+  retreatChance:   [0.45, 0.12],// chance a normal mouse ducks back in instead of charging
+  runSpeed:        [1.35, 3.1], // world units per second toward the cheese
+  eatTime:         [1.4, 0.85], // seconds nibbling at the plate before a bite lands
+  SPEED_VARIANCE:  0.15,        // ± per-mouse speed randomness
+
+  // ---- Threat readability ------------------------------------------
+  THREAT_RANGE: 5.5,        // mice within this distance of cheese start to grow and glow
+  THREAT_SCALE: 0.5,        // extra size at max threat (0.5 = 150%)
+  CLUTCH_THREAT: 0.75,      // threat level above which a whack counts as a "clutch save"
+  HIT_RADIUS: 0.8,          // tap forgiveness in world units (grows with mouse size)
+
+  // ---- Rules & scoring ---------------------------------------------
+  LIVES: 9,
+  CHEESE_BITES: 3,          // bites each cheese survives
+  EAT_RADIUS: 0.95,         // distance from cheese centre where a mouse starts eating
+  SCORE_WHACK: 10,
+  SCORE_CLUTCH: 15,
+  COMBO_STEP: 5,            // every N whacks in a row adds +1 to the multiplier
+  COMBO_MAX: 5,
+};
+
+const lerpPair = (pair, d) => pair[0] + (pair[1] - pair[0]) * d;
+
+/* ---------------------------------------------------------------------
+   DIFFICULTY SCALING
+   elapsed seconds → d in [0,1] → a bundle of live parameters.
+   To make the game harder faster, lower RAMP_SECONDS; to hold the gentle
+   opening longer, raise RAMP_CURVE. Each parameter's range is in CFG.
+   --------------------------------------------------------------------- */
+function getDifficulty(t) {
+  const x = Math.min(1, t / CFG.RAMP_SECONDS);
+  const d = Math.pow(x, CFG.RAMP_CURVE);
+  return {
+    d,
+    spawnInterval:    lerpPair(CFG.spawnInterval, d),
+    maxActive:        Math.floor(lerpPair(CFG.maxActive, d)),
+    multiSpawnChance: lerpPair(CFG.multiSpawnChance, d),
+    bombRatio:        lerpPair(CFG.bombRatio, d),
+    bombLifetime:     lerpPair(CFG.bombLifetime, d),
+    pauseTime:        lerpPair(CFG.pauseTime, d),
+    retreatChance:    lerpPair(CFG.retreatChance, d),
+    runSpeed:         lerpPair(CFG.runSpeed, d),
+    eatTime:          lerpPair(CFG.eatTime, d),
+  };
+}
+
+/* =====================================================================
+   WORLD LAYOUT  (x: left/right, z: back wall = 0 → toward camera)
+   ===================================================================== */
+const ROOM = { halfW: 4.5, depth: 13, wallH: 9, visDepth: 24 };  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
+const HOLES = [
+  { x: -3.0, z: 0,   n: [0, 1]  }, { x: 0.3, z: 0, n: [0, 1] }, { x: 3.0, z: 0, n: [0, 1] }, // back wall
+  { x: -4.5, z: 3.4, n: [1, 0]  }, { x: -4.5, z: 7.6, n: [1, 0] },                           // left wall
+  { x:  4.5, z: 2.6, n: [-1, 0] }, { x: 4.5, z: 5.9, n: [-1, 0] }, { x: 4.5, z: 9.3, n: [-1, 0] }, // right wall
+];
+const CHEESE_SPOTS = [ { x: -1.6, z: 2.5 }, { x: 2.3, z: 5.2 }, { x: -1.3, z: 8.7 } ];
+const CAT_POS = new THREE.Vector3(0, 0, 11.3);
+
+/* =====================================================================
+   RENDERER / SCENE
+   ===================================================================== */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+renderer.setClearColor(0x24403a);
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x1d302b, 30, 60);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 80);
+const camBase = new THREE.Vector3();
+const camTarget = new THREE.Vector3(0, 0.3, 6.1);
+
+scene.add(new THREE.HemisphereLight(0xfff0d2, 0x4a3122, 0.82));
+const sun = new THREE.DirectionalLight(0xffe0b0, 0.62);
+sun.position.set(3, 9, 7);
+scene.add(sun);
+const lamp = new THREE.PointLight(0xffc27a, 0.5, 14, 2);
+lamp.position.set(0, 3, 6);
+scene.add(lamp);
+
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- procedural textures ---------- */
+function canvasTex(w, h, draw, rx, ry) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry);
+  t.anisotropy = 4;
+  return t;
+}
+const floorTex = canvasTex(256, 256, (g, w, h) => {
+  const tones = ['#7a4f33', '#84573a', '#6f472f', '#8b5d3d'];
+  for (let i = 0; i < 8; i++) {
+    g.fillStyle = tones[(i * 3) % 4]; g.fillRect(0, i * 32, w, 32);
+    g.fillStyle = 'rgba(40,20,10,.35)'; g.fillRect(0, i * 32, w, 2);
+    g.fillRect((i * 97) % w, i * 32, 2, 32);
+    g.fillStyle = 'rgba(255,220,180,.05)';
+    for (let k = 0; k < 5; k++) g.fillRect(0, i * 32 + 6 + k * 5 + ((i * k) % 3), w, 1);
+  }
+}, 2, 5.9);
+const wallTex = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#2f5a53'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#34635b'; g.fillRect(0, 0, w / 2, h);
+  g.fillStyle = 'rgba(251,241,220,.22)';
+  for (let y = 8; y < h; y += 32) { g.beginPath(); g.arc(w * 0.75, y, 3, 0, 7); g.fill(); g.beginPath(); g.arc(w * 0.75, y + 16, 1.5, 0, 7); g.fill(); }
+}, 7, 6.2);
+const wallTexSide = wallTex.clone(); wallTexSide.needsUpdate = true; wallTexSide.repeat.set(18.7, 6.2);
+
+/* ---------- room ---------- */
+const lam = (color, extra) => new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {}));
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, ROOM.visDepth), lam(0xffffff, { map: floorTex }));
+floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, ROOM.visDepth / 2);
+scene.add(floor);
+
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, ROOM.wallH), lam(0xffffff, { map: wallTex }));
+backWall.position.set(0, ROOM.wallH / 2, 0);
+scene.add(backWall);
+for (const side of [-1, 1]) {
+  const w = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.visDepth, ROOM.wallH), lam(0xe6e6e6, { map: wallTexSide }));
+  w.rotation.y = -side * Math.PI / 2;
+  w.position.set(side * ROOM.halfW, ROOM.wallH / 2, ROOM.visDepth / 2);
+  scene.add(w);
+}
+// baseboards + chair rail
+const trimMat = lam(0xefe0c2);
+function trim(w, h, d, x, y, z) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), trimMat); m.position.set(x, y, z); scene.add(m); }
+trim(ROOM.halfW * 2, 0.3, 0.08, 0, 0.15, 0.04);
+trim(0.08, 0.3, ROOM.visDepth, -ROOM.halfW + 0.04, 0.15, ROOM.visDepth / 2);
+trim(0.08, 0.3, ROOM.visDepth, ROOM.halfW - 0.04, 0.15, ROOM.visDepth / 2);
+trim(ROOM.halfW * 2, 0.07, 0.07, 0, 1.25, 0.035);
+trim(0.07, 0.07, ROOM.visDepth, -ROOM.halfW + 0.035, 1.25, ROOM.visDepth / 2);
+trim(0.07, 0.07, ROOM.visDepth, ROOM.halfW - 0.035, 1.25, ROOM.visDepth / 2);
+// window with moonlit sky on the back wall
+(() => {
+  const g = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.3, 0.06), trimMat); g.add(frame);
+  const sky = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.1), new THREE.MeshBasicMaterial({ color: 0x223a5a })); sky.position.z = 0.035; g.add(sky);
+  const moon = new THREE.Mesh(new THREE.CircleGeometry(0.14, 16), new THREE.MeshBasicMaterial({ color: 0xfff1c4 })); moon.position.set(0.45, 0.25, 0.04); g.add(moon);
+  const barV = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.04), trimMat); barV.position.z = 0.05; g.add(barV);
+  const barH = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.06, 0.04), trimMat); barH.position.z = 0.05; g.add(barH);
+  g.position.set(-1.4, 2.15, 0.03);
+  scene.add(g);
+})();
+// rug under the cat
+const rug = new THREE.Mesh(new THREE.CircleGeometry(1.5, 28), lam(0x9c3b2e));
+rug.rotation.x = -Math.PI / 2; rug.scale.set(1.35, 1, 1); rug.position.set(0, 0.01, 11.4);
+scene.add(rug);
+const rugIn = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 28), new THREE.MeshBasicMaterial({ color: 0xe3b35a }));
+rugIn.rotation.x = -Math.PI / 2; rugIn.scale.set(1.35, 1, 1); rugIn.position.set(0, 0.015, 11.4);
+scene.add(rugIn);
+
+/* ---------- mouse holes ---------- */
+function archShape(w, h) {
+  const r = w / 2, s = new THREE.Shape();
+  s.moveTo(-r, 0); s.lineTo(-r, h - r); s.absarc(0, h - r, r, Math.PI, 0, true); s.lineTo(r, 0); s.lineTo(-r, 0);
+  return s;
+}
+const holeGeo = new THREE.ShapeGeometry(archShape(0.9, 0.8), 10);
+const rimGeo = new THREE.ShapeGeometry(archShape(1.1, 0.92), 10);
+const holeMat = new THREE.MeshBasicMaterial({ color: 0x0b0806 });
+const rimMat = lam(0x5b3a26);
+for (const h of HOLES) {
+  h.pos = new THREE.Vector3(h.x, 0, h.z);
+  h.normal = new THREE.Vector3(h.n[0], 0, h.n[1]);
+  h.mouthIn = h.pos.clone().addScaledVector(h.normal, 0.15);
+  h.mouthOut = h.pos.clone().addScaledVector(h.normal, 0.8);
+  const g = new THREE.Group();
+  const rim = new THREE.Mesh(rimGeo, rimMat); rim.position.z = 0.09; g.add(rim);
+  const hole = new THREE.Mesh(holeGeo, holeMat); hole.position.z = 0.1; g.add(hole);
+  g.position.copy(h.pos);
+  g.rotation.y = Math.atan2(h.normal.x, h.normal.z);
+  scene.add(g);
+}
+
+/* =====================================================================
+   CHEESE
+   ===================================================================== */
+const wedgeGeo = (() => {
+  const R = 0.62, a = Math.PI / 3.2, s = new THREE.Shape();
+  s.moveTo(0, 0); s.lineTo(R, 0); s.absarc(0, 0, R, 0, a, false); s.lineTo(0, 0);
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.38, bevelEnabled: false, curveSegments: 6 });
+  g.rotateX(-Math.PI / 2); g.translate(-0.28, 0, 0.15);
+  return g;
+})();
+const dimpleGeo = new THREE.CircleGeometry(0.05, 8);
+const dimpleMat = new THREE.MeshBasicMaterial({ color: 0xc98e12 });
+const plateGeo = new THREE.CylinderGeometry(0.78, 0.7, 0.07, 22);
+const standGeo = new THREE.CylinderGeometry(0.22, 0.36, 0.24, 10);
+const warnGeo = new THREE.RingGeometry(0.95, 1.15, 32);
+const crumbGeo = new THREE.BoxGeometry(0.07, 0.05, 0.07);
+
+class Cheese {
+  constructor(spot) {
+    this.pos = new THREE.Vector3(spot.x, 0, spot.z);
+    this.group = new THREE.Group(); this.group.position.copy(this.pos);
+    const stand = new THREE.Mesh(standGeo, lam(0x6a4128)); stand.position.y = 0.12; this.group.add(stand);
+    const plate = new THREE.Mesh(plateGeo, lam(0xf4ecdc)); plate.position.y = 0.27; this.group.add(plate);
+    this.mat = lam(0xf4c13d, { emissive: 0x000000 });
+    this.wedge = new THREE.Group(); this.wedge.position.y = 0.3; this.wedge.rotation.y = Math.random() * Math.PI * 2;
+    this.wedge.add(new THREE.Mesh(wedgeGeo, this.mat));
+    for (const [x, z] of [[0.02, 0.05], [0.17, -0.05], [-0.03, -0.1]]) {
+      const d = new THREE.Mesh(dimpleGeo, dimpleMat); d.rotation.x = -Math.PI / 2; d.position.set(x, 0.385, z); this.wedge.add(d);
+    }
+    this.group.add(this.wedge);
+    this.crumbs = new THREE.Group(); this.crumbs.position.y = 0.31;
+    for (let i = 0; i < 7; i++) {
+      const c = new THREE.Mesh(crumbGeo, this.mat); const a = i * 2.4, r = 0.1 + (i % 3) * 0.13;
+      c.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); c.rotation.y = a; this.crumbs.add(c);
+    }
+    this.group.add(this.crumbs);
+    this.warnMat = new THREE.MeshBasicMaterial({ color: 0xe2452c, transparent: true, opacity: 0, depthWrite: false });
+    this.warn = new THREE.Mesh(warnGeo, this.warnMat); this.warn.rotation.x = -Math.PI / 2; this.warn.position.y = 0.02;
+    this.group.add(this.warn);
+    scene.add(this.group);
+    this.reset();
+  }
+  reset() {
+    this.hp = CFG.CHEESE_BITES; this.alive = true; this.danger = 0; this.shownDanger = 0; this.hitT = 0;
+    this.wedge.visible = true; this.crumbs.visible = false; this.wedge.scale.setScalar(1);
+  }
+  bite() {
+    if (!this.alive) return;
+    this.hp--; this.hitT = 0.45;
+    if (this.hp <= 0) { this.alive = false; this.wedge.visible = false; this.crumbs.visible = true; }
+  }
+  update(dt, time) {
+    const target = 0.45 + 0.55 * (this.hp / CFG.CHEESE_BITES);
+    const s = this.wedge.scale.x + (target - this.wedge.scale.x) * Math.min(1, dt * 10);
+    const jig = this.hitT > 0 ? 1 + Math.sin(this.hitT * 50) * 0.08 * this.hitT : 1;
+    this.wedge.scale.set(s * jig, s / jig, s * jig);
+    this.hitT = Math.max(0, this.hitT - dt);
+    this.mat.emissive.setRGB(this.hitT * 1.2, 0, 0);
+    // warning ring = how close the nearest attacker is
+    this.shownDanger += ((this.alive ? this.danger : 0) - this.shownDanger) * Math.min(1, dt * 8);
+    const pulse = this.shownDanger > 0.6 ? 0.5 + 0.5 * Math.sin(time * 14) : 1;
+    this.warnMat.opacity = this.shownDanger * (0.35 + 0.45 * pulse);
+    this.warn.scale.setScalar(1 + 0.08 * pulse * this.shownDanger);
+    this.danger = 0;
+  }
+}
+const cheeses = CHEESE_SPOTS.map(s => new Cheese(s));
+function nearestCheese(pos) {
+  let best = null, bd = Infinity;
+  for (const c of cheeses) {
+    if (!c.alive) continue;
+    const d = (c.pos.x - pos.x) ** 2 + (c.pos.z - pos.z) ** 2;
+    if (d < bd) { bd = d; best = c; }
+  }
+  return best;
+}
+
+/* =====================================================================
+   CAT
+   ===================================================================== */
+// Grumpy colorpoint cat: cream body, brown-grey mask and back, ice-blue eyes,
+// heavy slanted brows and a permanent frown. Sits facing the player.
+const furMat = lam(0xf1e9df), pointMat = lam(0x7d6453), backMat = lam(0x8f7a69), pinkMat = lam(0xe8a0a0);
+const darkMat = lam(0x3a2a22), FUR_HEX = 0xf1e9df;
+const cat = new THREE.Group(); cat.position.copy(CAT_POS); cat.scale.setScalar(1.25); scene.add(cat);
+const catBody = new THREE.Group(); cat.add(catBody);
+const head = new THREE.Group(); head.position.set(0, 1.5, 0.62); head.rotation.x = -0.9; head.scale.setScalar(1.45);
+catBody.add(head);
+(() => {
+  const sph = r => new THREE.SphereGeometry(r, 14, 10);
+  const mk = (parent, geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (sx) m.scale.set(sx, sy, sz); parent.add(m); return m; };
+  // body
+  mk(catBody, sph(0.7), furMat, 0, 0.62, 0, 1, 0.85, 1.2);
+  mk(catBody, sph(0.58), backMat, 0, 0.74, -0.42, 0.95, 0.7, 0.95);
+  mk(catBody, sph(0.38), furMat, -0.45, 0.36, -0.38); mk(catBody, sph(0.38), furMat, 0.45, 0.36, -0.38);
+  mk(catBody, sph(0.36), furMat, 0, 0.86, 0.62, 1.15, 1.2, 0.75);
+  mk(catBody, sph(0.17), furMat, -0.32, 0.13, 0.84, 1, 0.8, 1.2);
+  // head
+  mk(head, sph(0.52), furMat, 0, 0, 0, 1.1, 0.95, 1);
+  mk(head, sph(0.47), pointMat, 0, 0.0, 0.13, 1.06, 0.92, 0.9);
+  mk(head, new THREE.BoxGeometry(0.08, 0.34, 0.06), furMat, 0, 0.14, 0.55).rotation.x = -0.2;   // white blaze
+  mk(head, sph(0.17), furMat, -0.11, -0.18, 0.47, 1, 0.85, 0.8);                                   // muzzle
+  mk(head, sph(0.17), furMat, 0.11, -0.18, 0.47, 1, 0.85, 0.8);
+  mk(head, sph(0.14), furMat, 0, -0.31, 0.4, 1.1, 0.8, 0.9);                                       // chin
+  mk(head, new THREE.SphereGeometry(0.055, 8, 6), pinkMat, 0, -0.08, 0.62, 1.2, 0.8, 0.7);         // nose
+  const frown = mk(head, new THREE.TorusGeometry(0.1, 0.02, 4, 12, Math.PI), darkMat, 0, -0.29, 0.58);
+  frown.scale.set(1, 0.55, 1);
+  const eyeM = new THREE.MeshBasicMaterial({ color: 0x8ec9ef }), pupilM = new THREE.MeshBasicMaterial({ color: 0x14100e });
+  for (const s of [-1, 1]) {
+    mk(head, new THREE.SphereGeometry(0.09, 10, 8), eyeM, s * 0.19, 0.05, 0.49, 1, 0.72, 0.6);
+    mk(head, new THREE.SphereGeometry(0.045, 8, 6), pupilM, s * 0.19, 0.04, 0.55, 1, 1, 0.5);
+    const brow = mk(head, new THREE.BoxGeometry(0.24, 0.07, 0.08), pointMat, s * 0.19, 0.11, 0.53);
+    brow.rotation.z = s * 0.38;                                                                      // inner ends droop = grumpy
+    const ear = mk(head, new THREE.ConeGeometry(0.19, 0.36, 4), pointMat, s * 0.31, 0.44, -0.02); ear.rotation.z = -s * 0.35;
+    const inner = mk(head, new THREE.ConeGeometry(0.1, 0.22, 4), pinkMat, s * 0.3, 0.41, 0.06); inner.rotation.z = -s * 0.35;
+    for (const a of [0.12, -0.08]) {
+      const w = mk(head, new THREE.BoxGeometry(0.4, 0.012, 0.012), furMat, s * 0.36, -0.2 + a * 0.3, 0.46);
+      w.rotation.z = s * a; w.rotation.y = -s * 0.35;
+    }
+  }
+})();
+const tailPivot = new THREE.Group(); tailPivot.position.set(0, 0.42, -0.8); catBody.add(tailPivot);
+tailPivot.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+  new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.35, 0.2, -0.45), new THREE.Vector3(0.45, 0.8, -0.55), new THREE.Vector3(0.2, 1.3, -0.4)
+]), 12, 0.1, 6), backMat));
+// swipe arm + paw live in world space so they can stretch across the room
+const armGeo = new THREE.CylinderGeometry(0.12, 0.15, 1, 7); armGeo.translate(0, 0.5, 0);
+const arm = new THREE.Mesh(armGeo, furMat); scene.add(arm);
+const paw = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), furMat); paw.scale.set(1, 0.7, 1.1); scene.add(paw);
+const swipe = { active: false, t: 0, target: new THREE.Vector3() };
+let catLean = 0, catIdle = 0, catFlinch = 0;
+const UP = new THREE.Vector3(0, 1, 0);
+const _sh = new THREE.Vector3(), _rest = new THREE.Vector3(), _pp = new THREE.Vector3(), _dir = new THREE.Vector3();
+
+function startSwipe(p) {
+  swipe.active = true; swipe.t = 0; swipe.target.copy(p); swipe.target.y = 0.25;
+  catLean = -Math.sign(p.x - CAT_POS.x) * 0.18;   // head tilts toward the target, still glaring at you
+  catIdle = 0.7;
+}
+function updateCat(dt, time, danger) {
+  catIdle = Math.max(0, catIdle - dt);
+  head.rotation.z += ((catIdle > 0 ? catLean : Math.sin(time * 0.7) * 0.04) - head.rotation.z) * Math.min(1, dt * 12);
+  tailPivot.rotation.z = Math.sin(time * (2 + danger * 7)) * (0.22 + danger * 0.25);
+  catFlinch = Math.max(0, catFlinch - dt);
+  catBody.position.x = catFlinch > 0 ? Math.sin(catFlinch * 60) * 0.12 * catFlinch : 0;
+  furMat.color.setHex(catFlinch > 0.25 ? 0x4a403a : FUR_HEX);
+  cat.updateMatrixWorld(true);
+  cat.localToWorld(_sh.set(0.5, 1.05, 0.25));
+  cat.localToWorld(_rest.set(0.34, 0.13, 0.84));
+  _pp.copy(_rest);
+  if (swipe.active) {
+    swipe.t += dt;
+    const OUT = 0.1, HOLD = 0.06, BACK = 0.17, t = swipe.t;
+    if (t < OUT) { const k = 1 - (1 - t / OUT) ** 2; _pp.lerpVectors(_rest, swipe.target, k); _pp.y += Math.sin(k * Math.PI) * 1.4; }
+    else if (t < OUT + HOLD) _pp.copy(swipe.target);
+    else if (t < OUT + HOLD + BACK) { const k = (t - OUT - HOLD) / BACK; _pp.lerpVectors(swipe.target, _rest, k * k * (3 - 2 * k)); _pp.y += Math.sin(k * Math.PI) * 0.9; }
+    else swipe.active = false;
+  }
+  paw.position.copy(_pp);
+  _dir.subVectors(_pp, _sh); const len = Math.max(0.01, _dir.length());
+  arm.position.copy(_sh);
+  arm.quaternion.setFromUnitVectors(UP, _dir.divideScalar(len));
+  arm.scale.set(1, len, 1);
+}
+
+/* =====================================================================
+   PARTICLES & BOOM
+   ===================================================================== */
+const partGeo = new THREE.IcosahedronGeometry(0.08, 0);
+const parts = [];
+for (let i = 0; i < 60; i++) {
+  const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true }));
+  m.visible = false; scene.add(m);
+  parts.push({ m, v: new THREE.Vector3(), life: 0, max: 1 });
+}
+function burst(pos, color, n, speed, up, size) {
+  for (const p of parts) {
+    if (n <= 0) break;
+    if (p.life > 0) continue;
+    n--;
+    p.m.visible = true; p.m.position.copy(pos); p.m.material.color.setHex(color); p.m.scale.setScalar(size * (0.6 + Math.random() * 0.8));
+    const a = Math.random() * Math.PI * 2, s = speed * (0.4 + Math.random() * 0.6);
+    p.v.set(Math.cos(a) * s, up * (0.5 + Math.random()), Math.sin(a) * s);
+    p.life = p.max = 0.45 + Math.random() * 0.35;
+  }
+}
+function updateParticles(dt) {
+  for (const p of parts) {
+    if (p.life <= 0) continue;
+    p.life -= dt;
+    if (p.life <= 0) { p.m.visible = false; continue; }
+    p.v.y -= 11 * dt;
+    p.m.position.addScaledVector(p.v, dt);
+    if (p.m.position.y < 0.05) { p.m.position.y = 0.05; p.v.y *= -0.35; p.v.x *= 0.7; p.v.z *= 0.7; }
+    p.m.rotation.x += dt * 8; p.m.rotation.y += dt * 6;
+    p.m.material.opacity = Math.min(1, p.life / p.max * 1.6);
+  }
+}
+const boomMat = new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0, depthWrite: false });
+const boom = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), boomMat); boom.visible = false; scene.add(boom);
+let boomT = 0, shake = 0;
+function explode(pos) {
+  boom.position.copy(pos); boom.position.y = 0.4; boom.visible = true; boomT = 0.4;
+  burst(boom.position, 0xffb02e, 14, 5, 5, 1.4);
+  burst(boom.position, 0x3a3434, 10, 3, 4, 1.8);
+  shake = reduceMotion ? 0.08 : 0.35;
+  const fl = document.getElementById('flash'); fl.classList.remove('on'); void fl.offsetWidth; fl.classList.add('on');
+}
+function updateBoom(dt) {
+  if (boomT <= 0) return;
+  boomT -= dt;
+  const k = 1 - Math.max(0, boomT) / 0.4;
+  boom.scale.setScalar(0.3 + k * 1.6);
+  boomMat.opacity = 0.9 * (1 - k);
+  boomMat.color.setHex(k < 0.3 ? 0xfff0b0 : 0xff8a2a);
+  if (boomT <= 0) boom.visible = false;
+}
+
+/* =====================================================================
+   MICE
+   ===================================================================== */
+const MG = {
+  body: new THREE.SphereGeometry(0.32, 10, 8),
+  head: new THREE.ConeGeometry(0.2, 0.44, 8),
+  ear: new THREE.CircleGeometry(0.13, 10),
+  eye: new THREE.SphereGeometry(0.038, 6, 4),
+  nose: new THREE.SphereGeometry(0.048, 6, 4),
+  tail: new THREE.CylinderGeometry(0.03, 0.012, 0.72, 5),
+  ring: new THREE.RingGeometry(0.44, 0.58, 24),
+  shadow: new THREE.CircleGeometry(0.42, 16),
+  bomb: new THREE.SphereGeometry(0.21, 10, 8),
+  fuse: new THREE.CylinderGeometry(0.022, 0.022, 0.22, 4),
+  spark: new THREE.SphereGeometry(0.07, 6, 4),
+  band: new THREE.TorusGeometry(0.19, 0.05, 5, 12),
+};
+const MM = {
+  fur: lam(0x9b8f86), ear: lam(0xe7a3a0, { side: THREE.DoubleSide }), eye: new THREE.MeshBasicMaterial({ color: 0x111111 }),
+  nose: lam(0xe77b86), tail: lam(0xd99a9a),
+  bombFur: lam(0x3b3538), bombEar: lam(0x6d4a4f, { side: THREE.DoubleSide }), bombEye: new THREE.MeshBasicMaterial({ color: 0xff3a24 }),
+  bomb: lam(0x1b1a1c), fuse: lam(0x8a6a45), band: lam(0xd8402b),
+  shadow: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }),
+};
+const RING_FAR = new THREE.Color(0xf6d56a), RING_NEAR = new THREE.Color(0xff3320);
+const easeBack = k => { const c = 1.9; return 1 + (c + 1) * (k - 1) ** 3 + c * (k - 1) ** 2; };
+
+class Mouse {
+  constructor() {
+    this.root = new THREE.Group(); this.root.visible = false;
+    this.model = new THREE.Group(); this.root.add(this.model);
+    const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); this.model.add(m); return m; };
+    this.body = add(MG.body, MM.fur, 0, 0.27, 0); this.body.scale.set(0.85, 0.72, 1.15);
+    this.head = add(MG.head, MM.fur, 0, 0.3, 0.46); this.head.rotation.x = Math.PI / 2;
+    this.nose = add(MG.nose, MM.nose, 0, 0.3, 0.69);
+    this.ears = [add(MG.ear, MM.ear, -0.15, 0.52, 0.33), add(MG.ear, MM.ear, 0.15, 0.52, 0.33)];
+    this.eyes = [add(MG.eye, MM.eye, -0.09, 0.39, 0.52), add(MG.eye, MM.eye, 0.09, 0.39, 0.52)];
+    this.tail = add(MG.tail, MM.tail, 0, 0.2, -0.64); this.tail.rotation.x = Math.PI / 2 + 0.4;
+    // bomb rig
+    this.bombRig = new THREE.Group(); this.model.add(this.bombRig);
+    const bomb = new THREE.Mesh(MG.bomb, MM.bomb); bomb.position.set(0, 0.62, -0.12); this.bombRig.add(bomb);
+    this.fuse = new THREE.Mesh(MG.fuse, MM.fuse); this.fuse.position.set(0, 0.82, -0.12); this.bombRig.add(this.fuse);
+    this.sparkMat = new THREE.MeshBasicMaterial({ color: 0xffc23a });
+    this.spark = new THREE.Mesh(MG.spark, this.sparkMat); this.spark.position.set(0, 0.94, -0.12); this.bombRig.add(this.spark);
+    const band = new THREE.Mesh(MG.band, MM.band); band.position.set(0, 0.3, 0.3); this.bombRig.add(band);
+    // floor decals
+    this.shadow = new THREE.Mesh(MG.shadow, MM.shadow); this.shadow.rotation.x = -Math.PI / 2; this.shadow.position.y = 0.012; this.root.add(this.shadow);
+    this.ringMat = new THREE.MeshBasicMaterial({ color: 0xf6d56a, transparent: true, opacity: 0, depthWrite: false });
+    this.ring = new THREE.Mesh(MG.ring, this.ringMat); this.ring.rotation.x = -Math.PI / 2; this.ring.position.y = 0.02; this.root.add(this.ring);
+    this.active = false;
+    this.center = new THREE.Vector3();
+    scene.add(this.root);
+  }
+  spawn(hole, isBomb, D, opts) {
+    this.active = true; this.root.visible = true;
+    this.hole = hole; this.isBomb = isBomb; this.attract = !!opts.attract;
+    this.speed = D.runSpeed * (1 + (Math.random() * 2 - 1) * CFG.SPEED_VARIANCE);
+    this.pauseTime = D.pauseTime * (0.8 + Math.random() * 0.4);
+    this.eatTime = D.eatTime;
+    this.willRetreat = this.attract || (!isBomb && Math.random() < D.retreatChance);
+    this.life = this.maxLife = D.bombLifetime;
+    this.target = null; this.threat = 0; this.visScale = 1; this.pop = 0; this.sqY = 1; this.sqXZ = 1;
+    this.age = 0;
+    this.root.position.copy(hole.mouthIn);
+    this.root.rotation.y = Math.atan2(hole.normal.x, hole.normal.z);
+    this.model.position.set(0, 0, 0); this.model.rotation.set(0, 0, 0);
+    const furM = isBomb ? MM.bombFur : MM.fur;
+    this.body.material = furM; this.head.material = furM;
+    this.tail.material = isBomb ? MM.bombFur : MM.tail;
+    for (const e of this.ears) e.material = isBomb ? MM.bombEar : MM.ear;
+    for (const e of this.eyes) e.material = isBomb ? MM.bombEye : MM.eye;
+    this.bombRig.visible = isBomb;
+    this.ring.visible = !isBomb;   // no threat ring on bombs: "no ring = hands off"
+    this.ringMat.opacity = 0;
+    this.setState('emerge');
+  }
+  setState(s) { this.state = s; this.t = 0; }
+  release() { this.active = false; this.root.visible = false; }
+  get hittable() {
+    if (!this.active) return false;
+    if (this.isBomb) return this.age >= CFG.BOMB_TELEGRAPH && (this.state === 'emerge' || this.state === 'peek' || this.state === 'run' || this.state === 'loiter' || this.state === 'home');
+    if (this.state === 'retreat') return this.t < 0.18;
+    return this.state === 'emerge' || this.state === 'peek' || this.state === 'run' || this.state === 'eat';
+  }
+  // counts toward the maxActive cap (leaving/dying mice don't)
+  get occupying() { return this.active && this.state !== 'whacked' && this.state !== 'escape' && this.state !== 'retreat' && this.state !== 'home'; }
+  faceToward(x, z, dt) {
+    const want = Math.atan2(x - this.root.position.x, z - this.root.position.z);
+    let diff = want - this.root.rotation.y;
+    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    this.root.rotation.y += diff * Math.min(1, dt * 12);
+  }
+  update(dt, time) {
+    this.t += dt; this.age += dt;
+    const p = this.root.position;
+    let bob = 0;
+
+    // bombs: fuse burns while it roams; when time's up it scurries back into its hole
+    if (this.isBomb && this.state !== 'whacked' && this.state !== 'home' && this.state !== 'retreat') {
+      this.life -= dt;
+      const k = Math.max(0, this.life / this.maxLife);
+      this.fuse.scale.y = 0.25 + 0.75 * k; this.fuse.position.y = 0.73 + 0.09 * (0.25 + 0.75 * k);
+      this.spark.position.y = this.fuse.position.y + 0.11 * (0.25 + 0.75 * k);
+      const telegraph = this.age < CFG.BOMB_TELEGRAPH;
+      this.spark.scale.setScalar((telegraph ? 1.8 : 1) * (0.7 + Math.random() * 0.7));
+      this.sparkMat.color.setHex(Math.random() < 0.5 ? 0xffc23a : 0xfff3b0);
+      if (this.life <= 0) this.setState(this.state === 'emerge' || this.state === 'peek' ? 'retreat' : 'home');
+    }
+
+    switch (this.state) {
+      case 'emerge': {
+        const k = Math.min(1, this.t / 0.32);
+        p.lerpVectors(this.hole.mouthIn, this.hole.mouthOut, 1 - (1 - k) ** 2);
+        this.pop = easeBack(k);
+        if (k >= 1) this.setState('peek');
+        break;
+      }
+      case 'peek': {
+        this.model.rotation.x = Math.sin(time * 18) * 0.06;
+        this.model.rotation.y = Math.sin(time * 5 + this.hole.x) * 0.3;
+        if (this.t >= this.pauseTime) {
+          this.model.rotation.set(0, 0, 0);
+          if (this.willRetreat) this.setState('retreat');
+          else { this.target = nearestCheese(p); this.setState(this.target ? 'run' : 'retreat'); }
+        }
+        break;
+      }
+      case 'run': {
+        if (!this.target || !this.target.alive) this.target = nearestCheese(p);
+        if (!this.target) { this.setState('escape'); break; }
+        const c = this.target.pos, dx = c.x - p.x, dz = c.z - p.z, dist = Math.hypot(dx, dz);
+        const step = Math.min(this.speed * dt, Math.max(0, dist - CFG.EAT_RADIUS));
+        p.x += dx / dist * step; p.z += dz / dist * step;
+        this.faceToward(c.x, c.z, dt);
+        bob = Math.abs(Math.sin(this.t * 22)) * 0.06;
+        if (dist - CFG.EAT_RADIUS < 0.02) this.setState(this.isBomb ? 'loiter' : 'eat');
+        break;
+      }
+      case 'eat': {
+        if (!this.target || !this.target.alive) { this.setState('run'); break; }
+        this.faceToward(this.target.pos.x, this.target.pos.z, dt);
+        this.model.rotation.x = 0.25 + Math.sin(time * 30) * 0.12;
+        if (this.t >= this.eatTime) {
+          this.model.rotation.x = 0;
+          onBite(this, this.target);
+          this.setState('escape');
+        }
+        break;
+      }
+      case 'loiter': {
+        this.model.rotation.y = Math.sin(time * 4) * 0.4;
+        break;
+      }
+      case 'home': {   // bomb mouse walking back to its hole mouth, then ducking in
+        const h = this.hole.mouthOut, dx = h.x - p.x, dz = h.z - p.z, dist = Math.hypot(dx, dz);
+        if (dist > 0.05) { const s = Math.min(dist, this.speed * 1.3 * dt); p.x += dx / dist * s; p.z += dz / dist * s; this.faceToward(h.x, h.z, dt); bob = Math.abs(Math.sin(this.t * 24)) * 0.06; }
+        else { p.copy(h); this.setState('retreat'); }
+        break;
+      }
+      case 'retreat': {
+        const k = Math.min(1, this.t / 0.3);
+        p.lerpVectors(this.hole.mouthOut, this.hole.mouthIn, k * k);
+        this.pop = 1 - k;
+        if (k >= 1) this.release();
+        break;
+      }
+      case 'escape': {
+        const h = this.hole.mouthIn, dx = h.x - p.x, dz = h.z - p.z, dist = Math.hypot(dx, dz);
+        if (dist > 0.05) { const s = Math.min(dist, this.speed * 1.6 * dt); p.x += dx / dist * s; p.z += dz / dist * s; }
+        this.faceToward(h.x, h.z, dt);
+        bob = Math.abs(Math.sin(this.t * 26)) * 0.06;
+        this.pop = Math.max(0, 1 - Math.max(0, this.t - 0.45) / 0.3);
+        if (this.pop <= 0) this.release();
+        break;
+      }
+      case 'whacked': {
+        const k = Math.min(1, this.t / 0.09);
+        this.sqY = 1 - 0.85 * k; this.sqXZ = 1 + 0.5 * k;
+        if (this.t > 0.35) this.pop = Math.max(0, 1 - (this.t - 0.35) / 0.2);
+        if (this.t > 0.55) this.release();
+        break;
+      }
+    }
+    if (!this.active) return;
+
+    /* Threat = proximity to the nearest remaining cheese. Drives size, ring
+       colour and pulse so players triage the close ones first. */
+    if (!this.isBomb) {
+      let th = 0;
+      if (this.state === 'eat') th = 1;
+      else if (this.state === 'emerge' || this.state === 'peek' || this.state === 'run') {
+        const c = (this.state === 'run' && this.target && this.target.alive) ? this.target : nearestCheese(p);
+        if (c) {
+          const dist = Math.hypot(c.pos.x - p.x, c.pos.z - p.z) - CFG.EAT_RADIUS;
+          th = Math.max(0, Math.min(1, 1 - dist / CFG.THREAT_RANGE));
+          if (this.state !== 'run') th *= 0.6;   // peeking mice haven't committed yet
+          c.danger = Math.max(c.danger, th);
+        }
+      }
+      if (this.state === 'eat' && this.target) this.target.danger = 1;
+      this.threat += (th - this.threat) * Math.min(1, dt * 6);
+      const pulse = this.threat > 0.6 ? Math.sin(time * (10 + 10 * this.threat)) : 0;
+      this.ringMat.color.copy(RING_FAR).lerp(RING_NEAR, this.threat);
+      this.ringMat.opacity = (0.25 + 0.65 * this.threat) * Math.min(1, this.pop);
+      this.ring.scale.setScalar((1 + 0.1 * pulse) * (1 + 0.35 * this.threat));
+    } else {
+      this.threat = 0;
+    }
+    this.visScale = 1 + CFG.THREAT_SCALE * this.threat;
+    const s = Math.max(0.001, this.pop * this.visScale);
+    this.model.scale.set(s * this.sqXZ, s * this.sqY, s * this.sqXZ);
+    this.model.position.y = bob;
+    this.shadow.scale.setScalar(Math.max(0.001, this.pop * this.visScale));
+    this.center.set(p.x, 0.3 * s, p.z);
+  }
+}
+const mice = Array.from({ length: 14 }, () => new Mouse());
+
+/* =====================================================================
+   GAME STATE
+   ===================================================================== */
+let state = 'menu';            // menu | playing | paused | ending | over
+let elapsed = 0, score = 0, lives = CFG.LIVES, combo = 0, whackedCount = 0;
+let spawnTimer = 0, bombStreak = 0, spawnedCount = 0, seenBomb = false;
+let endTimer = 0, endReason = '', attractTimer = 0;
+let D = getDifficulty(0);
+
+function isHoleFree(h) {
+  for (const m of mice) if (m.active && m.hole === h && (m.state === 'emerge' || m.state === 'peek' || m.state === 'retreat')) return false;
+  return true;
+}
+
+/* ---------------------------------------------------------------------
+   SPAWN LOGIC
+   A spawn "event" fires every spawnInterval seconds (± jitter). Each event
+   releases 1 mouse, or 2 with probability multiSpawnChance, but never
+   pushes the field past maxActive. Early on (d≈0) that means one mouse at
+   a time from one hole, every ~2s. Holes that currently have a mouse in
+   their mouth are skipped so two mice never stack in one hole.
+   --------------------------------------------------------------------- */
+function updateSpawner(dt) {
+  spawnTimer -= dt;
+  if (spawnTimer > 0) return;
+  spawnTimer = D.spawnInterval * (1 + (Math.random() * 2 - 1) * CFG.spawnJitter);
+  const count = 1 + (Math.random() < D.multiSpawnChance ? 1 : 0);
+  for (let i = 0; i < count; i++) {
+    let occupying = 0;
+    for (const m of mice) if (m.occupying) occupying++;
+    if (occupying >= D.maxActive) break;
+    spawnMouse({});
+  }
+}
+
+function spawnMouse(opts) {
+  const free = HOLES.filter(isHoleFree);
+  const m = mice.find(x => !x.active);
+  if (!free.length || !m) return null;
+  const hole = free[(Math.random() * free.length) | 0];
+
+  /* -------------------------------------------------------------------
+     BOMB RATIO
+     Base roll uses D.bombRatio (10% at the start → ~34% at full
+     difficulty). Guardrails keep it fair:
+       • the first SAFE_OPENING_MICE of a run are always normal,
+       • no more than MAX_BOMB_STREAK bombs in a row,
+       • bombs never exceed BOMB_FIELD_SHARE of the maxActive cap.
+     ------------------------------------------------------------------- */
+  let isBomb;
+  if (opts.attract) isBomb = Math.random() < 0.2;
+  else {
+    isBomb = Math.random() < D.bombRatio;
+    if (spawnedCount < CFG.SAFE_OPENING_MICE) isBomb = false;
+    if (isBomb && bombStreak >= CFG.MAX_BOMB_STREAK) isBomb = false;
+    if (isBomb) {
+      let bombs = 0;
+      for (const x of mice) if (x.active && x.isBomb && x.occupying) bombs++;
+      if (bombs >= Math.max(1, Math.floor(D.maxActive * CFG.BOMB_FIELD_SHARE))) isBomb = false;
+    }
+    bombStreak = isBomb ? bombStreak + 1 : 0;
+    spawnedCount++;
+  }
+  m.spawn(hole, isBomb, D, opts);
+  if (isBomb && !opts.attract && !seenBomb) {
+    seenBomb = true;
+    floatText(hole.mouthOut.clone().setY(1.3), 'Bomb! Don’t tap', 'warn');
+  }
+  return m;
+}
+
+/* ---------- player actions ---------- */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const _hit = new THREE.Vector3();
+
+function handleTap(clientX, clientY) {
+  ndc.set(clientX / window.innerWidth * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const ray = raycaster.ray;
+  // Distance-from-ray test against each mouse's centre: cheap, forgiving,
+  // and bigger (more threatening) mice are easier to hit.
+  let best = null, bestScore = Infinity;
+  for (const m of mice) {
+    if (!m.hittable) continue;
+    const r = CFG.HIT_RADIUS * m.visScale;
+    const n = ray.distanceSqToPoint(m.center) / (r * r);
+    if (n > 1) continue;
+    const sc = n + (m.isBomb ? CFG.BOMB_TAP_PENALTY : 0);
+    if (sc < bestScore) { bestScore = sc; best = m; }
+  }
+  if (best) { whack(best); return; }
+  if (ray.intersectPlane(floorPlane, _hit)) {
+    _hit.x = Math.max(-ROOM.halfW + 0.3, Math.min(ROOM.halfW - 0.3, _hit.x));
+    _hit.z = Math.max(0.3, Math.min(ROOM.depth - 0.5, _hit.z));
+    startSwipe(_hit);
+    burst(_hit.clone().setY(0.1), 0xb08a64, 4, 1.2, 1.5, 0.8);
+    sfx.miss();
+  }
+}
+
+function whack(m) {
+  startSwipe(m.root.position);
+  if (m.isBomb) {
+    explode(m.root.position);
+    m.release();
+    lives--; combo = 0; catFlinch = 0.6;
+    floatText(m.center.clone().setY(1), '−1 life', 'bad');
+    sfx.boom();
+    vibrate(120);
+    updateHud();
+    const lv = document.getElementById('lives'); lv.classList.add('hurt'); setTimeout(() => lv.classList.remove('hurt'), 500);
+    checkEnd();
+    return;
+  }
+  const clutch = m.threat >= CFG.CLUTCH_THREAT;
+  combo++;
+  const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
+  const pts = (CFG.SCORE_WHACK + (clutch ? CFG.SCORE_CLUTCH : 0)) * mult;
+  score += pts; whackedCount++;
+  m.setState('whacked');
+  burst(m.center.clone().setY(0.4), 0xffe07a, 7, 2.2, 3.2, 0.9);
+  floatText(m.center.clone().setY(0.9), clutch ? `Clutch +${pts}` : `+${pts}`, clutch ? 'clutch' : '');
+  sfx.whack(clutch);
+  vibrate(18);
+  updateHud();
+}
+
+function onBite(m, c) {
+  if (state !== 'playing' && state !== 'ending') return;
+  c.bite();
+  combo = 0;
+  burst(c.pos.clone().setY(0.55), 0xf4c13d, 8, 1.8, 2.5, 0.9);
+  floatText(c.pos.clone().setY(1.1), c.alive ? 'Chomp!' : 'Cheese gone!', 'bad');
+  sfx.bite(!c.alive);
+  vibrate(40);
+  const idx = cheeses.indexOf(c);
+  const w = document.querySelectorAll('#cheeses .wedge')[idx];
+  if (w) { w.classList.add('hit'); setTimeout(() => w.classList.remove('hit'), 350); }
+  updateHud();
+  checkEnd();
+}
+
+/* Fail states: cheese loss is the primary loss; lives are the misplay penalty. */
+function checkEnd() {
+  if (state !== 'playing') return;
+  if (!cheeses.some(c => c.alive)) endGame('cheese');
+  else if (lives <= 0) endGame('lives');
+}
+function endGame(reason) {
+  state = 'ending'; endReason = reason; endTimer = 1.2;
+  sfx.over();
+}
+
+/* =====================================================================
+   HUD / UI
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const ui = {
+  hud: $('hud'), score: $('score'), combo: $('combo'), lives: $('lives'), cheeses: $('cheeses'), time: $('time'), heat: $('heat'),
+  start: $('startScreen'), pause: $('pauseScreen'), over: $('overScreen'), fx: $('fx'),
+};
+const PAW = '<svg class="pip" viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="16" rx="6.2" ry="5.2"/><circle cx="4.8" cy="9.6" r="2.5"/><circle cx="9.3" cy="5" r="2.5"/><circle cx="14.7" cy="5" r="2.5"/><circle cx="19.2" cy="9.6" r="2.5"/></svg>';
+ui.lives.innerHTML = PAW.repeat(CFG.LIVES);
+(() => {
+  // each cheese icon = CHEESE_BITES vertical slices of a wedge; tip slices go first
+  const y = x => 4 + (x - 2) * 18 / 32;
+  let html = '';
+  for (let c = 0; c < cheeses.length; c++) {
+    let polys = '';
+    for (let b = 0; b < CFG.CHEESE_BITES; b++) {
+      const x0 = 2 + 32 * b / CFG.CHEESE_BITES, x1 = 2 + 32 * (b + 1) / CFG.CHEESE_BITES;
+      polys += `<polygon class="bite" data-b="${b}" points="${x0},${y(x0)} ${x1},${y(x1)} ${x1},22 ${x0},22" stroke-linejoin="round"/>`;
+    }
+    html += `<svg class="wedge" viewBox="0 0 36 24" aria-label="Cheese ${c + 1}">${polys}</svg>`;
+  }
+  ui.cheeses.innerHTML = html;
+})();
+const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+let lastTimeShown = -1;
+function updateHud() {
+  ui.score.textContent = score;
+  const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
+  ui.combo.hidden = mult <= 1; ui.combo.textContent = `x${mult}`;
+  ui.lives.querySelectorAll('.pip').forEach((p, i) => p.classList.toggle('lost', i >= lives));
+  const wedges = ui.cheeses.querySelectorAll('.wedge');
+  cheeses.forEach((c, i) => {
+    wedges[i].querySelectorAll('.bite').forEach(b => {
+      // slices vanish from the tip (highest index) inward
+      b.classList.toggle('gone', +b.dataset.b >= c.hp);
+    });
+  });
+}
+function updateClockHud() {
+  const s = Math.floor(elapsed);
+  if (s !== lastTimeShown) { lastTimeShown = s; ui.time.textContent = fmtTime(elapsed); ui.heat.style.width = `${Math.round(D.d * 100)}%`; }
+}
+
+function floatText(worldPos, text, cls) {
+  if (ui.fx.childElementCount > 14) ui.fx.firstChild.remove();
+  const v = worldPos.clone().project(camera);
+  const el = document.createElement('div');
+  el.className = 'float ' + (cls || '');
+  el.textContent = text;
+  el.style.left = `${(v.x * 0.5 + 0.5) * window.innerWidth}px`;
+  el.style.top = `${(-v.y * 0.5 + 0.5) * window.innerHeight}px`;
+  ui.fx.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+
+/* ---------- best score ---------- */
+const BEST_KEY = 'catguard.best';
+function getBest() { try { return +(localStorage.getItem(BEST_KEY) || 0); } catch (e) { return 0; } }
+function setBest(v) { try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) {} }
+function showBestOnStart() { const b = getBest(); $('bestStart').textContent = b ? b : '—'; }
+showBestOnStart();
+
+/* ---------- screens ---------- */
+function clearField() { for (const m of mice) m.release(); }
+function resetGame() {
+  clearField();
+  cheeses.forEach(c => c.reset());
+  elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
+  spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false;
+  lastTimeShown = -1; D = getDifficulty(0);
+  ui.fx.innerHTML = '';
+  updateHud(); updateClockHud();
+}
+function startGame() {
+  initAudio();
+  resetGame();
+  ui.start.hidden = true; ui.over.hidden = true; ui.pause.hidden = true; ui.hud.hidden = false;
+  state = 'playing';
+}
+function pauseGame() {
+  if (state !== 'playing') return;
+  state = 'paused'; ui.pause.hidden = false; $('resumeBtn').focus({ preventScroll: true });
+}
+function resumeGame() {
+  if (state !== 'paused') return;
+  state = 'playing'; ui.pause.hidden = true;
+}
+function quitToTitle() {
+  clearField(); cheeses.forEach(c => c.reset());
+  state = 'menu'; ui.pause.hidden = true; ui.hud.hidden = true; ui.start.hidden = false; showBestOnStart();
+}
+function showGameOver() {
+  state = 'over';
+  const best = getBest(), isNew = score > best;
+  if (isNew) setBest(score);
+  $('overEyebrow').textContent = isNew && score > 0 ? 'New best!' : 'Game over';
+  $('overTitle').textContent = endReason === 'cheese' ? 'The cheese is gone' : 'Out of lives';
+  $('overReason').textContent = endReason === 'cheese'
+    ? 'The mice carried off every last crumb. Whack the ones with red rings first.'
+    : 'Nine bombs is a lot, even for a cat. Leave them be and they head back into their holes.';
+  $('oScore').textContent = score;
+  $('oTime').textContent = fmtTime(elapsed);
+  $('oWhacked').textContent = whackedCount;
+  $('oBest').textContent = Math.max(best, score);
+  $('oBest').classList.toggle('new', isNew && score > 0);
+  ui.over.hidden = false;
+  $('againBtn').focus({ preventScroll: true });
+}
+
+$('startBtn').addEventListener('click', startGame);
+$('againBtn').addEventListener('click', startGame);
+$('pauseBtn').addEventListener('click', pauseGame);
+$('resumeBtn').addEventListener('click', resumeGame);
+$('quitBtn').addEventListener('click', quitToTitle);
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' || e.key === 'p') { state === 'playing' ? pauseGame() : resumeGame(); }
+});
+
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (state !== 'playing') return;
+  e.preventDefault();
+  handleTap(e.clientX, e.clientY);
+}, { passive: false });
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+/* =====================================================================
+   AUDIO (tiny WebAudio synth, started from the Start button)
+   ===================================================================== */
+let actx = null, soundOn = true;
+try { soundOn = localStorage.getItem('catguard.sound') !== 'off'; } catch (e) {}
+function syncSoundLabels() { for (const id of ['soundBtn', 'soundBtn2']) $(id).textContent = `Sound: ${soundOn ? 'on' : 'off'}`; }
+syncSoundLabels();
+function toggleSound() { soundOn = !soundOn; try { localStorage.setItem('catguard.sound', soundOn ? 'on' : 'off'); } catch (e) {} syncSoundLabels(); initAudio(); }
+$('soundBtn').addEventListener('click', toggleSound);
+$('soundBtn2').addEventListener('click', toggleSound);
+function initAudio() {
+  if (actx || !soundOn) { if (actx && actx.state === 'suspended') actx.resume(); return; }
+  try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
+}
+function tone(f0, f1, dur, type, vol, delay) {
+  if (!actx || !soundOn) return;
+  const t = actx.currentTime + (delay || 0), o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, vol, freq) {
+  if (!actx || !soundOn) return;
+  const n = Math.floor(actx.sampleRate * dur), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 2;
+  const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  src.buffer = buf; f.type = 'lowpass'; f.frequency.value = freq; g.gain.value = vol;
+  src.connect(f); f.connect(g); g.connect(actx.destination); src.start();
+}
+const sfx = {
+  whack: clutch => { tone(clutch ? 900 : 620, 180, 0.12, 'square', 0.07); if (clutch) tone(1200, 1500, 0.08, 'triangle', 0.05, 0.06); },
+  miss: () => noise(0.06, 0.12, 900),
+  boom: () => { noise(0.5, 0.5, 700); tone(160, 40, 0.4, 'sine', 0.25); },
+  bite: gone => { tone(140, 90, 0.18, 'sawtooth', 0.06); if (gone) tone(300, 80, 0.45, 'triangle', 0.08, 0.1); },
+  over: () => { tone(440, 220, 0.3, 'triangle', 0.08); tone(330, 110, 0.5, 'triangle', 0.08, 0.25); },
+};
+
+/* =====================================================================
+   CAMERA FIT — keeps the whole play floor visible in any aspect ratio.
+   Portrait phones get a steeper, more top-down angle.
+   ===================================================================== */
+const FIT_POINTS = [
+  [-ROOM.halfW, 0, 0], [ROOM.halfW, 0, 0], [-ROOM.halfW, 1.0, 0], [ROOM.halfW, 1.0, 0],
+  [-ROOM.halfW, 0, 10], [ROOM.halfW, 0, 10], [-1, 0, 12.3], [1, 0, 12.3], [0, 3.3, 11.6],
+].map(a => new THREE.Vector3(...a));
+function fitCamera() {
+  const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
+  renderer.setSize(w, h);
+  camera.aspect = aspect;
+  camera.fov = aspect < 1 ? 48 : 40;
+  camera.updateProjectionMatrix();
+  camera.clearViewOffset();
+  const el = THREE.MathUtils.degToRad(aspect < 0.75 ? 66 : aspect < 1.3 ? 56 : 46);
+  const dir = new THREE.Vector3(0, Math.sin(el), Math.cos(el));
+  const topLimit = aspect < 1 ? 0.66 : 0.74;   // leave room for the HUD
+  const bottom = -0.97, v = new THREE.Vector3();
+  let dist = 6, minY = 0, maxY = 0;
+  for (let i = 0; i < 160; i++) {
+    camera.position.copy(camTarget).addScaledVector(dir, dist);
+    camera.lookAt(camTarget); camera.updateMatrixWorld();
+    let ok = true; minY = Infinity; maxY = -Infinity;
+    for (const p of FIT_POINTS) {
+      v.copy(p).project(camera);
+      if (Math.abs(v.x) > 0.99) ok = false;
+      minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+    }
+    if (ok && maxY - minY <= topLimit - bottom) break;
+    dist += 0.2;
+  }
+  // centre the room in the space below the HUD
+  const shift = (topLimit + bottom) / 2 - (minY + maxY) / 2;
+  camera.setViewOffset(w, h, 0, shift * h / 2, w, h);
+  camBase.copy(camera.position);
+}
+window.addEventListener('resize', fitCamera);
+fitCamera();
+
+/* =====================================================================
+   MAIN LOOP
+   ===================================================================== */
+let last = performance.now(), clock = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  clock += dt;
+
+  if (state === 'playing' || state === 'ending') {
+    const sdt = state === 'ending' ? dt * 0.3 : dt;   // slow-mo on the final blow
+    if (state === 'playing') {
+      elapsed += dt;
+      D = getDifficulty(elapsed);
+      updateSpawner(dt);
+      updateClockHud();
+    }
+    for (const m of mice) if (m.active) m.update(sdt, clock);
+    if (state === 'ending') { endTimer -= dt; if (endTimer <= 0) showGameOver(); }
+  } else if (state === 'menu') {
+    // attract mode: mice peek out and duck back in behind the title card
+    attractTimer -= dt;
+    if (attractTimer <= 0) { attractTimer = 1.1 + Math.random() * 0.8; spawnMouse({ attract: true }); }
+    for (const m of mice) if (m.active) m.update(dt, clock);
+  }
+
+  let danger = 0;
+  for (const c of cheeses) { danger = Math.max(danger, c.danger); c.update(dt, clock); }
+  updateCat(dt, clock, danger);
+  updateParticles(dt);
+  updateBoom(dt);
+
+  shake = Math.max(0, shake - dt * 1.4);
+  camera.position.copy(camBase);
+  if (shake > 0) camera.position.add(new THREE.Vector3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0));
+  lamp.intensity = 0.5 + Math.sin(clock * 1.3) * 0.03;
+
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+
+</html>
