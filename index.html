@@ -463,7 +463,7 @@ function toggleDresserDoor(x) {
   if (!dresserDoors.length) return;
   let best = dresserDoors[0];
   for (const d of dresserDoors) if (Math.abs(d.x - x) < Math.abs(best.x - x)) best = d;
-  best.target = best.target ? 0 : -1.8;
+  best.target = best.target ? 0 : -1.66;                             // ~95°: square to the front, clear of its own contents and the neighbour's
   sfx.creak(); if (best.target) setTimeout(sfx.rustle, 220);
 }
 function updateDresser(dt) {
@@ -644,33 +644,63 @@ const mainDoors = credenza(MAIN_X0, MAIN_W, CAB_H, 5);
    Each hides a stuffed cupboard: dark cavity, a shelf, folded blankets bulging out, papers and crumpled balls. */
 const dresserDoors = [];
 {
-  const papers = lam(0xf4f1ea), dark = basic(0x140c08), shelf = lam(0x2a1a12);
-  const blanketMats = [lam(0x7f8388), lam(0x2f6f73), lam(0xffffff, { map: stripeTex }), lam(0xb9a88f), lam(0x5a4a6e)];
-  const crumple = new THREE.IcosahedronGeometry(IN(1.6), 0);
-  mainDoors.forEach((d, idx) => {
+  // The cupboards are shallow stages set just in front of the dresser face. Contents stay in the right-hand
+  // middle 78% of the opening and no deeper than 3", and the door swings ~95°, so an open door never cuts
+  // through what's inside or covers the next cupboard. Each of the three has its own story.
+  const dark = basic(0x140c08), shelfMat = lam(0x2a1a12), papers = lam(0xf4f1ea);
+  const stages = [
+    // 1) linen cupboard: neatly folded blankets, the striped one on top, one corner tumbling out
+    (g, w, h) => {
+      const mats = [lam(0x7f8388), lam(0x2f6f73), lam(0xb9a88f), lam(0xffffff, { map: stripeTex })];
+      let y = -h / 2 + IN(1);
+      mats.forEach((m, k) => { const th = IN(3.4); box(w * 0.78, th, IN(2.4), m, IN(0.6), y + th / 2, IN(1.4), g).rotation.z = (k % 2 ? 1 : -1) * 0.02; y += th + IN(0.2); });
+      const flap = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.34, IN(4)), lam(0xffffff, { map: stripeTex, side: THREE.DoubleSide }));
+      flap.position.set(w * 0.2, y - IN(1), IN(2.8)); flap.rotation.x = 0.5; g.add(flap);
+      box(w * 0.5, IN(2.6), IN(2.4), lam(0xe9e2d5), IN(1), h / 2 - IN(3), IN(1.4), g);                      // spare pillowcase roll
+    },
+    // 2) junk cupboard: stacked board-game boxes, magazines, papers, crumpled balls
+    (g, w, h) => {
+      const lids = [[0xc8322b, 0xf2d24b], [0x2e5fa8, 0xffffff], [0x3b8a4e, 0xf7e7c6]];
+      let y = -h / 2 + IN(1);
+      lids.forEach(([c, stripe], k) => {
+        const bw = w * (0.8 - k * 0.07), bh = IN(2.2); box(bw, bh, IN(2.6), lam(c), IN(0.8) + k * IN(0.3), y + bh / 2, IN(1.4), g);
+        box(bw * 0.9, IN(0.5), IN(0.15), lam(stripe), IN(0.8) + k * IN(0.3), y + bh / 2, IN(2.75), g);   // title band on the box side
+        y += bh + IN(0.15);
+      });
+      for (let k = 0; k < 5; k++) { box(w * 0.62, IN(0.3), IN(2.6), k % 2 ? papers : lam(0xd8e1ea), IN(1.2), h / 2 - IN(6.5) + k * IN(0.36), IN(1.4), g).rotation.y = (k - 2) * 0.03; }
+      const sheet = box(w * 0.4, IN(0.15), IN(3.2), papers, w * 0.12, h / 2 - IN(4.2), IN(2.2), g); sheet.rotation.x = -0.3;
+      const ball = new THREE.IcosahedronGeometry(IN(1.3), 0);
+      for (let k = 0; k < 2; k++) { const c = new THREE.Mesh(ball, papers); c.position.set(w * (0.05 + k * 0.25), h / 2 - IN(2.2), IN(1.6)); c.rotation.set(k, k * 2, 1); g.add(c); }
+    },
+    // 3) the cat's secret stash: yarn balls, a toy mouse, a treat bag, a feather wand, a jingle ball
+    (g, w, h) => {
+      const yarn = (col, x, y, r) => {
+        const b = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), lam(col)); b.position.set(x, y, IN(1.5)); g.add(b);
+        for (let k = 0; k < 3; k++) { const t = new THREE.Mesh(new THREE.TorusGeometry(r * 1.01, r * 0.07, 4, 18), lam(col - 0x111111)); t.position.copy(b.position); t.rotation.set(k * 1.1, k * 0.7, 0); g.add(t); }
+      };
+      yarn(0xe86a8f, IN(0.8), -h / 2 + IN(2.5), IN(2.2));
+      yarn(0x7cc3d9, w * 0.3, -h / 2 + IN(2.1), IN(1.8));
+      const bag = box(IN(4.2), IN(5.5), IN(2), lam(0xf0a33a), -w * 0.18, -h / 2 + IN(8.5), IN(1.2), g); bag.rotation.z = 0.12;      // treat bag
+      const fish = new THREE.Mesh(new THREE.CircleGeometry(IN(0.9), 3), basic(0xffffff)); fish.position.set(-w * 0.18, -h / 2 + IN(8.8), IN(2.25)); fish.rotation.z = Math.PI / 2; g.add(fish);
+      const mouse = new THREE.Mesh(new THREE.SphereGeometry(IN(1.2), 10, 8), lam(0x8d8d92)); mouse.scale.set(1.5, 0.8, 0.9); mouse.position.set(w * 0.25, h / 2 - IN(3.5), IN(1.6)); g.add(mouse);   // toy mouse
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.12), IN(0.12), IN(3), 4), lam(0xe29aa0)); tail.rotation.z = 1.2; tail.position.set(w * 0.25 + IN(2.2), h / 2 - IN(4.1), IN(1.6)); g.add(tail);
+      const wand = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.2), IN(0.2), h * 0.75, 5), lam(0xd9c16a)); wand.rotation.z = 0.35; wand.position.set(w * 0.05, IN(0.5), IN(2.4)); g.add(wand);
+      for (let k = 0; k < 3; k++) { const f = new THREE.Mesh(new THREE.ConeGeometry(IN(0.6), IN(3), 5), lam([0xe8453c, 0x44b0e0, 0xf5d547][k])); f.position.set(w * 0.05 - h * 0.37 * Math.sin(0.35) + (k - 1) * IN(0.6), IN(0.5) + h * 0.37 * Math.cos(0.35) + IN(1), IN(2.4)); f.rotation.z = 0.35 + (k - 1) * 0.4; g.add(f); }
+      const jingle = new THREE.Mesh(new THREE.SphereGeometry(IN(1), 10, 8), lam(0xe8c547, { emissive: 0x2a2000 })); jingle.position.set(-w * 0.25, h / 2 - IN(2.4), IN(1.6)); g.add(jingle);
+    },
+  ];
+  mainDoors.forEach(d => {
     const m = d.mesh;
     if (Math.abs(m.position.x - CAT_POS.x) < 1.05) return;             // blocked by the cat's box
+    const n = dresserDoors.length;
     const hinge = new THREE.Group(); hinge.position.set(m.position.x - d.w / 2, m.position.y, m.position.z); scene.add(hinge);
-    scene.remove(m); m.position.set(d.w / 2, 0, 0); hinge.add(m);          // door now swings on its left edge
-    const inside = new THREE.Group(); inside.position.set(m.position.x + hinge.position.x - d.w / 2 + d.w / 2, hinge.position.y, DEPTH + 0.021); inside.visible = false; scene.add(inside);
-    inside.position.x = hinge.position.x + d.w / 2;
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(d.w, d.h), dark); inside.add(back);
-    box(d.w, IN(0.8), IN(3), shelf, 0, 0, IN(1), inside);                                            // mid shelf edge
-    // lower half: folded blankets crammed in, bulging out of the doorway, one corner hanging over the edge
-    let y = -d.h / 2 + IN(1);
-    for (let k = 0; k < 3; k++) {
-      const th = IN(3.2 + Math.random() * 1.5), b = box(d.w * (0.82 + Math.random() * 0.12), th, IN(4 + k), blanketMats[(idx + k) % blanketMats.length], (Math.random() - 0.5) * IN(1.5), y + th / 2, IN(1.5 + k * 0.6), inside);
-      b.rotation.z = (Math.random() - 0.5) * 0.08; y += th;
-    }
-    const drape = new THREE.Mesh(new THREE.PlaneGeometry(d.w * 0.45, IN(5)), blanketMats[(idx + 1) % blanketMats.length]);
-    drape.material = drape.material.clone(); drape.material.side = THREE.DoubleSide;
-    drape.position.set(d.w * 0.18, -d.h / 2 - IN(1.5), IN(4.2)); drape.rotation.x = 0.25; inside.add(drape);
-    // upper half: a stack of papers, a sheet poking out, crumpled balls
-    let py = IN(1);
-    for (let k = 0; k < 7; k++) { const sh = box(d.w * 0.7, IN(0.35), IN(3.5), papers, (Math.random() - 0.5) * IN(1), py + IN(0.2), IN(1.8), inside); sh.rotation.y = (Math.random() - 0.5) * 0.15; py += IN(0.45); }
-    const sheet = box(d.w * 0.5, IN(0.2), IN(5), papers, -d.w * 0.15, py + IN(0.5), IN(3), inside); sheet.rotation.x = -0.35; sheet.rotation.z = 0.2;
-    for (let k = 0; k < 3; k++) { const c = new THREE.Mesh(crumple, papers); c.position.set((k - 1) * d.w * 0.28, d.h / 2 - IN(3.2), IN(2.4)); c.rotation.set(k, k * 2, k); inside.add(c); }
-    const rig = { hinge, inside, angle: 0, target: 0, x: hinge.position.x + d.w / 2, center: new THREE.Vector3(hinge.position.x + d.w / 2, m.position.y + hinge.position.y - m.position.y, DEPTH + 0.1) };
+    scene.remove(m); m.position.set(d.w / 2, 0, 0); hinge.add(m);          // door swings on its left edge
+    const inside = new THREE.Group(); inside.position.set(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.021); inside.visible = false; scene.add(inside);
+    inside.add(new THREE.Mesh(new THREE.PlaneGeometry(d.w, d.h), dark));
+    box(d.w, IN(0.8), IN(2.5), shelfMat, 0, 0, IN(0.9), inside);                                          // mid shelf edge
+    const stage = new THREE.Group(); inside.add(stage);                                                   // contents kept to the middle 78%: clear of both door swings
+    stages[n % stages.length](stage, d.w * 0.78, d.h);
+    const rig = { hinge, inside, angle: 0, target: 0, x: hinge.position.x + d.w / 2, center: new THREE.Vector3(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.1) };
     m.userData.dresserDoor = rig; tapTargets.push(m);
     dresserDoors.push(rig);
   });
@@ -979,7 +1009,7 @@ for (const [side, z0] of [[-1, COUCH_LEFT_Z0], [1, COUCH_RIGHT_Z0]]) {
 
 /* ---------- claw marks: tap a sofa and the cat scratches it, three levels of destruction per sofa ----------
    level 1: light claw lines · level 2: torn rips with fraying fluff · level 3: shredded fabric with stuffing out.
-   Every mark on a sofa shows that sofa's current level, so the whole thing visibly gets worse. */
+   Each spot escalates on its own: hit the same place again to tear it further. */
 const scratchTex = [1, 2, 3].map(level => canvasTex(128, 128, (g, w, h) => {
   g.clearRect(0, 0, w, h);
   const lines = level + 2;
@@ -1001,21 +1031,28 @@ const scratchMats = scratchTex.map(t => new THREE.MeshBasicMaterial({ map: t, tr
 const couchDamage = { '-1': { level: 0, marks: [], fluff: [] }, '1': { level: 0, marks: [], fluff: [] } };
 const scratchGeo = new THREE.PlaneGeometry(0.55, 0.55), fluffGeo = new THREE.IcosahedronGeometry(0.06, 1), fluffMat = lam(0xffffff);
 function scratchCouch(side, point, normal) {
-  const d = couchDamage[side];
-  d.level = Math.min(3, d.level + 1);
-  if (d.marks.length < 14) {
-    const m = new THREE.Mesh(scratchGeo, scratchMats[d.level - 1]);
-    m.position.copy(point).addScaledVector(normal, 0.012);
-    m.lookAt(point.clone().add(normal)); m.rotateZ((Math.random() - 0.5) * 0.9);
-    scene.add(m); d.marks.push(m);
-    if (d.level === 3) for (let k = 0; k < 4; k++) {                    // tufts of stuffing actually poking out
+  // Only hitting the SAME spot again escalates it (light → torn → shredded). A new spot starts a fresh light mark.
+  const d = couchDamage[side], SAME = 0.35;
+  let mark = d.marks.find(m => m.position.distanceTo(point) < SAME);
+  if (!mark) {
+    if (d.marks.length >= 18) return;
+    mark = new THREE.Mesh(scratchGeo, scratchMats[0]); mark.userData.level = 0;
+    mark.position.copy(point).addScaledVector(normal, 0.012);
+    mark.lookAt(point.clone().add(normal)); mark.rotateZ((Math.random() - 0.5) * 0.9);
+    scene.add(mark); d.marks.push(mark);
+  }
+  mark.userData.level = Math.min(3, mark.userData.level + 1);
+  mark.material = scratchMats[mark.userData.level - 1];
+  if (mark.userData.level === 3 && !mark.userData.stuffed) {            // shredded: stuffing pokes out of this spot
+    mark.userData.stuffed = true;
+    for (let k = 0; k < 4; k++) {
       const f = new THREE.Mesh(fluffGeo, fluffMat); f.position.copy(point).addScaledVector(normal, 0.03 + Math.random() * 0.04);
       f.position.x += (Math.random() - 0.5) * 0.3; f.position.z += (Math.random() - 0.5) * 0.3; f.position.y += (Math.random() - 0.5) * 0.2;
       f.scale.setScalar(0.7 + Math.random() * 0.8); scene.add(f); d.fluff.push(f);
     }
   }
-  d.marks.forEach(m => m.material = scratchMats[d.level - 1]);     // the whole sofa shows its current level
-  sfx.scratch(d.level);
+  d.level = Math.max(...d.marks.map(m => m.userData.level));
+  sfx.scratch(mark.userData.level);
 }
 function resetCouches() {
   for (const k of ['-1', '1']) { const d = couchDamage[k]; d.marks.concat(d.fluff).forEach(o => scene.remove(o)); d.marks = []; d.fluff = []; d.level = 0; }
@@ -2254,7 +2291,7 @@ const FIT_POINTS = [
   new THREE.Vector3(0, 3.9, 0.3), new THREE.Vector3(-3.4, 3.2, 0.3), new THREE.Vector3(3.4, 3.2, 0.3),   // TV top + dresser ends
   new THREE.Vector3(0, 0, 12.6),                                                                        // front edge of the play area
 ];
-const CAM_PULLBACK = 1.2;                              // >1 = camera further back than the tightest fit
+const CAM_PULLBACK = 1.32, CAM_PULLBACK_PORTRAIT = 1.08;   // >1 = camera further back than the tightest fit (phones need less)                              // >1 = camera further back than the tightest fit
 function fitCamera() {
   const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
   renderer.setSize(w, h);
@@ -2262,7 +2299,7 @@ function fitCamera() {
   camera.fov = aspect < 1 ? 48 : 40;
   camera.updateProjectionMatrix();
   camera.clearViewOffset();
-  const el = THREE.MathUtils.degToRad(aspect < 0.75 ? 63 : aspect < 1.3 ? 48 : 40);   // camera tilt: lower = more 'standing in the room'
+  const el = THREE.MathUtils.degToRad(aspect < 0.75 ? 56 : aspect < 1.3 ? 43 : 36);   // camera tilt: lower = more 'standing in the room'
   const dir = new THREE.Vector3(0, Math.sin(el), Math.cos(el));
   const topLimit = aspect < 1 ? 0.66 : 0.74;   // leave room for the HUD
   const bottom = -0.97, v = new THREE.Vector3();
@@ -2280,7 +2317,7 @@ function fitCamera() {
     dist += 0.2;
   }
   // pull back a little past the tight fit so the level has breathing room
-  dist *= CAM_PULLBACK;
+  dist *= aspect < 0.75 ? CAM_PULLBACK_PORTRAIT : CAM_PULLBACK;
   camera.position.copy(camTarget).addScaledVector(dir, dist); camera.lookAt(camTarget); camera.updateMatrixWorld();
   minY = Infinity; maxY = -Infinity;
   for (const p of FIT_POINTS) { v.copy(p).project(camera); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); }
