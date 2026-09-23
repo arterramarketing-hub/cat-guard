@@ -430,7 +430,7 @@ const cordTexH = canvasTex(32, 64, (g, w, h) => {         // same corduroy, ribs
 const lam = (color, extra) => new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {}));
 const basic = (color, extra) => new THREE.MeshBasicMaterial(Object.assign({ color }, extra || {}));
 const box = (w, h, d, mat, x, y, z, parent) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); (parent || scene).add(m); return m; };
-let starMesh = null, mirrorRig = null, gloveRig = null, windowRig = null, tableRig = null;
+let starMesh = null, mirrorRig = null, gloveRig = null, windowRig = null, tableRig = null, diffuserRig = null;
 const steamPuffs = [];
 function breakTable() {
   const t = tableRig; if (!t || t.broken) return;
@@ -473,6 +473,30 @@ function updateDresser(dt) {
     d.inside.visible = d.angle < -0.12;
   }
 }
+function knockDiffuser() {
+  const d = diffuserRig; if (!d || d.state !== 'rest') return;
+  d.state = 'fall'; d.v.set((Math.random() - 0.5) * 0.6, 1.1, 1.7); d.w.set(2.6 + Math.random(), (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2); sfx.whoosh();
+}
+function updateDiffuser(dt) {
+  const d = diffuserRig; if (!d) return;
+  if (d.state === 'fall') {
+    d.v.y -= 9.8 * dt; d.vase.position.addScaledVector(d.v, dt);
+    d.vase.rotation.x += d.w.x * dt; d.vase.rotation.y += d.w.y * dt; d.vase.rotation.z += d.w.z * dt;
+    const onDresser = d.vase.position.z < IN(18) && d.vase.position.x < SHELF_X - SHELF_W / 2;
+    if (!onDresser && d.vase.position.y <= 0.05) {                          // hits the carpet: smash
+      d.state = 'broken'; d.vase.visible = false;
+      d.broken.position.set(d.vase.position.x, 0, d.vase.position.z); d.broken.visible = true;
+      d.puddle.position.set(d.vase.position.x + 0.1, 0.011, d.vase.position.z + 0.15); d.puddle.visible = true; d.wet = 0.05;
+      burst(d.broken.position.clone().setY(0.2), 0xf4f1ec, 12, 2.4, 3, 0.8); burst(d.broken.position.clone().setY(0.1), 0x9fc4d8, 8, 1.6, 2, 0.6);   // shards + water
+      sfx.shatter(); sfx.splash(); shake = Math.max(shake, reduceMotion ? 0.05 : 0.25);
+    }
+  }
+  if (d.state === 'broken' && d.wet < 1) { d.wet = Math.min(1, d.wet + dt * 0.6); d.puddle.scale.setScalar(0.25 + 0.75 * Math.sqrt(d.wet)); }
+}
+function resetDiffuser() {
+  const d = diffuserRig; if (!d) return;
+  d.state = 'rest'; d.vase.visible = true; d.vase.position.copy(d.home); d.vase.rotation.set(0, 0, 0); d.broken.visible = false; d.puddle.visible = false;
+}
 function toggleBlinds() { const r = windowRig; if (!r) return; r.target = r.target > 0.4 ? 0.06 : r.base; sfx.rattle(); }
 function updateBlinds(dt) {
   const r = windowRig; if (!r) return;
@@ -508,9 +532,11 @@ function updateGloves(dt, time) {
 function updateSteam(time) {
   for (const w of steamPuffs) {
     const k = (time * 0.22 + w.phase) % 1;
-    w.sprite.position.set(w.x + Math.sin(time * 0.9 + w.phase * 6) * IN(0.8) * k, w.y + k * IN(11), w.z);
-    w.sprite.scale.setScalar(IN(1.2) + k * IN(4.5));
-    w.sprite.material.opacity = 0.11 * Math.sin(k * Math.PI);
+    const alive = !diffuserRig || diffuserRig.state === 'rest';
+    w.sprite.visible = alive;
+    w.sprite.position.set(w.x + Math.sin(time * 0.9 + w.phase * 6) * IN(1.4) * k, w.y + k * IN(18), w.z);
+    w.sprite.scale.setScalar(IN(1.6) + k * IN(7));
+    w.sprite.material.opacity = 0.2 * Math.sin(k * Math.PI);
   }
 }
 const starSpin = { home: 0, target: 0, wobble: 0 };
@@ -701,16 +727,38 @@ for (const [x, z, r, h] of [[MAIN_X0 + IN(4), IN(9), IN(2), IN(12)], [TV_L - IN(
 }
 const candleLight = new THREE.PointLight(0xffb45a, 0.32, 6, 2); candleLight.position.set(0.2, CAB_H + FT(1.2), IN(30)); scene.add(candleLight);
 // white diffuser (~7") + pink salt lamp
-const diff = new THREE.Mesh(new THREE.SphereGeometry(IN(3.5), 12, 8), lam(0xf6f4ef)); diff.scale.y = 1.3; diff.position.set(MAIN_X0 + MAIN_W - IN(5), CAB_H + IN(4.5), IN(11)); scene.add(diff);
-{ // it's an air diffuser: little spout on top, faint mist rising
-  const topY = diff.position.y + IN(3.5) * 1.3;
-  const spout = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.55), IN(0.85), IN(0.7), 12), lam(0xd9d4ca)); spout.position.set(diff.position.x, topY + IN(0.15), diff.position.z); scene.add(spout);
-  const hole = new THREE.Mesh(new THREE.CircleGeometry(IN(0.35), 10), basic(0x6f6a63)); hole.rotation.x = -Math.PI / 2; hole.position.set(diff.position.x, topY + IN(0.52), diff.position.z); scene.add(hole);
+/* ---------- air diffuser: a white ceramic vase with a mist nozzle. Tap it and it topples off the credenza,
+   smashes on the carpet and leaves a spreading water mark. ---------- */
+{
+  const prof = [[0, 0], [1.6, 0], [2.3, 0.5], [3.2, 1.9], [3.6, 3.6], [3.3, 5.4], [2.3, 6.8], [1.4, 7.7], [1.2, 8.4], [1.55, 8.9], [1.45, 9.15], [0, 9.1]].map(([r, y]) => new THREE.Vector2(IN(r), IN(y)));
+  const ceramic = lam(0xf4f1ec);
+  const vase = new THREE.Group(); vase.position.set(MAIN_X0 + MAIN_W - IN(3.5), CAB_H, IN(13.5)); scene.add(vase);
+  vase.add(new THREE.Mesh(new THREE.LatheGeometry(prof, 28), ceramic));
+  const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.45), IN(0.65), IN(0.6), 12), lam(0xcfc9be)); nozzle.position.y = IN(9.35); vase.add(nozzle);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(IN(3.45), IN(0.18), 6, 28), lam(0xd8d0c2)); band.rotation.x = Math.PI / 2; band.position.y = IN(3.8); vase.add(band);   // glazed ring
+  // vapour: more, bigger, a touch denser than before
   const steamTex = canvasTex(64, 64, (g, w, h) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, 1, 1);
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 10; i++) {
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: steamTex, transparent: true, depthWrite: false, opacity: 0 }));
-    scene.add(sp); steamPuffs.push({ sprite: sp, phase: i / 6, x: diff.position.x, y: topY + IN(0.6), z: diff.position.z });
+    scene.add(sp); steamPuffs.push({ sprite: sp, phase: i / 10, x: vase.position.x, y: CAB_H + IN(9.6), z: vase.position.z });
   }
+  // broken version: the bottom of the vase plus a few curved shards (hidden until it smashes)
+  const broken = new THREE.Group(); broken.visible = false; scene.add(broken);
+  const base = new THREE.Mesh(new THREE.LatheGeometry(prof.slice(0, 5).concat([new THREE.Vector2(IN(3.3), IN(4.2))]), 20, 0, Math.PI * 1.6), ceramic);
+  base.material = ceramic.clone(); base.material.side = THREE.DoubleSide; base.rotation.z = Math.PI / 2; base.position.y = IN(3.3); broken.add(base);
+  for (let i = 0; i < 5; i++) {
+    const sh = new THREE.Mesh(new THREE.SphereGeometry(IN(3.4), 6, 4, 0, 0.9 + Math.random() * 0.6, 0.6, 0.9), base.material);
+    sh.position.set((Math.random() - 0.5) * 0.9, IN(0.5), (Math.random() - 0.5) * 0.9); sh.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6); broken.add(sh);
+  }
+  // water mark: an irregular dark damp patch that spreads out after the smash
+  const wetTex = canvasTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    for (let i = 0; i < 26; i++) { const a = Math.random() * 7, r = Math.random() * 34; const gr = g.createRadialGradient(64 + Math.cos(a) * r, 64 + Math.sin(a) * r, 2, 64 + Math.cos(a) * r, 64 + Math.sin(a) * r, 18 + Math.random() * 16); gr.addColorStop(0, 'rgba(60,40,24,.5)'); gr.addColorStop(1, 'rgba(60,40,24,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }
+  }, 1, 1);
+  const puddle = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), new THREE.MeshBasicMaterial({ map: wetTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  puddle.rotation.x = -Math.PI / 2; puddle.visible = false; scene.add(puddle);
+  diffuserRig = { vase, broken, puddle, state: 'rest', v: new THREE.Vector3(), w: new THREE.Vector3(), wet: 0, home: vase.position.clone(), center: new THREE.Vector3(vase.position.x, CAB_H + IN(4.5), vase.position.z) };
+  vase.traverse(o => { if (o.isMesh) { o.userData.diffuser = true; tapTargets.push(o); } });
 }
 box(IN(4), IN(4), IN(4), lam(0xf0b8a0), LEFT_X0 + LEFT_W - IN(14), CAB_H + IN(2), IN(12));   // pink salt lamp
 // right-corner black shelf (~4' tall, 14" wide) with a plant, and the paper star lamp (2' star on a 5' pole)
@@ -1816,6 +1864,7 @@ function interactables() {
   screen.getWorldPosition(_ip); list.push({ obj: screen, pos: _ip.clone(), r: 1.4 });
   if (starMesh) list.push({ obj: starMesh, pos: starMesh.position.clone(), r: 1.0 });
   for (const d of dresserDoors) list.push({ obj: d.hinge.children[0], pos: d.center, r: 0.55 });
+  if (diffuserRig && diffuserRig.state === 'rest') list.push({ obj: diffuserRig.vase.children[0], pos: diffuserRig.center, r: 0.45 });
   if (tableRig && !tableRig.broken) list.push({ obj: tableRig.pieces[0].mesh, pos: tableRig.center, r: 0.9 });
   if (windowRig) { windowRig.bl.getWorldPosition(_ip); list.push({ obj: windowRig.bl, pos: _ip.clone(), r: 1.2 }); }
   if (mirrorRig) { mirrorRig.glass.getWorldPosition(_ip); list.push({ obj: mirrorRig.glass, pos: _ip.clone(), r: 1.1 }); }
@@ -1830,6 +1879,7 @@ function interact(o, point, face) {
   if (o.userData.tv) { startSwipe(point, true); setTV(!tvOn); sfx.tvStatic(tvOn); tapShake(); return true; }
   if (o.userData.star) { startSwipe(point, true); setTimeout(nudgeStar, 90); tapShake(); return true; }
   if (o.userData.dresserDoor || o.userData.dresser) { startSwipe(point, true); setTimeout(() => toggleDresserDoor(o.userData.dresserDoor ? o.userData.dresserDoor.x : point.x), 90); tapShake(); return true; }
+  if (o.userData.diffuser) { startSwipe(point, true); setTimeout(knockDiffuser, 90); tapShake(); return true; }
   if (o.userData.table) { if (tableRig && tableRig.broken) return false; startSwipe(point, true); setTimeout(breakTable, 90); return true; }
   if (o.userData.window) { startSwipe(point, true); setTimeout(toggleBlinds, 90); tapShake(); return true; }
   if (o.userData.mirror) { startSwipe(point, true); setTimeout(hitMirror, 90); tapShake(); return true; }
@@ -1982,7 +2032,7 @@ function clearField() { for (const m of mice) m.release(); }
 function resetGame() {
   clearField();
   cheeses.forEach(c => c.reset());
-  resetProps(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches();
+  resetProps(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -2103,6 +2153,7 @@ const sfx = {
   },
   rustle: () => noise(0.18, 0.1, 5200),                            // paper star
   scratch: level => { for (let i = 0; i < 2 + level; i++) setTimeout(() => noise(0.07, 0.12 + level * 0.03, 3800 - level * 600), i * 70); },   // claws on corduroy
+  splash: () => { noise(0.35, 0.3, 900); setTimeout(() => noise(0.25, 0.12, 1800), 80); },   // water hitting the carpet
   creak: () => { tone(260, 180, 0.35, 'sawtooth', 0.025); tone(420, 300, 0.2, 'triangle', 0.02, 0.1); },   // cupboard door
   shatter: () => {                                                  // acrylic breaking: bright crash + a scatter of tiny tinkles
     noise(0.45, 0.4, 11000); noise(0.2, 0.25, 3000);
@@ -2279,6 +2330,7 @@ function frame(now) {
   updateBlinds(dt);
   updateTable(dt);
   updateDresser(dt);
+  updateDiffuser(dt);
   updateGloves(dt, clock);
   updateSteam(clock);
   updateBoom(dt);
