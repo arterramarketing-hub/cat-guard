@@ -926,9 +926,9 @@ tv.children.forEach(c => { if (c.isMesh && c !== screen) { c.userData.tv = true;
 const showCanvas = document.createElement('canvas'); showCanvas.width = 256; showCanvas.height = 144;
 const showCtx = showCanvas.getContext('2d'), showTex = new THREE.CanvasTexture(showCanvas), tvShowMat = basic(0xffffff, { map: showTex });
 const showCast = [
-  { x: 70, scarf: '#d8322b', hat: '#33c2c9', bobble: '#f5d33a', pom: 'flat', fat: 1.4, talk: 0, arm: 0, pose: 0 },   // chubby: red scarf, turquoise hat, yellow pom-pom
-  { x: 130, scarf: '#f07a1f', hat: '#3fbf45', flaps: true, square: true, talk: 0, arm: 0, pose: 0 },   // orange scarf, square-topped green hat with built-in earmuffs
-  { x: 186, scarf: '#7a4a2a', hat: '#3553c6', bobble: '#e0322b', pom: 'fuzzy', talk: 0, arm: 0, pose: 0 },   // brown scarf, blue hat, red pom-pom
+  { x: 70, scarf: '#d8322b', hat: '#33c2c9', bobble: '#f5d33a', pom: 'flat', band: ['#f5d33a', 2.5], fat: 1.4, talk: 0, arm: 0, pose: 0 },   // chubby: red scarf, turquoise hat, yellow pom-pom
+  { x: 130, scarf: '#f07a1f', hat: '#3fbf45', flaps: true, square: true, band: ['#2c9433', 5, true], talk: 0, arm: 0, pose: 0 },   // orange scarf, square-topped green hat with built-in earmuffs
+  { x: 186, scarf: '#7a4a2a', hat: '#3553c6', bobble: '#e0322b', pom: 'fuzzy', band: ['#e0322b', 4], talk: 0, arm: 0, pose: 0 },   // brown scarf, blue hat, red pom-pom
 ];
 function drawShow(t) {
   const g = showCtx, W = 256, H = 144;
@@ -947,19 +947,27 @@ function drawShow(t) {
     g.lineWidth = 1.2; g.strokeStyle = '#1f1712';
     const hx = x + (c.talk ? 2 : 0), hy = y - 30 + (F > 1 ? 3 : 0);
     const scarfW = F > 1 ? 40 * F * 0.92 : 34;                           // the chubby one's scarf wraps his whole width
-    if (F > 1) { g.fillStyle = c.scarf; g.fillRect(x - scarfW / 2, hy + 11, scarfW, 8); g.strokeRect(x - scarfW / 2, hy + 11, scarfW, 8); g.fillRect(x + 10, hy + 17, 7, 13); }   // under the chin
+    if (F > 1) { g.fillStyle = c.scarf; g.fillRect(x - scarfW / 2, hy + 11, scarfW, 8); g.fillRect(x + 10, hy + 17, 7, 13); }   // under the chin
     for (const sx of [-1, 1]) { g.fillStyle = '#9b8f86'; g.beginPath(); g.arc(hx + sx * 15, hy - 14, 9, 0, 7); g.fill(); g.stroke(); g.fillStyle = '#e7a3a0'; g.beginPath(); g.arc(hx + sx * 15, hy - 14, 5, 0, 7); g.fill(); }   // ears
-    g.fillStyle = '#b0a59c'; g.beginPath(); g.ellipse(hx, hy, 19 * (1 + (F - 1) * 0.45), 17, 0, 0, 7); g.fill(); g.stroke();                               // head
+    g.fillStyle = '#b0a59c'; g.beginPath(); g.ellipse(hx, hy, 19 * (1 + (F - 1) * 0.45), 17, 0, 0, 7); g.fill(); g.stroke();
+    if (F > 1) { g.beginPath(); g.ellipse(hx, hy + 16, 12, 4.5, 0, 0, 7); g.fill(); g.beginPath(); g.ellipse(hx, hy + 16, 12, 4.5, 0, 0.1, Math.PI - 0.1); g.stroke(); }   // double chin, sitting over the scarf                               // head
     if (c.hat) {
       const hw = 15 * (1 + (F - 1) * 0.45);
       g.fillStyle = c.hat; g.beginPath();
       if (c.square) { g.moveTo(hx - hw - 1, hy - 10); g.lineTo(hx - hw + 1, hy - 28); g.lineTo(hx + hw - 1, hy - 28); g.lineTo(hx + hw + 1, hy - 10); g.closePath(); }   // flat, boxy top
       else g.ellipse(hx, hy - 12, hw, 8, 0, Math.PI, 0);
       g.fill(); g.stroke();
-      if (c.flaps) for (const sx of [-1, 1]) { g.beginPath(); g.ellipse(hx + sx * 17, hy - 4, 6, 10, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = 'rgba(0,0,0,.15)'; g.beginPath(); g.ellipse(hx + sx * 17, hy - 2, 3.5, 6, 0, 0, 7); g.fill(); g.fillStyle = c.hat; }   // earmuff flaps
+      if (c.band) {                                                     // trim along the hat's bottom edge (yellow line / flap cover / red stripe)
+        const [bc, bh, outline] = c.band, by = c.square ? hy - 10 : hy - 12;
+        g.fillStyle = bc; g.fillRect(hx - hw - (c.square ? 1 : 0), by - bh, 2 * hw + (c.square ? 2 : 0), bh); if (outline) g.strokeRect(hx - hw - 1, by - bh, 2 * hw + 2, bh);
+        g.fillStyle = c.hat;
+      }
+      if (c.flaps) for (const sx of [-1, 1]) { g.beginPath(); g.ellipse(hx + sx * 17, hy - 4, 6, 10, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = c.band ? c.band[0] : 'rgba(0,0,0,.15)'; g.beginPath(); g.ellipse(hx + sx * 17, hy - 2, 3.5, 6, 0, 0, 7); g.fill(); g.fillStyle = c.hat; }   // earmuff flaps
       else if (c.pom === 'fuzzy') {                                      // shaggy yarn pom-pom
-        g.strokeStyle = c.bobble; g.lineWidth = 1.3;
-        for (let k = 0; k < 22; k++) { const a = k / 22 * Math.PI * 2 + Math.sin(k * 3.7) * 0.2, r = 4.5 + (k % 3); g.beginPath(); g.moveTo(hx, hy - 21); g.lineTo(hx + Math.cos(a) * r, hy - 21 + Math.sin(a) * r); g.stroke(); }
+        for (const [sc, lw, ext] of [['#1f1712', 2.8, 0.9], [c.bobble, 1.3, 0]]) {    // black outline pass, then the red yarn
+          g.strokeStyle = sc; g.lineWidth = lw;
+          for (let k = 0; k < 22; k++) { const a = k / 22 * Math.PI * 2 + Math.sin(k * 3.7) * 0.2, r = 4.5 + (k % 3) + ext; g.beginPath(); g.moveTo(hx, hy - 21); g.lineTo(hx + Math.cos(a) * r, hy - 21 + Math.sin(a) * r); g.stroke(); }
+        }
         g.fillStyle = c.bobble; g.beginPath(); g.arc(hx, hy - 21, 2.6, 0, 7); g.fill(); g.strokeStyle = '#1f1712'; g.lineWidth = 1.2;
       }
       else if (c.pom === 'flat') { g.fillStyle = c.bobble; g.beginPath(); g.ellipse(hx, hy - 20, 5.5, 2.6, 0, 0, 7); g.fill(); g.stroke(); }   // squashed pom-pom
