@@ -164,6 +164,7 @@
   .float{position:absolute;transform:translate(-50%,-50%);font-family:var(--display);font-size:22px;color:var(--cheese);white-space:nowrap;
          -webkit-text-stroke:4px var(--ink);paint-order:stroke fill;animation:rise .85s ease-out forwards}
   .float.clutch{color:#fff}
+  .float.hearts{color:#ff4f7a;font-size:12px;letter-spacing:1px}
   .float.chaos{color:#c9a8ff;font-size:17px}
   .float.shot{color:#ff2a2a;font-size:24px}
   .alt-mode{display:flex;justify-content:center;margin-top:-4px;font-size:14px;font-weight:700;color:#8a4a70}
@@ -1925,6 +1926,7 @@ const galaxyRig = (() => {
   add(VD, WH, new THREE.Vector3(-ROOM.halfW + 0.04, WH / 2, VD / 2), Math.PI / 2);                  // left wall
   add(VD, WH, new THREE.Vector3(ROOM.halfW - 0.04, WH / 2, VD / 2), -Math.PI / 2);                  // right wall
   add(ROOM.halfW * 2, VD, new THREE.Vector3(0, 0.02, VD / 2), 0, -Math.PI / 2);                     // stars across the carpet
+  add(ROOM.halfW * 2, VD, new THREE.Vector3(0, WH - 0.04, VD / 2), 0, Math.PI / 2);                // ...and the ceiling
   // the projectors themselves: a little dark base and a translucent dome that lights up
   const domes = [];
   const projector = (pos) => {
@@ -1941,7 +1943,8 @@ const galaxyRig = (() => {
   const rave = [0xff2fb4, 0x28e0ff, 0x9b4bff].map(c => { const l = new THREE.PointLight(c, 0, 14, 1.6); scene.add(l); return l; });
   return { nebula, stars, nebMat, starMat, planes, domes, rave, level: 0 };
 })();
-let raveKick = -1, remoteLed = null, danceUntil = 0;
+let raveKick = -1, remoteLed = null, danceUntil = 0, raveUntil = 0;
+const RAVE_SECS = 40;                                                  // the party shuts itself off after this long
 function setRoomMode(m) {
   roomMode = m;
   lightTarget = m === 0 ? 1 : m === 1 ? 0.16 : 0.1;
@@ -1951,10 +1954,12 @@ function setRoomMode(m) {
 function hitRemote() {
   sfx.remoteClick(); bonus(10);
   if (roomMode === 0) { setRoomMode(1); sfx.powerDown(); }
-  else if (roomMode === 1) { setRoomMode(2); sfx.bassDrop(); showBanner('Rave mode!'); danceUntil = clock + 10; }   // every mouse drops what it's doing and dances for 10 s
-  else { setRoomMode(0); sfx.powerUp(); }
+  else if (roomMode === 1) { setRoomMode(2); sfx.bassDrop(); showBanner('Rave mode!'); raveUntil = clock + RAVE_SECS; danceUntil = clock + (gameMode === 'chaos' ? RAVE_SECS : 10); }   // every mouse drops what it's doing and dances (chaos: the whole party)
+  else { setRoomMode(0); sfx.powerUp(); raveUntil = 0; danceUntil = Math.min(danceUntil, clock); }
 }
 function updateRoomFx(dt) {
+  updateCeilingDomes();
+  if (roomMode === 2 && raveUntil && clock > raveUntil) { setRoomMode(0); sfx.powerUp(); raveUntil = 0; danceUntil = Math.min(danceUntil, clock); }   // party's over: lights back on
   lightF += (lightTarget - lightF) * Math.min(1, dt * 4);
   if (remoteLed) remoteLed.material.opacity = 0.35 + 0.65 * (Math.sin(clock * 5) > 0 ? 1 : 0.2);   // standby light blinks so you can spot it
   for (const r of roomLights) r.l.intensity = r.base * lightF;
@@ -1972,7 +1977,28 @@ function updateRoomFx(dt) {
     l.intensity = roomMode === 2 ? 0.9 + 1.6 * beat : Math.max(0, l.intensity - dt * 4);
   });
 }
-function resetRoomFx() { setRoomMode(0); lightF = 1; danceUntil = 0; }
+/* ---------- ceiling with two frosted dome lights. It faces down only, so from the usual camera up above it's
+   see-through; it only shows if the camera is zoomed far out and dips below the top of the walls. ---------- */
+const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
+{
+  const VD = ROOM.visDepth, WH = ROOM.wallH;
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, VD), ceilMat); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, WH, VD / 2); scene.add(ceil);
+  const ringMat = lam(0xb89a5e), domeMat = basic(0xfff6e2);
+  for (const z of [4.6, 9.6]) {
+    const g = new THREE.Group(); g.position.set(0, WH, z); scene.add(g);
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(IN(8), IN(8), IN(0.8), 28), ringMat); ring.position.y = -IN(0.4); g.add(ring);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(IN(7.2), 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), domeMat); dome.rotation.x = Math.PI; dome.scale.y = 0.55; dome.position.y = -IN(0.8); g.add(dome);
+    const finial = new THREE.Mesh(new THREE.SphereGeometry(IN(0.7), 10, 8), ringMat); finial.position.y = -IN(0.8) - IN(7.2) * 0.55; g.add(finial);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xffe9c0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.55 }));
+    glow.position.y = -IN(3); glow.scale.setScalar(2.2); g.add(glow);
+    ceilingDomes.push({ domeMat, glow });
+  }
+}
+function updateCeilingDomes() {                                      // switch off with the room lights (dark / rave)
+  ceilMat.color.setHex(0xe4dfd6).multiplyScalar(0.25 + 0.75 * lightF);
+  for (const d of ceilingDomes) { d.domeMat.color.setRGB(0.35 + 0.65 * lightF, 0.33 + 0.63 * lightF, 0.3 + 0.58 * lightF); d.glow.material.opacity = 0.55 * lightF; }
+}
+function resetRoomFx() { setRoomMode(0); lightF = 1; danceUntil = 0; raveUntil = 0; }
 { // the TV remote, lying on the right sofa's seat
   const rm = new THREE.Group(); rm.position.set(ROOM.halfW - COUCH_DEPTH + IN(9), IN(18.3), COUCH_RIGHT_Z0 + FT(2.85) * 1.5); rm.rotation.y = 0.5; rm.scale.setScalar(1.7); scene.add(rm);   // middle cushion, near the front
   { const body = new THREE.Mesh(new THREE.BoxGeometry(IN(2), IN(0.8), IN(7)), lam(0x1d1d22)); body.position.y = IN(0.4); rm.add(body); }
@@ -2250,7 +2276,7 @@ class Cheese {
     this.usePrize();
     this.state = 'home'; this.alive = true; this.claimant = null;
     this.pos.copy(this.home); this.danger = 0; this.shownDanger = 0; this.hitT = 0; this.dropT = 0;
-    this.yaw = Math.random() * Math.PI * 2; this.wob = 0; this.tdir = 0; this.off = new THREE.Vector2(); this.downT = 0; this.lie = 0;
+    this.yaw = Math.random() * Math.PI * 2; this.wob = 0; this.tdir = 0; this.off = new THREE.Vector2(); this.downT = 0; this.lie = 0; this.roll = null;
     this.wedge.visible = true; this.wedge.rotation.set(0, this.yaw, 0);
   }
   get available() { return this.alive && !this.claimant; }
@@ -2264,7 +2290,9 @@ class Cheese {
     }
     this.claimant = null;
   }
-  nudge() { if (!this.alive || this.state === 'carried') return; this.yaw += (Math.random() < 0.5 ? -1 : 1) * (0.4 + Math.random() * 0.25); this.wob = 1; this.tdir = Math.random() * Math.PI * 2; this.downT = 1.8; sfx.nudge(); }
+  nudge() { if (!this.alive || this.state === 'carried') return; this.yaw += (Math.random() < 0.5 ? -1 : 1) * (0.4 + Math.random() * 0.25); this.wob = 1;
+    this.tdir = Math.atan2(this.pos.x - CAT_POS.x, this.pos.z - CAT_POS.z) + (Math.random() - 0.5) * 0.9;   // batted away from the cat
+    this.roll = { t: 0, e: 0, dur: 0.75, dist: 1.0 + Math.random() * 0.6 }; this.downT = 0; sfx.nudge(); }
   lose() { this.state = 'gone'; this.alive = false; this.claimant = null; this.wedge.visible = false; }
   update(dt, time) {
     let y = 0, s = 1;                                    // cheese sits right on the carpet
@@ -2280,23 +2308,37 @@ class Cheese {
     if (this.state !== 'carried') {                                  // nudged by a paw: turns a little further, hops and wobbles
       this.wob = Math.max(0, (this.wob || 0) - dt * 1.4);
       this.wedge.rotation.y += (this.yaw - this.wedge.rotation.y) * Math.min(1, dt * 8);
-      // tumbles: tips over hard one way, rocks back and forth and settles, skidding a little across the carpet
+      // tumbles: somersaults head over heels away from the paw, rolling to a new spot, then flops on its side, rocks and rights itself
+      let spin = 0;
+      if (this.roll) {
+        const r = this.roll; r.t += dt;
+        const k = Math.min(1, r.t / r.dur), e = 1 - (1 - k) * (1 - k), step = (e - r.e) * r.dist; r.e = e;   // fast off the paw, slowing down
+        const nx = this.pos.x + Math.sin(this.tdir) * step, nz = this.pos.z + Math.cos(this.tdir) * step;
+        if (!rollBlocked(nx, nz) && nz > 1.2 && nz < ROOM.depth - 1) { this.pos.x = nx; this.pos.z = nz; } else r.t = r.dur;   // stops against furniture
+        spin = e * Math.PI * 2;
+        y += 0.24 * (1 - Math.cos(spin)) * (this.wedge.userData.baseScale || 1) + Math.sin(k * Math.PI) * 0.12;   // stays on the carpet as it flips
+        this.downT = 0; this.lie = 0;
+        if (r.t >= r.dur) { this.roll = null; spin = 0; this.downT = 1.8; }
+      }
       this.downT = Math.max(0, (this.downT || 0) - dt);
       const want = this.downT > 0.35 ? 1.4 : 0;                            // knocked flat on its side, then back up
       this.lie = (this.lie || 0) + (want - (this.lie || 0)) * Math.min(1, dt * (want ? 9 : 5));
       const rock = want ? Math.sin(this.downT * 14) * 0.08 * Math.max(0, this.downT - 1.3) : Math.sin(this.downT * 20) * 0.12 * this.downT;
       const tilt = this.lie + rock;
-      this.wedge.rotation.x = tilt * Math.cos(this.tdir); this.wedge.rotation.z = tilt * Math.sin(this.tdir);
+      this.wedge.rotation.x = 0; this.wedge.rotation.z = 0; this._spin = spin + tilt;   // applied below as a forward tip toward tdir
       y += Math.sin(Math.min(1, this.lie / 1.4) * Math.PI / 2) * 0.2 * (this.wedge.userData.baseScale || 1);   // cap resting on the carpet
-      if (this.downT > 1.5) { this.off.x += Math.sin(this.tdir) * 0.5 * dt; this.off.y += Math.cos(this.tdir) * 0.5 * dt; if (this.off.length() > 0.14) this.off.setLength(0.14); }   // only a short skid
     }
     if (this.state === 'carried') this.off.set(0, 0);
     const tm = this.claimant;
     if (tm && tm.state === 'grab' && this.state !== 'carried') {       // rocks toward the mouse with every yank
       const dir = Math.atan2(tm.root.position.x - this.pos.x, tm.root.position.z - this.pos.z), a = 0.06 + (tm.tug || 0) * 0.3;
-      this._pre = this.wedge.rotation.clone();
+      if (!this._pre) this._pre = this.wedge.rotation.clone();
       _tq.setFromAxisAngle(_tax.set(Math.cos(dir), 0, -Math.sin(dir)), a); this.wedge.quaternion.premultiply(_tq);
       y += (tm.tug || 0) * 0.04;
+    }
+    if (this.state !== 'carried' && this._spin) {                     // tip / somersault forward, toward tdir
+      if (!this._pre) this._pre = this.wedge.rotation.clone();
+      _tq.setFromAxisAngle(_tax.set(Math.cos(this.tdir), 0, -Math.sin(this.tdir)), this._spin); this.wedge.quaternion.premultiply(_tq);
     }
     this.wedge.position.set(this.pos.x + this.off.x, y, this.pos.z + this.off.y);
     const jig = this.hitT > 0 ? 1 + Math.sin(this.hitT * 50) * 0.08 * this.hitT : 1;
@@ -2492,7 +2534,7 @@ function updateBombFx(dt) {
     src.buffer = b; src.loop = true; hp.type = 'highpass'; hp.frequency.value = 4200; fizzGain.gain.value = 0;
     src.connect(hp); hp.connect(fizzGain); fizzGain.connect(actx.destination); src.start(); fizzNode = src;
   }
-  const want = state === 'playing' && lit ? Math.min(0.06, 0.032 + 0.01 * lit) : 0;
+  const want = state === 'playing' && lit ? Math.min(0.035, 0.018 + 0.006 * lit) : 0;
   fizzGain.gain.value += (want - fizzGain.gain.value) * Math.min(1, dt * 8);
 }
 function explode(pos) {
@@ -2674,7 +2716,8 @@ class Mouse {
   }
   update(dt, time) {
     // rave mode: everyone on screen stands up on their hind legs and dances to the beat for a while
-    if (danceUntil > clock && this.state !== 'whacked' && this.state !== 'emerge' && this.state !== 'home' && !this.attract) {
+    if (danceUntil > clock && this.state !== 'whacked' && this.state !== 'emerge' && this.state !== 'home' && !this.attract
+        && (gameMode !== 'chaos' || (this.state === 'wander' && !this.wp && this.hops >= 1))) {   // chaos: scamper out onto the carpet first, then dance
       if (!this.dancing) { this.dancing = true; this.dancePhase = Math.random() * 6; }
       const beat = actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 6) : Math.abs(Math.sin(clock * 8.1));
       const ph = this.dancePhase, s = this.model.scale.y || 1;
@@ -2723,7 +2766,7 @@ class Mouse {
             else this.setState('taunt');                                  // otherwise bombs never go for the cheese
           }
           else if (this.willRetreat) this.setState('retreat');
-          else if (gameMode === 'chaos') { this.wp = null; this.hops = 0; this.maxHops = 4 + (Math.random() * 3 | 0); this.wpPause = 0; this.setState('wander'); }
+          else if (gameMode === 'chaos') { this.wp = null; this.hops = 0; this.maxHops = 1; this.wpPause = 0; this.setState('wander'); }
           else { this.target = nearestCheese(p); this.setState(this.target ? 'run' : 'retreat'); }
         }
         break;
@@ -2905,6 +2948,11 @@ function isHoleFree(h) {
 function updateSpawner(dt) {
   spawnTimer -= dt;
   if (spawnTimer > 0) return;
+  if (gameMode === 'chaos') {                                      // chaos: no thieves at all, the mice only come out to party during a rave
+    spawnTimer = 0.5 + Math.random() * 0.6;
+    if (roomMode === 2 && danceUntil > clock + 3 && mice.filter(m => m.active && !m.boss).length < 7) spawnMouse({ safe: true });
+    return;
+  }
   spawnTimer = D.spawnInterval * (1 + (Math.random() * 2 - 1) * CFG.spawnJitter);
   const count = 1 + (Math.random() < D.multiSpawnChance ? 1 : 0);
   for (let i = 0; i < count; i++) {
@@ -2931,6 +2979,7 @@ function spawnMouse(opts) {
      ------------------------------------------------------------------- */
   let isBomb;
   if (opts.attract) isBomb = Math.random() < 0.2;
+  else if (opts.safe) isBomb = false;
   else {
     isBomb = Math.random() < D.bombRatio;
     if (spawnedCount < CFG.SAFE_OPENING_MICE) isBomb = false;
@@ -3105,7 +3154,7 @@ function claimCrown(m) {
   const from = m.crown.getWorldPosition(new THREE.Vector3());
   catCard.updateMatrixWorld(true);
   const top = new THREE.Box3().setFromObject(catCard).max.y;
-  crownFlight = { t: 0, from, to: new THREE.Vector3(CAT_POS.x - 0.02, top - 0.2, CAT_POS.z + 0.18) };
+  crownFlight = { t: 0, from, to: new THREE.Vector3(CAT_POS.x - 0.03, top - 0.1, CAT_POS.z - 0.04) };   // perched on top of her head, not over her face
   catCrown.position.copy(from); catCrown.scale.setScalar(2.4); catCrown.visible = true;
   m.crown.visible = false;
   floatText(from.clone().setY(from.y + 0.6), 'Crown claimed!', 'clutch');
@@ -3117,7 +3166,7 @@ function updateCatCrown(dt) {
     const k = crownFlight.t, e = k * k * (3 - 2 * k);
     catCrown.position.lerpVectors(crownFlight.from, crownFlight.to, e); catCrown.position.y += Math.sin(k * Math.PI) * 2.2;
     catCrown.rotation.set(0, k * Math.PI * 4, (1 - k) * 0.6);
-    catCrown.scale.setScalar(THREE.MathUtils.lerp(2.4, 3.2, e));
+    catCrown.scale.setScalar(THREE.MathUtils.lerp(2.4, 2.1, e));
     if (k >= 1) { catCrown.userData.y = crownFlight.to.y; crownFlight = null; sfx.sparkle(); tailWag = 2; burst(catCrown.position.clone(), 0xf2c14a, 10, 1.5, 2, 0.5); }
   } else {                                                             // riding along on her head as she leans and flinches
     catCrown.rotation.set(0, Math.sin(clock * 0.8) * 0.15, -0.12 + Math.sin(clock * 1.7) * 0.03);   // sits a little jauntily, gently turning
@@ -3133,7 +3182,7 @@ function hurtBoss(m, dmg) {                                         // returns t
     p.x = Math.max(-ROOM.halfW + 0.6, Math.min(ROOM.halfW - 0.6, p.x + (p.x - CAT_POS.x) / d * 0.5)); p.z = Math.min(ROOM.depth - 0.6, p.z + (p.z - CAT_POS.z) / d * 0.5);
     m.speed = 0; setTimeout(() => { if (m.active && m.boss) m.speed = m.baseSpeed; }, 450);
     m.hitT = 0.3; burst(m.center.clone().setY(0.6), 0xff6fae, 8, 2.4, 3, 0.9);
-    floatText(m.center.clone().setY(1.6), `Rat King ${'♥'.repeat(m.hp)}`, 'bad'); sfx.whack(true); sfx.squeak(2); shake = Math.max(shake, 0.15);
+    floatText(m.center.clone().setY(1.5), '♥'.repeat(m.hp), 'hearts'); sfx.whack(true); sfx.squeak(2); shake = Math.max(shake, 0.15);
     return false;
   }
   score += 500; showBanner('Rat King defeated! +500'); burst(m.center.clone().setY(0.6), 0xf2c14a, 16, 3.5, 4, 1.2); sfx.gasp();
@@ -3240,8 +3289,32 @@ function burritoMouse(m) {                                          // special k
   floatText(m.center.clone().setY(1.1), `Blanket burrito! +${pts}`, 'clutch'); showBanner('Burrito bonus!');
   m.release(); updateHud();
 }
+// shot mice leave blood on the carpet that slowly fades away
+const bloodTex = canvasTex(128, 128, (g, w, h) => {
+  const blob = (x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); };
+  g.fillStyle = 'rgba(120,0,8,1)'; blob(64, 64, 26);
+  for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, d = 20 + Math.random() * 34; blob(64 + Math.cos(a) * d, 64 + Math.sin(a) * d, 3 + Math.random() * 9); }
+  g.fillStyle = 'rgba(70,0,4,.6)'; blob(58, 60, 12);
+}, 1, 1);
+const bloodGeo = new THREE.PlaneGeometry(1, 1), bloods = [], BLOOD_LIFE = 25;
+function spawnBlood(at, size) {
+  if (bloods.length >= 24) { const old = bloods.shift(); scene.remove(old.mesh); old.mesh.material.dispose(); }
+  const mesh = new THREE.Mesh(bloodGeo, new THREE.MeshLambertMaterial({ map: bloodTex, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  mesh.rotation.set(-Math.PI / 2, 0, Math.random() * 6.28); mesh.scale.setScalar(size * (0.8 + Math.random() * 0.4));
+  mesh.position.set(at.x, 0.013 + bloods.length * 0.0004, at.z); scene.add(mesh);
+  bloods.push({ mesh, age: 0 });
+}
+function updateBlood(dt) {
+  for (let i = bloods.length - 1; i >= 0; i--) {
+    const b = bloods[i]; b.age += dt;
+    b.mesh.material.opacity = 0.85 * Math.max(0, 1 - b.age / BLOOD_LIFE);   // fades out over time
+    if (b.age >= BLOOD_LIFE) { scene.remove(b.mesh); b.mesh.material.dispose(); bloods.splice(i, 1); }
+  }
+}
+function clearBlood() { for (const b of bloods) { scene.remove(b.mesh); b.mesh.material.dispose(); } bloods.length = 0; }
 function shootMouse(m) {
   if (!m.active || !m.hittable) return;
+  if (!m.isBomb || m.boss) spawnBlood(m.root.position, m.boss ? 2.2 : 1.4);
   if (m.boss && !hurtBoss(m, 3)) return;                            // a bullet does 3 damage to the Rat King
   if (m.isBomb && !m.boss) {                                                   // shot bombs just fizzle out: no life lost
     burst(m.center.clone().setY(0.4), 0x3a3434, 8, 2, 2.5, 1.2); floatText(m.center.clone().setY(0.9), 'Defused!', ''); m.release(); return;
@@ -3453,7 +3526,7 @@ function resetGame() {
   cheeses.forEach(c => c.reset());
   if (gameMode === 'chaos') cheeses.forEach(c => c.lose());
   document.querySelector('.c-cheese').style.visibility = gameMode === 'chaos' ? 'hidden' : '';
-  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
+  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false; bossDone = false;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -3466,6 +3539,7 @@ function startGame(mode) {
   resetGame();
   ui.start.hidden = true; ui.over.hidden = true; ui.pause.hidden = true; ui.hud.hidden = false;
   state = 'playing';
+  if (gameMode === 'chaos') showBanner('Chaos! Tap the remote 2x for a mouse rave');
 }
 function pauseGame() {
   if (state !== 'playing') return;
@@ -3688,7 +3762,7 @@ const sfx = {
   rattle: () => { for (let i = 0; i < 6; i++) tone(900 + Math.random() * 500, 700, 0.03, 'square', 0.02, i * 0.045); },   // blind slats
   whoosh: () => noise(0.25, 0.06, 1400),                           // mirror tipping
   clack: () => { tone(520, 260, 0.07, 'triangle', 0.06); noise(0.05, 0.1, 2500); },   // mirror back against the wall
-  squeak: n => { for (let i = 0; i < n; i++) { const f = 3400 + Math.random() * 900; tone(f, f + 600 + Math.random() * 400, 0.06, 'sine', 0.05, i * 0.09); } },   // mouse squeaks
+  squeak: n => { for (let i = 0; i < n; i++) { const f = 3400 + Math.random() * 900; tone(f, f + 600 + Math.random() * 400, 0.06, 'sine', 0.028, i * 0.09); } },   // mouse squeaks (kept soft)
   angryMeow: () => {
     // A cat meow is HIGH (fundamental ~550–1000 Hz), glides up then down ("mi-AOW"), and its vowel comes from two
     // narrow resonances sweeping ee → ah → ow. Everything under ~450 Hz is cut, so no elephant rumble.
@@ -3954,7 +4028,7 @@ function frame(now) {
   updateBoom(dt);
   updateCatCrown(dt);
   updateRoomFx(dt);
-  updateWallpaper(dt);
+  updateWallpaper(dt); updateBlood(dt);
   updateFan(dt);
   updateBombFx(dt);
 
