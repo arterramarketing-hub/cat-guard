@@ -306,12 +306,12 @@ const ROOM = { halfW: 5.2, depth: 13, wallH: 18, visDepth: 24 };  // depth = pla
 /* ACCESS POINTS — where mice come in and go home.
    kind 'couch': out from under a sofa · 'wall': a mouse hole · 'door': through the doorway from the hall.
    x/z is the point on the edge, n is the direction the mouse walks out. */
-const COUCH_DEPTH = 2.1, COUCH_LEFT_Z0 = 1.6, COUCH_RIGHT_Z0 = 6.9;
+const COUCH_DEPTH = 2.1, COUCH_LEFT_Z0 = 1.6, COUCH_RIGHT_Z0 = 7.35;   // right sofa pushed down to make room for the acrylic table
 const HOLES = [
   { kind: 'couch', x: -ROOM.halfW + COUCH_DEPTH, z: 3.2,  n: [1, 0]  },   // under the left sofa
   { kind: 'couch', x: -ROOM.halfW + COUCH_DEPTH, z: 6.7,  n: [1, 0]  },
-  { kind: 'couch', x:  ROOM.halfW - COUCH_DEPTH, z: 8.4,  n: [-1, 0] },   // under the right sofa
-  { kind: 'couch', x:  ROOM.halfW - COUCH_DEPTH, z: 11.4, n: [-1, 0] },
+  { kind: 'couch', x:  ROOM.halfW - COUCH_DEPTH, z: 8.8,  n: [-1, 0] },   // under the right sofa
+  { kind: 'couch', x:  ROOM.halfW - COUCH_DEPTH, z: 11.5, n: [-1, 0] },
   { kind: 'wall',  x: -ROOM.halfW,               z: 10.6, n: [1, 0]  },   // mouse hole past the end of the left sofa
   { kind: 'door',  x:  ROOM.halfW + 0.6,         z: 5.4 / 1.3, n: [-1, 0] }, // through the doorway (DOOR_Z)
 ];
@@ -636,7 +636,7 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   s.moveTo(-ox, -oy); s.lineTo(DOOR_Z0 - ox, -oy); s.lineTo(DOOR_Z0 - ox, DOOR_H - oy); s.lineTo(DOOR_Z1 - ox, DOOR_H - oy);
   s.lineTo(DOOR_Z1 - ox, -oy); s.lineTo(ox, -oy); s.lineTo(ox, oy); s.lineTo(-ox, oy); s.lineTo(-ox, -oy);
   const wt = panelTexSide.clone(); wt.needsUpdate = true; wt.repeat.set(1 / (IN(8) * 4), 1 / Hh);   // shape UVs are in world units
-  const rw = new THREE.Mesh(new THREE.ShapeGeometry(s), lam(0xf2efe8, { map: wt }));
+  const rw = new THREE.Mesh(new THREE.ShapeGeometry(s), lam(0xf2efe8, { map: wt })); rw.userData.rightWall = true;
   rw.rotation.y = -Math.PI / 2; rw.position.set(ROOM.halfW, oy, L / 2); scene.add(rw);
   box(0.05, 0.26, DOOR_Z0 - CASING, trimMat, ROOM.halfW - 0.025, 0.13, (DOOR_Z0 - CASING) / 2);                  // baseboard, split at the door
   box(0.05, 0.26, L - DOOR_Z1 - CASING, trimMat, ROOM.halfW - 0.025, 0.13, (L + DOOR_Z1 + CASING) / 2);
@@ -704,17 +704,17 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
       g.fillStyle = gr; g.fillRect(0, 0, w, h);
     }, 1, 1);
     const acrylic = basic(0xffffff, { map: irid, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
-    const T_L = IN(20), T_W = IN(12), T_H = IN(18);
-    const TX = ROOM.halfW - T_L / 2 - IN(4), TZ = (DOOR_Z1 + CASING + COUCH_RIGHT_Z0 - IN(7)) / 2;
+    const T_L = COUCH_DEPTH * 0.96, T_W = T_L * 0.6, T_H = IN(23);             // as long as the sofa arm is deep, as tall as the arm
+    const TX = ROOM.halfW - T_L / 2 - IN(1.5), TZ = (DOOR_Z1 + CASING + COUCH_RIGHT_Z0 - IN(7)) / 2;
     const table = new THREE.Group(); table.position.set(TX, 0, TZ); scene.add(table);
     const top = new THREE.Shape(), rr = T_W / 2, sx0 = T_L / 2 - rr;
     top.moveTo(-sx0, -rr); top.lineTo(sx0, -rr); top.absarc(sx0, 0, rr, -Math.PI / 2, Math.PI / 2, false); top.lineTo(-sx0, rr); top.absarc(-sx0, 0, rr, Math.PI / 2, Math.PI * 1.5, false);
     const topGeo = new THREE.ExtrudeGeometry(top, { depth: IN(0.5), bevelEnabled: false, curveSegments: 16 }); topGeo.rotateX(-Math.PI / 2);
     const topMesh = new THREE.Mesh(topGeo, acrylic); topMesh.position.y = T_H; table.add(topMesh);
-    const legW = IN(5), legR = legW / 2, leg = new THREE.Shape();            // arched panel, rounded end on the floor
+    const legW = IN(8), legR = legW / 2, leg = new THREE.Shape();            // arched panel, rounded end on the floor
     leg.moveTo(-legR, T_H); leg.lineTo(-legR, legR); leg.absarc(0, legR, legR, Math.PI, Math.PI * 2, false); leg.lineTo(legR, T_H); leg.lineTo(-legR, T_H);
     const legGeo = new THREE.ExtrudeGeometry(leg, { depth: IN(0.4), bevelEnabled: false, curveSegments: 12 }); legGeo.rotateY(Math.PI / 2);
-    for (const lx of [-IN(4.5), IN(4.5)]) for (const lz of [-IN(3), IN(3)]) { const m = new THREE.Mesh(legGeo, acrylic); m.position.set(lx, 0, lz); table.add(m); }
+    for (const lx of [-T_L * 0.24, T_L * 0.24]) for (const lz of [-T_W * 0.26, T_W * 0.26]) { const m = new THREE.Mesh(legGeo, acrylic); m.position.set(lx, 0, lz); table.add(m); }
   }
 
   /* ---- wall sconce on the right wall above the mirror: brass plate + arm, frosted tulip shade ---- */
@@ -763,31 +763,33 @@ function couch(side, z0, modules) {                    // side: -1 = left wall, 
 couch(-1, COUCH_LEFT_Z0, 3);
 couch(1, COUCH_RIGHT_Z0, 3);
 
-/* ---------- black throw blanket (white underside) draped over the front edge of the left sofa ---------- */
+/* ---------- black throw blanket (white underside) thrown over the front arm of the left sofa ----------
+   Cross-section: a flap lies on the seat, rises over the inside of the arm, crosses its top, then hangs
+   down the outside almost to the carpet; one bottom corner flips up so the white underside shows. */
 {
-  const L = FT(2.7), SEAT_TOP = IN(17) + IN(1), FRONT_X = -ROOM.halfW + COUCH_DEPTH, onSeat = IN(18), drop = IN(14);
-  const z0 = COUCH_LEFT_Z0 + FT(2.85) * 2 + IN(4);                          // across the front seat section
-  const g = new THREE.PlaneGeometry(1, 1, 18, 22), pos = g.attributes.position;
+  const ARM_T = IN(7), ARM_H = IN(23), SEAT_TOP = IN(17) + IN(1) + 0.04, lift = 0.035;
+  const armIn = COUCH_LEFT_Z0 + FT(2.85) * 3, armOut = armIn + ARM_T;          // inner / outer faces of the front arm
+  const W = COUCH_DEPTH * 1.05, X0 = -ROOM.halfW + 0.1;                                // blanket width runs along the arm (wall → front)
+  const seg = [0.42, ARM_H - SEAT_TOP, ARM_T, ARM_H - 0.22], total = seg.reduce((a, b) => a + b);
+  const g = new THREE.PlaneGeometry(1, 1, 20, 30), pos = g.attributes.position;
   for (let i = 0; i < pos.count; i++) {
-    const u = pos.getX(i) + 0.5, t = 0.5 - pos.getY(i), s = t * (onSeat + drop);   // u along the sofa, s across then down
-    let x, y, z = z0 + u * L;
-    if (s < onSeat) { x = FRONT_X - onSeat + s; y = SEAT_TOP + 0.045 + Math.sin(u * 9 + s * 4) * 0.018; }      // lying on the seat, soft wrinkles
-    else {
-      const d = s - onSeat, k = d / drop;
-      x = FRONT_X + 0.03 + Math.sin(u * 7 + d * 5) * 0.03; y = SEAT_TOP - d;                                    // hanging down the front
-      if (u > 0.72 && k > 0.55) {                                                                               // one corner curls back up: white side shows
-        const c = Math.min(1, (u - 0.72) / 0.28) * (k - 0.55) / 0.45, ang = c * 2.2, r = drop * 0.35;
-        x += Math.sin(ang) * r * 0.9; y += (1 - Math.cos(ang)) * r;
-      }
+    const u = pos.getX(i) + 0.5, s = (0.5 - pos.getY(i)) * total;
+    let x = X0 + u * W, y, z, d = s;
+    if (d < seg[0]) { z = armIn - seg[0] + d - lift; y = SEAT_TOP + Math.sin(u * 8 + d * 6) * 0.015; }                   // on the seat
+    else if ((d -= seg[0]) < seg[1]) { z = armIn - lift; y = SEAT_TOP + d; }                                                // up the inside of the arm
+    else if ((d -= seg[1]) < seg[2]) { z = armIn + d; y = ARM_H + lift; }                                                     // over the top
+    else {                                                                                                                  // hanging down the outside
+      d -= seg[2]; const k = d / seg[3];
+      z = armOut + lift + Math.sin(u * 6 + d * 4) * 0.035; y = ARM_H - d;
+      if (u > 0.74 && k > 0.62) { const c = Math.min(1, (u - 0.74) / 0.26) * (k - 0.62) / 0.38, ang = c * 2.3, r = seg[3] * 0.3; z += Math.sin(ang) * r; y += (1 - Math.cos(ang)) * r; }
     }
+    x += Math.sin(s * 3 + u * 2) * 0.02;
     pos.setXYZ(i, x, y, z);
   }
   g.computeVertexNormals();
-  // make sure the black face is the one facing up on the seat
-  const upFacing = g.attributes.normal.getY(0) > 0;
-  const black = lam(0x1c1c20, { side: upFacing ? THREE.FrontSide : THREE.BackSide });
-  const white = lam(0xf2efe9, { side: upFacing ? THREE.BackSide : THREE.FrontSide });
-  scene.add(new THREE.Mesh(g, black)); scene.add(new THREE.Mesh(g, white));
+  const upFacing = g.attributes.normal.getY(Math.round(0.5 * 21 + 21 * 3)) > 0;   // a vertex on the seat flap: black side should face up
+  scene.add(new THREE.Mesh(g, lam(0x1c1c20, { side: upFacing ? THREE.FrontSide : THREE.BackSide })));
+  scene.add(new THREE.Mesh(g, lam(0xf2efe9, { side: upFacing ? THREE.BackSide : THREE.FrontSide })));
 }
 
 /* ---------- half disco balls glued, scattered, on the right wall above the sofa ---------- */
@@ -800,12 +802,13 @@ const discoTex = canvasTex(64, 32, (g, w, h) => {
   g.fillStyle = '#555'; for (let y = 3; y < h; y += 4) g.fillRect(0, y, w, 1); for (let x = 3; x < w; x += 4) g.fillRect(x, 0, 1, h);
 }, 1, 1);
 const discoMat = new THREE.MeshPhongMaterial({ map: discoTex, specular: 0xffffff, shininess: 120, flatShading: true, color: 0xdadde3 });
-const discoGlints = [];
+const discoGlints = [], DISCO_ZONE = { z0: 0, z1: 0, y0: 0, y1: 0 };
 {
   let seed = 11; const r01 = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   // even, organic scatter: random "darts" that must keep a minimum distance from every ball already placed
   // (blue-noise), so there are no rows and no clumps. From just past the door casing to the end of the sofa.
   const Z0 = DOOR_Z1 + CASING + 0.35, Z1 = COUCH_RIGHT_Z0 + FT(2.85) * 3 - 0.2, Y0 = 3.0, Y1 = DOOR_H + 0.9, COUNT = 22;
+  Object.assign(DISCO_ZONE, { z0: Z0 - 0.4, z1: Z1 + 0.4, y0: Y0 - 0.6, y1: Y1 + 0.6 });
   const spots = [];
   for (let minD = 0.95; spots.length < COUNT && minD > 0.3; minD *= 0.93) {
     for (let tries = 0; tries < 400 && spots.length < COUNT; tries++) {
@@ -943,9 +946,18 @@ const PRIZES = { cheese: { one: 'cheese', many: 'cheeses', label: 'Cheese' }, mu
 let prizeMode = 'cheese';
 try { if (localStorage.getItem('catguard.prize') === 'mushroom') prizeMode = 'mushroom'; } catch (e) {}
 const PZ = () => PRIZES[prizeMode];
-const mushStemGeo = new THREE.CylinderGeometry(0.1, 0.14, 0.34, 14), mushCapGeo = new THREE.SphereGeometry(0.34, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2);
-const mushGillGeo = new THREE.CircleGeometry(0.32, 18), mushSpotGeo = new THREE.SphereGeometry(0.05, 8, 6);
-const mushStemMat = lam(0xf3ece0), mushSpotMat = lam(0xffffff);
+// Toadstool, plush-toy proportions: chunky cream stem that flares at the base, a tall rounded red cap whose lip
+// overhangs the stem, a few BIG raised white spots that sit on the cap's curve, pale gills underneath.
+const MUSH = { capR: 0.36, capSquash: 0.82, capY: 0.3, lip: Math.PI * 0.58 };
+const mushStemGeo = new THREE.LatheGeometry([[0, 0], [0.19, 0], [0.215, 0.035], [0.2, 0.09], [0.165, 0.17], [0.15, 0.25], [0.155, 0.31], [0, 0.31]].map(([x, y]) => new THREE.Vector2(x, y)), 20);
+const mushCapGeo = new THREE.SphereGeometry(MUSH.capR, 26, 16, 0, Math.PI * 2, 0, MUSH.lip);
+const mushGillTex = canvasTex(64, 64, (g, w, h) => {                     // radial gill lines
+  g.fillStyle = '#efe2cc'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(150,120,90,.35)'; g.lineWidth = 1;
+  for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2; g.beginPath(); g.moveTo(32 + Math.cos(a) * 6, 32 + Math.sin(a) * 6); g.lineTo(32 + Math.cos(a) * 32, 32 + Math.sin(a) * 32); g.stroke(); }
+}, 1, 1);
+const mushGillGeo = new THREE.RingGeometry(0.15, MUSH.capR * Math.sin(MUSH.lip) + 0.005, 26), mushSpotGeo = new THREE.SphereGeometry(1, 12, 8);
+const mushStemMat = lam(0xf3ece0), mushSpotMat = lam(0xffffff), mushGillMat = lam(0xffffff, { map: mushGillTex, side: THREE.DoubleSide });
 class Cheese {
   constructor(spot) {
     this.home = new THREE.Vector3(spot.x, 0, spot.z);
@@ -959,17 +971,21 @@ class Cheese {
     scene.add(this.wedge);
     this.cheeseVis = this.wedge; this.cheeseMat = this.mat;
     // big red toadstool with white spots (the alternative prize)
-    this.mushMat = lam(0xd23a3a, { emissive: 0x000000 });
+    this.mushMat = lam(0xd8342f, { emissive: 0x000000 });
     this.mushVis = new THREE.Group();
-    const stem = new THREE.Mesh(mushStemGeo, mushStemMat); stem.position.y = 0.17; this.mushVis.add(stem);
-    const cap = new THREE.Mesh(mushCapGeo, this.mushMat); cap.scale.y = 0.72; cap.position.y = 0.3; this.mushVis.add(cap);
-    const gill = new THREE.Mesh(mushGillGeo, mushStemMat); gill.rotation.x = Math.PI / 2; gill.position.y = 0.3; this.mushVis.add(gill);
-    for (let i = 0; i < 8; i++) {
-      const th = i < 1 ? 0 : 0.55 + (i % 2) * 0.35, ph = i * 2.1;
+    this.mushVis.add(new THREE.Mesh(mushStemGeo, mushStemMat));
+    const cap = new THREE.Mesh(mushCapGeo, this.mushMat); cap.scale.y = MUSH.capSquash; cap.position.y = MUSH.capY; this.mushVis.add(cap);
+    const lipY = MUSH.capY + Math.cos(MUSH.lip) * MUSH.capR * MUSH.capSquash;
+    const gill = new THREE.Mesh(mushGillGeo, mushGillMat); gill.rotation.x = Math.PI / 2; gill.position.y = lipY + 0.004; this.mushVis.add(gill);
+    const up = new THREE.Vector3(0, 1, 0), nrm = new THREE.Vector3();
+    for (const [th, ph, r] of [[0, 0, 0.085], [0.62, 0.3, 0.07], [0.7, 2.2, 0.075], [0.66, 4.1, 0.065], [1.12, 1.2, 0.06], [1.15, 3.2, 0.055], [1.1, 5.1, 0.06]]) {
+      nrm.set(Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph));                     // point on the unit cap
       const sp = new THREE.Mesh(mushSpotGeo, mushSpotMat);
-      sp.position.set(Math.sin(th) * Math.cos(ph) * 0.33, 0.3 + Math.cos(th) * 0.33 * 0.72, Math.sin(th) * Math.sin(ph) * 0.33); sp.scale.y = 0.45; this.mushVis.add(sp);
+      sp.position.set(nrm.x * MUSH.capR, MUSH.capY + nrm.y * MUSH.capR * MUSH.capSquash, nrm.z * MUSH.capR);
+      sp.quaternion.setFromUnitVectors(up, nrm.normalize()); sp.scale.set(r, r * 0.28, r);             // a flat raised disc hugging the curve
+      this.mushVis.add(sp);
     }
-    this.mushVis.userData.baseScale = 1.5;                                   // big toadstools
+    this.mushVis.userData.baseScale = 1.35;                                  // big toadstools
     this.mushVis.visible = false; scene.add(this.mushVis);
     this.warnMat = new THREE.MeshBasicMaterial({ color: 0xe2452c, transparent: true, opacity: 0, depthWrite: false });
     this.warn = new THREE.Mesh(warnGeo, this.warnMat); this.warn.rotation.x = -Math.PI / 2;
@@ -1552,6 +1568,11 @@ function handleTap(clientX, clientY) {
   // 3) nothing to bat: the paw still reaches exactly where you tapped (walls, sofas, furniture, floor)
   const surf = raycaster.intersectObjects(scene.children, true).find(h => h.object.isMesh && h.object.visible && !h.object.material.transparent);
   pawReadyAt += CFG.WHIFF_COOLDOWN;                                 // swiped at nothing: off balance for a moment
+  if (surf && surf.object.userData.rightWall && surf.point.z > DISCO_ZONE.z0 && surf.point.z < DISCO_ZONE.z1 && surf.point.y > DISCO_ZONE.y0 && surf.point.y < DISCO_ZONE.y1) {
+    // smacked the disco wall: the thump shakes a random ball loose
+    const loose = props.filter(p => p.restHalf === 0 && p.state === 'rest');
+    if (loose.length) { const pr = loose[(Math.random() * loose.length) | 0]; startSwipe(surf.point, true); setTimeout(() => knockProp(pr), 90); tapShake(); pawReadyAt -= CFG.WHIFF_COOLDOWN; return; }
+  }
   if (surf && surf.point.y > 0.05) { startSwipe(surf.point, true); sfx.miss(); return; }
   if (ray.intersectPlane(floorPlane, _hit)) {
     _hit.x = Math.max(-ROOM.halfW + 0.3, Math.min(ROOM.halfW - 0.3, _hit.x));
