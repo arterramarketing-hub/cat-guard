@@ -139,7 +139,7 @@
     <ul class="rules">
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><ellipse cx="17" cy="24" rx="14" ry="6" fill="none" stroke="#e2452c" stroke-width="3"/><ellipse cx="17" cy="19" rx="7" ry="6" fill="#9b8f86" stroke="#1f1712" stroke-width="1.5"/><circle cx="12" cy="12" r="3.5" fill="#e7a3a0" stroke="#1f1712" stroke-width="1.5"/><circle cx="22" cy="12" r="3.5" fill="#e7a3a0" stroke="#1f1712" stroke-width="1.5"/></svg>
-        <span><b>Swipe mice before they haul the cheese home.</b> Bigger mouse, redder ring = closer to stealing it.</span>
+        <span><b>Swipe mice before they haul the cheese home.</b> The bigger a mouse looks, the closer it is to stealing.</span>
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="16" cy="20" r="10" fill="#1f1712"/><path d="M20 11 q3 -5 7 -4" stroke="#8a6a45" stroke-width="2" fill="none"/><circle cx="27" cy="7" r="3.5" fill="#ffb02e"/><circle cx="27" cy="7" r="1.6" fill="#fff4c2"/></svg>
@@ -429,7 +429,7 @@ function credenza(x0, width, height, doors) {
 }
 const CAB_H = IN(30);                                                  // 30" tall
 const LEFT_X0 = -ROOM.halfW, LEFT_W = FT(3.8);                         // 3'10" cabinet
-const MAIN_X0 = LEFT_X0 + LEFT_W + IN(1), MAIN_W = FT(6.8);            // 6'10" credenza
+const MAIN_X0 = LEFT_X0 + LEFT_W + IN(6), MAIN_W = FT(6.8);            // 6'10" credenza, 6" gap from the cabinet
 credenza(LEFT_X0, LEFT_W, CAB_H, 2);
 credenza(MAIN_X0, MAIN_W, CAB_H, 4);
 // folded blanket stack (~20") with the striped blanket on top
@@ -463,18 +463,27 @@ const candleLight = new THREE.PointLight(0xffb45a, 0.32, 6, 2); candleLight.posi
 const diff = new THREE.Mesh(new THREE.SphereGeometry(IN(3.5), 12, 8), lam(0xf6f4ef)); diff.scale.y = 1.3; diff.position.set(MAIN_X0 + MAIN_W - IN(5), CAB_H + IN(4.5), IN(11)); scene.add(diff);
 box(IN(4), IN(4), IN(4), lam(0xf0b8a0), TV_L - IN(4), CAB_H + IN(2), IN(10));
 // right-corner black shelf (~4' tall, 14" wide) with a plant, and the paper star lamp (2' star on a 5' pole)
-const SHELF_W = IN(16), SHELF_X = MAIN_X0 + MAIN_W + IN(2) + SHELF_W / 2;          // leaves the far-right corner open
+const SHELF_W = IN(16), SHELF_X = ROOM.halfW - SHELF_W / 2 - 0.02;                 // tucked into the back-right corner
 box(SHELF_W, FT(4), IN(14), lam(0x1c1c1e), SHELF_X, FT(2), IN(7) + 0.02);
 const pot = new THREE.Mesh(new THREE.CylinderGeometry(IN(3.5), IN(2.8), IN(5), 10), lam(0xe9e4da)); pot.position.set(SHELF_X, FT(4) + IN(2.5), IN(7)); scene.add(pot);
 const leafMat = lam(0x3f8a45);
 for (let i = 0; i < 7; i++) { const l = new THREE.Mesh(new THREE.SphereGeometry(IN(3.5), 7, 5), leafMat); l.position.set(SHELF_X + Math.cos(i) * IN(3.5), FT(4) + IN(7) + (i % 3) * IN(2.5), IN(7) + Math.sin(i) * IN(3)); scene.add(l); }
 (() => {
-  const s = new THREE.Shape(), R = FT(1), r = FT(0.4);
-  for (let i = 0; i < 10; i++) { const rr = i % 2 ? r : R, a = Math.PI / 2 + i * Math.PI / 5; (i ? s.lineTo : s.moveTo).call(s, Math.cos(a) * rr, Math.sin(a) * rr); }
-  const sx = MAIN_X0 + MAIN_W - IN(3);
-  const star = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: IN(3), bevelEnabled: false }), lam(0xf1f1ee, { emissive: 0x303030 }));
-  star.position.set(sx, FT(5), IN(4)); star.rotation.set(0.1, -0.35, 0.15); scene.add(star);
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.5), IN(0.5), FT(4.5), 6), lam(0xd9d6cf)); pole.position.set(sx, FT(2.25), IN(6)); scene.add(pole);
+  // folded-paper star: every point is a ridged pyramid (raised centre front & back), flat-shaded so
+  // each point reads half lit / half shaded like the real silver paper star
+  const R = FT(1.3), r = FT(0.52), front = IN(6), back = IN(3), pos = [];
+  const pt = i => { const rr = i % 2 ? r : R, a = Math.PI / 2 + i * Math.PI / 5; return [Math.cos(a) * rr, Math.sin(a) * rr, 0]; };
+  for (let i = 0; i < 10; i++) {
+    const A = pt(i), B = pt((i + 1) % 10);
+    pos.push(0, 0, front, ...A, ...B);          // front facets
+    pos.push(0, 0, -back, ...B, ...A);          // back facets
+  }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); sg.computeVertexNormals();
+  const sx = (MAIN_X0 + MAIN_W + SHELF_X - SHELF_W / 2) / 2;   // stands in the gap between credenza and shelf
+  const star = new THREE.Mesh(sg, lam(0xd8dadd, { emissive: 0x1c1c1e, flatShading: true }));
+  star.position.set(sx, FT(4.9), IN(5)); star.rotation.set(0.05, -0.3, 0.12); scene.add(star);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.5), IN(0.5), FT(4.3), 6), lam(0x9a9ca0)); pole.position.set(sx, FT(2.15), IN(4)); scene.add(pole);
+  for (const a of [0.4, 2.5, 4.6]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.4), IN(0.4), IN(16), 5), lam(0x9a9ca0)); leg.position.set(sx + Math.cos(a) * IN(5), IN(7), IN(4) + Math.sin(a) * IN(5)); leg.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); scene.add(leg); }
 })();
 // right wall: 32" x 80" doorway cut right through the wall, with a dim hallway behind it
 // left wall: 66" x 30" window starting at the same distance from the back wall as the door,
@@ -514,7 +523,6 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   box(CASING, DOOR_H + CASING, IN(0.8), trimMat, -DOOR_W / 2 - CASING / 2, (DOOR_H + CASING) / 2, IN(0.4), d);
   box(CASING, DOOR_H + CASING, IN(0.8), trimMat, DOOR_W / 2 + CASING / 2, (DOOR_H + CASING) / 2, IN(0.4), d);
   box(DOOR_W + CASING * 2, CASING, IN(0.8), trimMat, 0, DOOR_H + CASING / 2, IN(0.4), d);
-  const sc = new THREE.Mesh(new THREE.SphereGeometry(IN(3), 10, 8), basic(0xfff1d6)); sc.scale.y = 1.4; sc.position.set(-DOOR_W / 2 - IN(14), FT(5.3), IN(4)); d.add(sc);   // wall sconce
 
   /* ---- window: starts where the door starts ---- */
   const winZ = DOOR_Z0 + WIN_W / 2;
@@ -537,9 +545,10 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   patch.rotation.x = -Math.PI / 2; patch.position.set(-ROOM.halfW + Math.tan(dropAngle) * sy, 0.012, winZ); scene.add(patch);
   const sun = new THREE.PointLight(0xfff1d8, 0.25, 9, 2); sun.position.set(-ROOM.halfW + FT(1), WIN_SILL + openH, winZ); scene.add(sun);
 
-  /* ---- tall grey-framed mirror (18" x 52") leaning against the right wall, back corner ---- */
+  /* ---- tall grey-framed mirror (18" x 52") leaning back against the right wall, past the corner shelf ---- */
   const MIR_W = IN(18), MIR_H = IN(52), MIR_LEAN = Math.asin(IN(8) / MIR_H);
-  const mir = new THREE.Group(); mir.position.set(ROOM.halfW - IN(8) - 0.02, 0, FT(1.8)); mir.rotation.y = -Math.PI / 2; scene.add(mir);
+  const MIR_Z = (IN(14) + DOOR_Z0 - CASING) / 2;                                              // centred between shelf and door
+  const mir = new THREE.Group(); mir.position.set(ROOM.halfW - IN(8) - 0.02, 0, MIR_Z); mir.rotation.y = -Math.PI / 2; scene.add(mir);
   const lean = new THREE.Group(); lean.rotation.x = -MIR_LEAN; mir.add(lean);                  // top rests on the wall
   const frameMat = lam(0x8f9296), frameDark = lam(0x72757a);
   box(MIR_W, MIR_H, IN(1.5), frameMat, 0, MIR_H / 2, 0, lean);
@@ -547,6 +556,17 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
     box(bw, bh, IN(0.6), frameDark, x, y, IN(0.9), lean);                                        // raised panel moulding
   const glass = new THREE.Mesh(new THREE.PlaneGeometry(MIR_W - IN(5), MIR_H - IN(5)), basic(0xffffff, { map: mirrorTex }));
   glass.position.set(0, MIR_H / 2, IN(0.8)); lean.add(glass);
+
+  /* ---- wall sconce on the right wall above the mirror: brass plate + arm, frosted tulip shade ---- */
+  const brass = lam(0xb08d57), scY = FT(6.3);
+  const scG = new THREE.Group(); scG.position.set(ROOM.halfW - 0.01, 0, MIR_Z); scG.rotation.y = -Math.PI / 2; scene.add(scG);   // local +z points into the room
+  box(IN(3), IN(5), IN(1), brass, 0, scY, IN(0.5), scG);
+  const scArm = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.5), IN(0.5), IN(5), 6), brass); scArm.rotation.x = Math.PI / 2; scArm.position.set(0, scY, IN(3)); scG.add(scArm);
+  const shade = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.6), IN(1.1), IN(5.5), 14, 1, true), basic(0xfff3dc, { side: THREE.DoubleSide }));
+  shade.position.set(0, scY + IN(3), IN(5.5)); scG.add(shade);
+  const scGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8 }));
+  scGlow.position.set(0, scY + IN(3), IN(6)); scGlow.scale.setScalar(FT(1.6)); scG.add(scGlow);
+  const scLight = new THREE.PointLight(0xffdcae, 0.3, 5, 2); scLight.position.set(0, scY, IN(12)); scG.add(scLight);
 })();
 // cream corduroy floor cushion the cat sits on (like the modular sofa)
 const cushion = box(2.1, 0.34, 1.9, lam(0xffffff, { map: cordTex }), 0, 0.17, CAT_POS.z + 0.1);
@@ -615,6 +635,7 @@ class Cheese {
     scene.add(this.wedge);
     this.warnMat = new THREE.MeshBasicMaterial({ color: 0xe2452c, transparent: true, opacity: 0, depthWrite: false });
     this.warn = new THREE.Mesh(warnGeo, this.warnMat); this.warn.rotation.x = -Math.PI / 2;
+    this.warn.visible = false;     // warning ring under cheese removed
     scene.add(this.warn);
     this.reset();
   }
@@ -871,7 +892,7 @@ class Mouse {
     this.bombRig.visible = isBomb;
     this.xEyes.visible = false;
     for (const e of this.eyes) e.visible = true;
-    this.ring.visible = !isBomb;   // no threat ring on bombs: "no ring = hands off"
+    this.ring.visible = false;     // coloured threat rings removed; threat reads through size, shadows stay
     this.ringMat.opacity = 0;
     this.setState('emerge');
   }
