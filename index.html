@@ -147,7 +147,7 @@
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="16" cy="20" r="10" fill="#1f1712"/><path d="M20 11 q3 -5 7 -4" stroke="#8a6a45" stroke-width="2" fill="none"/><circle cx="27" cy="7" r="3.5" fill="#ffb02e"/><circle cx="27" cy="7" r="1.6" fill="#fff4c2"/></svg>
-        <span><b>Leave bomb mice alone.</b> Dark fur, lit fuse. Tapping one costs the cat a life. They only taunt you from their hole, then slink back in if you leave them be.</span>
+        <span><b>Leave bomb mice alone.</b> Dark fur, lit fuse. Tapping one costs the cat a life. They taunt from their hideouts, and guard the very last cheese.</span>
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><path d="M3 27 L31 27 L3 9 Z" fill="#f4c13d" stroke="#1f1712" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="20" r="2" fill="#c98e12"/><circle cx="15" cy="23" r="1.5" fill="#c98e12"/></svg>
@@ -238,6 +238,11 @@ const CFG = {
   THREAT_SCALE: 0.5,        // extra size at max threat (0.5 = 150%)
   CLUTCH_THREAT: 0.75,      // threat level above which a whack counts as a "clutch save"
   HIT_RADIUS: 0.8,          // tap forgiveness in world units (grows with mouse size)
+
+  // ---- Anti-spam (stops camping the last cheese) --------------------
+  SWIPE_COOLDOWN: 0.28,     // seconds before the paw can swipe again
+  WHIFF_COOLDOWN: 0.45,     // extra recovery after a swipe that hits nothing (cat is off balance)
+  LAST_STAND_BOMB_GUARD: true, // with one cheese left, bomb mice go and stand guard around it
 
   // ---- Rules & scoring ---------------------------------------------
   LIVES: 9,
@@ -410,6 +415,16 @@ const cordTexH = canvasTex(32, 64, (g, w, h) => {         // same corduroy, ribs
 const lam = (color, extra) => new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {}));
 const basic = (color, extra) => new THREE.MeshBasicMaterial(Object.assign({ color }, extra || {}));
 const box = (w, h, d, mat, x, y, z, parent) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); (parent || scene).add(m); return m; };
+let starMesh = null;
+const starSpin = { home: 0, target: 0, wobble: 0 };
+function nudgeStar() { starSpin.target += 0.22; starSpin.wobble = 1; sfx.rustle(); }   // each tap turns it a little further round its stand
+function updateStar(dt) {
+  if (!starMesh) return;
+  starSpin.wobble = Math.max(0, starSpin.wobble - dt * 2.5);
+  starMesh.rotation.z += (starSpin.target - starMesh.rotation.z) * Math.min(1, dt * 8);
+  starMesh.rotation.x = -0.2 + Math.sin(starSpin.wobble * 14) * 0.06 * starSpin.wobble;
+}
+
 /* ---------- knockable props: tap one and the cat bats it off its perch ----------
    Each prop gets a push (onKnock sets p.v), falls under gravity, and lands on whatever is below:
    carpet, a sofa seat or the credenza top (groundY). Tapping a prop lying on the floor bats it again. */
@@ -585,8 +600,9 @@ for (let i = 0; i < 7; i++) { const l = new THREE.Mesh(new THREE.SphereGeometry(
   }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); sg.computeVertexNormals();
   const sx = TV_R + R * 0.82;                                    // right of the TV, propped on the credenza
-  const star = new THREE.Mesh(sg, lam(0xd8dadd, { emissive: 0x1c1c1e, flatShading: true }));
+  const star = starMesh = new THREE.Mesh(sg, lam(0xd8dadd, { emissive: 0x1c1c1e, flatShading: true }));
   star.position.set(sx, CAB_H + R * 0.81 + IN(11), IN(9)); star.rotation.set(-0.2, -0.6, 0.32); scene.add(star);
+  star.userData.star = true; tapTargets.push(star); starSpin.home = star.rotation.z; starSpin.target = star.rotation.z;
   const standMat = lam(0x9a9ca0), sy0 = CAB_H, sy1 = star.position.y;            // lamp stand: base + stem + collar
   const base = new THREE.Mesh(new THREE.CylinderGeometry(IN(4), IN(5), IN(1.2), 16), standMat); base.position.set(sx, sy0 + IN(0.6), IN(9)); scene.add(base);
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.45), IN(0.45), sy1 - sy0, 8), standMat); stem.position.set(sx, (sy0 + sy1) / 2, IN(8)); scene.add(stem);
@@ -977,7 +993,7 @@ const _sh = new THREE.Vector3(), _pp = new THREE.Vector3(), _dir = new THREE.Vec
 let tailWag = 0;
 
 function startSwipe(p, keepY) {
-  swipe.active = true; swipe.t = 0; swipe.target.copy(p); swipe.target.y = keepY ? Math.min(p.y, 6) : 0.25;
+  swipe.active = true; swipe.t = 0; swipe.target.copy(p); swipe.target.y = keepY ? Math.min(p.y, 7) : 0.25;
   catLean = -Math.sign(p.x - CAT_POS.x) * 0.07;     // the card tips toward the target
   catIdle = 0.5;
 }
@@ -1199,22 +1215,26 @@ class Mouse {
         this.model.rotation.y = Math.sin(time * 5 + this.hole.x) * 0.3;
         if (this.t >= this.pauseTime) {
           this.model.rotation.set(0, 0, 0);
-          if (this.isBomb && !this.attract) this.setState('taunt');     // bombs never go for the cheese
+          if (this.isBomb && !this.attract) {
+            const left = cheeses.filter(c => c.alive);
+            if (CFG.LAST_STAND_BOMB_GUARD && left.length === 1) { this.target = left[0]; this.setState('run'); }   // last stand: guard the final cheese
+            else this.setState('taunt');                                  // otherwise bombs never go for the cheese
+          }
           else if (this.willRetreat) this.setState('retreat');
           else { this.target = nearestCheese(p); this.setState(this.target ? 'run' : 'retreat'); }
         }
         break;
       }
       case 'run': {
-        if (!this.target || !this.target.available) this.target = nearestCheese(p);
+        if (!this.target || (!this.target.available && !(this.isBomb && this.target.alive))) this.target = nearestCheese(p);
         if (!this.target) { this.setState('home'); break; }   // nothing left to steal
-        const c = this.target.pos, gr = this.target.grabRadius, dx = c.x - p.x, dz = c.z - p.z, dist = Math.hypot(dx, dz) || 0.001;
+        const c = this.target.pos, gr = this.isBomb ? 0.9 : this.target.grabRadius, dx = c.x - p.x, dz = c.z - p.z, dist = Math.hypot(dx, dz) || 0.001;
         const step = Math.min(this.speed * dt, Math.max(0, dist - gr));
         p.x += dx / dist * step; p.z += dz / dist * step;
         this.faceToward(c.x, c.z, dt);
         bob = Math.abs(Math.sin(this.t * 22)) * 0.06;
         if (dist - gr < 0.02) {
-          if (this.isBomb) this.setState('loiter');
+          if (this.isBomb) this.setState('loiter');                       // bomb stands guard next to the cheese
           else { this.target.claimant = this; this.setState('grab'); }
         }
         break;
@@ -1407,7 +1427,10 @@ const ndc = new THREE.Vector2();
 const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const _hit = new THREE.Vector3();
 
+let pawReadyAt = 0;
 function handleTap(clientX, clientY) {
+  if (clock < pawReadyAt) return;                                   // paw still recovering from the last swipe
+  pawReadyAt = clock + CFG.SWIPE_COOLDOWN;
   ndc.set(clientX / window.innerWidth * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
   const ray = raycaster.ray;
@@ -1423,12 +1446,20 @@ function handleTap(clientX, clientY) {
     if (sc < bestScore) { bestScore = sc; best = m; }
   }
   if (best) { whack(best); return; }
+  // 1) a direct hit on something interactive
   const hits = raycaster.intersectObjects(tapTargets, false);
-  if (hits.length) {
-    const h = hits[0], o = h.object;
-    if (o.userData.tv) { startSwipe(h.point, true); setTV(!tvOn); sfx.tvStatic(tvOn); return; }
-    if (o.userData.prop) { const pr = o.userData.prop; startSwipe(h.point, true); setTimeout(() => knockProp(pr), 90); return; }
+  if (hits.length && interact(hits[0].object, hits[0].point)) return;
+  // 2) a near miss: the closest interactive thing whose "reach bubble" the tap ray passes through
+  let near = null, nearN = 1;
+  for (const it of interactables()) {
+    const n = ray.distanceSqToPoint(it.pos) / (it.r * it.r);
+    if (n < nearN) { nearN = n; near = it; }
   }
+  if (near) { interact(near.obj, near.pos); return; }
+  // 3) nothing to bat: the paw still reaches exactly where you tapped (walls, sofas, furniture, floor)
+  const surf = raycaster.intersectObjects(scene.children, true).find(h => h.object.isMesh && h.object.visible && !h.object.material.transparent);
+  pawReadyAt += CFG.WHIFF_COOLDOWN;                                 // swiped at nothing: off balance for a moment
+  if (surf && surf.point.y > 0.05) { startSwipe(surf.point, true); sfx.miss(); return; }
   if (ray.intersectPlane(floorPlane, _hit)) {
     _hit.x = Math.max(-ROOM.halfW + 0.3, Math.min(ROOM.halfW - 0.3, _hit.x));
     _hit.z = Math.max(0.3, Math.min(ROOM.depth - 0.5, _hit.z));
@@ -1437,6 +1468,26 @@ function handleTap(clientX, clientY) {
     sfx.miss();
   }
 }
+// everything the cat can bat, with a generous reach radius so near-misses still count
+const _ip = new THREE.Vector3();
+function interactables() {
+  const list = [];
+  for (const p of props) {
+    const r = p.restHalf === 0 ? 0.5 : p.restHalf > 0.2 ? 0.7 : 0.5;          // disco ball / pillow / candle
+    list.push({ obj: p.obj.isMesh ? p.obj : p.obj.children[0], pos: p.obj.position.clone(), r });
+  }
+  screen.getWorldPosition(_ip); list.push({ obj: screen, pos: _ip.clone(), r: 1.4 });
+  if (starMesh) list.push({ obj: starMesh, pos: starMesh.position.clone(), r: 1.0 });
+  return list;
+}
+function interact(o, point) {
+  if (o.userData.tv) { startSwipe(point, true); setTV(!tvOn); sfx.tvStatic(tvOn); tapShake(); return true; }
+  if (o.userData.star) { startSwipe(point, true); setTimeout(nudgeStar, 90); tapShake(); return true; }
+  if (o.userData.prop) { const pr = o.userData.prop; startSwipe(point, true); setTimeout(() => knockProp(pr), 90); tapShake(); return true; }
+  return false;
+}
+function tapShake() { shake = Math.max(shake, reduceMotion ? 0.03 : 0.13); }
+
 
 function whack(m) {
   startSwipe(m.root.position);
@@ -1474,6 +1525,7 @@ function onCheeseGrabbed(m, c) {
   sfx.grab();
   updateHud();
 }
+let lastStandWarned = false;
 function onCheeseStolen(m, c) {
   if (state !== 'playing' && state !== 'ending') { c.drop(); return; }
   c.lose();
@@ -1483,6 +1535,11 @@ function onCheeseStolen(m, c) {
   sfx.bite(true);
   vibrate(60);
   updateHud();
+  if (!lastStandWarned && cheeses.filter(x => x.alive).length === 1) {
+    lastStandWarned = true;
+    const last = cheeses.find(x => x.alive);
+    floatText(last.pos.clone().setY(1.4), 'Last cheese! Bombs are guarding it', 'warn');
+  }
   checkEnd();
 }
 
@@ -1559,7 +1616,7 @@ function clearField() { for (const m of mice) m.release(); }
 function resetGame() {
   clearField();
   cheeses.forEach(c => c.reset());
-  resetProps(); setTV(false);
+  resetProps(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0;
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -1581,7 +1638,7 @@ function resumeGame() {
   state = 'playing'; ui.pause.hidden = true;
 }
 function quitToTitle() {
-  clearField(); cheeses.forEach(c => c.reset()); resetProps(); setTV(false);
+  clearField(); cheeses.forEach(c => c.reset()); resetProps(); setTV(false); starSpin.target = starSpin.home;
   state = 'menu'; ui.pause.hidden = true; ui.hud.hidden = true; ui.start.hidden = false; showBestOnStart();
 }
 function showGameOver() {
@@ -1649,7 +1706,8 @@ function noise(dur, vol, freq) {
   src.connect(f); f.connect(g); g.connect(actx.destination); src.start();
 }
 const sfx = {
-  whack: clutch => { tone(170, 90, 0.05, 'sine', 0.08); const f = 2500 + Math.random() * 500; tone(f, f * 1.45, 0.09, 'sine', 0.07, 0.015); if (clutch) tone(f * 1.2, f * 1.8, 0.08, 'sine', 0.06, 0.11); },   // soft bop + mouse squeak (double squeak on a clutch save)
+  whack: clutch => { sfx.plush(clutch); },
+  _oldWhack: clutch => { tone(170, 90, 0.05, 'sine', 0.08); const f = 2500 + Math.random() * 500; tone(f, f * 1.45, 0.09, 'sine', 0.07, 0.015); if (clutch) tone(f * 1.2, f * 1.8, 0.08, 'sine', 0.06, 0.11); },   // soft bop + mouse squeak (double squeak on a clutch save)
   miss: () => noise(0.06, 0.12, 900),
   boom: () => { noise(0.5, 0.5, 700); tone(160, 40, 0.4, 'sine', 0.25); },
   grab: () => sfx.squeak(3),
@@ -1657,6 +1715,27 @@ const sfx = {
   thump: () => noise(0.12, 0.25, 380),                                                                                // pillow
   clink: () => { tone(1900, 1500, 0.09, 'triangle', 0.05); tone(1250, 1100, 0.14, 'triangle', 0.04, 0.05); },           // candle
   tvStatic: on => { if (on) noise(0.35, 0.08, 7000); else tone(900, 200, 0.12, 'sine', 0.04); },
+  // rubber squeaker inside a plush toy: square wave through a narrow "rubber" resonance, pitch bends up and back,
+  // a fast flutter for the rasp, plus a puff of air. Five variants picked at random so hits don't all sound alike.
+  plush: clutch => {
+    if (!actx || !soundOn) return;
+    const V = [[820, 1500, 1150, 0.17], [1000, 1750, 1350, 0.13], [680, 1300, 980, 0.21], [900, 1250, 1600, 0.16], [760, 1600, 900, 0.19]];
+    const play = (v, t0) => {
+      const [f0, f1, f2, dur] = v, t = actx.currentTime + t0;
+      const o = actx.createOscillator(), fl = actx.createOscillator(), fg = actx.createGain(), bp = actx.createBiquadFilter(), g = actx.createGain();
+      o.type = 'square'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.35); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+      fl.frequency.value = 38; fg.gain.value = 45; fl.connect(fg); fg.connect(o.frequency);
+      bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 2.2;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.012); g.gain.setValueAtTime(0.16, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(bp); bp.connect(g); g.connect(actx.destination);
+      o.start(t); fl.start(t); o.stop(t + dur + 0.02); fl.stop(t + dur + 0.02);
+    };
+    noise(0.05, 0.12, 900);                                        // soft plush thump
+    const v = V[(Math.random() * V.length) | 0];
+    play(v, 0.01);
+    if (clutch || Math.random() < 0.3) play(V[(Math.random() * V.length) | 0], v[3] + 0.05);   // sometimes a double squeeze
+  },
+  rustle: () => noise(0.18, 0.1, 5200),                            // paper star
   squeak: n => { for (let i = 0; i < n; i++) { const f = 2600 + Math.random() * 700; tone(f, f + 600 + Math.random() * 400, 0.06, 'sine', 0.05, i * 0.09); } },   // mouse squeaks
   angryMeow: () => {
     // A cat meow is HIGH (fundamental ~550–1000 Hz), glides up then down ("mi-AOW"), and its vowel comes from two
@@ -1814,6 +1893,7 @@ function frame(now) {
   updateParticles(dt);
   updateProps(dt);
   updateTV(dt);
+  updateStar(dt);
   updateBoom(dt);
 
   shake = Math.max(0, shake - dt * 1.4);
