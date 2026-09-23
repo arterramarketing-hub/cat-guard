@@ -29,10 +29,24 @@
   #stage canvas{display:block;width:100%;height:100%;touch-action:none}
 
   /* ---------- HUD ---------- */
-  .hud{position:fixed;top:0;left:0;right:0;z-index:5;pointer-events:none;
-       padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 0;display:grid;gap:6px}
-  .hud-row{display:flex;justify-content:space-between;align-items:stretch;gap:8px}
-  .chip{background:var(--hud);border:1.5px solid rgba(251,241,220,.14);border-radius:12px;padding:6px 10px;display:flex;align-items:center;gap:8px}
+  .hud{position:fixed;top:0;left:0;right:0;z-index:5;pointer-events:none;display:flex;justify-content:center;
+       padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 0}
+  .hud-bar{width:100%;max-width:780px;background:var(--hud);border:1.5px solid rgba(251,241,220,.14);border-radius:16px;
+           padding:8px 12px;display:grid;align-items:center;column-gap:0;row-gap:8px;
+           grid-template-columns:auto auto 1fr minmax(96px,auto) auto;grid-template-areas:"score cheese lives heat pause"}
+  .hud-cell{display:grid;gap:3px;padding:0 14px;border-left:1px solid rgba(251,241,220,.12);min-width:0}
+  .c-score{grid-area:score;padding-left:2px;border-left:0}
+  .c-cheese{grid-area:cheese}.c-lives{grid-area:lives}.c-heat{grid-area:heat}
+  .c-pause{grid-area:pause;margin-left:6px}
+  .val-row{display:flex;align-items:center;gap:6px}
+  .lbl-split{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  @media (max-width:560px){
+    .hud-bar{grid-template-columns:auto 1fr auto;grid-template-areas:"score cheese pause" "lives lives heat";padding:8px 10px}
+    .c-cheese{justify-self:center;border-left:0}
+    .c-lives{padding-left:2px;border-left:0}
+    .c-heat{padding-right:2px}
+    .c-pause{margin-left:0}
+  }
   .lbl{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--label);font-weight:800}
   .stack{display:grid;gap:2px}
   .score-val{font-family:var(--display);font-size:26px;line-height:1;color:var(--cheese);font-variant-numeric:tabular-nums;min-width:3ch}
@@ -48,9 +62,8 @@
   .wedge.carried path{fill:var(--danger);animation:blink .35s infinite alternate}
   .wedge.gone path{fill:transparent;stroke:rgba(251,241,220,.3);stroke-dasharray:2 2}
   @keyframes blink{to{opacity:.35}}
-  .meta{display:flex;align-items:center;gap:10px}
-  .time{font-variant-numeric:tabular-nums;font-weight:800;font-size:16px;min-width:4ch;text-align:right}
-  .heat{width:52px;height:6px;border-radius:3px;background:rgba(251,241,220,.16);overflow:hidden}
+  .time{font-variant-numeric:tabular-nums;font-weight:800;font-size:13px;letter-spacing:0;text-transform:none;color:var(--paper);min-width:4ch;text-align:right}
+  .heat{width:100%;min-width:72px;height:6px;border-radius:3px;background:rgba(251,241,220,.16);overflow:hidden}
   .heat i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cheese),var(--danger));transition:width .5s}
   .icon-btn{pointer-events:auto;appearance:none;border:1.5px solid rgba(251,241,220,.25);background:rgba(251,241,220,.08);color:var(--paper);
             width:34px;height:34px;border-radius:10px;display:grid;place-items:center;cursor:pointer;padding:0}
@@ -108,28 +121,16 @@
 <div id="flash"></div>
 <div id="fx"></div>
 
-<!-- HUD -->
+<!-- HUD: one bar across the top -->
 <div class="hud" id="hud" hidden>
-  <div class="hud-row">
-    <div class="chip">
-      <div class="stack"><span class="lbl">Score</span><span class="score-val" id="score">0</span></div>
-      <span class="combo" id="combo" hidden>x2</span>
-    </div>
-    <div class="chip">
-      <div class="stack"><span class="lbl">Lives</span><div class="lives" id="lives"></div></div>
-    </div>
-  </div>
-  <div class="hud-row">
-    <div class="chip">
-      <div class="stack"><span class="lbl">Cheese</span><div class="cheeses" id="cheeses"></div></div>
-    </div>
-    <div class="chip meta">
-      <div class="stack"><span class="lbl">Heat</span><div class="heat"><i id="heat"></i></div></div>
-      <span class="time" id="time">0:00</span>
-      <button class="icon-btn" id="pauseBtn" aria-label="Pause">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="1" width="3.5" height="12" rx="1"/><rect x="8.5" y="1" width="3.5" height="12" rx="1"/></svg>
-      </button>
-    </div>
+  <div class="hud-bar">
+    <div class="hud-cell c-score"><span class="lbl">Score</span><div class="val-row"><span class="score-val" id="score">0</span><span class="combo" id="combo" hidden>x2</span></div></div>
+    <div class="hud-cell c-cheese"><span class="lbl">Cheese</span><div class="cheeses" id="cheeses"></div></div>
+    <div class="hud-cell c-lives"><span class="lbl">Lives</span><div class="lives" id="lives"></div></div>
+    <div class="hud-cell c-heat"><span class="lbl lbl-split"><span>Heat</span><span class="time" id="time">0:00</span></span><div class="heat"><i id="heat"></i></div></div>
+    <button class="icon-btn c-pause" id="pauseBtn" aria-label="Pause">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="1" width="3.5" height="12" rx="1"/><rect x="8.5" y="1" width="3.5" height="12" rx="1"/></svg>
+    </button>
   </div>
 </div>
 
@@ -395,7 +396,8 @@ const blindsTex = canvasTex(32, 64, (g, w, h) => {
 }, 1, 3);
 const cordTex = canvasTex(64, 32, (g, w, h) => {          // cream corduroy
   g.fillStyle = '#e9e1d2'; g.fillRect(0, 0, w, h);
-  g.fillStyle = 'rgba(120,100,70,.18)'; for (let x = 0; x < w; x += 6) g.fillRect(x, 0, 2, h);
+  g.fillStyle = 'rgba(110,90,62,.3)'; for (let x = 0; x < w; x += 6) g.fillRect(x, 0, 2, h);
+  g.fillStyle = 'rgba(255,250,240,.35)'; for (let x = 3; x < w; x += 6) g.fillRect(x, 0, 1, h);
 }, 4, 1);
 
 /* ---------- room: carpet, white paneling ---------- */
@@ -582,7 +584,7 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   const scLight = new THREE.PointLight(0xffdcae, 0.3, 5, 2); scLight.position.set(0, scY, IN(12)); scG.add(scLight);
 })();
 /* ---------- cream corduroy modular sofas along both side walls ---------- */
-const cordMat = lam(0xffffff, { map: cordTex }), couchGapMat = basic(0x1a1512);
+const cordMat = lam(0xd9d6d0, { map: cordTex }), couchBaseMat = lam(0xc3bfb8, { map: cordTex }), couchGapMat = basic(0x1a1512);   // tops no longer blow out
 // pillow = a squashed "superellipsoid": square-ish outline with rounded corners, fat in the middle, thin at the seams
 const PILLOW_GEO = (() => {
   const w = IN(18), h = IN(18), t = IN(7), g = new THREE.SphereGeometry(1, 24, 18), p = g.attributes.position;
@@ -593,16 +595,16 @@ const PILLOW_GEO = (() => {
   }
   g.computeVertexNormals(); return g;
 })();
-const pillowMat = lam(0xf5efe6, { map: cordTex });
+const pillowMat = lam(0xffffff, { emissive: 0x2a2a2a });                 // crisp white pillows
 function couch(side, z0, modules) {                    // side: -1 = left wall, +1 = right wall
   const D = COUCH_DEPTH, MOD = FT(2.85), SEAT_H = IN(17), LEG = IN(3), BACK_T = IN(8), BACK_H = IN(30), ARM_T = IN(7), ARM_H = IN(23);
   const wallX = side * ROOM.halfW, inX = -side, len = MOD * modules, zc = z0 + len / 2;
   box(D - 0.08, LEG, len - 0.08, couchGapMat, wallX + inX * D / 2, LEG / 2, zc);                              // dark gap mice hide in
-  box(D, SEAT_H - LEG - IN(4), len, cordMat, wallX + inX * D / 2, LEG + (SEAT_H - LEG - IN(4)) / 2, zc);       // base
+  box(D, SEAT_H - LEG - IN(4), len, couchBaseMat, wallX + inX * D / 2, LEG + (SEAT_H - LEG - IN(4)) / 2, zc);   // base (a shade darker)
   for (let i = 0; i < modules; i++) {
     const z = z0 + MOD * (i + 0.5);
-    box(D - BACK_T - 0.04, IN(5), MOD - 0.05, cordMat, wallX + inX * (BACK_T + (D - BACK_T) / 2), SEAT_H - IN(1.5), z);   // seat cushion
-    box(BACK_T, BACK_H - SEAT_H + IN(4), MOD - 0.05, cordMat, wallX + inX * BACK_T / 2, SEAT_H + (BACK_H - SEAT_H) / 2 - IN(2), z); // back cushion
+    box(D - BACK_T - 0.08, IN(5), MOD - 0.09, cordMat, wallX + inX * (BACK_T + (D - BACK_T) / 2), SEAT_H - IN(1.5), z);   // seat cushion
+    box(BACK_T, BACK_H - SEAT_H + IN(4), MOD - 0.09, cordMat, wallX + inX * BACK_T / 2, SEAT_H + (BACK_H - SEAT_H) / 2 - IN(2), z); // back cushion
   }
   for (const za of [z0 - ARM_T / 2, z0 + len + ARM_T / 2]) box(D, ARM_H - LEG, ARM_T, cordMat, wallX + inX * D / 2, LEG + (ARM_H - LEG) / 2, za); // arms
   for (const [pz, tw] of [[z0 + IN(15), 0.25], [z0 + len - IN(15), -0.3]]) {                                   // two puffy corduroy pillows
@@ -627,7 +629,7 @@ const discoGlints = [];
 {
   let seed = 11; const r01 = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   // even spread: one ball per cell of a jittered grid, from just past the door casing to the end of the sofa
-  const Z0 = DOOR_Z1 + CASING + 0.35, Z1 = COUCH_RIGHT_Z0 + FT(2.85) * 3 - 0.2, Y0 = 2.2, Y1 = DOOR_H, COLS = 9, ROWS = 3;
+  const Z0 = DOOR_Z1 + CASING + 0.35, Z1 = COUCH_RIGHT_Z0 + FT(2.85) * 3 - 0.2, Y0 = 3.0, Y1 = DOOR_H + 0.9, COLS = 11, ROWS = 2;   // 22 balls (was 27), set higher on the wall
   const cells = [];
   for (let c = 0; c < COLS; c++) for (let rw = 0; rw < ROWS; rw++) cells.push([c, rw]);
   for (const [c, rw] of cells) {
@@ -857,13 +859,13 @@ const furTex = (() => {
     g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 2, y + 4 + Math.random() * 6); g.stroke(); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 })();
-const furMat = lam(0xe6e0da, { map: furTex });
+const furMat = lam(0xa99d94, { map: furTex });                 // grey-beige, like the cat's legs in the photo
 const armGeo = new THREE.CylinderGeometry(0.075, 0.1, 1, 8); armGeo.translate(0, 0.5, 0);
 const arm = new THREE.Mesh(armGeo, furMat); arm.visible = false; scene.add(arm);          // forearm: elbow → paw
 // paw: soft round palm with four toe beans fanned across the front, pink pads peeking underneath
 const paw = new THREE.Group(); paw.visible = false; scene.add(paw);
 {
-  const pawFur = lam(0xe9e3dc, { map: furTex }), bean = lam(0xe29aa0);
+  const pawFur = lam(0xc4bab1, { map: furTex }), bean = lam(0xe29aa0);
   const palm = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10), pawFur); palm.scale.set(1.05, 0.62, 1); paw.add(palm);
   for (let i = 0; i < 4; i++) {
     const a = -0.62 + i * 0.41, toe = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), pawFur);
@@ -1542,18 +1544,34 @@ const sfx = {
   boom: () => { noise(0.5, 0.5, 700); tone(160, 40, 0.4, 'sine', 0.25); },
   grab: () => sfx.squeak(3),
   squeak: n => { for (let i = 0; i < n; i++) { const f = 2600 + Math.random() * 700; tone(f, f + 600 + Math.random() * 400, 0.06, 'sine', 0.05, i * 0.09); } },   // mouse squeaks
-  angryMeow: () => {                                                        // hurt / angry "mrrrOWW" + hiss
+  angryMeow: () => {
+    // A cat meow is HIGH (fundamental ~550–1000 Hz), glides up then down ("mi-AOW"), and its vowel comes from two
+    // narrow resonances sweeping ee → ah → ow. Everything under ~450 Hz is cut, so no elephant rumble.
     if (!actx || !soundOn) return;
-    const t = actx.currentTime, o = actx.createOscillator(), lfo = actx.createOscillator(), lg = actx.createGain(), f = actx.createBiquadFilter(), g = actx.createGain();
-    o.type = 'sawtooth';
-    o.frequency.setValueAtTime(360, t); o.frequency.linearRampToValueAtTime(820, t + 0.2); o.frequency.linearRampToValueAtTime(720, t + 0.45); o.frequency.exponentialRampToValueAtTime(300, t + 0.8);
-    lfo.frequency.value = 13; lg.gain.value = 30; lfo.connect(lg); lg.connect(o.frequency);          // growly vibrato
-    f.type = 'bandpass'; f.Q.value = 1.6; f.frequency.setValueAtTime(800, t); f.frequency.linearRampToValueAtTime(1700, t + 0.22); f.frequency.linearRampToValueAtTime(900, t + 0.8);  // "me-OW" mouth
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + 0.06); g.gain.setValueAtTime(0.22, t + 0.45); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.85);
-    o.connect(f); f.connect(g); g.connect(actx.destination);
-    o.start(t); lfo.start(t); o.stop(t + 0.9); lfo.stop(t + 0.9);
-    setTimeout(() => noise(0.35, 0.09, 5000), 820);                                                  // hiss
+    const t = actx.currentTime + 0.01, dur = 0.6;
+    const o = actx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(560, t); o.frequency.exponentialRampToValueAtTime(980, t + 0.13);
+    o.frequency.exponentialRampToValueAtTime(840, t + 0.3); o.frequency.exponentialRampToValueAtTime(470, t + dur);
+    const vib = actx.createOscillator(), vg = actx.createGain(); vib.frequency.value = 7; vg.gain.value = 10; vib.connect(vg); vg.connect(o.frequency);
+    const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 450; hp.Q.value = 0.7;
+    const out = actx.createGain();
+    out.gain.setValueAtTime(0.0001, t); out.gain.exponentialRampToValueAtTime(0.3, t + 0.03); out.gain.setValueAtTime(0.3, t + 0.34); out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    for (const [q, pts, lvl] of [[5, [900, 1450, 1050, 720], 1], [7, [2300, 3100, 2500, 1800], 0.55]]) {   // two vowel formants
+      const f = actx.createBiquadFilter(), g = actx.createGain(); f.type = 'bandpass'; f.Q.value = q; g.gain.value = lvl;
+      f.frequency.setValueAtTime(pts[0], t); f.frequency.linearRampToValueAtTime(pts[1], t + 0.14); f.frequency.linearRampToValueAtTime(pts[2], t + 0.34); f.frequency.linearRampToValueAtTime(pts[3], t + dur);
+      hp.connect(f); f.connect(g); g.connect(out);
+    }
+    o.connect(hp); out.connect(actx.destination);
+    o.start(t); vib.start(t); o.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
+    // angry hiss right after: bright noise only (highpassed), quick attack, slow fade
+    const n = Math.floor(actx.sampleRate * 0.45), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const src = actx.createBufferSource(), hh = actx.createBiquadFilter(), hg = actx.createGain(), th = t + dur - 0.05;
+    src.buffer = buf; hh.type = 'highpass'; hh.frequency.value = 2800;
+    hg.gain.setValueAtTime(0.0001, th); hg.gain.exponentialRampToValueAtTime(0.12, th + 0.03); hg.gain.exponentialRampToValueAtTime(0.0001, th + 0.45);
+    src.connect(hh); hh.connect(hg); hg.connect(actx.destination); src.start(th);
   },
+
   bite: gone => { sfx.squeak(4); tone(140, 90, 0.18, 'sawtooth', 0.05, 0.3); if (gone) tone(300, 80, 0.45, 'triangle', 0.07, 0.4); },
   over: () => { tone(440, 220, 0.3, 'triangle', 0.08); tone(330, 110, 0.5, 'triangle', 0.08, 0.25); },
 };
