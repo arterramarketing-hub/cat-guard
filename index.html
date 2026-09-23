@@ -79,6 +79,14 @@
             width:34px;height:34px;border-radius:10px;display:grid;place-items:center;cursor:pointer;padding:0}
   .icon-btn:focus-visible{outline:2px solid var(--cheese);outline-offset:2px}
 
+  .banner{position:fixed;left:50%;top:40%;z-index:8;pointer-events:none;white-space:nowrap;
+          font:400 clamp(30px,9vw,64px)/1 var(--display);color:var(--cheese);-webkit-text-stroke:2px var(--ink);
+          text-shadow:0 5px 0 var(--ink),0 10px 24px rgba(0,0,0,.45);transform:translate(-50%,-50%) scale(.2) rotate(-6deg);opacity:0;
+          animation:bannerPop 2.4s cubic-bezier(.2,1.6,.4,1) forwards}
+  @keyframes bannerPop{12%{opacity:1;transform:translate(-50%,-50%) scale(1.08) rotate(-4deg)}20%{transform:translate(-50%,-50%) scale(1) rotate(-4deg)}
+                       80%{opacity:1;transform:translate(-50%,-50%) scale(1.02) rotate(-4deg)}100%{opacity:0;transform:translate(-50%,-62%) scale(.95) rotate(-4deg)}}
+  @media (prefers-reduced-motion:reduce){.banner{animation-duration:2.4s;transform:translate(-50%,-50%) rotate(-4deg)}}
+
   /* ---------- Screens ---------- */
   .screen{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;overflow-y:auto;
           padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 16px);
@@ -1460,52 +1468,52 @@ const blanketFuzzTex = canvasTex(128, 128, (g, w, h) => {               // white
 }, 3, 3);
 const blanketBlackMat = lam(0xffffff, { map: blanketBlackTex }), blanketFuzzMat = lam(0xffffff, { map: blanketFuzzTex });
 {
-  // neatly folded: black layers with the fuzzy white showing between them, rolled folds on the front edge,
-  // and the top corner turned back to show the fleece. Sits on the seat cushion, clear of the back and the arm.
-  const W = IN(15), L = IN(21), HB = IN(1.25), HW = IN(0.45), SEAT_TOP = IN(17.3);
-  const fold = new THREE.Group(); fold.position.set(-ROOM.halfW + IN(8) + IN(1.5) + W / 2, SEAT_TOP, COUCH_LEFT_Z0 + FT(2.85) * 3 - IN(1.5) - L / 2 - IN(0.6)); fold.rotation.y = -0.07; scene.add(fold);
-  const puff = (w, h, d, mat, x, y, z, sag) => {                          // a soft, pillowy slab: rounded edges, bulging sides, a slight sag
-    const g = new THREE.BoxGeometry(w, h, d, 10, 3, 12), q = g.attributes.position;
-    for (let i = 0; i < q.count; i++) {
-      const u = q.getX(i) / (w / 2), v = q.getY(i) / (h / 2), t = q.getZ(i) / (d / 2), e = Math.max(Math.abs(u), Math.abs(t)) ** 6;
-      const bulge = 1 + 0.035 * (1 - v * v);
-      q.setXYZ(i, q.getX(i) * bulge, q.getY(i) * (1 - 0.45 * e) - sag * (1 - u * u) * (1 - t * t) * (v > 0 ? 0 : 1) + (v > 0 ? 0.004 * Math.sin(u * 5 + t * 3) : 0), q.getZ(i) * bulge);
+  // A throw tossed diagonally across the seat cushion and over the arm. It rides a smoothed height map of the sofa
+  // (seat, arm) and hangs straight down the sofa front and the arm's outside face, keeping its length, so no part of
+  // it ever cuts into the sofa. The top gets a soft cloth-relax pass so it slopes over the arm instead of stepping.
+  const WALL = -ROOM.halfW, FRONT = WALL + COUCH_DEPTH, BACK_EDGE = WALL + IN(8);
+  const armIn = COUCH_LEFT_Z0 + FT(2.85) * 3, armOut = armIn + IN(7), SEAT = IN(18.3), ARM = IN(23.7), LIFT = 0.03, PAD = 0.1;
+  const H = (x, z) => (x < WALL || x > FRONT || z > armOut) ? 0 : z >= armIn ? ARM : SEAT;   // (it stops short of the back cushion)
+  const Hs = (x, z) => Math.max(H(x, z), H(x - PAD, z), H(x + PAD, z), H(x, z - PAD), H(x, z + PAD));
+  const W = FT(2.8), L = FT(2.1), ang = 0.62, ca = Math.cos(ang), sa = Math.sin(ang), cx = FRONT - 0.22, cz = armIn - 0.1;
+  const NX = 41, NZ = 31, g = new THREE.PlaneGeometry(1, 1, NX - 1, NZ - 1), q = g.attributes.position;
+  const top0 = new Float32Array(q.count), drop = new Float32Array(q.count), dir = new Uint8Array(q.count), hang = new Uint8Array(q.count), XZ = new Float32Array(q.count * 2);
+  for (let i = 0; i < q.count; i++) {                                  // 1) where each point sits in plan, and how far it hangs past an edge
+    const u = q.getX(i), v = q.getY(i);
+    let x = cx + u * W * ca - v * L * sa, z = cz + u * W * sa + v * L * ca;
+    x = Math.max(BACK_EDGE + 0.04, x);
+    const ex = Math.min(x, FRONT - 0.01), ez = Math.min(z, armOut - 0.01);
+    top0[i] = Hs(ex, ez) + LIFT + Math.sin(u * 13 + v * 9) * 0.008;
+    const ox = Math.max(0, x - FRONT), oz = Math.max(0, z - armOut);
+    if (ox > 0 || oz > 0) {
+      hang[i] = 1; drop[i] = Math.max(ox, oz); dir[i] = ox >= oz ? 0 : 1;
+      const flare = ox > 0 && oz > 0 ? 0.95 * Math.min(ox, oz) : 0;     // the corner bells out like a skirt
+      if (ox > 0) x = FRONT + 0.03 + flare + Math.min(ox, 0.25) * 0.08;
+      if (oz > 0) z = armOut + 0.03 + flare + Math.min(oz, 0.25) * 0.08;
     }
-    g.computeVertexNormals();
-    const m = new THREE.Mesh(g, mat); m.position.set(x, y, z); fold.add(m); return m;
-  };
-  let y = 0;
-  for (let i = 0; i < 4; i++) {
-    const ox = (Math.random() - 0.5) * IN(0.6), oz = (Math.random() - 0.5) * IN(0.6), sh = 1 - i * 0.015;
-    if (i > 0) { puff(W * sh + IN(0.2), HW, L * sh + IN(0.2), blanketFuzzMat, ox, y + HW / 2, oz, 0); y += HW * 0.8; }   // fleece peeking out between the folds
-    puff(W * sh, HB, L * sh, blanketBlackMat, ox, y + HB / 2, oz, IN(0.15)).rotation.y = (Math.random() - 0.5) * 0.04; y += HB * 0.9;
+    XZ[i * 2] = x; XZ[i * 2 + 1] = z;
   }
-  // top corner turned back: a fleece triangle with a soft black roll along the crease
-  const CW = IN(6.5), CH = IN(5.5);
-  const corner = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(-CW, 0), new THREE.Vector2(0, CH)])), blanketFuzzMat);
-  corner.rotation.x = -Math.PI / 2; corner.position.set(W / 2 - IN(0.2), y + IN(0.35), L / 2 - IN(0.2)); fold.add(corner);
-  const crease = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.35), IN(0.35), Math.hypot(CW, CH), 10), blanketBlackMat);
-  crease.position.set(W / 2 - IN(0.2) - CW / 2, y + IN(0.2), L / 2 - IN(0.2) - CH / 2); crease.rotation.set(Math.PI / 2, 0, 0); crease.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.atan2(-CW, CH)); fold.add(crease);
-  // the top layer's end runs off the stack, up over the sofa arm and hangs down its outside, the fleece curling out at the hem
-  {
-    const armIn = L / 2 + IN(2.1), armOut = armIn + IN(7), armTop = IN(23) - SEAT_TOP + IN(0.5);
-    const path = [[L / 2 - IN(4), y], [L / 2 + IN(0.5), y + IN(0.3)], [armIn, armTop], [armOut - IN(1), armTop + IN(0.2)], [armOut + IN(0.5), armTop - IN(1)],
-                  [armOut + IN(0.7), armTop - IN(6)], [armOut + IN(0.9), armTop - IN(11)], [armOut + IN(2.2), armTop - IN(13)]];
-    const seg = [0]; for (let i = 1; i < path.length; i++) seg.push(seg[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
-    const at = d => { let i = 1; while (i < path.length - 1 && seg[i] < d) i++; const k = (d - seg[i - 1]) / (seg[i] - seg[i - 1]); return [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * k, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * k]; };
-    const DW = W * 0.86, total = seg[seg.length - 1], gg = new THREE.PlaneGeometry(1, 1, 14, 40), q = gg.attributes.position;
-    for (let i = 0; i < q.count; i++) {
-      const u = q.getX(i), v = q.getY(i) + 0.5, d = v * total, [zz, yy] = at(d), hang = Math.max(0, (d - seg[4]) / (total - seg[4]));
-      q.setXYZ(i, u * DW * (1 + hang * 0.12) + Math.sin(u * 9 + d * 20) * IN(0.25) * hang, yy + Math.sin(u * 11) * IN(0.3) * hang, zz + Math.sin(u * 7 + 1) * IN(0.6) * hang);   // folds and a flared hem as it hangs
-    }
-    gg.computeVertexNormals();
-    const up = gg.attributes.normal.getY(Math.floor(q.count / 2 / 41) * 41 + 5) > 0;   // a vertex on the flat top run: its black face points up
-    for (const [mat, side] of [[blanketBlackMat, up ? THREE.FrontSide : THREE.BackSide], [blanketFuzzMat, up ? THREE.BackSide : THREE.FrontSide]]) {
-      const m = new THREE.Mesh(gg, mat.clone()); m.material.side = side; fold.add(m);
-    }
+  const T = Float32Array.from(top0);                                   // 2) smooth the top surface so it slopes over the arm (never below the sofa)
+  for (let it = 0; it < 40; it++) for (let iz = 0; iz < NZ; iz++) for (let ix = 0; ix < NX; ix++) {
+    const i = iz * NX + ix; let sum = 0, n = 0;
+    if (ix > 0) { sum += T[i - 1]; n++; } if (ix < NX - 1) { sum += T[i + 1]; n++; }
+    if (iz > 0) { sum += T[i - NX]; n++; } if (iz < NZ - 1) { sum += T[i + NX]; n++; }
+    T[i] = Math.max(top0[i], sum / n - 0.012);
   }
-  blanketDrape = fold;
-  fold.traverse(o => { if (o.isMesh) { o.userData.blanket = true; tapTargets.push(o); } });
+  for (let i = 0; i < q.count; i++) {                                  // 3) hanging points fall from that smooth edge, pooling on the carpet if long
+    let x = XZ[i * 2], z = XZ[i * 2 + 1], y = T[i] - drop[i];
+    if (y < 0.02) { const pool = 0.02 - y; y = 0.02; if (dir[i] === 0) x += pool; else z += pool; }
+    q.setXYZ(i, x - cx, y, z - cz);
+  }
+  g.computeVertexNormals();
+  let top = 0; for (let i = 0; i < q.count; i++) if (!hang[i]) { top = i; break; }
+  const upFacing = g.attributes.normal.getY(Math.floor(NZ / 2) * NX + Math.floor(NX / 2)) > 0;
+  const drape = new THREE.Group(); drape.position.set(cx, 0, cz); scene.add(drape);
+  drape.add(new THREE.Mesh(g, lam(0xffffff, { map: blanketBlackTex, side: upFacing ? THREE.FrontSide : THREE.BackSide })));
+  drape.add(new THREE.Mesh(g, lam(0xffffff, { map: blanketFuzzTex, side: upFacing ? THREE.BackSide : THREE.FrontSide })));
+  drape.position.y = 0; drape.userData.seat = SEAT;
+  blanketDrape = drape;
+  drape.traverse(o => { if (o.isMesh) { o.userData.blanket = true; tapTargets.push(o); } });
 }
 
 /* ---------- rustic stone fireplace on the left wall: rough fieldstone, a chunky dark wood beam for a mantle,
@@ -1844,7 +1852,7 @@ const tailTex = (() => {
   }
   fg.computeVertexNormals();
   const heap = twoSided(fg); heap.visible = false; scene.add(heap);
-  blanketRig = { state: 'sofa', lump, heap, heapGeo: fg, heapBase: Float32Array.from(fp.array), from: new THREE.Vector3(), to: new THREE.Vector3(), t: 0, dest: 'cat', rumbleT: 0, sofaPos: blanketDrape.position.clone().setY(blanketDrape.position.y + 0.2) };
+  blanketRig = { state: 'sofa', lump, heap, heapGeo: fg, heapBase: Float32Array.from(fp.array), from: new THREE.Vector3(), to: new THREE.Vector3(), t: 0, dest: 'cat', rumbleT: 0, sofaPos: blanketDrape.position.clone().setY(IN(20)) };
   for (const gr of [lump, heap]) gr.traverse(o => { if (o.isMesh) { o.userData.blanket = true; tapTargets.push(o); } });
 }
 const catTail = new THREE.Group(); catTail.position.set(BOX.w * 0.24, BOX.h * 0.5, -BOX.d * 0.12); catBox.add(catTail);
@@ -2201,13 +2209,23 @@ function updateBoom(dt) {
    MICE
    ===================================================================== */
 const steamPuffTex = canvasTex(64, 64, (g, w, h) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.55, 'rgba(250,252,255,.7)'); gr.addColorStop(1, 'rgba(250,252,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }, 1, 1);
+// Mouse, rebuilt soft and round: a pear-shaped body (fuller at the back), a rounded head that tapers into a short
+// snout with chubby cheeks, big thin round ears with pink insides, glossy eyes with a highlight, whiskers,
+// little pink feet that patter when it runs, and a thin curved tail that sways.
+const shapeGeo = (geo, fn) => { const q = geo.attributes.position, v = new THREE.Vector3(); for (let i = 0; i < q.count; i++) { v.fromBufferAttribute(q, i); fn(v); q.setXYZ(i, v.x, v.y, v.z); } geo.computeVertexNormals(); return geo; };
 const MG = {
-  body: new THREE.SphereGeometry(0.32, 10, 8),
-  head: new THREE.ConeGeometry(0.2, 0.44, 8),
-  ear: new THREE.CircleGeometry(0.13, 10),
-  eye: new THREE.SphereGeometry(0.038, 6, 4),
-  nose: new THREE.SphereGeometry(0.048, 6, 4),
-  tail: new THREE.CylinderGeometry(0.03, 0.012, 0.72, 5),
+  body: shapeGeo(new THREE.SphereGeometry(0.32, 26, 20), v => { const k = 1 + 0.12 * (-v.z / 0.32); v.x *= k; v.y *= k; }),                    // pear: wider at the rump
+  head: shapeGeo(new THREE.SphereGeometry(0.2, 24, 18), v => { const f = Math.max(0, v.z / 0.2); v.x *= 1 - 0.5 * f * f; v.y *= 1 - 0.42 * f * f; v.z *= 1.35; }),   // tapers to a snout
+  cheek: new THREE.SphereGeometry(0.085, 14, 10),
+  belly: new THREE.SphereGeometry(0.3, 20, 14),
+  earRim: new THREE.CylinderGeometry(0.155, 0.155, 0.022, 26),
+  ear: new THREE.CircleGeometry(0.115, 24),
+  eye: new THREE.SphereGeometry(0.056, 14, 10),
+  glint: new THREE.SphereGeometry(0.014, 6, 4),
+  nose: new THREE.SphereGeometry(0.05, 12, 8),
+  foot: new THREE.SphereGeometry(0.055, 10, 6),
+  whiskers: (() => { const pts = []; for (const sx of [-1, 1]) for (const [dy, dz] of [[0.03, 0.02], [0, 0], [-0.03, -0.015]]) pts.push(new THREE.Vector3(sx * 0.07, 0, 0), new THREE.Vector3(sx * 0.3, dy * 3, dz * 3 - 0.04)); return new THREE.BufferGeometry().setFromPoints(pts); })(),
+  tail: new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -0.02, -0.22), new THREE.Vector3(0.06, 0.04, -0.45), new THREE.Vector3(0.16, 0.16, -0.62), new THREE.Vector3(0.2, 0.3, -0.66)]), 24, 0.02, 6, false),
   ring: new THREE.RingGeometry(0.44, 0.58, 24),
   shadow: new THREE.CircleGeometry(0.42, 16),
   bomb: new THREE.SphereGeometry(0.21, 10, 8),
@@ -2217,7 +2235,8 @@ const MG = {
   xBar: new THREE.BoxGeometry(0.2, 0.045, 0.02),
 };
 const MM = {
-  fur: lam(0x9b8f86), ear: lam(0xe7a3a0, { side: THREE.DoubleSide }), eye: new THREE.MeshBasicMaterial({ color: 0x111111 }),
+  fur: lam(0x9b8f86), ear: lam(0xf0aeb0, { side: THREE.DoubleSide }), eye: new THREE.MeshPhongMaterial({ color: 0x101010, shininess: 120, specular: 0x888888 }),
+  belly: lam(0xcfc5bc), bombBelly: lam(0xa89e96), foot: lam(0xe8a3a5), whisker: new THREE.LineBasicMaterial({ color: 0x3a3330, transparent: true, opacity: 0.7 }), glint: new THREE.MeshBasicMaterial({ color: 0xffffff }),
   nose: lam(0xe77b86), tail: lam(0xd99a9a),
   bombFur: lam(0x7a7069), bombTail: lam(0xb07c7c), bombEar: lam(0xbc8583, { side: THREE.DoubleSide }), bombEye: new THREE.MeshBasicMaterial({ color: 0xff3a24 }),
   bomb: lam(0x1b1a1c), fuse: lam(0x8a6a45), band: lam(0xd8402b),
@@ -2232,12 +2251,28 @@ class Mouse {
     this.root = new THREE.Group(); this.root.visible = false;
     this.model = new THREE.Group(); this.root.add(this.model);
     const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); this.model.add(m); return m; };
-    this.body = add(MG.body, MM.fur, 0, 0.27, 0); this.body.scale.set(0.85, 0.72, 1.15);
-    this.head = add(MG.head, MM.fur, 0, 0.3, 0.46); this.head.rotation.x = Math.PI / 2;
-    this.nose = add(MG.nose, MM.nose, 0, 0.3, 0.69);
-    this.ears = [add(MG.ear, MM.ear, -0.15, 0.52, 0.33), add(MG.ear, MM.ear, 0.15, 0.52, 0.33)];
-    this.eyes = [add(MG.eye, MM.eye, -0.09, 0.39, 0.52), add(MG.eye, MM.eye, 0.09, 0.39, 0.52)];
-    this.tail = add(MG.tail, MM.tail, 0, 0.2, -0.64); this.tail.rotation.x = Math.PI / 2 + 0.4;
+    this.body = add(MG.body, MM.fur, 0, 0.27, -0.02); this.body.scale.set(0.84, 0.74, 1.12);
+    this.belly = add(MG.belly, MM.belly, 0, 0.19, 0.02); this.belly.scale.set(0.66, 0.42, 0.95);            // paler underside
+    this.head = add(MG.head, MM.fur, 0, 0.35, 0.36);
+    this.furParts = [this.body, this.head];
+    for (const sx of [-1, 1]) { const ch = add(MG.cheek, MM.fur, sx * 0.1, 0.3, 0.42); ch.scale.set(1, 0.85, 1); this.furParts.push(ch); }
+    this.nose = add(MG.nose, MM.nose, 0, 0.345, 0.64);
+    this.ears = []; this.earRims = [];
+    for (const sx of [-1, 1]) {
+      const ear = new THREE.Group(); ear.position.set(sx * 0.15, 0.55, 0.3); ear.rotation.set(-0.15, sx * 0.25, -sx * 0.35); this.model.add(ear);
+      const rim = new THREE.Mesh(MG.earRim, MM.fur); rim.rotation.x = Math.PI / 2; ear.add(rim); this.furParts.push(rim);
+      const inner = new THREE.Mesh(MG.ear, MM.ear); inner.position.z = 0.013; ear.add(inner); this.ears.push(inner);
+    }
+    this.eyes = [];
+    for (const sx of [-1, 1]) {
+      const e = add(MG.eye, MM.eye, sx * 0.088, 0.42, 0.5); this.eyes.push(e);
+      const gl = new THREE.Mesh(MG.glint, MM.glint); gl.position.set(sx * 0.012 - 0.012, 0.022, 0.044); e.add(gl);   // catch-light
+    }
+    const wh = new THREE.LineSegments(MG.whiskers, MM.whisker); wh.position.set(0, 0.33, 0.58); this.model.add(wh);
+    this.feet = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([sx, sz]) => { const f = add(MG.foot, MM.foot, sx * 0.15, 0.03, sz * 0.17); f.scale.set(1, 0.5, 1.5); f.userData.home = f.position.clone(); return f; });
+    this.tailPivot = new THREE.Group(); this.tailPivot.position.set(0, 0.17, -0.34); this.model.add(this.tailPivot);
+    this.tail = new THREE.Mesh(MG.tail, MM.tail); this.tailPivot.add(this.tail);
+    this.gait = 0; this._lp = new THREE.Vector3();
     // bomb rig
     this.bombRig = new THREE.Group(); this.model.add(this.bombRig);
     const bomb = new THREE.Mesh(MG.bomb, MM.bomb); bomb.position.set(0, 0.62, -0.12); this.bombRig.add(bomb);
@@ -2274,9 +2309,11 @@ class Mouse {
     this.age = 0;
     this.root.position.copy(hole.mouthIn);
     this.root.rotation.y = Math.atan2(hole.normal.x, hole.normal.z);
+    this._lp.copy(this.root.position);
     this.model.position.set(0, 0, 0); this.model.rotation.set(0, 0, 0);
     const furM = isBomb ? MM.bombFur : MM.fur;
-    this.body.material = furM; this.head.material = furM;
+    for (const f of this.furParts) f.material = furM;
+    this.belly.material = isBomb ? MM.bombBelly : MM.belly;
     this.tail.material = isBomb ? MM.bombTail : MM.tail;
     for (const e of this.ears) e.material = isBomb ? MM.bombEar : MM.ear;
     for (const e of this.eyes) e.material = isBomb ? MM.bombEye : MM.eye;
@@ -2464,6 +2501,12 @@ class Mouse {
     const s = Math.max(0.001, this.pop * this.visScale);
     this.model.scale.set(s * this.sqXZ, s * this.sqY, s * this.sqXZ);
     this.model.position.y = bob;
+    // pattering feet and a swaying tail, driven by how fast it's actually moving
+    const moved = this.root.position.distanceTo(this._lp) / Math.max(dt, 1e-3); this._lp.copy(this.root.position);
+    const run = Math.min(1, moved / 2.5); this.gait += dt * (4 + 22 * run);
+    this.feet.forEach((f, i) => { const ph = this.gait + (i === 0 || i === 3 ? 0 : Math.PI); f.position.set(f.userData.home.x, f.userData.home.y + Math.max(0, Math.sin(ph)) * 0.05 * run, f.userData.home.z + Math.cos(ph) * 0.06 * run); });
+    this.tailPivot.rotation.y = Math.sin(time * (3 + 6 * run) + this.gait * 0.2) * (0.25 + 0.2 * run);
+    this.tailPivot.rotation.x = -0.1 + Math.sin(time * 2.3) * 0.08;
     this.shadow.scale.setScalar(Math.max(0.001, this.pop * this.visScale));
     this.center.set(p.x, 0.3 * s, p.z);
   }
@@ -2683,7 +2726,12 @@ const gunRig = (() => {
   flash.position.copy(held.userData.muzzle).z += IN(1.2); flash.scale.setScalar(IN(9)); flash.visible = false; held.add(flash);
   const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe07a, transparent: true, opacity: 0 });
   const tracers = Array.from({ length: 12 }, () => { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), tracerMat.clone()); l.visible = false; l.frustumCulled = false; scene.add(l); return { l, life: 0 }; });
-  return { state: 'cupboard', ammo: 0, held, flash, flashT: 0, recoil: 0, tracers, aim: new THREE.Vector3(CAT_POS.x, 0.3, CAT_POS.z + 5),
+  const starTex = canvasTex(64, 64, (g, w, h) => {                   // four-point twinkle
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 30); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.2, 'rgba(255,248,210,.8)'); gr.addColorStop(1, 'rgba(255,240,180,0)');
+    g.fillStyle = gr; g.beginPath(); g.moveTo(32, 0); g.quadraticCurveTo(35, 29, 64, 32); g.quadraticCurveTo(35, 35, 32, 64); g.quadraticCurveTo(29, 35, 0, 32); g.quadraticCurveTo(29, 29, 32, 0); g.fill();
+  }, 1, 1);
+  const sparkles = Array.from({ length: 7 }, (_, i) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: starTex, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true })); sp.visible = false; sp.renderOrder = 9; scene.add(sp); return { sp, phase: i / 7, spot: new THREE.Vector3() }; });
+  return { sparkles, revealed: false, box: new THREE.Box3(), state: 'cupboard', ammo: 0, held, flash, flashT: 0, recoil: 0, tracers, aim: new THREE.Vector3(CAT_POS.x, 0.3, CAT_POS.z + 5),
            hand: new THREE.Vector3(CAT_POS.x + 0.42, BOX.h + 0.3, CAT_POS.z + BOX.d / 2 + 0.12), v: new THREE.Vector3(), w: new THREE.Vector3() };
 })();
 // floating shots-left counter beside the gun
@@ -2699,10 +2747,14 @@ function showFireBtn() {
   g.fillStyle = '#1f1712'; g.font = '800 72px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(n), 64, 70);
   ammoTex.needsUpdate = true; ammoTag.visible = gunRig.state === 'cat'; ammoPop = 1;
 }
+function showBanner(text) {
+  const el = document.createElement('div'); el.className = 'banner'; el.textContent = text; document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
 function takeGun() {
   const gr = gunRig; if (gr.state !== 'cupboard' || state !== 'playing') return;
   gr.state = 'cat'; gr.ammo = GUN_ROUNDS; cupboardPistol.visible = false; gr.held.visible = true; gr.held.position.copy(gr.hand); gr.held.rotation.set(0, 0, 0);
-  sfx.cock(); tailWag = 1.4; floatText(gr.hand.clone().setY(BOX.h + 1.3), 'Locked & loaded! Tap to shoot', 'clutch');
+  sfx.cock(); sfx.gasp(); tailWag = 1.4; showBanner('Kitty’s got a gun!'); floatText(gr.hand.clone().setY(BOX.h + 1.3), 'Tap to shoot', 'clutch');
   if (pistolDoor.target) { pistolDoor.target = 0; sfx.creak(); }    // cupboard swings shut behind her
   showFireBtn();
 }
@@ -2775,6 +2827,15 @@ function tossGun() {                                                 // empty: s
 }
 function updateGun(dt) {
   const gr = gunRig;
+  const reveal = gr.state === 'cupboard' && pistolDoor && pistolDoor.angle < -0.9 && cupboardPistol.visible;   // the pistol glints when its cupboard opens
+  if (reveal && !gr.revealed) { gr.revealed = true; gr.box.setFromObject(cupboardPistol); sfx.sparkle(); }
+  if (!reveal) gr.revealed = false;
+  for (const s of gr.sparkles) {
+    s.sp.visible = reveal; if (!reveal) continue;
+    const k = (clock * 0.9 + s.phase) % 1;
+    if (k < s.last || s.last === undefined) s.spot.set(THREE.MathUtils.lerp(gr.box.min.x, gr.box.max.x, Math.random()), THREE.MathUtils.lerp(gr.box.min.y, gr.box.max.y, Math.random()), gr.box.max.z + 0.02);
+    s.last = k; s.sp.position.copy(s.spot); s.sp.scale.setScalar(0.28 * Math.sin(k * Math.PI)); s.sp.material.rotation = k * 1.5;
+  }
   for (const t of gr.tracers) if (t.life > 0) { t.life -= dt; t.l.material.opacity = Math.max(0, t.life / 0.2); if (t.life <= 0) t.l.visible = false; }
   if (gr.flashT > 0) { gr.flashT -= dt; if (gr.flashT <= 0) gr.flash.visible = false; }
   if (gr.state === 'cat') {
@@ -3086,6 +3147,26 @@ const sfx = {
     glassGrain(t0, 0.05, 0.5, 3200, 1.2); tone(1900, 1500, 0.04, 'square', 0.025);
     for (let i = 0; i < 7; i++) glassGrain(t0 + 0.02 + Math.random() * 0.22, 0.01 + Math.random() * 0.02, 0.1 + Math.random() * 0.1, 3000 + Math.random() * 5000, 16);
   },
+  gasp: () => {                                                     // a whole crowd sucking in its breath — "HUH!" — then a low "ooooh"
+    if (!actx || !soundOn) return;
+    const t0 = actx.currentTime + 0.02, sr = actx.sampleRate, n = Math.floor(sr * 1.0), b = actx.createBuffer(1, n, sr), d = b.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    for (let k = 0; k < 16; k++) {                                   // breathy intakes, each voice a little different
+      const st = t0 + Math.random() * 0.09, f = 650 + Math.random() * 1000, src = actx.createBufferSource(), bp = actx.createBiquadFilter(), g = actx.createGain();
+      src.buffer = b; bp.type = 'bandpass'; bp.Q.value = 2.5 + Math.random() * 2;
+      bp.frequency.setValueAtTime(f * 0.75, st); bp.frequency.linearRampToValueAtTime(f * 1.3, st + 0.16);
+      g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(0.07, st + 0.06); g.gain.exponentialRampToValueAtTime(0.015, st + 0.28); g.gain.exponentialRampToValueAtTime(0.0001, st + 0.6);
+      src.connect(bp); bp.connect(g); g.connect(actx.destination); src.start(st, Math.random() * 0.3); src.stop(st + 0.65);
+    }
+    for (let k = 0; k < 7; k++) {                                    // then a murmured "ooooh"
+      const st = t0 + 0.25 + Math.random() * 0.12, p = 150 + Math.random() * 180, o = actx.createOscillator(), lp = actx.createBiquadFilter(), g = actx.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(p * 1.15, st); o.frequency.exponentialRampToValueAtTime(p * 0.85, st + 0.9);
+      lp.type = 'bandpass'; lp.frequency.value = 500 + Math.random() * 150; lp.Q.value = 3;
+      g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(0.022, st + 0.15); g.gain.exponentialRampToValueAtTime(0.0001, st + 1.0);
+      o.connect(lp); lp.connect(g); g.connect(actx.destination); o.start(st); o.stop(st + 1.05);
+    }
+  },
+  sparkle: () => { [2637, 3136, 3951, 5274].forEach((f, i) => tone(f, f * 1.01, 0.35, 'sine', 0.035, i * 0.07)); },   // twinkly reveal chime
   gunshot: () => { noise(0.2, 0.6, 6000); tone(190, 45, 0.2, 'sine', 0.38); noise(0.6, 0.12, 900); },   // crack + thump + room tail
   cock: () => { noise(0.03, 0.25, 6000); tone(2400, 1700, 0.03, 'square', 0.04); setTimeout(() => { noise(0.04, 0.3, 5000); tone(1500, 1100, 0.04, 'square', 0.04); }, 140); },   // chk-chk
   ricochet: () => {                                                  // "pyeeeww"
