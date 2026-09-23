@@ -43,9 +43,11 @@
   .lives.hurt .pip:not(.lost){color:#ffb4a4}
   .cheeses{display:flex;gap:6px}
   .wedge{width:34px;height:23px;display:block}
-  .wedge .bite{fill:var(--cheese);stroke:var(--cheese-deep);stroke-width:1.2;transition:fill .2s}
-  .wedge .bite.gone{fill:transparent;stroke:rgba(251,241,220,.3);stroke-dasharray:2 2}
-  .wedge.hit .bite:not(.gone){fill:var(--danger)}
+  .wedge path{fill:var(--cheese);stroke:var(--cheese-deep);stroke-width:1.4;stroke-linejoin:round;transition:fill .2s}
+  .wedge.moved path{fill:#f0983a}
+  .wedge.carried path{fill:var(--danger);animation:blink .35s infinite alternate}
+  .wedge.gone path{fill:transparent;stroke:rgba(251,241,220,.3);stroke-dasharray:2 2}
+  @keyframes blink{to{opacity:.35}}
   .meta{display:flex;align-items:center;gap:10px}
   .time{font-variant-numeric:tabular-nums;font-weight:800;font-size:16px;min-width:4ch;text-align:right}
   .heat{width:52px;height:6px;border-radius:3px;background:rgba(251,241,220,.16);overflow:hidden}
@@ -137,7 +139,7 @@
     <ul class="rules">
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><ellipse cx="17" cy="24" rx="14" ry="6" fill="none" stroke="#e2452c" stroke-width="3"/><ellipse cx="17" cy="19" rx="7" ry="6" fill="#9b8f86" stroke="#1f1712" stroke-width="1.5"/><circle cx="12" cy="12" r="3.5" fill="#e7a3a0" stroke="#1f1712" stroke-width="1.5"/><circle cx="22" cy="12" r="3.5" fill="#e7a3a0" stroke="#1f1712" stroke-width="1.5"/></svg>
-        <span><b>Tap mice before they reach the cheese.</b> A bigger mouse with a red ring is about to take a bite.</span>
+        <span><b>Swipe mice before they haul the cheese home.</b> Bigger mouse, redder ring = closer to stealing it.</span>
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><circle cx="16" cy="20" r="10" fill="#1f1712"/><path d="M20 11 q3 -5 7 -4" stroke="#8a6a45" stroke-width="2" fill="none"/><circle cx="27" cy="7" r="3.5" fill="#ffb02e"/><circle cx="27" cy="7" r="1.6" fill="#fff4c2"/></svg>
@@ -145,7 +147,7 @@
       </li>
       <li>
         <svg viewBox="0 0 34 34" aria-hidden="true"><path d="M3 27 L31 27 L3 9 Z" fill="#f4c13d" stroke="#1f1712" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="20" r="2" fill="#c98e12"/><circle cx="15" cy="23" r="1.5" fill="#c98e12"/></svg>
-        <span>Each cheese survives <b>3 bites</b>. Lose all three cheeses, or all <b>9 lives</b>, and the house is overrun.</span>
+        <span>Swipe a thief and it <b>drops the cheese where it stands</b>, often nearer a hole. Lose all three cheeses, or all <b>9 lives</b>, and it's over.</span>
       </li>
     </ul>
     <button class="btn" id="startBtn">Start guarding</button>
@@ -214,7 +216,8 @@ const CFG = {
   pauseTime:       [1.15, 0.45],// how long a mouse peeks out of its hole before deciding
   retreatChance:   [0.45, 0.12],// chance a normal mouse ducks back in instead of charging
   runSpeed:        [1.35, 3.1], // world units per second toward the cheese
-  eatTime:         [1.4, 0.85], // seconds nibbling at the plate before a bite lands
+  grabTime:        [1.0, 0.55], // seconds a mouse tugs at the cheese before hauling it off
+  CARRY_SPEED:     0.55,        // carrying speed as a fraction of runSpeed
   SPEED_VARIANCE:  0.15,        // ± per-mouse speed randomness
 
   // ---- Threat readability ------------------------------------------
@@ -225,8 +228,9 @@ const CFG = {
 
   // ---- Rules & scoring ---------------------------------------------
   LIVES: 9,
-  CHEESE_BITES: 3,          // bites each cheese survives
-  EAT_RADIUS: 0.95,         // distance from cheese centre where a mouse starts eating
+  PLATE_GRAB_RADIUS: 0.95,  // how close a mouse must get to a cheese on its plate to grab it
+  FLOOR_GRAB_RADIUS: 0.5,   // ...and to a cheese that was dropped on the floor
+  CARRY_THREAT_RANGE: 6,    // carriers glow hotter as they get within this distance of their hole
   SCORE_WHACK: 10,
   SCORE_CLUTCH: 15,
   COMBO_STEP: 5,            // every N whacks in a row adds +1 to the multiplier
@@ -254,7 +258,7 @@ function getDifficulty(t) {
     pauseTime:        lerpPair(CFG.pauseTime, d),
     retreatChance:    lerpPair(CFG.retreatChance, d),
     runSpeed:         lerpPair(CFG.runSpeed, d),
-    eatTime:          lerpPair(CFG.eatTime, d),
+    grabTime:         lerpPair(CFG.grabTime, d),
   };
 }
 
@@ -263,12 +267,12 @@ function getDifficulty(t) {
    ===================================================================== */
 const ROOM = { halfW: 4.5, depth: 13, wallH: 9, visDepth: 24 };  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
 const HOLES = [
-  { x: -3.0, z: 0,   n: [0, 1]  }, { x: 0.3, z: 0, n: [0, 1] }, { x: 3.0, z: 0, n: [0, 1] }, // back wall
-  { x: -4.5, z: 3.4, n: [1, 0]  }, { x: -4.5, z: 7.6, n: [1, 0] },                           // left wall
-  { x:  4.5, z: 2.6, n: [-1, 0] }, { x: 4.5, z: 5.9, n: [-1, 0] }, { x: 4.5, z: 9.3, n: [-1, 0] }, // right wall
+  { x: -3.4, z: 0,    n: [0, 1]  }, { x: 3.4, z: 0, n: [0, 1] },                                  // back wall, either side of the cat
+  { x: -4.5, z: 4.2,  n: [1, 0]  }, { x: -4.5, z: 7.6, n: [1, 0] }, { x: -4.5, z: 11.0, n: [1, 0] }, // left wall
+  { x:  4.5, z: 3.2,  n: [-1, 0] }, { x: 4.5, z: 6.4, n: [-1, 0] }, { x: 4.5, z: 9.8, n: [-1, 0] },  // right wall
 ];
-const CHEESE_SPOTS = [ { x: -1.6, z: 2.5 }, { x: 2.3, z: 5.2 }, { x: -1.3, z: 8.7 } ];
-const CAT_POS = new THREE.Vector3(0, 0, 11.3);
+const CHEESE_SPOTS = [ { x: -1.4, z: 5.0 }, { x: 1.6, z: 7.4 }, { x: -0.3, z: 10.0 } ];
+const CAT_POS = new THREE.Vector3(0, 0, 1.7);   // cat guards from the top of the screen, swiping down
 
 /* =====================================================================
    RENDERER / SCENE
@@ -283,7 +287,7 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x1d302b, 30, 60);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 80);
 const camBase = new THREE.Vector3();
-const camTarget = new THREE.Vector3(0, 0.3, 6.1);
+const camTarget = new THREE.Vector3(0, 0.3, 6.4);
 
 scene.add(new THREE.HemisphereLight(0xfff0d2, 0x4a3122, 0.82));
 const sun = new THREE.DirectionalLight(0xffe0b0, 0.62);
@@ -354,15 +358,15 @@ trim(0.07, 0.07, ROOM.visDepth, ROOM.halfW - 0.035, 1.25, ROOM.visDepth / 2);
   const moon = new THREE.Mesh(new THREE.CircleGeometry(0.14, 16), new THREE.MeshBasicMaterial({ color: 0xfff1c4 })); moon.position.set(0.45, 0.25, 0.04); g.add(moon);
   const barV = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.04), trimMat); barV.position.z = 0.05; g.add(barV);
   const barH = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.06, 0.04), trimMat); barH.position.z = 0.05; g.add(barH);
-  g.position.set(-1.4, 2.15, 0.03);
+  g.position.set(0, 2.9, 0.03);
   scene.add(g);
 })();
 // rug under the cat
 const rug = new THREE.Mesh(new THREE.CircleGeometry(1.5, 28), lam(0x9c3b2e));
-rug.rotation.x = -Math.PI / 2; rug.scale.set(1.35, 1, 1); rug.position.set(0, 0.01, 11.4);
+rug.rotation.x = -Math.PI / 2; rug.scale.set(1.35, 1, 1); rug.position.set(0, 0.01, 1.9);
 scene.add(rug);
 const rugIn = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.18, 28), new THREE.MeshBasicMaterial({ color: 0xe3b35a }));
-rugIn.rotation.x = -Math.PI / 2; rugIn.scale.set(1.35, 1, 1); rugIn.position.set(0, 0.015, 11.4);
+rugIn.rotation.x = -Math.PI / 2; rugIn.scale.set(1.35, 1, 1); rugIn.position.set(0, 0.015, 1.9);
 scene.add(rugIn);
 
 /* ---------- mouse holes ---------- */
@@ -375,6 +379,8 @@ const holeGeo = new THREE.ShapeGeometry(archShape(0.9, 0.8), 10);
 const rimGeo = new THREE.ShapeGeometry(archShape(1.1, 0.92), 10);
 const holeMat = new THREE.MeshBasicMaterial({ color: 0x0b0806 });
 const rimMat = lam(0x5b3a26);
+const holeShadowGeo = new THREE.CircleGeometry(0.75, 18, 0, Math.PI).rotateX(Math.PI / 2);
+const holeShadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
 for (const h of HOLES) {
   h.pos = new THREE.Vector3(h.x, 0, h.z);
   h.normal = new THREE.Vector3(h.n[0], 0, h.n[1]);
@@ -383,6 +389,8 @@ for (const h of HOLES) {
   const g = new THREE.Group();
   const rim = new THREE.Mesh(rimGeo, rimMat); rim.position.z = 0.09; g.add(rim);
   const hole = new THREE.Mesh(holeGeo, holeMat); hole.position.z = 0.1; g.add(hole);
+  // dark half-disc on the floor so holes read clearly from the high camera
+  const mat = new THREE.Mesh(holeShadowGeo, holeShadowMat); mat.position.set(0, 0.013, 0.1); g.add(mat);
   g.position.copy(h.pos);
   g.rotation.y = Math.atan2(h.normal.x, h.normal.z);
   scene.add(g);
@@ -403,62 +411,77 @@ const dimpleMat = new THREE.MeshBasicMaterial({ color: 0xc98e12 });
 const plateGeo = new THREE.CylinderGeometry(0.78, 0.7, 0.07, 22);
 const standGeo = new THREE.CylinderGeometry(0.22, 0.36, 0.24, 10);
 const warnGeo = new THREE.RingGeometry(0.95, 1.15, 32);
-const crumbGeo = new THREE.BoxGeometry(0.07, 0.05, 0.07);
 
+/* A cheese starts on its plate ('home'). A mouse can grab it and haul it
+   toward its own hole ('carried'). Whack the carrier and the cheese is
+   dropped right there on the floor ('dropped') — usually closer to a hole
+   than before. Reaching the hole = the cheese is gone for good. */
 class Cheese {
   constructor(spot) {
-    this.pos = new THREE.Vector3(spot.x, 0, spot.z);
-    this.group = new THREE.Group(); this.group.position.copy(this.pos);
-    const stand = new THREE.Mesh(standGeo, lam(0x6a4128)); stand.position.y = 0.12; this.group.add(stand);
-    const plate = new THREE.Mesh(plateGeo, lam(0xf4ecdc)); plate.position.y = 0.27; this.group.add(plate);
+    this.home = new THREE.Vector3(spot.x, 0, spot.z);
+    this.pos = this.home.clone();
+    const plateGroup = new THREE.Group(); plateGroup.position.copy(this.home);
+    const stand = new THREE.Mesh(standGeo, lam(0x6a4128)); stand.position.y = 0.12; plateGroup.add(stand);
+    const plate = new THREE.Mesh(plateGeo, lam(0xf4ecdc)); plate.position.y = 0.27; plateGroup.add(plate);
+    scene.add(plateGroup);
     this.mat = lam(0xf4c13d, { emissive: 0x000000 });
-    this.wedge = new THREE.Group(); this.wedge.position.y = 0.3; this.wedge.rotation.y = Math.random() * Math.PI * 2;
+    this.wedge = new THREE.Group();
     this.wedge.add(new THREE.Mesh(wedgeGeo, this.mat));
     for (const [x, z] of [[0.02, 0.05], [0.17, -0.05], [-0.03, -0.1]]) {
       const d = new THREE.Mesh(dimpleGeo, dimpleMat); d.rotation.x = -Math.PI / 2; d.position.set(x, 0.385, z); this.wedge.add(d);
     }
-    this.group.add(this.wedge);
-    this.crumbs = new THREE.Group(); this.crumbs.position.y = 0.31;
-    for (let i = 0; i < 7; i++) {
-      const c = new THREE.Mesh(crumbGeo, this.mat); const a = i * 2.4, r = 0.1 + (i % 3) * 0.13;
-      c.position.set(Math.cos(a) * r, 0, Math.sin(a) * r); c.rotation.y = a; this.crumbs.add(c);
-    }
-    this.group.add(this.crumbs);
+    scene.add(this.wedge);
     this.warnMat = new THREE.MeshBasicMaterial({ color: 0xe2452c, transparent: true, opacity: 0, depthWrite: false });
-    this.warn = new THREE.Mesh(warnGeo, this.warnMat); this.warn.rotation.x = -Math.PI / 2; this.warn.position.y = 0.02;
-    this.group.add(this.warn);
-    scene.add(this.group);
+    this.warn = new THREE.Mesh(warnGeo, this.warnMat); this.warn.rotation.x = -Math.PI / 2;
+    scene.add(this.warn);
     this.reset();
   }
   reset() {
-    this.hp = CFG.CHEESE_BITES; this.alive = true; this.danger = 0; this.shownDanger = 0; this.hitT = 0;
-    this.wedge.visible = true; this.crumbs.visible = false; this.wedge.scale.setScalar(1);
+    this.state = 'home'; this.alive = true; this.claimant = null;
+    this.pos.copy(this.home); this.danger = 0; this.shownDanger = 0; this.hitT = 0; this.dropT = 0;
+    this.wedge.visible = true; this.wedge.rotation.y = Math.random() * Math.PI * 2;
   }
-  bite() {
-    if (!this.alive) return;
-    this.hp--; this.hitT = 0.45;
-    if (this.hp <= 0) { this.alive = false; this.wedge.visible = false; this.crumbs.visible = true; }
+  get available() { return this.alive && !this.claimant; }
+  get grabRadius() { return this.state === 'home' ? CFG.PLATE_GRAB_RADIUS : CFG.FLOOR_GRAB_RADIUS; }
+  startCarry(m) { this.state = 'carried'; this.claimant = m; this.hitT = 0.3; }
+  drop() {
+    if (this.state === 'carried') {
+      this.state = 'dropped'; this.dropT = 0.45;
+      this.pos.x = Math.max(-ROOM.halfW + 0.5, Math.min(ROOM.halfW - 0.5, this.pos.x));
+      this.pos.z = Math.max(0.5, Math.min(ROOM.depth - 0.5, this.pos.z));
+    }
+    this.claimant = null;
   }
+  lose() { this.state = 'gone'; this.alive = false; this.claimant = null; this.wedge.visible = false; }
   update(dt, time) {
-    const target = 0.45 + 0.55 * (this.hp / CFG.CHEESE_BITES);
-    const s = this.wedge.scale.x + (target - this.wedge.scale.x) * Math.min(1, dt * 10);
+    let y = this.state === 'home' ? 0.3 : 0.0, s = 1;
+    if (this.state === 'carried' && this.claimant) {
+      const m = this.claimant, ry = m.root.rotation.y, reach = 0.55 * m.visScale;
+      this.pos.set(m.root.position.x + Math.sin(ry) * reach, 0, m.root.position.z + Math.cos(ry) * reach);
+      this.wedge.rotation.y = ry + Math.PI * 0.75;
+      y = 0.06 + Math.abs(Math.sin(time * 20)) * 0.04; s = 0.8;
+    }
+    if (this.dropT > 0) { this.dropT = Math.max(0, this.dropT - dt); y += Math.sin((1 - this.dropT / 0.45) * Math.PI) * 0.45; }
+    this.wedge.position.set(this.pos.x, y, this.pos.z);
     const jig = this.hitT > 0 ? 1 + Math.sin(this.hitT * 50) * 0.08 * this.hitT : 1;
     this.wedge.scale.set(s * jig, s / jig, s * jig);
     this.hitT = Math.max(0, this.hitT - dt);
     this.mat.emissive.setRGB(this.hitT * 1.2, 0, 0);
-    // warning ring = how close the nearest attacker is
+    // warning ring under the cheese = how close the nearest thief is
     this.shownDanger += ((this.alive ? this.danger : 0) - this.shownDanger) * Math.min(1, dt * 8);
     const pulse = this.shownDanger > 0.6 ? 0.5 + 0.5 * Math.sin(time * 14) : 1;
     this.warnMat.opacity = this.shownDanger * (0.35 + 0.45 * pulse);
-    this.warn.scale.setScalar(1 + 0.08 * pulse * this.shownDanger);
+    this.warn.position.set(this.pos.x, 0.02, this.pos.z);
+    this.warn.scale.setScalar((this.state === 'home' ? 1 : 0.6) * (1 + 0.08 * pulse * this.shownDanger));
     this.danger = 0;
   }
 }
 const cheeses = CHEESE_SPOTS.map(s => new Cheese(s));
+// nearest cheese nobody has claimed yet
 function nearestCheese(pos) {
   let best = null, bd = Infinity;
   for (const c of cheeses) {
-    if (!c.alive) continue;
+    if (!c.available) continue;
     const d = (c.pos.x - pos.x) ** 2 + (c.pos.z - pos.z) ** 2;
     if (d < bd) { bd = d; best = c; }
   }
@@ -664,7 +687,7 @@ class Mouse {
     this.hole = hole; this.isBomb = isBomb; this.attract = !!opts.attract;
     this.speed = D.runSpeed * (1 + (Math.random() * 2 - 1) * CFG.SPEED_VARIANCE);
     this.pauseTime = D.pauseTime * (0.8 + Math.random() * 0.4);
-    this.eatTime = D.eatTime;
+    this.grabTime = D.grabTime;
     this.willRetreat = this.attract || (!isBomb && Math.random() < D.retreatChance);
     this.life = this.maxLife = D.bombLifetime;
     this.target = null; this.threat = 0; this.visScale = 1; this.pop = 0; this.sqY = 1; this.sqXZ = 1;
@@ -683,12 +706,13 @@ class Mouse {
     this.setState('emerge');
   }
   setState(s) { this.state = s; this.t = 0; }
-  release() { this.active = false; this.root.visible = false; }
+  release() { this.dropCheese(); this.active = false; this.root.visible = false; }
+  dropCheese() { if (this.target && this.target.claimant === this) this.target.drop(); }
   get hittable() {
     if (!this.active) return false;
     if (this.isBomb) return this.age >= CFG.BOMB_TELEGRAPH && (this.state === 'emerge' || this.state === 'peek' || this.state === 'run' || this.state === 'loiter' || this.state === 'home');
     if (this.state === 'retreat') return this.t < 0.18;
-    return this.state === 'emerge' || this.state === 'peek' || this.state === 'run' || this.state === 'eat';
+    return this.state === 'emerge' || this.state === 'peek' || this.state === 'run' || this.state === 'grab' || this.state === 'carry' || this.state === 'home';
   }
   // counts toward the maxActive cap (leaving/dying mice don't)
   get occupying() { return this.active && this.state !== 'whacked' && this.state !== 'escape' && this.state !== 'retreat' && this.state !== 'home'; }
@@ -734,25 +758,35 @@ class Mouse {
         break;
       }
       case 'run': {
-        if (!this.target || !this.target.alive) this.target = nearestCheese(p);
-        if (!this.target) { this.setState('escape'); break; }
-        const c = this.target.pos, dx = c.x - p.x, dz = c.z - p.z, dist = Math.hypot(dx, dz);
-        const step = Math.min(this.speed * dt, Math.max(0, dist - CFG.EAT_RADIUS));
+        if (!this.target || !this.target.available) this.target = nearestCheese(p);
+        if (!this.target) { this.setState('home'); break; }   // nothing left to steal
+        const c = this.target.pos, gr = this.target.grabRadius, dx = c.x - p.x, dz = c.z - p.z, dist = Math.hypot(dx, dz) || 0.001;
+        const step = Math.min(this.speed * dt, Math.max(0, dist - gr));
         p.x += dx / dist * step; p.z += dz / dist * step;
         this.faceToward(c.x, c.z, dt);
         bob = Math.abs(Math.sin(this.t * 22)) * 0.06;
-        if (dist - CFG.EAT_RADIUS < 0.02) this.setState(this.isBomb ? 'loiter' : 'eat');
+        if (dist - gr < 0.02) {
+          if (this.isBomb) this.setState('loiter');
+          else { this.target.claimant = this; this.setState('grab'); }
+        }
         break;
       }
-      case 'eat': {
-        if (!this.target || !this.target.alive) { this.setState('run'); break; }
-        this.faceToward(this.target.pos.x, this.target.pos.z, dt);
-        this.model.rotation.x = 0.25 + Math.sin(time * 30) * 0.12;
-        if (this.t >= this.eatTime) {
-          this.model.rotation.x = 0;
-          onBite(this, this.target);
-          this.setState('escape');
-        }
+      case 'grab': {   // tugging the cheese loose
+        const c = this.target;
+        if (!c || !c.alive || c.claimant !== this) { this.setState('run'); break; }
+        this.faceToward(c.pos.x, c.pos.z, dt);
+        this.model.rotation.x = 0.2 + Math.sin(time * 30) * 0.1;
+        if (this.t >= this.grabTime) { this.model.rotation.x = 0; c.startCarry(this); onCheeseGrabbed(this, c); this.setState('carry'); }
+        break;
+      }
+      case 'carry': {  // hauling it back to the hole, slower than running
+        const c = this.target;
+        if (!c || c.claimant !== this) { this.setState('home'); break; }
+        const h = this.hole.mouthOut, dx = h.x - p.x, dz = h.z - p.z, dist = Math.hypot(dx, dz);
+        if (dist > 0.05) {
+          const s = Math.min(dist, this.speed * CFG.CARRY_SPEED * dt); p.x += dx / dist * s; p.z += dz / dist * s;
+          this.faceToward(h.x, h.z, dt); bob = Math.abs(Math.sin(this.t * 16)) * 0.05;
+        } else { p.copy(h); onCheeseStolen(this, c); this.setState('retreat'); }
         break;
       }
       case 'loiter': {
@@ -791,21 +825,28 @@ class Mouse {
     }
     if (!this.active) return;
 
-    /* Threat = proximity to the nearest remaining cheese. Drives size, ring
-       colour and pulse so players triage the close ones first. */
+    /* Threat drives size, ring colour and pulse so players triage by danger:
+         peeking  → up to 0.45 (hasn't committed yet)
+         running  → up to 0.75 as it closes on a cheese
+         grabbing → 0.85
+         carrying → 0.8 → 1.0 as it nears its hole (always a "clutch" save) */
     if (!this.isBomb) {
-      let th = 0;
-      if (this.state === 'eat') th = 1;
-      else if (this.state === 'emerge' || this.state === 'peek' || this.state === 'run') {
-        const c = (this.state === 'run' && this.target && this.target.alive) ? this.target : nearestCheese(p);
+      let th = 0, c = null;
+      if (this.state === 'carry' || this.state === 'grab') {
+        c = this.target;
+        if (this.state === 'grab') th = 0.85;
+        else {
+          const dh = Math.hypot(this.hole.mouthOut.x - p.x, this.hole.mouthOut.z - p.z);
+          th = 0.8 + 0.2 * Math.max(0, Math.min(1, 1 - dh / CFG.CARRY_THREAT_RANGE));
+        }
+      } else if (this.state === 'emerge' || this.state === 'peek' || this.state === 'run') {
+        c = (this.state === 'run' && this.target && this.target.available) ? this.target : nearestCheese(p);
         if (c) {
-          const dist = Math.hypot(c.pos.x - p.x, c.pos.z - p.z) - CFG.EAT_RADIUS;
-          th = Math.max(0, Math.min(1, 1 - dist / CFG.THREAT_RANGE));
-          if (this.state !== 'run') th *= 0.6;   // peeking mice haven't committed yet
-          c.danger = Math.max(c.danger, th);
+          const dist = Math.hypot(c.pos.x - p.x, c.pos.z - p.z) - c.grabRadius;
+          th = Math.max(0, Math.min(1, 1 - dist / CFG.THREAT_RANGE)) * (this.state === 'run' ? 0.75 : 0.45);
         }
       }
-      if (this.state === 'eat' && this.target) this.target.danger = 1;
+      if (c) c.danger = Math.max(c.danger, th);
       this.threat += (th - this.threat) * Math.min(1, dt * 6);
       const pulse = this.threat > 0.6 ? Math.sin(time * (10 + 10 * this.threat)) : 0;
       this.ringMat.color.copy(RING_FAR).lerp(RING_NEAR, this.threat);
@@ -940,6 +981,8 @@ function whack(m) {
     checkEnd();
     return;
   }
+  const saved = m.state === 'carry' || m.state === 'grab';
+  if (saved) m.dropCheese();
   const clutch = m.threat >= CFG.CLUTCH_THREAT;
   combo++;
   const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
@@ -947,23 +990,26 @@ function whack(m) {
   score += pts; whackedCount++;
   m.setState('whacked');
   burst(m.center.clone().setY(0.4), 0xffe07a, 7, 2.2, 3.2, 0.9);
-  floatText(m.center.clone().setY(0.9), clutch ? `Clutch +${pts}` : `+${pts}`, clutch ? 'clutch' : '');
+  floatText(m.center.clone().setY(0.9), saved ? `Dropped! +${pts}` : clutch ? `Clutch +${pts}` : `+${pts}`, clutch ? 'clutch' : '');
   sfx.whack(clutch);
   vibrate(18);
   updateHud();
 }
 
-function onBite(m, c) {
+function onCheeseGrabbed(m, c) {
   if (state !== 'playing' && state !== 'ending') return;
-  c.bite();
+  floatText(c.pos.clone().setY(1.1), 'Thief!', 'warn');
+  sfx.grab();
+  updateHud();
+}
+function onCheeseStolen(m, c) {
+  if (state !== 'playing' && state !== 'ending') { c.drop(); return; }
+  c.lose();
   combo = 0;
-  burst(c.pos.clone().setY(0.55), 0xf4c13d, 8, 1.8, 2.5, 0.9);
-  floatText(c.pos.clone().setY(1.1), c.alive ? 'Chomp!' : 'Cheese gone!', 'bad');
-  sfx.bite(!c.alive);
-  vibrate(40);
-  const idx = cheeses.indexOf(c);
-  const w = document.querySelectorAll('#cheeses .wedge')[idx];
-  if (w) { w.classList.add('hit'); setTimeout(() => w.classList.remove('hit'), 350); }
+  burst(m.hole.mouthOut.clone().setY(0.4), 0xf4c13d, 8, 1.8, 2.5, 0.9);
+  floatText(m.hole.mouthOut.clone().setY(1.1), 'Cheese stolen!', 'bad');
+  sfx.bite(true);
+  vibrate(60);
   updateHud();
   checkEnd();
 }
@@ -990,16 +1036,10 @@ const ui = {
 const PAW = '<svg class="pip" viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="16" rx="6.2" ry="5.2"/><circle cx="4.8" cy="9.6" r="2.5"/><circle cx="9.3" cy="5" r="2.5"/><circle cx="14.7" cy="5" r="2.5"/><circle cx="19.2" cy="9.6" r="2.5"/></svg>';
 ui.lives.innerHTML = PAW.repeat(CFG.LIVES);
 (() => {
-  // each cheese icon = CHEESE_BITES vertical slices of a wedge; tip slices go first
-  const y = x => 4 + (x - 2) * 18 / 32;
+  // one wedge per cheese; its class shows where the cheese is (plate / floor / being stolen / gone)
   let html = '';
   for (let c = 0; c < cheeses.length; c++) {
-    let polys = '';
-    for (let b = 0; b < CFG.CHEESE_BITES; b++) {
-      const x0 = 2 + 32 * b / CFG.CHEESE_BITES, x1 = 2 + 32 * (b + 1) / CFG.CHEESE_BITES;
-      polys += `<polygon class="bite" data-b="${b}" points="${x0},${y(x0)} ${x1},${y(x1)} ${x1},22 ${x0},22" stroke-linejoin="round"/>`;
-    }
-    html += `<svg class="wedge" viewBox="0 0 36 24" aria-label="Cheese ${c + 1}">${polys}</svg>`;
+    html += `<svg class="wedge" viewBox="0 0 36 24" aria-label="Cheese ${c + 1}"><path d="M3 22 L34 22 L3 4 Z"/><circle cx="9" cy="16" r="2" fill="#c98e12"/></svg>`;
   }
   ui.cheeses.innerHTML = html;
 })();
@@ -1012,10 +1052,9 @@ function updateHud() {
   ui.lives.querySelectorAll('.pip').forEach((p, i) => p.classList.toggle('lost', i >= lives));
   const wedges = ui.cheeses.querySelectorAll('.wedge');
   cheeses.forEach((c, i) => {
-    wedges[i].querySelectorAll('.bite').forEach(b => {
-      // slices vanish from the tip (highest index) inward
-      b.classList.toggle('gone', +b.dataset.b >= c.hp);
-    });
+    wedges[i].classList.toggle('moved', c.state === 'dropped');
+    wedges[i].classList.toggle('carried', c.state === 'carried');
+    wedges[i].classList.toggle('gone', c.state === 'gone');
   });
 }
 function updateClockHud() {
@@ -1079,7 +1118,7 @@ function showGameOver() {
   $('overEyebrow').textContent = isNew && score > 0 ? 'New best!' : 'Game over';
   $('overTitle').textContent = endReason === 'cheese' ? 'The cheese is gone' : 'Out of lives';
   $('overReason').textContent = endReason === 'cheese'
-    ? 'The mice carried off every last crumb. Whack the ones with red rings first.'
+    ? 'The mice dragged every cheese into their holes. Swipe the thieves first, even if it means a dropped cheese.'
     : 'Nine bombs is a lot, even for a cat. Leave them be and they head back into their holes.';
   $('oScore').textContent = score;
   $('oTime').textContent = fmtTime(elapsed);
@@ -1140,6 +1179,7 @@ const sfx = {
   whack: clutch => { tone(clutch ? 900 : 620, 180, 0.12, 'square', 0.07); if (clutch) tone(1200, 1500, 0.08, 'triangle', 0.05, 0.06); },
   miss: () => noise(0.06, 0.12, 900),
   boom: () => { noise(0.5, 0.5, 700); tone(160, 40, 0.4, 'sine', 0.25); },
+  grab: () => tone(520, 760, 0.12, 'triangle', 0.05),
   bite: gone => { tone(140, 90, 0.18, 'sawtooth', 0.06); if (gone) tone(300, 80, 0.45, 'triangle', 0.08, 0.1); },
   over: () => { tone(440, 220, 0.3, 'triangle', 0.08); tone(330, 110, 0.5, 'triangle', 0.08, 0.25); },
 };
@@ -1150,7 +1190,7 @@ const sfx = {
    ===================================================================== */
 const FIT_POINTS = [
   [-ROOM.halfW, 0, 0], [ROOM.halfW, 0, 0], [-ROOM.halfW, 1.0, 0], [ROOM.halfW, 1.0, 0],
-  [-ROOM.halfW, 0, 10], [ROOM.halfW, 0, 10], [-1, 0, 12.3], [1, 0, 12.3], [0, 3.3, 11.6],
+  [-ROOM.halfW, 0, 11.8], [ROOM.halfW, 0, 11.8], [-1, 0, 12.8], [1, 0, 12.8], [0, 3.4, 1.7],
 ].map(a => new THREE.Vector3(...a));
 function fitCamera() {
   const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
