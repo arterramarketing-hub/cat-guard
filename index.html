@@ -926,9 +926,9 @@ tv.children.forEach(c => { if (c.isMesh && c !== screen) { c.userData.tv = true;
 const showCanvas = document.createElement('canvas'); showCanvas.width = 256; showCanvas.height = 144;
 const showCtx = showCanvas.getContext('2d'), showTex = new THREE.CanvasTexture(showCanvas), tvShowMat = basic(0xffffff, { map: showTex });
 const showCast = [
-  { x: 70, scarf: '#d8322b', hat: '#33c2c9', bobble: '#f5d33a', fat: 1.4, talk: 0, arm: 0, pose: 0 },   // chubby: red scarf, turquoise hat, yellow pom-pom
+  { x: 70, scarf: '#d8322b', hat: '#33c2c9', bobble: '#f5d33a', pom: 'flat', fat: 1.4, talk: 0, arm: 0, pose: 0 },   // chubby: red scarf, turquoise hat, yellow pom-pom
   { x: 130, scarf: '#f07a1f', hat: '#3fbf45', flaps: true, square: true, talk: 0, arm: 0, pose: 0 },   // orange scarf, square-topped green hat with built-in earmuffs
-  { x: 186, scarf: '#7a4a2a', hat: '#3553c6', bobble: '#e0322b', talk: 0, arm: 0, pose: 0 },   // brown scarf, blue hat, red pom-pom
+  { x: 186, scarf: '#7a4a2a', hat: '#3553c6', bobble: '#e0322b', pom: 'fuzzy', talk: 0, arm: 0, pose: 0 },   // brown scarf, blue hat, red pom-pom
 ];
 function drawShow(t) {
   const g = showCtx, W = 256, H = 144;
@@ -945,19 +945,27 @@ function drawShow(t) {
     g.strokeStyle = '#6f645c'; g.lineWidth = 3;                                                                                      // arms (flailing when talking)
     for (const sx of [-1, 1]) { const a = -0.6 + (c.arm * (sx > 0 ? 1 : 0.4)) * Math.sin(t * 14 + x); g.beginPath(); g.moveTo(x + sx * 16 * F, y - 4); g.lineTo(x + sx * (26 * F + 4 * c.arm), y - 4 - 12 * Math.sin(a + (sx > 0 ? 0.9 : 0.2)) * (c.talk ? 1.4 : 0.4)); g.stroke(); }
     g.lineWidth = 1.2; g.strokeStyle = '#1f1712';
-    const hx = x + (c.talk ? 2 : 0), hy = y - 30;
+    const hx = x + (c.talk ? 2 : 0), hy = y - 30 + (F > 1 ? 3 : 0);
+    const scarfW = F > 1 ? 40 * F * 0.92 : 34;                           // the chubby one's scarf wraps his whole width
+    if (F > 1) { g.fillStyle = c.scarf; g.fillRect(x - scarfW / 2, hy + 11, scarfW, 8); g.strokeRect(x - scarfW / 2, hy + 11, scarfW, 8); g.fillRect(x + 10, hy + 17, 7, 13); }   // under the chin
     for (const sx of [-1, 1]) { g.fillStyle = '#9b8f86'; g.beginPath(); g.arc(hx + sx * 15, hy - 14, 9, 0, 7); g.fill(); g.stroke(); g.fillStyle = '#e7a3a0'; g.beginPath(); g.arc(hx + sx * 15, hy - 14, 5, 0, 7); g.fill(); }   // ears
     g.fillStyle = '#b0a59c'; g.beginPath(); g.ellipse(hx, hy, 19 * (1 + (F - 1) * 0.45), 17, 0, 0, 7); g.fill(); g.stroke();                               // head
     if (c.hat) {
       const hw = 15 * (1 + (F - 1) * 0.45);
       g.fillStyle = c.hat; g.beginPath();
-      if (c.square) { g.moveTo(hx - hw - 1, hy - 10); g.lineTo(hx - hw + 1, hy - 23); g.lineTo(hx + hw - 1, hy - 23); g.lineTo(hx + hw + 1, hy - 10); g.closePath(); }   // flat, boxy top
+      if (c.square) { g.moveTo(hx - hw - 1, hy - 10); g.lineTo(hx - hw + 1, hy - 28); g.lineTo(hx + hw - 1, hy - 28); g.lineTo(hx + hw + 1, hy - 10); g.closePath(); }   // flat, boxy top
       else g.ellipse(hx, hy - 12, hw, 8, 0, Math.PI, 0);
       g.fill(); g.stroke();
       if (c.flaps) for (const sx of [-1, 1]) { g.beginPath(); g.ellipse(hx + sx * 17, hy - 4, 6, 10, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = 'rgba(0,0,0,.15)'; g.beginPath(); g.ellipse(hx + sx * 17, hy - 2, 3.5, 6, 0, 0, 7); g.fill(); g.fillStyle = c.hat; }   // earmuff flaps
+      else if (c.pom === 'fuzzy') {                                      // shaggy yarn pom-pom
+        g.strokeStyle = c.bobble; g.lineWidth = 1.3;
+        for (let k = 0; k < 22; k++) { const a = k / 22 * Math.PI * 2 + Math.sin(k * 3.7) * 0.2, r = 4.5 + (k % 3); g.beginPath(); g.moveTo(hx, hy - 21); g.lineTo(hx + Math.cos(a) * r, hy - 21 + Math.sin(a) * r); g.stroke(); }
+        g.fillStyle = c.bobble; g.beginPath(); g.arc(hx, hy - 21, 2.6, 0, 7); g.fill(); g.strokeStyle = '#1f1712'; g.lineWidth = 1.2;
+      }
+      else if (c.pom === 'flat') { g.fillStyle = c.bobble; g.beginPath(); g.ellipse(hx, hy - 20, 5.5, 2.6, 0, 0, 7); g.fill(); g.stroke(); }   // squashed pom-pom
       else { g.fillStyle = c.bobble || '#fff'; g.beginPath(); g.arc(hx, hy - 21, 3.8, 0, 7); g.fill(); g.stroke(); }                                        // bobble
     }
-    g.fillStyle = c.scarf; g.fillRect(hx - 17 * (1 + (F - 1) * 0.45), hy + 13, 34 * (1 + (F - 1) * 0.45), 6); g.fillRect(hx + 6, hy + 16, 6, 12);                                 // scarf
+    if (F === 1) { g.fillStyle = c.scarf; g.fillRect(hx - 17, hy + 13, 34, 6); g.fillRect(hx + 6, hy + 16, 6, 12); }                                 // scarf
     const look = c.talk ? (x < 128 ? 2 : -2) : 0;
     for (const sx of [-1, 1]) { g.fillStyle = '#fff'; g.beginPath(); g.ellipse(hx + sx * 7, hy - 3, 6, 7, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = '#111'; g.beginPath(); g.arc(hx + sx * 7 + look, hy - 2, 1.8, 0, 7); g.fill(); }
     g.strokeStyle = '#1f1712'; g.lineWidth = 1.6; for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(hx + sx * 11, hy - 12 - (c.talk ? 1 : 0)); g.lineTo(hx + sx * 3, hy - 10 + (c.talk ? 2 : 0)); g.stroke(); }   // cross brows
@@ -1621,19 +1629,28 @@ const catBox = new THREE.Group(); catBox.position.set(CAT_POS.x, 0, CAT_POS.z); 
 // 2D tail card to match the photo cat: a painted fluffy grey-cream tail with a darker tip, pivoting at its
 // base (behind the cat, inside the box) so a wag swings it side to side in the picture plane
 const tailTex = (() => {
-  const c = document.createElement('canvas'); c.width = 192; c.height = 256; const g = c.getContext('2d');
+  const c = document.createElement('canvas'); c.width = 384; c.height = 512; const g = c.getContext('2d'); g.scale(2, 2);   // drawn at 2x for soft, clean fur
   const P = t => { const u = 1 - t; return [u * u * 40 + 2 * u * t * 200 + t * t * 120, u * u * 246 + 2 * u * t * 170 + t * t * 30]; };   // sweeps out to the right, then curls up
-  for (let i = 0; i <= 60; i++) {
-    const t = i / 60, [x, y] = P(t), r = 34 - t * 12;
-    const light = t < 0.62, col = light ? [205, 196, 188] : [120, 106, 96];
-    const gr = g.createRadialGradient(x, y, r * 0.2, x, y, r);
-    gr.addColorStop(0, `rgba(${col},1)`); gr.addColorStop(0.75, `rgba(${col.map(v => v - 22)},.9)`); gr.addColorStop(1, `rgba(${col},0)`);
+  const T = t => { const u = 1 - t, dx = 2 * u * (200 - 40) + 2 * t * (120 - 200), dy = 2 * u * (170 - 246) + 2 * t * (30 - 170), l = Math.hypot(dx, dy); return [dx / l, dy / l]; };
+  const R = t => 32 - t * 12;
+  const col = t => { const k = Math.min(1, Math.max(0, (t - 0.45) / 0.5)), s = k * k * (3 - 2 * k); return [206 - 94 * s, 197 - 98 * s, 189 - 99 * s].map(v => v | 0); };   // cream → grey tip, blended
+  for (let i = 0; i <= 90; i++) {                                     // soft fluffy halo
+    const t = i / 90, [x, y] = P(t), r = R(t) + 8, cc = col(t);
+    const gr = g.createRadialGradient(x, y, r * 0.5, x, y, r); gr.addColorStop(0, `rgba(${cc},.35)`); gr.addColorStop(1, `rgba(${cc},0)`);
     g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
   }
-  for (let i = 0; i < 500; i++) {                                    // wispy fur strands along the edges
-    const t = Math.random(), [x, y] = P(t), a = Math.random() * Math.PI * 2, r0 = 16 + Math.random() * 14, len = 6 + Math.random() * 12;
-    g.strokeStyle = t < 0.62 ? 'rgba(235,228,220,.55)' : 'rgba(90,78,70,.5)'; g.lineWidth = 1;
-    g.beginPath(); g.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); g.lineTo(x + Math.cos(a) * (r0 + len), y + Math.sin(a) * (r0 + len)); g.stroke();
+  for (let i = 0; i <= 140; i++) {                                    // the tail's body
+    const t = i / 140, [x, y] = P(t), r = R(t), cc = col(t);
+    const gr = g.createRadialGradient(x, y, r * 0.15, x, y, r);
+    gr.addColorStop(0, `rgba(${cc},1)`); gr.addColorStop(0.7, `rgba(${cc.map(v => v - 14)},.95)`); gr.addColorStop(1, `rgba(${cc.map(v => v - 14)},0)`);
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  }
+  for (let i = 0; i < 1100; i++) {                                    // fur that flows toward the tip and fans out a little at the sides
+    const t = Math.random() * 0.97, [x, y] = P(t), [tx, ty] = T(t), nx = -ty, ny = tx, sd = Math.random() < 0.5 ? -1 : 1, off = (Math.random() * 0.95) * R(t) * sd;
+    const sx = x + nx * off, sy = y + ny * off, len = 7 + Math.random() * 9, fan = 0.25 * (off / R(t));
+    const dx = tx + nx * fan, dy = ty + ny * fan, cc = col(t), lift = Math.random() < 0.5 ? 26 : -18;
+    g.strokeStyle = `rgba(${cc.map(v => Math.min(255, Math.max(0, v + lift)))},.28)`; g.lineWidth = 0.8;
+    g.beginPath(); g.moveTo(sx, sy); g.quadraticCurveTo(sx + dx * len * 0.5 + nx * sd, sy + dy * len * 0.5 + ny * sd, sx + dx * len, sy + dy * len); g.stroke();
   }
   const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
 })();
