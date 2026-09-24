@@ -282,7 +282,7 @@
       </li>
     </ul>
     <button class="btn" id="startBtn">Start your mission</button>
-    <div class="alt-row"><button class="link-btn chaos-link" id="achBtn">🏆 Achievements</button></div>
+    <div class="alt-row"><button class="link-btn chaos-link" id="achBtn">🏆 Achievements</button><span class="dot" style="opacity:.5;margin:0 8px">·</span><button class="link-btn chaos-link" id="updBtn">↻ Updates</button></div>
     <div class="foot foot-3"><span>Best: <span id="bestStart">—</span></span><span class="modes"><button class="link-btn chaos-link" id="chaosBtn">Chaos mode</button><span class="dot">·</span><button class="link-btn chaos-link" id="mouseBtn">Mouse mode</button></span><span class="foot-btns"><button class="link-btn" id="musicBtn">Music: on</button></span></div>
   </div>
 </section>
@@ -1443,6 +1443,14 @@ function startConsoleGame() {
   setTVMode(3); document.querySelectorAll('.joy-lbl')[0].textContent = tvGame === 'kart' ? '◀ ▶ steer' : 'Menu';
   document.querySelectorAll('.joy-lbl')[1].textContent = tvGame === 'kart' ? 'A: gas · B: item' : 'A: select · B: back';
 }
+const CONSOLE_PRIZES = [1000, 400, 200, 100];                            // winning a console game is a big score boost in the real game
+function consoleWin(title, pts) {                                     // a proper celebration when you come back to the room as champion
+  showBanner(`🏆 ${title} +${pts}`);
+  const p = consoleRig.g.position.clone().setY(CAB_H + 0.5);
+  for (let k = 0; k < 8; k++) setTimeout(() => burst(p.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2, Math.random(), (Math.random() - 0.5))), new THREE.Color().setHSL(Math.random(), 1, 0.6).getHex(), 10, 3.5, 4, 0.35), k * 120);
+  [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f, 0.16, 'square', 0.03, 0.3 + i * 0.1));
+  tailWag = 2.5;
+}
 function exitTvPlay() {
   if (state !== 'tvgame') return;
   $('tvFade').classList.add('on');
@@ -1450,10 +1458,10 @@ function exitTvPlay() {
     $('tvPlay').hidden = true; ui.hud.hidden = false; state = 'playing'; last = performance.now();
     if (tvGame === 'party' && game.over && !game.rewarded) {         // a board-game win pays out in the real game
       game.rewarded = true; const place = gameRanking().indexOf(0);
-      const pts = [300, 150, 75, 25][place]; bonus(pts, consoleRig.g.position, place === 0 ? 'Board champ!' : 'Game night'); if (!place) unlock('boardWin');
+      const pts = CONSOLE_PRIZES[place]; bonus(pts, consoleRig.g.position, place === 0 ? 'Board champ!' : 'Game night'); if (!place) { unlock('boardWin'); consoleWin('Board game champion!', pts); }
     }
     if (tvGame === 'kart' && kart.over && !kart.rewarded) {            // so does a kart race
-      kart.rewarded = true; const pts = [300, 150, 75, 25][kart.place - 1]; bonus(pts, consoleRig.g.position, kart.place === 1 ? 'Kart champ!' : 'Race day'); if (kart.place === 1) unlock('kartWin');
+      kart.rewarded = true; const pts = CONSOLE_PRIZES[kart.place - 1]; bonus(pts, consoleRig.g.position, kart.place === 1 ? 'Kart champ!' : 'Race day'); if (kart.place === 1) { unlock('kartWin'); consoleWin('Kart race champion!', pts); }
     }
     game.player = false; for (const k in tvHeld) tvHeld[k] = false;
     tvGame = tvPlays % 2 === 0 ? 'kart' : 'party'; resetKart(); resetBoardGame(); setTVMode(3);   // the TV now shows the next game up
@@ -2206,7 +2214,7 @@ let fireRig = null, mantleMirror = null;
     const light = new THREE.PointLight(0xff7a30, 0, 8, 1.8); light.position.set(IN(12), IN(10), 0); scene.add(light); light.position.add(g.position);
     const ember = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xffb040, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     ember.scale.setScalar(0.4); ember.visible = false; scene.add(ember);
-    const hot = new THREE.Mesh(new THREE.BoxGeometry(IN(24), IN(16), IN(10)), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));   // invisible tap zone over the firebox
+    const hot = new THREE.Mesh(new THREE.BoxGeometry(IN(24), IN(16), IN(10)), new THREE.MeshBasicMaterial({ visible: false }));   // invisible tap zone over the firebox
     hot.position.copy(toWorld(0, RB + IN(8), IN(5))); hot.rotation.y = Math.PI / 2; hot.userData.fireHit = true; scene.add(hot); tapTargets.push(hot);
     fireRig = { g, flames, glow, light, ember, center: g.position.clone(), level: 0, target: 0, blow: 0, crackleT: 0, fly: null, flare: 0 };
   }
@@ -3720,6 +3728,21 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
+const BUILD = '2026-09-24 09:08';                                              // stamped when the site is published
+async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
+  if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
+  camToast('Checking for updates…', 1500);
+  try {
+    const txt = await (await fetch('index.html?check=' + Date.now(), { cache: 'no-store' })).text();
+    const m = txt.match(/const BUILD = '([^']+)'/), latest = m && m[1];
+    if (latest && latest !== BUILD) {
+      camToast('New version found: updating…', 1800);
+      try { for (const r of (await navigator.serviceWorker.getRegistrations())) await r.update(); } catch (e) {}
+      try { for (const k of await caches.keys()) await caches.delete(k); } catch (e) {}
+      setTimeout(() => location.reload(), 700);
+    } else camToast(`You're up to date ✓ (${BUILD})`, 2600);
+  } catch (e) { camToast("Couldn't reach the server: try again in a moment", 2800); }
+}
 let achDone = {}; try { achDone = JSON.parse(localStorage.getItem(ACH_KEY) || '{}'); } catch (e) {}
 function unlock(id) {
   if (achDone[id] || !ACH_BY_ID[id]) return;
@@ -4657,6 +4680,7 @@ window.addEventListener('keyup', e => {
   if (k) tvHeld[k] = false;
 });
 $('achBtn').addEventListener('click', () => openAchievements('startScreen'));
+$('updBtn').addEventListener('click', checkForUpdates);
 $('overAchBtn').addEventListener('click', () => openAchievements('overScreen'));
 $('achClose').addEventListener('click', () => { $('achScreen').hidden = true; $(achFrom).hidden = false; });
 $('shareBtn').addEventListener('click', shareScore);

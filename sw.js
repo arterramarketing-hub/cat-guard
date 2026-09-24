@@ -1,7 +1,7 @@
 /* Princess Kitty Defender: offline support.
    The game page is fetched fresh whenever there's a connection (so updates show up right away) and
    kept as a fallback; everything else (Three.js, fonts, icons) comes straight from the cache. */
-const CACHE = 'pkd-v1';
+const CACHE = 'pkd-v2';
 const CORE = [
   './', './index.html', './apple-touch-icon.png', './icon-512.png', './manifest.json',
   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
@@ -18,6 +18,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  if (req.cache === 'no-store' || new URL(req.url).searchParams.has('check')) return;   // 'Check for updates' always asks the network
   const isPage = req.mode === 'navigate' || (req.destination === 'document');
   e.respondWith(caches.open(CACHE).then(async c => {
     if (isPage) {                                                     // network first: always the latest version when online
