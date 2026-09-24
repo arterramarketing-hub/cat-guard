@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="manifest" href="manifest.json">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Princess Kitty Defender</title>
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -175,6 +176,16 @@
   .chaos-link{color:#7a3fb8}
   .modes{display:flex;align-items:center;gap:5px;white-space:nowrap}.modes .dot{opacity:.5}
   .heist-ring{}
+  .btn-share{background:#c9a8ff;font-size:18px;padding:10px 16px}
+  .ach-card{max-height:calc(100vh - 40px);overflow:hidden;display:flex;flex-direction:column}
+  .ach-count{font:800 14px var(--body);color:#8a4a70;margin-top:-6px}
+  .ach-list{overflow:auto;display:grid;gap:8px;padding-right:4px;margin:4px 0 6px;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+  .ach{display:grid;grid-template-columns:38px 1fr;gap:10px;align-items:center;background:var(--paper-2);border:2px solid rgba(58,20,52,.12);border-radius:12px;padding:7px 10px}
+  .ach .ic{font-size:24px;text-align:center}
+  .ach b{display:block;font:800 14px var(--body)}.ach span{display:block;font:600 12px/1.3 var(--body);color:#7a5a6a}
+  .ach.locked{opacity:.55}.ach.locked .ic{filter:grayscale(1)}
+  .ach-sec{font:800 11px var(--body);letter-spacing:.12em;text-transform:uppercase;color:#a0628a;margin:6px 2px 0}
+  .ach-toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 70px);transform:translateX(-50%);z-index:30;pointer-events:none;background:#2b1030;color:#ffe9a8;border:2px solid #ffd23a;border-radius:14px;padding:8px 16px;font:800 14px var(--body);box-shadow:0 6px 20px rgba(0,0,0,.35);animation:toast 3.2s ease forwards;white-space:nowrap}
   .alt-row{display:flex;justify-content:center;font-size:14px;font-weight:700;color:#8a4a70;margin-top:-4px}
   .float.bad{color:var(--danger);font-size:26px}
   .float.warn{color:#ffd3e8;font-size:17px;animation-duration:1.6s}
@@ -241,6 +252,15 @@
 </div>
 
 <!-- Start -->
+<section class="screen" id="achScreen" hidden>
+  <div class="card ach-card">
+    <p class="eyebrow">Trophy room</p>
+    <h2>Achievements</h2>
+    <div class="ach-count" id="achCount">0 / 0</div>
+    <div class="ach-list" id="achList"></div>
+    <button class="btn" id="achClose">Back</button>
+  </div>
+</section>
 <section class="screen" id="startScreen">
   <div class="card">
     <h1 class="title" aria-label="Princess Kitty Defender">
@@ -262,6 +282,7 @@
       </li>
     </ul>
     <button class="btn" id="startBtn">Start your mission</button>
+    <div class="alt-row"><button class="link-btn chaos-link" id="achBtn">🏆 Achievements</button></div>
     <div class="foot foot-3"><span>Best: <span id="bestStart">—</span></span><span class="modes"><button class="link-btn chaos-link" id="chaosBtn">Chaos mode</button><span class="dot">·</span><button class="link-btn chaos-link" id="mouseBtn">Mouse mode</button></span><span class="foot-btns"><button class="link-btn" id="musicBtn">Music: on</button></span></div>
   </div>
 </section>
@@ -289,7 +310,8 @@
       <div><dt>Best</dt><dd id="oBest">0</dd></div>
     </dl>
     <button class="btn" id="againBtn">Play again</button>
-    <div class="alt-row"><button class="link-btn" id="overTitleBtn">Return to title</button></div>
+    <button class="btn btn-share" id="shareBtn">📤 Share my score</button>
+    <div class="alt-row"><button class="link-btn chaos-link" id="overAchBtn">🏆 Achievements</button><span class="dot" style="opacity:.5;margin:0 8px">·</span><button class="link-btn" id="overTitleBtn">Return to title</button></div>
   </div>
 </section>
 
@@ -543,7 +565,7 @@ let starMesh = null, mirrorRig = null, gloveRig = null, windowRig = null, tableR
 const steamPuffs = [];
 function breakTable() {
   const t = tableRig; if (!t || t.broken) return;
-  t.broken = true; bonus(150, new THREE.Vector3(t.center.x, 0.8, t.center.z), 'Smash!'); sfx.shatter(); shake = Math.max(shake, reduceMotion ? 0.06 : 0.4);
+  t.broken = true; unlock('table'); bonus(150, new THREE.Vector3(t.center.x, 0.8, t.center.z), 'Smash!'); sfx.shatter(); shake = Math.max(shake, reduceMotion ? 0.06 : 0.4);
   for (const p of t.pieces) { p.v.set((Math.random() - 0.3) * -1.6, 1.2 + Math.random() * 1.2, (Math.random() - 0.5) * 2.2); p.w.set((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 8); p.down = false; }
   for (const s of t.shards) {
     s.mesh.visible = true; s.down = false;
@@ -584,7 +606,7 @@ function updateDresser(dt) {
 }
 function knockDiffuser() {
   const d = diffuserRig; if (!d || d.state !== 'rest') return;
-  d.state = 'fall'; bonus(100, null, 'Splash!'); d.v.set((Math.random() - 0.5) * 0.6, 1.1, 1.7); d.w.set(2.6 + Math.random(), (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2); sfx.whoosh();
+  d.state = 'fall'; bonus(100, null, 'Splash!'); unlock('diffuser'); d.v.set((Math.random() - 0.5) * 0.6, 1.1, 1.7); d.w.set(2.6 + Math.random(), (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2); sfx.whoosh();
 }
 function updateDiffuser(dt) {
   const d = diffuserRig; if (!d) return;
@@ -769,7 +791,7 @@ function breakMirror(level) {
   const m = mirrorRig;
   if (level === 2) { m.cracks.visible = true; sfx.crack(); bonus(40, null, 'Crack!'); shake = Math.max(shake, reduceMotion ? 0.03 : 0.12); }
   else if (level === 3) {
-    m.glass.visible = false; m.cracks.visible = false; m.stuck.visible = true; sfx.shatter(); bonus(150, null, 'Shattered!'); shake = Math.max(shake, reduceMotion ? 0.06 : 0.35);
+    m.glass.visible = false; m.cracks.visible = false; m.stuck.visible = true; sfx.shatter(); bonus(150, null, 'Shattered!'); unlock('mirror'); shake = Math.max(shake, reduceMotion ? 0.06 : 0.35);
     m.lean.updateMatrixWorld(true);
     for (const sh of m.shards) {
       sh.mesh.position.set((Math.random() - 0.5) * m.gw, m.gy + (Math.random() - 0.5) * m.gh, IN(0.8)); m.lean.localToWorld(sh.mesh.position);
@@ -859,7 +881,7 @@ function knockProp(p) {
   if (p.state === 'down') {                                    // already on the floor: a little batted hop away from the cat
     const dx = p.obj.position.x - CAT_POS.x, dz = p.obj.position.z - CAT_POS.z, l = Math.hypot(dx, dz) || 1;
     p.v.set(dx / l * 2.2, 2.2, dz / l * 2.2); sfx.thump();
-  } else { if (p.onKnock) p.onKnock(p); if (p.state === 'rest') bonus(10, p.obj.position); }
+  } else { if (p.onKnock) p.onKnock(p); if (p.state === 'rest') { bonus(10, p.obj.position); if (p.restHalf === 0) unlock('disco'); } }
   p.state = 'fall';
 }
 // stuffing from a ripped pillow: tufts burst out, float down slowly and settle over the carpet
@@ -1388,7 +1410,7 @@ function gameInput(k) {
 let tvCine = null, tvPad = null;
 function startTvPlay() {
   if (state !== 'playing' || tvCine) return;
-  state = 'tvcine'; tvCine = { t: 0 };
+  state = 'tvcine'; tvCine = { t: 0 }; unlock('console');
   if (!tvPad) {                                                       // the pair of controllers she snatches off the console
     tvPad = new THREE.Group(); scene.add(tvPad);
     for (const [sx, c] of [[-1, 0x0ab9e6], [1, 0xff3c28]]) box(IN(1.35), IN(4), IN(0.6), new THREE.MeshPhongMaterial({ color: c, shininess: 50 }), sx * IN(0.9), 0, 0, tvPad);
@@ -2047,7 +2069,7 @@ function scratchCouch(side, point, normal) {
   }
   d.level = Math.max(...d.marks.map(m => m.userData.level));
   sfx.scratch(mark.userData.level);
-  bonus(mark.userData.level >= 3 ? 15 : 5, point);
+  bonus(mark.userData.level >= 3 ? 15 : 5, point); if (mark.userData.level >= 3) unlock('sofa');
 }
 function resetCouches() {
   for (const k of ['-1', '1']) { const d = couchDamage[k]; d.marks.concat(d.fluff).forEach(o => scene.remove(o)); d.marks = []; d.fluff = []; d.level = 0; }
@@ -2266,7 +2288,7 @@ let fireRig = null, mantleMirror = null;
         wreck.position.set(g.position.x, 0.01, g.position.z); wreck.rotation.y = Math.random() * 6; wreck.visible = true;
         burst(g.position.clone().setY(0.2), 0x4a3625, 18, 2.2, 1.8, 0.6); burst(g.position.clone().setY(0.2), 0x6a6d72, 6, 1.6, 1.4, 0.4);
         sfx.shatter(); sfx.padThud(1); shake = Math.max(shake, reduceMotion ? 0.03 : 0.15);
-        bonus(60, g.position, 'Smashed!');
+        bonus(60, g.position, 'Smashed!'); unlock('plant');
       },
       onReset: () => { g.visible = true; wreck.visible = false; },
     };
@@ -2363,7 +2385,7 @@ function updateFan(dt) {
       f.slats.rotation.x = 0.25; f.slats.position.x += IN(0.6);                                            // grille knocked loose
       for (const sh of f.shards) { sh.m.visible = true; sh.down = false; sh.m.position.copy(top).setY(0.15); sh.m.position.x -= Math.random() * 1.2; sh.v.set((Math.random() - 0.3) * 2.4, 1 + Math.random() * 1.6, (Math.random() - 0.5) * 2.4); }
       burst(top.clone().setY(0.2), 0xf3f3f1, 10, 2.2, 2, 0.5);
-      sfx.fanCrash(); bonus(120, top, 'Crash!'); shake = Math.max(shake, reduceMotion ? 0.05 : 0.35);
+      sfx.fanCrash(); bonus(120, top, 'Crash!'); unlock('fan'); shake = Math.max(shake, reduceMotion ? 0.05 : 0.35);
     }
   }
   if (f.state === 'broken') {
@@ -2443,7 +2465,7 @@ function hitWallpaper(point, normal) {
   r.geo = new THREE.PlaneGeometry(w.PW * 0.96, w.PH, 1, 18); r.geo.translate(0, w.PH / 2, 0); r.base = Float32Array.from(r.geo.attributes.position.array);
   const flap = new THREE.Group(); flap.position.set(0, -0.1 - w.PH / 2, 0.004); r.g.add(flap);
   flap.add(new THREE.Mesh(r.geo, w.frontMat)); flap.add(new THREE.Mesh(r.geo, w.backMat));
-  r.peel = 0.001; sfx.scratch(3); bonus(40, point, 'Peeled!');
+  r.peel = 0.001; sfx.scratch(3); bonus(40, point, 'Peeled!'); unlock('wall');
 }
 function updateWallpaper(dt) {
   const w = wallRig; if (!w) return;
@@ -2516,8 +2538,8 @@ function setRoomMode(m) {
 }
 function hitRemote() {
   sfx.remoteClick(); bonus(10);
-  if (roomMode === 0) { setRoomMode(1); sfx.powerDown(); }
-  else if (roomMode === 1) { setRoomMode(2); sfx.bassDrop(); showBanner('Rave mode!'); raveUntil = clock + RAVE_SECS; danceUntil = clock + (gameMode === 'chaos' ? RAVE_SECS : 10); }   // every mouse drops what it's doing and dances (chaos: the whole party)
+  if (roomMode === 0) { setRoomMode(1); sfx.powerDown(); unlock('dark'); }
+  else if (roomMode === 1) { setRoomMode(2); sfx.bassDrop(); showBanner('Rave mode!'); unlock('rave'); raveUntil = clock + RAVE_SECS; danceUntil = clock + (gameMode === 'chaos' ? RAVE_SECS : 10); }   // every mouse drops what it's doing and dances (chaos: the whole party)
   else { setRoomMode(0); sfx.powerUp(); raveUntil = 0; danceUntil = Math.min(danceUntil, clock); }
 }
 function updateRoomFx(dt) {
@@ -2571,11 +2593,13 @@ function sendEmber(from) {
   f.ember.visible = true; noise(0.25, 0.03, 5000);                  // a soft sizzle as it flicks off the wick
 }
 function igniteFire() {
+  unlock('fire');
   const f = fireRig; f.target = 1; f.blow = 0;
   sfx.whoosh(); burst(f.center.clone().setY(f.center.y + 0.2), 0xffa040, 12, 1.6, 3, 0.35);
   bonus(75, f.center, 'Fire!');
 }
 function blowOutFire() {
+  unlock('fireOut');
   const f = fireRig; f.target = 0; f.blow = 0;
   noise(0.7, 0.07, 700); burst(f.center.clone().setY(f.center.y + 0.4), 0x8e8a86, 14, 1.2, 2.2, 1.3);   // hiss and a puff of smoke
   bonus(40, f.center, 'Blown out!');
@@ -2616,7 +2640,7 @@ function updateFire(dt) {
 // a bomb going off in the fireplace blasts the whole mantle mirror off the wall: it pitches forward and smashes on the floor
 function blastMantleMirror() {
   const mm = mantleMirror; if (!mm || mm.state !== 'wall') return;
-  mm.state = 'fall'; mm.v.set(0, 1.4, 2.2); mm.spin = 2.6; sfx.crack();
+  mm.state = 'fall'; mm.v.set(0, 1.4, 2.2); mm.spin = 2.6; sfx.crack(); unlock('mantle');
 }
 function updateMantleMirror(dt) {
   const mm = mantleMirror; if (!mm) return;
@@ -2659,6 +2683,7 @@ function resetMantleMirror() {
 // paw in the flames: a burst of fire, a pained yowl, and a life gone
 function burnPaw() {
   const f = fireRig; if (!f || f.target === 0 || state !== 'playing') return;
+  unlock('burn');
   f.flare = 1;
   const c = f.center.clone().setY(f.center.y + 0.3);
   burst(c, 0xff7a1a, 18, 2.6, 3.5, 0.5); burst(c, 0xffd23a, 12, 2, 3, 0.35); burst(c, 0x3a3434, 6, 1.2, 2.5, 0.9);
@@ -3638,7 +3663,87 @@ function separateMice() {
    mouth, get it back to any mouse hole. The cat hunts you: a red ring marks where her paw is about to land.
    Steal all three to win; three hits and she's got you.
    ===================================================================== */
-function unlock(id) {}                                               // (achievements: filled in later)
+/* ---------- achievements: every extra and hidden feature in the room, saved on this device ---------- */
+const ACHIEVEMENTS = [
+  ['Playing the game', [
+    ['firstWhack', '🐭', 'First whack', 'Whack your first mouse'],
+    ['combo', '🔥', 'On a roll', 'Reach a x5 combo'],
+    ['clutch', '💪', 'Clutch save', 'Whack a mouse right next to a mushroom'],
+    ['save', '🍄', 'Saved it!', 'Make a thief drop a mushroom'],
+    ['helmet', '⛑️', 'Clonk!', 'Knock the helmet off a helmet mouse'],
+    ['rainbow', '🌈', 'Rainbow hunter', 'Catch a rare rainbow mouse (5x points)'],
+    ['wave5', '🌊', 'Wave rider', 'Reach wave 5'],
+    ['survive3', '⏱️', 'Survivor', 'Last 3 minutes in the main game'],
+    ['score5k', '⭐', 'High roller', 'Score 5,000 in one game'],
+  ]],
+  ['The Rat King', [
+    ['king', '👑', 'Crowned', 'Beat the Rat King and take his crown (1,500 pts)'],
+    ['kingAgain', '🐀', 'Long live the queen', 'Beat him again when he returns (3,500 pts)'],
+    ['kingAll', '🏰', 'Kingslayer', 'Beat all three Rat Kings (7,000 pts)'],
+  ]],
+  ['Weapons & tricks', [
+    ['gun', '🔫', 'Armed & fluffy', 'Find the pistol in the cupboard and take it'],
+    ['tv', '📺', 'Screen time over', 'Break the TV'],
+    ['burrito', '🌯', 'Blanket burrito', 'Roll a mouse up in a blanket'],
+    ['burn', '🥵', 'Ouch!', 'Put your paw in the fire'],
+  ]],
+  ['Wrecking the room', [
+    ['mirror', '🪞', 'Seven years\' bad luck', 'Shatter the tall mirror (3 taps)'],
+    ['mantle', '💥', 'Off the wall', 'Bring down the mirror over the fireplace'],
+    ['table', '🪟', 'Table flip', 'Smash the coffee table'],
+    ['diffuser', '💧', 'Splash', 'Knock the diffuser off the cabinet'],
+    ['fan', '🌀', 'Fan down', 'Tap the fan until it topples'],
+    ['plant', '🪴', 'Repotted', 'Knock a plant off the mantle'],
+    ['disco', '🪩', 'Disco inferno', 'Knock a disco ball off the wall'],
+    ['sofa', '🛋️', 'Shredder', 'Scratch the sofa until the stuffing comes out'],
+    ['wall', '🧱', 'Wallpaper ripper', 'Peel the wallpaper'],
+  ]],
+  ['Around the house', [
+    ['dark', '🌙', 'Lights out', 'Find the remote and turn the lights off'],
+    ['rave', '🎉', 'Rave mode', 'Press the remote again for a rave'],
+    ['galaxy', '🌌', 'Stargazer', 'Switch on a galaxy projector'],
+    ['fire', '🕯️', 'Cosy', 'Light the fire with a fallen candle'],
+    ['fireOut', '💨', 'Blown out', 'Let the fan blow the fire out'],
+    ['pov', '👀', 'Cat\'s eye', 'Look through the cat\'s eyes (📷 button)'],
+  ]],
+  ['The games console', [
+    ['console', '🎮', 'Player one', 'Tap the Switch twice to play it'],
+    ['kartWin', '🏁', 'Kart champ', 'Win the kart race'],
+    ['boardWin', '🎲', 'Board champ', 'Win the party board game'],
+  ]],
+  ['Other modes', [
+    ['chaos', '🌪️', 'Chaos complete', 'Finish a Chaos mode round'],
+    ['director', '🎥', 'Director', 'Pinch, twist and drag the camera in Chaos mode'],
+    ['heist', '🧀', 'Master thief', 'Steal all three mushrooms in Mouse mode'],
+    ['ghost', '🥷', 'Ghost', 'Win Mouse mode without being hit'],
+  ]],
+];
+const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
+const ACH_KEY = 'catguard.ach';
+let achDone = {}; try { achDone = JSON.parse(localStorage.getItem(ACH_KEY) || '{}'); } catch (e) {}
+function unlock(id) {
+  if (achDone[id] || !ACH_BY_ID[id]) return;
+  achDone[id] = Date.now(); try { localStorage.setItem(ACH_KEY, JSON.stringify(achDone)); } catch (e) {}
+  const a = ACH_BY_ID[id], el = document.createElement('div'); el.className = 'ach-toast'; el.textContent = `🏆 ${a[1]} ${a[2]}`; document.body.appendChild(el); setTimeout(() => el.remove(), 3300);
+  [784, 1047, 1319].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.035, i * 0.08));
+  updateAchCount();
+}
+const achTotal = () => Object.keys(ACH_BY_ID).length, achGot = () => Object.keys(achDone).filter(k => ACH_BY_ID[k]).length;
+function updateAchCount() { const b = document.getElementById('achBtn'); if (b) b.textContent = `🏆 Achievements (${achGot()}/${achTotal()})`; }
+function openAchievements(from) {
+  const list = document.getElementById('achList'); list.innerHTML = '';
+  for (const [sec, items] of ACHIEVEMENTS) {
+    const h = document.createElement('div'); h.className = 'ach-sec'; h.textContent = sec; list.appendChild(h);
+    for (const [id, ic, title, desc] of items) {
+      const got = !!achDone[id], row = document.createElement('div'); row.className = 'ach' + (got ? '' : ' locked');
+      row.innerHTML = `<div class="ic">${got ? ic : '🔒'}</div><div><b></b><span></span></div>`;
+      row.querySelector('b').textContent = title; row.querySelector('span').textContent = desc; list.appendChild(row);
+    }
+  }
+  document.getElementById('achCount').textContent = `${achGot()} / ${achTotal()} unlocked`;
+  achFrom = from; document.getElementById(from).hidden = true; document.getElementById('achScreen').hidden = false;
+}
+let achFrom = 'startScreen';
 const HEIST_LIVES = 3;
 const heistGoal = (() => {
   const g = new THREE.Group(); g.visible = false; scene.add(g);
@@ -3790,7 +3895,7 @@ function updateSpawner(dt) {
   if (gameMode === 'classic' && elapsed > CFG.WAVE_EVERY) {         // waves: a short breather every 45 s, then 'Wave N!'
     const phase = elapsed % CFG.WAVE_EVERY, w = 1 + Math.floor(elapsed / CFG.WAVE_EVERY);
     if (phase < CFG.WAVE_LULL) return;
-    if (w > waveNo) { waveNo = w; showBanner(`Wave ${w}!`); sfx.sparkle && sfx.sparkle(); }
+    if (w > waveNo) { waveNo = w; showBanner(`Wave ${w}!`); sfx.sparkle && sfx.sparkle(); if (w >= 5) unlock('wave5'); }
   }
   spawnTimer -= dt;
   if (spawnTimer > 0) return;
@@ -3969,7 +4074,7 @@ function interact(o, point, face) {
   if (o.userData.mirror) { startSwipe(point, true); setTimeout(hitMirror, 90); tapShake(); return true; }
   if (o.userData.gloves) { startSwipe(point, true); setTimeout(hitGloves, 90); tapShake(); return true; }
   if (o.userData.remote) { startSwipe(point, true); setTimeout(hitRemote, 90); tapShake(); return true; }
-  if (o.userData.galaxy) { startSwipe(point, true); setTimeout(() => { galaxyOn = !galaxyOn; sfx.remoteClick(); }, 90); tapShake(); return true; }
+  if (o.userData.galaxy) { startSwipe(point, true); setTimeout(() => { galaxyOn = !galaxyOn; sfx.remoteClick(); if (galaxyOn) unlock('galaxy'); }, 90); tapShake(); return true; }
   if (o.userData.fan) { if (fanRig.state === 'falling' || fanRig.state === 'broken') return false; startSwipe(point, true); setTimeout(hitFan, 90); tapShake(); return true; }
   if (o.userData.prop) { const pr = o.userData.prop; startSwipe(point, true); setTimeout(() => knockProp(pr), 90); tapShake(); return true; }
   return false;
@@ -4065,7 +4170,7 @@ function hurtBoss(m, dmg) {                                         // returns t
   score += 500; showBanner('Rat King defeated! +500'); burst(m.center.clone().setY(0.6), 0xf2c14a, 16, 3.5, 4, 1.2); sfx.gasp();
   if (!m.bossLevel) claimCrown(m);                                    // first win: his crown goes on the cat
   else { m.crown.visible = false; returnMushroom(m.center.clone()); }   // later wins: he coughs up a stolen mushroom
-  unlock && unlock(m.bossLevel ? 'kingAgain' : 'king');
+  unlock(m.bossLevel ? 'kingAgain' : 'king'); if (m.bossLevel >= 2) unlock('kingAll');
   return true;
 }
 function knockHelmet(m) {                                           // first tap on a helmet mouse: the helmet goes flying
@@ -4100,6 +4205,7 @@ function whack(m) {
   combo++;
   const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
   const rb = m.kind === 'rainbow', pts = (CFG.SCORE_WHACK + (clutch ? CFG.SCORE_CLUTCH : 0)) * mult * (rb ? 5 : 1);
+  unlock('firstWhack'); if (mult >= 5) unlock('combo'); if (clutch) unlock('clutch'); if (saved) unlock('save');
   score += pts; whackedCount++;
   m.setState('whacked');
   burst(m.center.clone().setY(0.4), 0xffe07a, 7, 2.2, 3.2, 0.9);
@@ -4146,6 +4252,7 @@ function showBanner(text) {
 }
 function takeGun() {
   const gr = gunRig; if (gr.state !== 'cupboard' || state !== 'playing') return;
+  unlock('gun');
   gr.state = 'cat'; gr.ammo = GUN_ROUNDS; cupboardPistol.visible = false; gr.held.visible = true; gr.held.position.copy(gr.hand); gr.held.rotation.set(0, 0, 0);
   sfx.cock(); sfx.gasp(); tailWag = 1.4; showBanner('Kitty’s got a gun!'); floatText(gr.hand.clone().setY(BOX.h + 1.3), 'Tap to shoot', 'clutch');
   if (pistolDoor.target) { pistolDoor.target = 0; sfx.creak(); }    // cupboard swings shut behind her
@@ -4170,6 +4277,7 @@ function rollBlocked(x, z) {
   return false;
 }
 function burritoMouse(m) {                                          // special kill: wrapped up and rolled away
+  unlock('burrito');
   if (m.isBomb) { floatText(m.center.clone().setY(1), 'Smothered!', 'clutch'); m.release(); return; }
   const saved = m.state === 'carry' || m.state === 'grab';
   if (saved) { m.dropCheese(); tailWag = 1.4; }
@@ -4264,6 +4372,7 @@ function fireGun() {
 }
 function breakTV() {
   if (tvBroken) return;
+  unlock('tv');
   tvBroken = true; setTV(false); tvLight.intensity = 0;
   const p = screen.getWorldPosition(new THREE.Vector3()); p.z += 0.1;
   burst(p, 0xfff2a0, 14, 3, 2, 0.5); burst(p, 0x2a2a2a, 8, 1.6, 2, 0.9); bonus(200, p, 'TV smashed!');
@@ -4350,6 +4459,8 @@ function checkEnd() {
   else if (lives <= 0) endGame('lives');
 }
 function endGame(reason) {
+  if (reason === 'chaos') unlock('chaos');
+  if (reason === 'heist') { unlock('heist'); if (lives >= HEIST_LIVES) unlock('ghost'); }
   state = 'ending'; endReason = reason; endTimer = 1.2;
   heist.ring.visible = false; heist.strike = null; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true;
   sfx.over();
@@ -4382,6 +4493,7 @@ buildPrizeIcons();
 const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 let lastTimeShown = -1;
 function updateHud() {
+  if (score >= 5000 && state === 'playing') unlock('score5k');
   checkBoss();
   ui.score.textContent = score;
   const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
@@ -4463,6 +4575,50 @@ function quitToTitle() {
   resetGame(); resetChaosCam();                                        // put the whole room back (fire out, mirror up, mess cleared) behind the title
   state = 'menu'; ui.pause.hidden = true; ui.hud.hidden = true; ui.start.hidden = false; showBestOnStart();
 }
+/* ---------- share: a scorecard picture (room snapshot + score) sent through the phone's share sheet (iMessage etc.) ---------- */
+let shareBlob = null;
+const SHARE_URL = 'https://arterramarketing-hub.github.io/cat-guard/';
+function prepareScoreCard() {
+  shareBlob = null;
+  try {
+    const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    const bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#ffd3e8'); bg.addColorStop(1, '#ff7fbf'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    g.fillStyle = '#fff5fa'; rr(50, 50, W - 100, H - 100, 48); g.fill(); g.lineWidth = 8; g.strokeStyle = '#3a1434'; g.stroke();
+    // the room, as it looked when the game ended
+    renderer.render(scene, camera);
+    const src = renderer.domElement, sw = src.width, sh = src.height, want = (W - 180) / 620, cw = Math.min(sw, sh * want), ch = cw / want;
+    const zc = 0.72, cw2 = cw * zc, ch2 = ch * zc;                    // crop in on the room (trims the dark backdrop)
+    g.save(); rr(90, 250, W - 180, 620, 32); g.clip(); g.fillStyle = '#2b2520'; g.fillRect(90, 250, W - 180, 620); g.drawImage(src, (sw - cw2) / 2, Math.max(0, (sh - ch2) / 2 - sh * 0.04), cw2, ch2, 90, 250, W - 180, 620); g.restore();
+    rr(90, 250, W - 180, 620, 32); g.lineWidth = 6; g.strokeStyle = '#3a1434'; g.stroke();
+    g.textAlign = 'center'; g.fillStyle = '#ff5fa2'; g.strokeStyle = '#3a1434'; g.lineWidth = 10; g.lineJoin = 'round';
+    g.font = '96px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; g.strokeText('Princess Kitty', W / 2, 150); g.fillText('Princess Kitty', W / 2, 150);
+    g.font = '72px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; g.fillStyle = '#ffc2dc'; g.strokeText('Defender', W / 2, 222); g.fillText('Defender', W / 2, 222);
+    const modeName = gameMode === 'chaos' ? 'Chaos mode' : gameMode === 'mouse' ? 'Mouse mode' : 'Classic';
+    g.fillStyle = '#8a4a70'; g.font = '800 44px Figtree, system-ui, sans-serif'; g.fillText(`${modeName} · ${$('overTitle').textContent}`, W / 2, 950);
+    g.fillStyle = '#3a1434'; g.font = '150px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; g.fillText(String(score), W / 2, 1100);
+    const crown = catCrown && catCrown.userData.claimed ? '  ·  👑 Crown won' : '';
+    g.fillStyle = '#6b3d5c'; g.font = '700 40px Figtree, system-ui, sans-serif';
+    g.fillText(`⏱ ${fmtTime(elapsed)}   ·   ${gameMode === 'mouse' ? `🍄 ${heist.stolen} stolen` : `🐭 ${whackedCount} whacked`}${crown}`, W / 2, 1170);
+    g.fillText(`🏆 ${achGot()}/${achTotal()} achievements`, W / 2, 1225);
+    g.fillStyle = '#ff5fa2'; g.font = '800 36px Figtree, system-ui, sans-serif'; g.fillText('Can you beat me? 🐾', W / 2, 1282);
+    c.toBlob(b => { shareBlob = b; }, 'image/png');
+  } catch (e) { shareBlob = null; }
+}
+async function shareScore() {
+  const title = 'Princess Kitty Defender', text = `I scored ${score} in Princess Kitty Defender! 🐱👑 Can you beat me? ${SHARE_URL}`;
+  try {
+    if (shareBlob) {
+      const file = new File([shareBlob], 'princess-kitty-score.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title, text }); return; }
+    }
+    if (navigator.share) { await navigator.share({ title, text, url: SHARE_URL }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  // no share sheet (desktop): save the picture and copy the message
+  if (shareBlob) { const a = document.createElement('a'); a.href = URL.createObjectURL(shareBlob); a.download = 'princess-kitty-score.png'; a.click(); }
+  try { await navigator.clipboard.writeText(text); } catch (e) {}
+  camToast('Scorecard saved · message copied', 2600);
+}
 function showGameOver() {
   state = 'over';
   const best = getBest(), isNew = score > best;
@@ -4477,6 +4633,7 @@ function showGameOver() {
   $('oBest').classList.toggle('new', isNew && score > 0);
   ui.over.hidden = false;
   $('againBtn').focus({ preventScroll: true });
+  prepareScoreCard();
 }
 
 $('startBtn').addEventListener('click', () => startGame('classic'));
@@ -4499,6 +4656,12 @@ window.addEventListener('keyup', e => {
   const k = { arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right', enter: 'a', ' ': 'a', a: 'a', z: 'a', b: 'b', x: 'b' }[e.key.toLowerCase()];
   if (k) tvHeld[k] = false;
 });
+$('achBtn').addEventListener('click', () => openAchievements('startScreen'));
+$('overAchBtn').addEventListener('click', () => openAchievements('overScreen'));
+$('achClose').addEventListener('click', () => { $('achScreen').hidden = true; $(achFrom).hidden = false; });
+$('shareBtn').addEventListener('click', shareScore);
+updateAchCount();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});   // works offline after the first visit
 $('overTitleBtn').addEventListener('click', () => { ui.over.hidden = true; quitToTitle(); });
 $('pauseBtn').addEventListener('click', pauseGame);
 $('resumeBtn').addEventListener('click', resumeGame);
@@ -4878,6 +5041,7 @@ function fitCamera() {
     camera.position.set(CAT_POS.x, POV_EYE_Y, CAT_POS.z + 0.5);        // from the cat in her box, peering over the rim down the room
     camera.lookAt(0, 0.35 - camTilt * 0.06, 9);                         // two-finger drag tips the gaze up / down
     camera.updateMatrixWorld(); camBase.copy(camera.position); catCard.rotation.y = 0;
+    if (state === 'playing') unlock('pov');
     return;
   }
   if (fc.on) {                                                        // chaos free look owns the camera: just keep the lens right for the window
@@ -4961,6 +5125,7 @@ function fcStart() {                                                  // take ov
   Object.assign(fc, { dist0: d, zoom: 1, tilt: 0, yaw: Math.atan2(v.x, v.z), el0: THREE.MathUtils.radToDeg(Math.asin(v.y / d)) });
   fc.focus.copy(p); fc.s.focus.copy(p); Object.assign(fc.s, { yaw: fc.yaw, zoom: 1, tilt: 0 });
   fc.on = true; camera.clearViewOffset(); camera.updateProjectionMatrix(); vcam.copy(camera);
+  if (gameMode === 'chaos') unlock('director');
 }
 function fcGround(cx, cy) {                                           // where a screen point lands on the focus's height, seen by the target camera
   _fcN.set(cx / window.innerWidth * 2 - 1, -(cy / window.innerHeight) * 2 + 1); _fcRay.setFromCamera(_fcN, vcam);
@@ -5067,6 +5232,7 @@ function frame(now) {
     if (state === 'playing') {
       elapsed += dt;
       if (gameMode === 'chaos' && elapsed >= CHAOS_SECS) { elapsed = CHAOS_SECS; endGame('chaos'); }
+      if (gameMode === 'classic' && elapsed >= 180) unlock('survive3');
       D = getDifficulty(elapsed);
       updateSpawner(dt);
       updateClockHud();
