@@ -178,6 +178,26 @@
   .float.warn{color:#ffd3e8;font-size:17px;animation-duration:1.6s}
   @keyframes rise{0%{opacity:0;transform:translate(-50%,-30%) scale(.5)}15%{opacity:1;transform:translate(-50%,-70%) scale(1.12)}100%{opacity:0;transform:translate(-50%,-180%) scale(1)}}
   #flash{position:fixed;inset:0;background:#ffc2dc;opacity:0;pointer-events:none;z-index:3}
+  #tvFade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:20;transition:opacity .35s}
+  #tvFade.on{opacity:1}
+  #tvPlay{position:fixed;inset:0;z-index:15;background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+          padding:calc(env(safe-area-inset-top,0px) + 12px) 12px calc(env(safe-area-inset-bottom,0px) + 12px);touch-action:none;-webkit-user-select:none;user-select:none}
+  #tvPlay[hidden]{display:none}
+  .tv-mid{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:960px;order:0}
+  .tv-frame{width:100%;aspect-ratio:16/9;background:#000;border:10px solid #121212;border-radius:10px;box-shadow:0 0 0 2px #2a2a2a,0 10px 40px rgba(0,0,0,.6);overflow:hidden}
+  .tv-frame canvas{width:100%;height:100%;display:block}
+  .tv-exit{appearance:none;border:2px solid #555;background:#222;color:#eee;font:800 14px var(--body);border-radius:999px;padding:8px 18px;cursor:pointer}
+  .tv-joy{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 18px;border-radius:28px;min-width:150px}
+  .tv-left{background:#0ab9e6;order:1}.tv-right{background:#ff3c28;order:2}
+  .joy-lbl{font:800 11px var(--body);color:rgba(0,0,0,.55);letter-spacing:.04em}
+  .dpad{display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px)}
+  .dpad button,.abxy button{appearance:none;border:none;background:#1c1c1e;color:#ddd;font:800 16px var(--body);border-radius:50%;cursor:pointer;touch-action:none}
+  .dpad button:active,.abxy button:active{transform:scale(.92);background:#3a3a3e}
+  .dpad [data-k=up]{grid-area:1/2}.dpad [data-k=left]{grid-area:2/1}.dpad [data-k=right]{grid-area:2/3}.dpad [data-k=down]{grid-area:3/2}
+  .abxy{display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px)}
+  .abxy .ka{grid-area:2/3;width:52px;height:52px;margin:-5px}.abxy .kb{grid-area:3/2}
+  @media (max-aspect-ratio:5/4){ #tvPlay{flex-direction:row;flex-wrap:wrap;align-content:center} .tv-mid{order:0;flex:0 0 100%} .tv-joy{min-width:0;flex:1 1 40%;max-width:46%} }   /* upright: TV on top, a controller in each hand below */
+  @media (min-aspect-ratio:5/4){ #tvPlay{flex-direction:row} .tv-left{order:0}.tv-mid{order:1;flex:1;min-width:0}.tv-right{order:2} }   /* sideways: controllers either side of the TV */
   #flash.on{animation:flash .4s ease-out}
   #stage.quake{animation:quake .5s cubic-bezier(.36,.07,.19,.97)}
   @keyframes quake{10%,90%{transform:translate(-2px,1px)}20%,80%{transform:translate(5px,-3px)}30%,50%,70%{transform:translate(-9px,4px)}40%,60%{transform:translate(9px,-4px)}100%{transform:none}}
@@ -191,6 +211,13 @@
 
 <div id="stage"></div>
 <div id="flash"></div>
+<div id="tvFade"></div>
+<!-- Playing the console: the TV full screen, with a pair of controllers -->
+<section id="tvPlay" hidden>
+  <div class="tv-joy tv-left"><div class="dpad"><button data-k="up" aria-label="Up">▲</button><button data-k="left" aria-label="Left">◀</button><button data-k="right" aria-label="Right">▶</button><button data-k="down" aria-label="Down">▼</button></div><span class="joy-lbl">Menu</span></div>
+  <div class="tv-mid"><div class="tv-frame" id="tvScreenHost"></div><button class="tv-exit" id="tvExit">✕ Exit game</button></div>
+  <div class="tv-joy tv-right"><div class="abxy"><button data-k="b" class="kb">B</button><button data-k="a" class="ka">A</button></div><span class="joy-lbl">A: select · B: back</span></div>
+</section>
 <div id="fx"></div>
 
 <!-- HUD: one bar across the top -->
@@ -1099,6 +1126,7 @@ let consoleRig = null;
 }
 function tapConsole() {
   const c = consoleRig; if (!c) return;
+  if (c.on && tvMode === 3 && !tvBroken && state === 'playing') { startTvPlay(); return; }   // it's already on: she grabs the controller and plays
   c.on = !c.on; c.led.material.color.setHex(c.on ? 0x3cff6a : 0x2a2a2a);
   tone(1200, 1500, 0.05, 'square', 0.03); if (c.on) tone(900, 1800, 0.12, 'sine', 0.04, 0.06);   // the little 'click-click' boot chime
   if (tvBroken) { tvSpark(); return; }
@@ -1213,9 +1241,10 @@ let tvMode = 0;                                                           // 0 o
 const gameCanvas = document.createElement('canvas'); gameCanvas.width = 384; gameCanvas.height = 216;
 const gameCtx = gameCanvas.getContext('2d'), gameTex = new THREE.CanvasTexture(gameCanvas), tvGameMat = basic(0xffffff, { map: gameTex });
 const GAME_PATH = [[40, 150], [80, 150], [120, 150], [160, 150], [200, 150], [200, 118], [200, 86], [240, 86], [280, 86], [320, 86], [320, 118], [320, 150], [320, 182], [280, 182], [240, 182], [160, 182], [120, 182], [80, 182], [40, 182], [40, 118], [80, 86], [120, 86]];
-const GAME_KIND = GAME_PATH.map((_, i) => i % 7 === 3 ? 'red' : i % 5 === 2 ? 'green' : i % 9 === 6 ? 'event' : 'blue');
+const GAME_KIND = GAME_PATH.map((_, i) => i === 11 ? 'star' : i % 7 === 3 ? 'red' : i % 5 === 2 ? 'green' : i % 9 === 6 ? 'event' : 'blue');
 const GAME_PLAYERS = [{ col: '#e23a32', cap: '#e23a32', at: 3 }, { col: '#3cb44b', cap: '#2b8a3a', at: 1 }, { col: '#f59fc4', cap: '#e56aa0', at: 8 }, { col: '#f2c230', cap: '#b87a14', at: 14 }];
-const game = { turn: 0, hop: 0, hopT: 0, roll: 5, rollT: 0, coins: [34, 17, 19, 12], stars: [1, 1, 0, 1], tick: 0 };
+const game = { turn: 0, hop: 0, hopT: 0, roll: 5, rollT: 0, coins: [34, 17, 19, 12], stars: [1, 1, 0, 1], tick: 0, player: false, cursor: 0, msg: '', msgT: 0, over: false, rewarded: false, hitT: 0 };
+const GAME_START = [3, 1, 8, 14];
 const gameBg = (() => {                                                // the board itself, drawn once
   const c = document.createElement('canvas'); c.width = 384; c.height = 216; const g = c.getContext('2d');
   g.fillStyle = '#5f9a3e'; g.fillRect(0, 0, 384, 216);                                            // grass
@@ -1236,10 +1265,10 @@ const gameBg = (() => {                                                // the bo
   GAME_PATH.forEach(([x, y], i) => {                                  // the spaces
     const k = GAME_KIND[i];
     g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x + 1, y + 3, 13, 9, 0, 0, 7); g.fill();
-    g.fillStyle = k === 'red' ? '#e0454d' : k === 'green' ? '#35b35a' : k === 'event' ? '#c9304a' : '#3f74e0'; g.beginPath(); g.ellipse(x, y, 13, 9, 0, 0, 7); g.fill();
+    g.fillStyle = k === 'red' ? '#e0454d' : k === 'green' ? '#35b35a' : k === 'event' ? '#c9304a' : k === 'star' ? '#f2c230' : '#3f74e0'; g.beginPath(); g.ellipse(x, y, 13, 9, 0, 0, 7); g.fill();
     g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke();
     g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(x - 3, y - 3, 6, 3, 0, 0, 7); g.fill();
-    if (k === 'green' || k === 'event') { g.fillStyle = '#fff'; g.font = 'bold 11px sans-serif'; g.textAlign = 'center'; g.fillText(k === 'green' ? '!' : '?', x, y + 4); }
+    if (k === 'green' || k === 'event' || k === 'star') { g.fillStyle = '#fff'; g.font = 'bold 11px sans-serif'; g.textAlign = 'center'; g.fillText(k === 'green' ? '!' : k === 'star' ? '★' : '?', x, y + 4); }
   });
   return c;
 })();
@@ -1256,7 +1285,7 @@ function drawGame(t) {
   // tokens (the one whose turn it is hops along)
   GAME_PLAYERS.forEach((p, i) => {
     let [x, y] = GAME_PATH[p.at];
-    if (i === game.turn % 4 && game.hop > 0) { const [nx, ny] = GAME_PATH[(p.at + 1) % GAME_PATH.length], k = game.hopT; x += (nx - x) * k; y += (ny - y) * k - Math.sin(k * Math.PI) * 10; }
+    if (i === game.turn % 4 && game.hop > 0) { const [nx, ny] = GAME_PATH[(p.at + 1) % GAME_PATH.length], k = Math.max(0, game.hopT); x += (nx - x) * k; y += (ny - y) * k - Math.sin(k * Math.PI) * 10; }
     drawPawn(g, x + (i - 1.5) * 3, y - 6, p);
   });
   // scoreboard
@@ -1268,25 +1297,121 @@ function drawGame(t) {
   });
   // side menu
   g.fillStyle = 'rgba(10,40,40,.7)'; g.fillRect(0, 0, 88, 62);
-  g.font = 'bold 11px sans-serif'; g.textAlign = 'left'; g.fillStyle = '#ffd23a'; g.fillText('▶', 4, 17); g.fillStyle = '#fff'; g.fillText('Dice Block', 16, 17); g.fillText('Items', 16, 35); g.fillText('Map', 16, 53);
+  g.font = 'bold 11px sans-serif'; g.textAlign = 'left'; g.fillStyle = '#ffd23a'; g.fillText('▶', 4, 17 + game.cursor * 18); g.fillStyle = '#fff'; g.fillText('Dice Block', 16, 17); g.fillText('Items', 16, 35); g.fillText('Map', 16, 53);
+  if (game.player) { g.fillStyle = '#ffd23a'; g.font = 'bold 8px sans-serif'; g.textAlign = 'center'; g.fillText('YOU', 114, 30); }
   // dice block held up by the current player, bottom-left
   const p = GAME_PLAYERS[game.turn % 4]; drawPawn(g, 40, 196, p, true);
-  const bob = Math.sin(t * 6) * 2, dx = 62, dy = 150 + bob;
+  const bob = Math.sin(t * 6) * 2 - game.hitT * 18, dx = 62, dy = 150 + bob;
   g.fillStyle = '#e23a32'; g.fillRect(dx - 1, dy - 1, 34, 34); g.fillStyle = '#fff'; g.fillRect(dx + 2, dy + 2, 28, 28);
   g.fillStyle = '#e23a32'; g.font = 'bold 22px sans-serif'; g.textAlign = 'center'; g.fillText(String(game.roll), dx + 16, dy + 24);
   g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(150, 202, 84, 14); g.fillStyle = '#fff'; g.font = 'bold 10px sans-serif'; g.fillText(`Turn ${Math.min(10, 1 + (game.turn >> 2))}/10`, 192, 212);
+  const mine = game.player && game.turn % 4 === 0 && !game.hop && !game.over;
+  if (mine && game.cursor === 0) { g.fillStyle = '#ffd23a'; g.font = 'bold 13px sans-serif'; g.textAlign = 'left'; g.fillText('Press A!', 100, 162 + Math.sin(t * 8) * 2); }
+  if (game.player && !mine && !game.over && !game.msgT) { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(250, 202, 130, 14); g.fillStyle = '#fff'; g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.fillText(['', 'Green', 'Pink', 'Yellow'][game.turn % 4] + "'s turn…", 315, 212); }
+  if (game.msgT > 0) { g.fillStyle = 'rgba(0,0,0,.72)'; g.fillRect(92, 92, 200, 34); g.strokeStyle = '#ffd23a'; g.lineWidth = 2; g.strokeRect(92, 92, 200, 34); g.fillStyle = '#fff'; g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.fillText(game.msg, 192, 114); }
+  if (game.over) {                                                    // results
+    g.fillStyle = 'rgba(10,15,30,.82)'; g.fillRect(72, 40, 240, 150); g.strokeStyle = '#ffd23a'; g.lineWidth = 2; g.strokeRect(72, 40, 240, 150);
+    g.fillStyle = '#ffd23a'; g.font = 'bold 16px sans-serif'; g.textAlign = 'center'; g.fillText('Results', 192, 62);
+    gameRanking().forEach((i, r) => { const y = 84 + r * 22; g.fillStyle = GAME_PLAYERS[i].col; g.beginPath(); g.arc(112, y - 4, 7, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 12px sans-serif'; g.textAlign = 'left'; g.fillText(`${['1st', '2nd', '3rd', '4th'][r]}${i === 0 && game.player ? ' (you)' : ''}`, 126, y); g.textAlign = 'right'; g.fillText(`★${game.stars[i]}  ●${game.coins[i]}`, 296, y); });
+    g.fillStyle = '#ffd23a'; g.font = 'bold 11px sans-serif'; g.textAlign = 'center'; g.fillText('A: play again · Exit: back to the room', 192, 182);
+  }
   gameTex.needsUpdate = true;
 }
+const gameRanking = () => [0, 1, 2, 3].sort((a, b) => game.stars[b] - game.stars[a] || game.coins[b] - game.coins[a]);
+function gameMsg(m, t) { game.msg = m; game.msgT = t || 1.4; }
+function resetBoardGame() {
+  GAME_PLAYERS.forEach((p, i) => p.at = GAME_START[i]);
+  Object.assign(game, { turn: 0, hop: 0, hopT: 0, rollT: 1.2, coins: [10, 10, 10, 10], stars: [0, 0, 0, 0], over: false, rewarded: false, cursor: 0, msgT: 0 });
+}
 function updateGame(dt) {
+  game.msgT = Math.max(0, game.msgT - dt); game.hitT = Math.max(0, game.hitT - dt * 3);
+  if (game.over) return;
+  const i = game.turn % 4;
   if (game.hop > 0) {                                                 // hopping space to space
     game.hopT += dt * 3.2;
-    if (game.hopT >= 1) { const p = GAME_PLAYERS[game.turn % 4]; p.at = (p.at + 1) % GAME_PATH.length; game.hopT = 0; game.hop--; tone(880, 990, 0.05, 'square', 0.015);
-      if (!game.hop) { const k = GAME_KIND[p.at], i = game.turn % 4; game.coins[i] = Math.max(0, game.coins[i] + (k === 'red' ? -3 : 3)); tone(k === 'red' ? 330 : 1320, k === 'red' ? 220 : 1760, 0.12, 'square', 0.02); game.turn++; game.rollT = 1.2; } }
+    if (game.hopT >= 1) {
+      const p = GAME_PLAYERS[i]; p.at = (p.at + 1) % GAME_PATH.length; game.hopT = 0; game.hop--; tone(880, 990, 0.05, 'square', 0.015);
+      if (GAME_KIND[p.at] === 'star' && game.coins[i] >= 20) {          // passing the star space with 20 coins buys a star
+        game.coins[i] -= 20; game.stars[i]++; [784, 988, 1175, 1568].forEach((f, k) => tone(f, f, 0.1, 'square', 0.025, k * 0.08));
+        if (game.player) gameMsg(i === 0 ? 'You got a Star! ★' : ['', 'Green', 'Pink', 'Yellow'][i] + ' got a Star!');
+      }
+      if (!game.hop) {                                                // landed
+        const k = GAME_KIND[p.at], d = k === 'red' ? -3 : k === 'green' ? 5 : k === 'event' ? (Math.random() < 0.5 ? -5 : 8) : k === 'star' ? 0 : 3;
+        game.coins[i] = Math.max(0, game.coins[i] + d);
+        tone(d < 0 ? 330 : 1320, d < 0 ? 220 : 1760, 0.12, 'square', 0.02);
+        if (game.player && i === 0) gameMsg(d < 0 ? `Oh no! ${d} coins` : d ? `+${d} coins!` : 'The Star space!', 1.1);
+        game.turn++; game.rollT = game.player ? 0.9 : 1.2;
+        if (game.turn >= 40) {                                        // 10 rounds of four turns
+          if (game.player) { game.over = true; [523, 659, 784, 1047].forEach((f, k) => tone(f, f, 0.14, 'square', 0.03, k * 0.12)); }
+          else resetBoardGame();                                      // (on the TV in the room it just loops)
+        }
+      }
+    }
+  } else if (game.player && i === 0) {                                // your turn: the dice spins until you hit it
+    if ((game.tick = (game.tick + 1) % 3) === 0) game.roll = 1 + (Math.random() * 6 | 0);
   } else {
     game.rollT -= dt;
     if (game.rollT > 0) { if ((game.tick = (game.tick + 1) % 4) === 0) game.roll = 1 + (Math.random() * 6 | 0); }   // dice spinning
     else { game.hop = game.roll; game.hopT = 0; }
   }
+}
+function gameInput(k) {
+  if (k === 'exit') return exitTvPlay();
+  if (game.over) { if (k === 'a') { resetBoardGame(); gameMsg('New game!'); } return; }
+  if (k === 'up' || k === 'left') { game.cursor = (game.cursor + 2) % 3; tone(660, 660, 0.03, 'square', 0.02); }
+  if (k === 'down' || k === 'right') { game.cursor = (game.cursor + 1) % 3; tone(660, 660, 0.03, 'square', 0.02); }
+  if (k === 'b') { game.msgT = 0; game.cursor = 0; }
+  if (k === 'a') {
+    const mine = game.turn % 4 === 0 && !game.hop;
+    if (game.cursor === 0) {
+      if (!mine) { gameMsg('Wait for your turn!', 1); return; }
+      game.hop = game.roll; game.hopT = -0.35; game.hitT = 1; tone(1047, 1397, 0.08, 'square', 0.03); gameMsg(`You rolled a ${game.roll}!`, 0.9);
+    } else if (game.cursor === 1) gameMsg('No items yet!');
+    else gameMsg('The Star is on the gold ★ space', 1.8);
+  }
+}
+/* ---------- playing the console: the cat grabs the controller, the room fades to the TV, and you play the board game ---------- */
+let tvCine = null, tvPad = null;
+function startTvPlay() {
+  if (state !== 'playing' || tvCine) return;
+  state = 'tvcine'; tvCine = { t: 0 };
+  if (!tvPad) {                                                       // the pair of controllers she snatches off the console
+    tvPad = new THREE.Group(); scene.add(tvPad);
+    for (const [sx, c] of [[-1, 0x0ab9e6], [1, 0xff3c28]]) box(IN(1.35), IN(4), IN(0.6), new THREE.MeshPhongMaterial({ color: c, shininess: 50 }), sx * IN(0.9), 0, 0, tvPad);
+  }
+  tvPad.position.copy(consoleRig.g.position).setY(CAB_H + IN(3)); tvPad.visible = true;
+  tvPad.userData.from = tvPad.position.clone(); tvPad.userData.to = new THREE.Vector3(CAT_POS.x + 0.2, 1.3, CAT_POS.z + 0.45);
+  startSwipe(consoleRig.g.position.clone().setY(CAB_H + 0.2), true); sfx.whoosh(); tailWag = 1.5;
+  ui.hud.hidden = true;
+}
+function updateTvCine(dt) {
+  if (!tvCine) return;
+  const c = tvCine; c.t += dt;
+  const k = Math.min(1, c.t / 0.7), e = k * k * (3 - 2 * k);
+  tvPad.position.lerpVectors(tvPad.userData.from, tvPad.userData.to, e); tvPad.position.y += Math.sin(k * Math.PI) * 0.8;
+  tvPad.rotation.set(k * 6, k * 4, 0);
+  if (c.t > 0.75 && !c.faded) { c.faded = true; $('tvFade').classList.add('on'); }
+  if (c.t > 1.15) {                                                   // cut to the TV, full screen
+    tvCine = null; tvPad.visible = false;
+    const host = $('tvScreenHost'); if (!host.contains(gameCanvas)) host.appendChild(gameCanvas);
+    game.player = true; resetBoardGame(); setTVMode(3); gameMsg('Your turn first! Hit the block', 1.8);
+    $('tvPlay').hidden = false; state = 'tvgame';
+    setTimeout(() => $('tvFade').classList.remove('on'), 60);
+    gameJingle();
+  }
+}
+function exitTvPlay() {
+  if (state !== 'tvgame') return;
+  $('tvFade').classList.add('on');
+  setTimeout(() => {
+    $('tvPlay').hidden = true; ui.hud.hidden = false; state = 'playing'; last = performance.now();
+    if (game.over && !game.rewarded) {                                // a board-game win pays out in the real game
+      game.rewarded = true; const place = gameRanking().indexOf(0);
+      const pts = [300, 150, 75, 25][place]; bonus(pts, consoleRig.g.position, place === 0 ? 'Board champ!' : 'Game night');
+    }
+    game.player = false;
+    setTimeout(() => $('tvFade').classList.remove('on'), 60);
+  }, 380);
 }
 function gameJingle() { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, f, 0.1, 'square', 0.025, i * 0.09)); }
 const tvAudio = { node: null, gain: null, nextLine: 0 };
@@ -1334,7 +1459,7 @@ function updateTV(dt) {
   if (tvAudio.gain) tvAudio.gain.gain.value = state === 'playing' || state === 'debug' ? 0.03 : 0;   // hush while paused
   if (tvMode === 3) {                                                     // the console game: tokens hop round the board
     updateGame(dt);
-    if ((staticTick = (staticTick + 1) % 3) === 0) drawGame(clock);
+    if (game.player || (staticTick = (staticTick + 1) % 3) === 0) drawGame(clock);
     tvLight.intensity = 0.4 + Math.sin(clock * 3) * 0.05;
     return;
   }
@@ -4018,7 +4143,7 @@ function showBestOnStart() { const b = getBest(); $('bestStart').textContent = b
 showBestOnStart();
 
 /* ---------- screens ---------- */
-function clearField() { for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.strike = null; heist.ring.visible = false; heist.hold = null; } }
+function clearField() { if (state === 'tvgame' || tvCine) { tvCine = null; if (tvPad) tvPad.visible = false; $('tvPlay').hidden = true; $('tvFade').classList.remove('on'); game.player = false; } for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.strike = null; heist.ring.visible = false; heist.hold = null; } }
 function resetGame() {
   clearField();
   cheeses.forEach(c => c.reset());
@@ -4074,6 +4199,13 @@ $('startBtn').addEventListener('click', () => startGame('classic'));
 $('chaosBtn').addEventListener('click', () => startGame('chaos'));
 $('mouseBtn').addEventListener('click', () => startGame('mouse'));
 $('againBtn').addEventListener('click', () => startGame(gameMode));
+document.querySelectorAll('#tvPlay [data-k]').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); gameInput(b.dataset.k); }));
+$('tvExit').addEventListener('click', () => gameInput('exit'));
+window.addEventListener('keydown', e => {
+  if (state !== 'tvgame') return;
+  const k = { arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right', enter: 'a', ' ': 'a', a: 'a', z: 'a', b: 'b', x: 'b', backspace: 'b', escape: 'exit' }[e.key.toLowerCase()];
+  if (k) { e.preventDefault(); gameInput(k); }
+});
 $('overTitleBtn').addEventListener('click', () => { ui.over.hidden = true; quitToTitle(); });
 $('pauseBtn').addEventListener('click', pauseGame);
 $('resumeBtn').addEventListener('click', resumeGame);
@@ -4664,7 +4796,7 @@ function frame(now) {
   updateCat(dt, clock, danger);
   updateParticles(dt);
   updateProps(dt);
-  updateTV(dt);
+  updateTV(dt); updateTvCine(dt);
   updateGun(dt);
   updateStar(dt);
   updateMirror(dt);
@@ -4703,7 +4835,7 @@ function frame(now) {
   candleLight.intensity = (0.32 + flick / flames.length * 0.1) * lit / flames.length;
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
 
-  renderer.render(scene, camera);
+  if (state !== 'tvgame') renderer.render(scene, camera);           // (the room is hidden behind the full-screen TV)
 }
 requestAnimationFrame(frame);
 })();
