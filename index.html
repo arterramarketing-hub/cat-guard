@@ -3689,15 +3689,21 @@ function handleTap(clientX, clientY) {
 }
 // everything the cat can bat, with a generous reach radius so near-misses still count
 const _ip = new THREE.Vector3();
+const gunReady = () => gunRig && gunRig.state === 'cupboard' && pistolDoor && pistolDoor.inside.visible && pistolDoor.angle < -0.6;   // open cupboard, pistol inside
 function interactables() {
   const list = [];
+  if (gunReady()) {                                                   // a big, forgiving target on the pistol while its cupboard is open
+    cupboardPistol.getWorldPosition(_ip);
+    let m = null; cupboardPistol.traverse(o => { if (!m && o.isMesh) m = o; });
+    list.push({ obj: m, pos: _ip.clone(), r: 1.05 });
+  }
   for (const p of props) {
     const r = p.restHalf === 0 ? 0.5 : p.restHalf > 0.2 ? 0.7 : 0.5;          // disco ball / pillow / candle
     list.push({ obj: p.obj.isMesh ? p.obj : p.obj.children[0], pos: p.obj.position.clone(), r });
   }
   screen.getWorldPosition(_ip); list.push({ obj: screen, pos: _ip.clone(), r: 1.4 });
   if (starMesh) list.push({ obj: starMesh, pos: starMesh.position.clone(), r: 1.0 });
-  for (const d of dresserDoors) list.push({ obj: d.hinge.children[0], pos: d.center, r: 0.55 });
+  for (const d of dresserDoors) if (!(d === pistolDoor && gunReady())) list.push({ obj: d.hinge.children[0], pos: d.center, r: 0.55 });   // (that door's bubble goes to the gun instead)
   if (diffuserRig && diffuserRig.state === 'rest') list.push({ obj: diffuserRig.vase.children[0], pos: diffuserRig.center, r: 0.45 });
   if (tableRig && !tableRig.broken) list.push({ obj: tableRig.pieces[0].mesh, pos: tableRig.center, r: 0.9 });
   if (windowRig) { windowRig.bl.getWorldPosition(_ip); list.push({ obj: windowRig.bl, pos: _ip.clone(), r: 1.2 }); }
@@ -3722,6 +3728,9 @@ function interact(o, point, face) {
   if (o.userData.tv) { startSwipe(point, true); if (tvBroken) tvSpark(); else { setTVMode((tvMode + 1) % 3); sfx.tvStatic(tvOn); bonus(5); } tapShake(); return true; }
   if (o.userData.star) { startSwipe(point, true); setTimeout(nudgeStar, 90); tapShake(); return true; }
   if (o.userData.wallpaper) { if (!point) return false; startSwipe(point, true); const n = o.userData.normal; setTimeout(() => hitWallpaper(point, n), 90); tapShake(); return true; }
+  if (gunReady() && ((o.userData.dresserDoor === pistolDoor) || (o.userData.dresser && point && Math.abs(point.x - pistolDoor.x) < pistolDoor.hinge.children[0].geometry.parameters.width * 0.8))) {
+    startSwipe(point || pistolDoor.center, true); setTimeout(takeGun, 90); return true;   // anywhere on the open gun cupboard (its door too) grabs the gun
+  }
   if (o.userData.dresserDoor || o.userData.dresser) { startSwipe(point, true); setTimeout(() => toggleDresserDoor(o.userData.dresserDoor ? o.userData.dresserDoor.x : point.x), 90); tapShake(); return true; }
   if (o.userData.blanket) { const br = o.userData.blanketRig || blanketRig; if (!br || br.state === 'flying' || br.state === 'gone' || br.state === 'burrito') return false; startSwipe(point, true); setTimeout(() => blanketToCat(point.clone(), br), 90); return true; }
   if (o.userData.fireHit) { if (!fireRig || fireRig.target === 0 || fireRig.level < 0.4) return false; startSwipe(point, true); setTimeout(burnPaw, 90); return true; }
