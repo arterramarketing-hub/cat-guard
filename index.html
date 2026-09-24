@@ -148,6 +148,11 @@
   #mirrorFlash.go{background:radial-gradient(circle,rgba(255,255,255,1),rgba(200,170,255,.9));animation:mflash .8s ease-out forwards}
   #mirrorFlash.hurt{background:radial-gradient(ellipse at 50% 50%,rgba(255,0,0,0) 35%,rgba(255,20,40,.7) 100%);animation:mflash .5s ease-out forwards}
   @keyframes mflash{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+  /* cat's-eye view with a blanket thrown over her: the whole screen is under it (knit fabric, a sliver of light at the hem) */
+  #blanketCover{position:fixed;inset:-6%;z-index:4;pointer-events:none;display:grid;place-items:center;animation:thrash .5s ease-in-out infinite alternate}
+  #blanketCover[hidden]{display:none}
+  #blanketCover span{font:800 16px var(--body);color:rgba(255,255,255,.75);background:rgba(0,0,0,.35);padding:6px 14px;border-radius:999px;margin-top:20vh}
+  @keyframes thrash{0%{transform:translate(0,0) rotate(0) scale(1)}35%{transform:translate(-10px,6px) rotate(-1.2deg) scale(1.02)}70%{transform:translate(8px,-5px) rotate(1deg) scale(1.01)}100%{transform:translate(-4px,9px) rotate(.4deg) scale(1.03)}}
   /* catnip mode: a dreamy rainbow haze over everything */
   #catnipFx{position:fixed;inset:-10%;pointer-events:none;z-index:3;opacity:0;transition:opacity 1.2s ease;mix-blend-mode:overlay;
             background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 30%,rgba(90,255,120,.55) 100%),
@@ -311,6 +316,7 @@
   <div class="tv-joy tv-right"><div class="abxy"><button data-k="b" class="kb">B</button><button data-k="a" class="ka">A</button></div><span class="joy-lbl">A: select · B: back</span></div>
 </section>
 <div id="catnipFx"></div>
+<div id="blanketCover" hidden><span>Mmmph! Tap to fling it off</span></div>
 <div id="fx"></div>
 <div id="paintSplash"></div>
 <div id="walkUI" hidden><div id="walkStick"><div id="walkKnob"></div></div><button id="walkJump">Jump</button><button class="walk-btn" id="walkSwipe"><span><b>🐾</b>Swipe</span></button><button class="walk-btn" id="walkMeow"><span><b>😺</b>Meow</span></button><div id="walkCaption"></div><div id="mirrorHud" hidden></div></div>
@@ -1618,7 +1624,7 @@ function exitTvPlay() {
       const pts = CONSOLE_PRIZES[place]; bonus(pts, consoleRig.g.position, place === 0 ? 'Board champ!' : 'Game night'); if (!place) { unlock('boardWin'); consoleWin('Board game champion!', pts); }
     }
     if (kart.over && !kart.rewarded) {            // so does a kart race
-      kart.rewarded = true; const pts = CONSOLE_PRIZES[kart.place - 1]; bonus(pts, consoleRig.g.position, kart.place === 1 ? 'Kart champ!' : 'Race day'); if (kart.place === 1) { unlock('kartWin'); consoleWin('Kart race champion!', pts); }
+      kart.rewarded = true; const fp = kart.finalPlace || kart.place, pts = CONSOLE_PRIZES[fp - 1]; bonus(pts, consoleRig.g.position, fp === 1 ? 'Kart champ!' : 'Race day'); if (fp === 1) { unlock('kartWin'); consoleWin('Kart race champion!', pts); }
     }
     if (retro.won && !retro.rewarded) {                               // beat the game inside the game inside the game
       retro.rewarded = true; bonus(1500, consoleRig.g.position, 'Game-ception!'); unlock('inception'); consoleWin('Game-ception complete!', 1500);
@@ -1650,7 +1656,7 @@ const kSegs = [];
 KART.LEN = kSegs.length * KART.SEG;
 const kart = { pos: 0, x: 0, speed: 0, lap: 0, coins: 0, item: null, boost: 0, bump: 0, state: 'count', t: 0, sky: 0, place: 1, over: false, rewarded: false, cars: [], msg: '', msgT: 0 };
 function resetKart() {
-  Object.assign(kart, { pos: 0, x: 0.3, speed: 0, lap: 0, coins: 0, item: null, boost: 0, bump: 0, state: 'count', t: 0, over: false, rewarded: false, msgT: 0, lastBeep: 4 });
+  Object.assign(kart, { pos: 0, x: 0.3, speed: 0, lap: 0, coins: 0, item: null, boost: 0, bump: 0, state: 'count', t: 0, over: false, rewarded: false, msgT: 0, lastBeep: 4, finalPlace: 0, final: null, saidF: -1 });
   kart.cars = [{ col: '#3cb44b', cap: '#2b8a3a', skill: 0.9 }, { col: '#f59fc4', cap: '#e56aa0', skill: 0.86 }, { col: '#f2c230', cap: '#b87a14', skill: 0.94 }]
     .map((c, i) => ({ ...c, pos: KART.SEG * (4 + i * 3), x: [-0.5, 0.45, -0.1][i], lap: 0, speed: 0, wob: Math.random() * 6 }));
   kSegs.forEach(sg => { if (sg.coin) sg.coin.got = false; if (sg.boxes) sg.boxes.forEach(b => b.got = 0); });
@@ -1667,6 +1673,12 @@ function updateKart(dt) {
     return;
   }
   if (K.state === 'done') { if (auto && K.t > 4) resetKart(); return; }
+  if (K.state === 'finish') {                                         // the slow-motion run-out and the ceremony
+    if (K.t < FINISH_CUT) { K.pos = (K.pos + K.speed * 0.25 * dt) % KART.LEN; for (const c of K.cars) c.pos = (c.pos + c.speed * 0.25 * dt) % KART.LEN; }
+    const ln = finishLine(K); if (ln && ln.i !== K.saidF) { K.saidF = ln.i; speak(ln.text); }
+    if (K.t >= FINISH_T) { K.state = 'done'; K.t = 0; hush(); }
+    return;
+  }
   // ---- you (or the autopilot on the room's TV)
   const seg = kSeg(K.pos), pct = K.speed / KART.MAX;
   let steer = 0, gas = false, brake = false;
@@ -1700,12 +1712,103 @@ function updateKart(dt) {
     if (dz < KART.SEG * 0.8 && Math.abs(c.x - K.x) < 0.35 && !K.bump) { K.bump = 0.6; K.speed *= 0.55; K.x += K.x < c.x ? -0.25 : 0.25; tone(160, 90, 0.12, 'square', 0.04); }
   }
   K.place = kartPlace();
-  if (K.lap >= KART.LAPS) { K.state = 'done'; K.t = 0; K.over = game.player; if (game.player) [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.14, 'square', 0.03, i * 0.12)); }
+  if (K.lap >= KART.LAPS) {
+    if (game.player) {                                                // your race: the finish cinematic
+      K.state = 'finish'; K.t = 0; K.over = true; K.saidF = -1; K.finalPlace = K.place;
+      K.final = [{ you: true, col: '#e23a32', cap: '#e23a32', p: kProg(K) }, ...K.cars.map(c => ({ col: c.col, cap: c.cap, p: kProg(c) }))].sort((a, b) => b.p - a.p);
+      K.final.forEach((r, i) => { if (r.you && i + 1 !== K.finalPlace) K.finalPlace = i + 1; });
+      [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f, 0.16, 'square', 0.035, i * 0.11));
+    } else { K.state = 'done'; K.t = 0; K.over = false; }
+  }
 }
 function kartUseItem() { if (kart.item !== 'mushroom') return; kart.item = null; kart.boost = 1.6; kart.speed = Math.max(kart.speed, KART.MAX * 1.2); [400, 600, 800].forEach((f, i) => tone(f, f * 1.5, 0.08, 'sawtooth', 0.025, i * 0.04)); }
 function kartInput(k) {
-  if (kart.over) { if (k === 'a') { if (kart.place === 1 && kart.t > 1) { startStory(); return; } resetKart(); kart.msg = 'Get ready!'; kart.msgT = 1; } return; }
+  if (kart.state === 'finish') { if (k === 'a') { kart.state = 'done'; kart.t = 1.2; hush(); } return; }   // skip the ceremony
+  if (kart.over) { if (k === 'a' && kart.t > 0.6) { if (kart.finalPlace === 1) { startStory(); return; } resetKart(); kart.msg = 'Get ready!'; kart.msgT = 1; } return; }   // (a press in the first moment is ignored, so a skip-tap can't restart the race)
   if (k === 'b') kartUseItem();
+}
+function cineOverlay(g, W, H, line, age, fade, bar, skipLabel) {   // letterbox bars, fade to black, a little film grain and a subtitle in the bottom bar
+  const b = bar == null ? 24 : bar;
+  for (let i = 0; i < 70; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.07)'; g.fillRect(Math.random() * W, Math.random() * H, 1.2, 1.2); }
+  if (fade > 0) { g.fillStyle = `rgba(0,0,0,${Math.min(1, fade)})`; g.fillRect(0, 0, W, H); }
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, b); g.fillRect(0, H - b, W, b);
+  if (line && b > 14) {
+    g.save(); g.globalAlpha = Math.min(1, Math.max(0, age) / 0.35); g.font = 'italic 600 12.5px sans-serif'; g.textAlign = 'center';
+    g.shadowColor = 'rgba(0,0,0,.9)'; g.shadowBlur = 4; g.fillStyle = '#fff'; g.fillText(line, W / 2, H - b / 2 + 4.5); g.restore();
+  }
+  if (skipLabel && b > 14) { g.font = 'bold 9px sans-serif'; g.fillStyle = 'rgba(255,255,255,.55)'; g.textAlign = 'right'; g.fillText(skipLabel, W - 8, b / 2 + 3); }
+}
+// the finish: slow motion over the line, then the podium ceremony (player races only), then "Press A to continue"
+const FINISH_T = 7.4, FINISH_CUT = 1.9;
+const FINISH_LINES = {
+  1: [[0.15, 'And across the line…'], [0.95, "It's a win!"], [2.5, 'Ladies and gentlemen… your champion!'], [4.7, 'Princess Racer takes the gold!']],
+  2: [[0.15, 'Across the line…'], [0.95, 'Second place!'], [2.5, 'What a race!'], [4.7, 'Silver for Princess Racer. So close!']],
+  3: [[0.15, 'Across the line…'], [0.95, 'Third place!'], [2.5, 'Up on the podium!'], [4.7, 'Bronze for Princess Racer. Not bad at all!']],
+  4: [[0.15, 'Across the line…'], [0.95, 'Fourth place…'], [2.5, 'The podium is full this time.'], [4.7, "There's always the next race."]],
+};
+function finishLine(K) { const L = FINISH_LINES[K.finalPlace] || FINISH_LINES[4]; let i = -1; for (let k = 0; k < L.length; k++) if (K.t >= L[k][0]) i = k; return i < 0 ? null : { i, text: L[i][1], age: K.t - L[i][0] }; }
+function drawFinishOverlay(g, W, H, K) {                              // over the slow-motion race: a waving chequered flag, FINISH!, confetti
+  const t = K.t, bar = Math.min(24, t / 0.5 * 24);
+  for (let i = 0; i < 60; i++) {                                     // confetti: each piece falls on its own seeded path
+    const sx = (i * 97) % W, sp = 40 + (i * 37) % 60, x = sx + Math.sin(t * 3 + i) * 14, y = -10 + sp * t + (i * 13) % 40;
+    if (y > H) continue; g.save(); g.translate(x, y); g.rotate(t * 5 + i); g.fillStyle = ['#ffd23a', '#ff5fa2', '#3fb8ff', '#3cd65a', '#ffffff'][i % 5]; g.fillRect(-2.5, -1.5, 5, 3); g.restore();
+  }
+  const fx = W / 2 - 60, fy = 34;                                     // the flag
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 10; c++) {
+    const wave = Math.sin(t * 8 - c * 0.7) * 3; g.fillStyle = (r + c) % 2 ? '#111' : '#fff';
+    g.fillRect(fx + c * 12, fy + r * 7 + wave, 12, 7);
+  }
+  const k = Math.min(1, t / 0.35), s = 0.6 + 0.4 * k + Math.sin(t * 6) * 0.02;
+  g.save(); g.translate(W / 2, H / 2 + 8); g.scale(s, s); g.font = 'bold 44px sans-serif'; g.textAlign = 'center'; g.lineWidth = 7; g.strokeStyle = '#000'; g.strokeText('FINISH!', 0, 0);
+  g.fillStyle = K.finalPlace === 1 ? '#ffd23a' : '#ffffff'; g.fillText('FINISH!', 0, 0); g.restore();
+  const fade = t > FINISH_CUT - 0.35 ? (t - (FINISH_CUT - 0.35)) / 0.35 : 0, ln = finishLine(K);
+  cineOverlay(g, W, H, ln && ln.text, ln ? ln.age : 0, fade, bar, 'A: skip');
+}
+function drawPodium(K) {                                              // the ceremony: night stadium, spotlights, crowd flashes, podium, fireworks
+  const g = gameCtx, W = KART.W, H = KART.H, t = K.t - FINISH_CUT, push = 1 + Math.min(1, t / (FINISH_T - FINISH_CUT)) * 0.08;
+  g.save(); g.translate(W / 2, H / 2); g.scale(push, push); g.translate(-W / 2, -H / 2);
+  const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#070b24'); sky.addColorStop(1, '#2c1a4c'); g.fillStyle = sky; g.fillRect(-20, -20, W + 40, H + 40);
+  for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(255,255,255,${0.3 + 0.4 * Math.abs(Math.sin(t * 2 + i))})`; g.fillRect((i * 71) % W, (i * 29) % 70, 1.3, 1.3); }
+  for (const [x0, ph] of [[20, 0], [W - 20, 2]]) {                    // two sweeping spotlights
+    const a = Math.sin(t * 0.9 + ph) * 0.45 + (x0 < W / 2 ? 0.5 : -0.5), len = 260;
+    g.save(); g.translate(x0, 8); g.rotate(a); const gr = g.createLinearGradient(0, 0, 0, len); gr.addColorStop(0, 'rgba(255,250,220,.35)'); gr.addColorStop(1, 'rgba(255,250,220,0)');
+    g.fillStyle = gr; g.beginPath(); g.moveTo(-4, 0); g.lineTo(4, 0); g.lineTo(45, len); g.lineTo(-45, len); g.fill(); g.restore();
+  }
+  for (let i = 0; i < 6; i++) {                                      // fireworks
+    const t0 = 0.25 + i * 0.75, u = t - t0; if (u < 0 || u > 1.3) continue;
+    const cx = 50 + (i * 83) % (W - 100), cy = 30 + (i * 37) % 50, col = ['#ffd23a', '#ff5fa2', '#3fb8ff', '#3cd65a', '#ffffff', '#ff8a2a'][i];
+    g.globalAlpha = Math.max(0, 1 - u / 1.3); g.fillStyle = col;
+    for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, r = u * 55; g.fillRect(cx + Math.cos(a) * r - 1.2, cy + Math.sin(a) * r + u * u * 18 - 1.2, 2.4, 2.4); }
+    g.globalAlpha = 1;
+  }
+  g.fillStyle = '#140c24'; for (let x = -10; x < W + 20; x += 14) { g.beginPath(); g.arc(x, 150 + Math.sin(x) * 3, 9, Math.PI, 0); g.fill(); g.fillRect(x - 9, 150 + Math.sin(x) * 3, 18, 20); }   // the crowd
+  for (let i = 0; i < 12; i++) if (Math.sin(t * 7 + i * 12.9) > 0.93) { g.fillStyle = '#fff'; g.beginPath(); g.arc((i * 53 + 17) % W, 146 + (i % 3) * 6, 2.2, 0, 7); g.fill(); }   // camera flashes
+  g.fillStyle = '#2a2140'; g.fillRect(-20, 168, W + 40, 60);                                                                 // stage floor
+  const blocks = { 1: [W / 2, 120, '#f2c230'], 2: [W / 2 - 62, 138, '#c9ced6'], 3: [W / 2 + 62, 150, '#d08a4a'] };
+  for (const pl of [2, 3, 1]) {
+    const [cx, top, col] = blocks[pl];
+    g.fillStyle = col; g.fillRect(cx - 30, top, 60, 190 - top); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(cx - 30, top, 60, 5);
+    g.font = 'bold 22px sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,.35)'; g.fillText(String(pl), cx, top + 30);
+  }
+  (K.final || []).forEach((r, i) => {                                // the racers in finishing order
+    const pl = i + 1, bounce = r.you ? Math.abs(Math.sin(t * 5)) * -4 : 0;
+    if (pl <= 3) { const [cx, top] = blocks[pl]; drawKartSprite(g, cx, top - 1 + bounce, 0.95, r.col, r.cap, 0); if (r.you) { g.font = 'bold 10px sans-serif'; g.fillStyle = '#ffd23a'; g.textAlign = 'center'; g.fillText('YOU', cx, top - 48 + bounce); } }
+    else {
+      drawKartSprite(g, W - 40, 196, 0.7, r.col, r.cap, 0);
+      if (r.you) { g.fillStyle = 'rgba(140,150,170,.9)'; for (const [dx, rr] of [[-8, 8], [3, 10], [13, 7]]) { g.beginPath(); g.arc(W - 40 + dx, 150, rr, 0, 7); g.fill(); } g.fillStyle = '#7fb8ff'; for (let k = 0; k < 5; k++) g.fillRect(W - 52 + k * 6, 160 + ((t * 60 + k * 9) % 22), 1.2, 4); }   // a little rain cloud
+    }
+  });
+  if (K.finalPlace === 1) {                                           // the trophy, glinting above the winner
+    const cx = W / 2, cy = 72 + Math.sin(t * 2) * 3; g.fillStyle = '#ffd23a';
+    g.beginPath(); g.moveTo(cx - 12, cy - 12); g.lineTo(cx + 12, cy - 12); g.lineTo(cx + 8, cy + 4); g.lineTo(cx - 8, cy + 4); g.fill();
+    g.fillRect(cx - 2, cy + 4, 4, 7); g.fillRect(cx - 8, cy + 11, 16, 3);
+    g.strokeStyle = '#ffd23a'; g.lineWidth = 2; g.beginPath(); g.arc(cx - 13, cy - 6, 5, Math.PI / 2, Math.PI * 1.5); g.stroke(); g.beginPath(); g.arc(cx + 13, cy - 6, 5, -Math.PI / 2, Math.PI / 2); g.stroke();
+    g.fillStyle = `rgba(255,255,255,${0.5 + 0.5 * Math.sin(t * 6)})`; g.fillRect(cx + 4, cy - 10, 2, 2);
+  }
+  g.restore();
+  const ln = finishLine(K), fadeIn = t < 0.4 ? 1 - t / 0.4 : 0;
+  cineOverlay(g, W, H, ln && ln.text, ln ? ln.age : 0, fadeIn, 24, 'A: skip');
+  gameTex.needsUpdate = true;
 }
 function drawKartSprite(g, x, y, s, col, cap, tilt) {                // a chunky little kart seen from behind, driver in a cap
   g.save(); g.translate(x, y); g.rotate(tilt || 0); g.scale(s, s);
@@ -1720,6 +1823,7 @@ function drawKartSprite(g, x, y, s, col, cap, tilt) {                // a chunky
 }
 function drawKart() {
   const g = gameCtx, W = KART.W, H = KART.H, K = kart;
+  if (K.state === 'finish' && K.t >= FINISH_CUT) { drawPodium(K); return; }
   // sky + rolling hills that slide round the bends
   const sky = g.createLinearGradient(0, 0, 0, H * 0.55); sky.addColorStop(0, '#4fb3ff'); sky.addColorStop(1, '#cdefff'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
   g.fillStyle = '#fff'; for (let i = 0; i < 5; i++) { const cx = ((i * 97 - K.sky * 300) % (W + 80) + W + 80) % (W + 80) - 40; g.beginPath(); g.ellipse(cx, 28 + (i % 2) * 14, 22, 8, 0, 0, 7); g.fill(); }
@@ -1785,12 +1889,13 @@ function drawKart() {
   g.textAlign = 'right'; g.font = 'bold 28px sans-serif'; g.lineWidth = 4; g.strokeStyle = '#000'; g.strokeText(ord, W - 8, 32); g.fillStyle = K.place === 1 ? '#ffd23a' : '#fff'; g.fillText(ord, W - 8, 32);
   g.textAlign = 'center';
   if (K.state === 'count') { const n = 3 - Math.floor(K.t); g.font = 'bold 54px sans-serif'; g.lineWidth = 6; g.strokeText(n > 0 ? String(n) : 'GO!', W / 2, H / 2); g.fillStyle = n > 0 ? '#fff' : '#3cff6a'; g.fillText(n > 0 ? String(n) : 'GO!', W / 2, H / 2); }
+  if (K.state === 'finish') { drawFinishOverlay(g, W, H, K); gameTex.needsUpdate = true; return; }
   if (K.msgT > 0) { g.font = 'bold 16px sans-serif'; g.lineWidth = 4; g.strokeText(K.msg, W / 2, 62); g.fillStyle = '#ffd23a'; g.fillText(K.msg, W / 2, 62); }
   if (K.state === 'done') {
     g.fillStyle = 'rgba(10,15,30,.8)'; g.fillRect(82, 50, 220, 110); g.strokeStyle = '#ffd23a'; g.lineWidth = 2; g.strokeRect(82, 50, 220, 110);
-    g.fillStyle = '#ffd23a'; g.font = 'bold 22px sans-serif'; g.fillText(K.place === 1 ? 'You win! 🏆' : `You finished ${ord}`, W / 2, 84);
+    g.fillStyle = '#ffd23a'; g.font = 'bold 22px sans-serif'; g.fillText((K.finalPlace || K.place) === 1 ? 'You win! 🏆' : `You finished ${['1st', '2nd', '3rd', '4th'][(K.finalPlace || K.place) - 1]}`, W / 2, 84);
     g.fillStyle = '#fff'; g.font = 'bold 12px sans-serif'; g.fillText(`Coins ● ${K.coins}`, W / 2, 106);
-    if (game.player) { g.fillStyle = '#ffd23a'; g.font = 'bold 11px sans-serif'; g.fillText(K.place === 1 ? 'A: see what happens next… ▶' : 'A: race again · Exit: back to the room', W / 2, 142); }
+    if (game.player) { g.fillStyle = '#ffd23a'; g.font = 'bold 12px sans-serif'; g.fillText((K.finalPlace || K.place) === 1 ? 'Press A to continue' : 'Press A to race again', W / 2, 142); }
   }
   gameTex.needsUpdate = true;
 }
@@ -1825,6 +1930,10 @@ function updateStory(dt) {
 function drawStory() {
   const g = gameCtx, W = 384, H = 216, t = story.t;
   g.save();
+  if (t < 9.4) {                                                       // slow Ken Burns moves: a creep in on the house, a drift across the living room
+    const k = t < 4.6 ? t / 4.6 : (t - 4.6) / 4.8, z = 1 + k * 0.07;
+    g.translate(W / 2, H / 2); g.scale(z, z); g.translate(-W / 2 + (t < 4.6 ? -k * 10 : k * 12), -H / 2);
+  }
   if (t < 4.6) {                                                       // 1) the drive home at sunset
     const k = t / 4.6;
     const sky = g.createLinearGradient(0, 0, 0, 150); sky.addColorStop(0, '#2b1b55'); sky.addColorStop(0.55, '#c9557a'); sky.addColorStop(1, '#ffc36b'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
@@ -1880,10 +1989,9 @@ function drawStory() {
     if (k > 0.9) { g.fillStyle = `rgba(255,255,255,${(k - 0.9) * 10})`; g.fillRect(-40, -40, W + 80, H + 80); }
   }
   g.restore();
-  // subtitles
-  const line = STORY[Math.max(0, story.said)].line;
-  g.font = 'italic bold 13px sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(line, W / 2, 206); g.fillStyle = '#fff'; g.fillText(line, W / 2, 206);
-  g.font = 'bold 9px sans-serif'; g.fillStyle = 'rgba(255,255,255,.6)'; g.textAlign = 'right'; g.fillText('A: skip', W - 6, 12);
+  // letterbox, a dip to black between shots, film grain and the subtitle
+  const cur = STORY[Math.max(0, story.said)], cut = Math.min(...[4.6, 9.4].map(b => Math.abs(t - b)));
+  cineOverlay(g, W, H, cur.line, t - cur.t, (t < 0.5 ? 1 - t / 0.5 : 0) + (cut < 0.35 ? 1 - cut / 0.35 : 0), 24, 'A: skip');
   gameTex.needsUpdate = true;
 }
 
@@ -4355,7 +4463,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 18:21';                                              // stamped when the site is published
+const BUILD = '2026-09-24 18:57';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5533,6 +5641,29 @@ function endCatnip() {
   const at = gameMode === 'walk' && walk.on ? walk.pos.clone().setY(walk.pos.y + 1.2) : new THREE.Vector3(CAT_POS.x, BOX.h + 1.5, CAT_POS.z);
   floatText(at, kind === 'zen' ? 'Ahh... so relaxed' : 'zzz... it wore off', 'warn'); tone(660, 330, 0.5, 'sine', 0.03);
 }
+const blanketCoverTex = {};
+function blanketCoverBg(striped) {                                   // a knit-fabric background for the cover, drawn once per blanket
+  const key = striped ? 's' : 'b'; if (blanketCoverTex[key]) return blanketCoverTex[key];
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = striped ? '#e9e0cc' : '#15151a'; g.fillRect(0, 0, 128, 128);
+  if (striped) [['#1f7a4a', 20], ['#c8322b', 52], ['#e6bf38', 84], ['#2f5fa8', 108]].forEach(([col, y]) => { g.fillStyle = col; g.fillRect(0, y, 128, 10); });
+  for (let y = 0; y < 128; y += 5) for (let x = 0; x < 128; x += 6) {                                  // little V stitches
+    g.strokeStyle = striped ? 'rgba(90,70,40,.18)' : 'rgba(255,255,255,.06)'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + 4, y + 5); g.lineTo(x + 8, y); g.stroke();
+  }
+  return (blanketCoverTex[key] = c.toDataURL());
+}
+function updateBlanketCover() {
+  const el = document.getElementById('blanketCover'); if (!el) return;
+  const rig = isPov() && (state === 'playing' || state === 'ending') ? blanketRigs.find(r => r.state === 'cat') : null;
+  if (!rig) { if (!el.hidden) el.hidden = true; return; }
+  const striped = rig === stripedRig;
+  if (el.hidden || el.dataset.kind !== String(striped)) {
+    el.dataset.kind = String(striped);
+    el.style.background = `radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 20%, rgba(0,0,0,.7) 100%), linear-gradient(to top, rgba(255,214,150,.5), rgba(255,214,150,0) 16%), url(${blanketCoverBg(striped)}) center / ${striped ? 420 : 200}px`;   // (big, soft weave right up against her face)
+    el.hidden = false;
+  }
+}
 function updateCatnip(dt) {
   const ready = catnipReady(), open = catnip.door && catnip.door.inside.visible;
   if (ready && catnip.fill.length && !catnip.fill[0].visible) catnip.fill.forEach(o => o.visible = true);   // refilled
@@ -6545,11 +6676,38 @@ function surfaceTop(x, z, fromY) {                                   // the high
   }
   walk.hitObj = null; return 0;
 }
+// her body as a set of points: nose, both shoulders, both hips, tail end and middle (so her sides and back end
+// can't slide into a sofa or the box, not just her nose)
+const BODY_PTS = [[0.36, 0], [0.18, 0.17], [0.18, -0.17], [-0.14, 0.17], [-0.14, -0.17], [-0.32, 0], [0, 0]];
+function bodyHits(x, z, face, lim, top) {                            // how far her body is pushed into things (0 = clear): the sum of how much each point is overlapped
+  const fx = Math.sin(face), fz = Math.cos(face), g = walk.gScale || 1; let n = 0;
+  for (const [f, sd] of BODY_PTS) n += Math.min(1, Math.max(0, surfaceTop(x + (fx * f + fz * sd) * g, z + (fz * f - fx * sd) * g, top) - lim));
+  return n;
+}
+// horizontal feelers at knee and head height, from her middle and both flanks, reaching past her nose: they catch the
+// front and side faces of furniture (a downward ray starting at head height can begin inside a tall cushion and miss it)
+const _hr = new THREE.Raycaster(), _ho = new THREE.Vector3(), _hd = new THREE.Vector3();
+function sideBlocked(x, z, y, mx, mz, scale) {
+  const ml = Math.hypot(mx, mz); if (ml < 1e-6) return false;
+  const dx = mx / ml, dz = mz / ml, g = scale || walk.gScale || 1;
+  _hd.set(dx, 0, dz); _hr.camera = camera;
+  for (const h of [0.4, 0.68]) for (const sd of [-0.17, 0, 0.17]) {
+    _hr.set(_ho.set(x + dz * sd * g, y + h * g, z - dx * sd * g), _hd); _hr.far = 0.36 * g + ml;
+    for (const hit of _hr.intersectObjects(walk.meshes, false)) {
+      let shown = true; for (let q = hit.object; q; q = q.parent) if (!q.visible) { shown = false; break; }
+      if (!shown || hit.object.userData.prop) continue;                // (loose things: she walks into those and knocks them flying)
+      return true;
+    }
+  }
+  return false;
+}
 function walkBlocked(nx, nz, ox, oz) {
   const p = walk.pos, lim = p.y + (walk.grounded ? WALK.step : 0.05), top = p.y + WALK.height;
-  if (surfaceTop(ox, oz, top) > lim) return false;                   // already tangled in something: always let her walk out
-  const mx = nx - ox, mz = nz - oz, ml = Math.hypot(mx, mz) || 1;
-  return surfaceTop(nx, nz, top) > lim || surfaceTop(nx + mx / ml * WALK.reach, nz + mz / ml * WALK.reach, top) > lim;
+  const mx = nx - ox, mz = nz - oz, face = mx || mz ? Math.atan2(mx, mz) : walk.face;   // (she turns to face where she's going)
+  if (sideBlocked(ox, oz, p.y, mx, mz)) return true;
+  const now = walk.nowHits != null ? walk.nowHits : bodyHits(ox, oz, walk.face, lim, top);
+  const next = Math.max(bodyHits(nx, nz, face, lim, top), bodyHits(nx, nz, walk.face, lim, top));   // both the way she's heading and the way she's still facing mid-turn
+  return now > 0.001 ? next > now - 0.0005 && next > 0.001 : next > 0.001;   // tangled: only steps that ease her out are allowed (so she can wriggle free, but never slide deeper)
 }
 function startWalk() {
   if (!walk.rig) walk.rig = makeWalker();
@@ -6560,6 +6718,8 @@ function startWalk() {
     for (let q = o; q; q = q.parent) if (skip.has(q)) return;
     if (o.userData.name === 'Sky' || o.userData.name === 'Backyard lawn') return;
     if (o.userData.table) { walk.meshes.push(o); return; }             // the acrylic table is see-through, but she can stand on it
+    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+    const ws = new THREE.Vector3(); o.getWorldScale(ws); if (o.geometry.boundingSphere.radius * Math.max(ws.x, ws.y, ws.z) < 0.03) return;   // tiny decor (buttons, studs): nothing to stand on
     const m = o.material;
     if (!Array.isArray(m) && (m.visible === false || m.blending === THREE.AdditiveBlending || (m.transparent && (m.opacity < 0.3 || m.depthWrite === false)))) return;
     walk.meshes.push(o);
@@ -6600,6 +6760,7 @@ function updateWalk(dt) {
   }
   // across: blocked by anything taller than a step (or, mid-air, anything at her height)
   const dx = walk.vel.x * dt, dz = walk.vel.z * dt;
+  walk.nowHits = bodyHits(p.x, p.z, walk.face, p.y + (walk.grounded ? WALK.step : 0.05), p.y + WALK.height);   // (how tangled she is right now: worked out once a frame)
   if (dx || dz) {
     const lx = ROOM.halfW - 0.3, tryMove = (nx, nz) => {
       nx = THREE.MathUtils.clamp(nx, -lx, lx); nz = THREE.MathUtils.clamp(nz, 0.3, ROOM.visDepth - 0.45);
@@ -6633,7 +6794,13 @@ function updateWalk(dt) {
   let want = null;
   if (spd > 0.25) { want = Math.atan2(walk.vel.x, walk.vel.z); walk.look = null; }
   else if (walk.look) want = Math.atan2(walk.look.x - p.x, walk.look.z - p.z);
-  if (want !== null) { let d = want - walk.face; d = Math.atan2(Math.sin(d), Math.cos(d)); walk.face += d * Math.min(1, dt * 12); }
+  if (want !== null) {
+    let d = want - walk.face; d = Math.atan2(Math.sin(d), Math.cos(d));
+    const nf = walk.face + d * Math.min(1, dt * 12), lim = p.y + (walk.grounded ? WALK.step : 0.05), top = p.y + WALK.height;
+    if (Math.abs(d) < 0.01 || bodyHits(p.x, p.z, nf, lim, top) <= bodyHits(p.x, p.z, walk.face, lim, top) + 0.0005) walk.face = nf;   // she can't swing her back end into the sofa by turning
+  }
+  walk.nowHits = null;
+  walk.face = Math.atan2(Math.sin(walk.face), Math.cos(walk.face));   // (kept in -π..π)
   // hot! the fire
   const f = fireRig; walk.burnCD -= dt;
   if (f && f.target > 0 && walk.burnCD <= 0 && p.y < 1 && Math.hypot(p.x - f.center.x, p.z - f.center.z) < 0.8) {
@@ -6802,6 +6969,7 @@ function hitDark() {
 }
 function darkBlocked(q, grounded, nx, nz) {
   const lim = q.y + (grounded ? WALK.step : 0.05), top = q.y + WALK.height;
+  if (sideBlocked(q.x, q.z, q.y, nx - q.x, nz - q.z, 1)) return true;   // (same feelers as Princess: no running through sofas)
   if (surfaceTop(q.x, q.z, top) > lim) return false;
   const mx = nx - q.x, mz = nz - q.z, ml = Math.hypot(mx, mz) || 1;
   return surfaceTop(nx, nz, top) > lim || surfaceTop(nx + mx / ml * WALK.reach, nz + mz / ml * WALK.reach, top) > lim;
@@ -7101,6 +7269,7 @@ function frame(now) {
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
 
   if (povEndWall) povEndWall.visible = camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02;   // the end wall + door: only from inside the room
+  updateBlanketCover();
   if (state !== 'tvgame') renderer.render(scene, camera);           // (the room is hidden behind the full-screen TV)
 }
 requestAnimationFrame(frame);
