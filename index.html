@@ -624,7 +624,7 @@ function blanketToCat(fromPoint, b = blanketRig) {
 }
 function throwBlanket(point, b = blanketRig) {
   if (!b || b.state !== 'cat') return;
-  b.lump.visible = false; catCard.visible = catTail.visible = true; catFlinch = 0.3;
+  b.lump.visible = false; catCard.visible = catTail.visible = !isPov(); catFlinch = 0.3;
   b.from.set(CAT_POS.x, 1.2, CAT_POS.z);
   let x = Math.max(-ROOM.halfW + 0.9, Math.min(ROOM.halfW - 0.9, point.x)), z = Math.max(2.6, Math.min(ROOM.depth - 0.8, point.z));
   const dx = x - CAT_POS.x, dz = z - CAT_POS.z, d = Math.hypot(dx, dz);   // never lands back over the cat's box
@@ -695,7 +695,7 @@ function resetBlanket() {
     b.heap.visible = false; b.burrito.visible = false; b.dir.set(0, 0, 0); b.victim = null;
     b.state = 'sofa'; b.lump.visible = b.heap.visible = false; if (b.src) b.src.visible = true;
   }
-  catCard.visible = catTail.visible = true;
+  catCard.visible = catTail.visible = !isPov();
 }
 function toggleBlinds() { const r = windowRig; if (!r) return; r.target = r.target > 0.4 ? 0.06 : r.base; sfx.rattle(); bonus(5); }
 function updateBlinds(dt) {
@@ -1101,6 +1101,8 @@ function tapConsole() {
   const c = consoleRig; if (!c) return;
   c.on = !c.on; c.led.material.color.setHex(c.on ? 0x3cff6a : 0x2a2a2a);
   tone(1200, 1500, 0.05, 'square', 0.03); if (c.on) tone(900, 1800, 0.12, 'sine', 0.04, 0.06);   // the little 'click-click' boot chime
+  if (tvBroken) { tvSpark(); return; }
+  if (c.on) { setTVMode(3); setTimeout(gameJingle, 250); } else if (tvMode === 3) setTVMode(0);   // the TV flicks on to the party game
   bonus(5);
 }
 // 55" TV (48" x 28"), switched off
@@ -1205,7 +1207,88 @@ function drawShow(t) {
   }
   showTex.needsUpdate = true;
 }
-let tvMode = 0;                                                           // 0 off · 1 static · 2 cartoon
+let tvMode = 0;                                                           // 0 off · 1 static · 2 cartoon · 3 console game
+/* ---------- a party-board game on the TV (the games console turns it on): a winding path of blue / red / green
+   spaces over stone and grass, four player tokens hopping along, a dice block, and the scoreboard up top ---------- */
+const gameCanvas = document.createElement('canvas'); gameCanvas.width = 384; gameCanvas.height = 216;
+const gameCtx = gameCanvas.getContext('2d'), gameTex = new THREE.CanvasTexture(gameCanvas), tvGameMat = basic(0xffffff, { map: gameTex });
+const GAME_PATH = [[40, 150], [80, 150], [120, 150], [160, 150], [200, 150], [200, 118], [200, 86], [240, 86], [280, 86], [320, 86], [320, 118], [320, 150], [320, 182], [280, 182], [240, 182], [160, 182], [120, 182], [80, 182], [40, 182], [40, 118], [80, 86], [120, 86]];
+const GAME_KIND = GAME_PATH.map((_, i) => i % 7 === 3 ? 'red' : i % 5 === 2 ? 'green' : i % 9 === 6 ? 'event' : 'blue');
+const GAME_PLAYERS = [{ col: '#e23a32', cap: '#e23a32', at: 3 }, { col: '#3cb44b', cap: '#2b8a3a', at: 1 }, { col: '#f59fc4', cap: '#e56aa0', at: 8 }, { col: '#f2c230', cap: '#b87a14', at: 14 }];
+const game = { turn: 0, hop: 0, hopT: 0, roll: 5, rollT: 0, coins: [34, 17, 19, 12], stars: [1, 1, 0, 1], tick: 0 };
+const gameBg = (() => {                                                // the board itself, drawn once
+  const c = document.createElement('canvas'); c.width = 384; c.height = 216; const g = c.getContext('2d');
+  g.fillStyle = '#5f9a3e'; g.fillRect(0, 0, 384, 216);                                            // grass
+  for (let y = 0; y < 216; y += 24) for (let x = 0; x < 384; x += 24) {                           // big stone tiles, a few missing (grass shows)
+    if (Math.random() < 0.18) continue;
+    const v = 150 + Math.random() * 30 | 0; g.fillStyle = `rgb(${v - 12},${v},${v + 14})`; g.fillRect(x + 1, y + 1, 22, 22);
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x + 1, y + 1, 22, 3);
+  }
+  for (let i = 0; i < 40; i++) {                                      // leafy tufts and ferns
+    const x = Math.random() * 384, y = 30 + Math.random() * 186; g.fillStyle = Math.random() < 0.5 ? '#3f8a2e' : '#62b043';
+    for (let k = 0; k < 5; k++) { g.beginPath(); g.ellipse(x + (k - 2) * 3, y - Math.abs(k - 2) * 2, 2, 6, (k - 2) * 0.4, 0, 7); g.fill(); }
+  }
+  g.strokeStyle = '#4d5560'; g.lineWidth = 8; g.globalAlpha = 0.55;                               // low stone walls between the lanes
+  [[20, 102, 180, 102], [220, 134, 300, 134], [60, 166, 300, 166]].forEach(([a, b, c2, d]) => { g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d); g.stroke(); });
+  g.globalAlpha = 1;
+  g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 2;           // little arrows between spaces
+  for (let i = 0; i < GAME_PATH.length - 1; i++) { const [x0, y0] = GAME_PATH[i], [x1, y1] = GAME_PATH[i + 1]; const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, a = Math.atan2(y1 - y0, x1 - x0); g.beginPath(); g.moveTo(mx - Math.cos(a) * 5, my - Math.sin(a) * 5); g.lineTo(mx + Math.cos(a) * 5, my + Math.sin(a) * 5); g.stroke(); }
+  GAME_PATH.forEach(([x, y], i) => {                                  // the spaces
+    const k = GAME_KIND[i];
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(x + 1, y + 3, 13, 9, 0, 0, 7); g.fill();
+    g.fillStyle = k === 'red' ? '#e0454d' : k === 'green' ? '#35b35a' : k === 'event' ? '#c9304a' : '#3f74e0'; g.beginPath(); g.ellipse(x, y, 13, 9, 0, 0, 7); g.fill();
+    g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(x - 3, y - 3, 6, 3, 0, 0, 7); g.fill();
+    if (k === 'green' || k === 'event') { g.fillStyle = '#fff'; g.font = 'bold 11px sans-serif'; g.textAlign = 'center'; g.fillText(k === 'green' ? '!' : '?', x, y + 4); }
+  });
+  return c;
+})();
+function drawPawn(g, x, y, p, big) {                                   // a round little player token with a cap
+  const r = big ? 11 : 7;
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(x, y + r * 0.9, r, r * 0.4, 0, 0, 7); g.fill();
+  g.fillStyle = p.col; g.beginPath(); g.ellipse(x, y, r * 0.8, r, 0, 0, 7); g.fill();                  // body
+  g.fillStyle = '#ffe0c2'; g.beginPath(); g.arc(x, y - r * 1.1, r * 0.72, 0, 7); g.fill();               // face
+  g.fillStyle = p.cap; g.beginPath(); g.arc(x, y - r * 1.3, r * 0.75, Math.PI, 0); g.fill(); g.fillRect(x - r * 0.2, y - r * 1.35, r, r * 0.25);   // cap + brim
+  g.fillStyle = '#222'; g.fillRect(x - r * 0.3, y - r * 1.1, 1.5, 2); g.fillRect(x + r * 0.2, y - r * 1.1, 1.5, 2);   // eyes
+}
+function drawGame(t) {
+  const g = gameCtx; g.drawImage(gameBg, 0, 0);
+  // tokens (the one whose turn it is hops along)
+  GAME_PLAYERS.forEach((p, i) => {
+    let [x, y] = GAME_PATH[p.at];
+    if (i === game.turn % 4 && game.hop > 0) { const [nx, ny] = GAME_PATH[(p.at + 1) % GAME_PATH.length], k = game.hopT; x += (nx - x) * k; y += (ny - y) * k - Math.sin(k * Math.PI) * 10; }
+    drawPawn(g, x + (i - 1.5) * 3, y - 6, p);
+  });
+  // scoreboard
+  const W = 384; g.fillStyle = 'rgba(20,30,50,.75)'; g.fillRect(96, 2, 286, 30);
+  GAME_PLAYERS.forEach((p, i) => {
+    const x = 104 + i * 70; g.fillStyle = p.col; g.beginPath(); g.arc(x + 10, 17, 10, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.stroke();
+    g.fillStyle = '#ffd23a'; g.font = 'bold 10px sans-serif'; g.textAlign = 'left'; g.fillText('★ ' + game.stars[i], x + 24, 14);
+    g.fillStyle = '#fff'; g.fillText('● ' + game.coins[i], x + 24, 27);
+  });
+  // side menu
+  g.fillStyle = 'rgba(10,40,40,.7)'; g.fillRect(0, 0, 88, 62);
+  g.font = 'bold 11px sans-serif'; g.textAlign = 'left'; g.fillStyle = '#ffd23a'; g.fillText('▶', 4, 17); g.fillStyle = '#fff'; g.fillText('Dice Block', 16, 17); g.fillText('Items', 16, 35); g.fillText('Map', 16, 53);
+  // dice block held up by the current player, bottom-left
+  const p = GAME_PLAYERS[game.turn % 4]; drawPawn(g, 40, 196, p, true);
+  const bob = Math.sin(t * 6) * 2, dx = 62, dy = 150 + bob;
+  g.fillStyle = '#e23a32'; g.fillRect(dx - 1, dy - 1, 34, 34); g.fillStyle = '#fff'; g.fillRect(dx + 2, dy + 2, 28, 28);
+  g.fillStyle = '#e23a32'; g.font = 'bold 22px sans-serif'; g.textAlign = 'center'; g.fillText(String(game.roll), dx + 16, dy + 24);
+  g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(150, 202, 84, 14); g.fillStyle = '#fff'; g.font = 'bold 10px sans-serif'; g.fillText(`Turn ${Math.min(10, 1 + (game.turn >> 2))}/10`, 192, 212);
+  gameTex.needsUpdate = true;
+}
+function updateGame(dt) {
+  if (game.hop > 0) {                                                 // hopping space to space
+    game.hopT += dt * 3.2;
+    if (game.hopT >= 1) { const p = GAME_PLAYERS[game.turn % 4]; p.at = (p.at + 1) % GAME_PATH.length; game.hopT = 0; game.hop--; tone(880, 990, 0.05, 'square', 0.015);
+      if (!game.hop) { const k = GAME_KIND[p.at], i = game.turn % 4; game.coins[i] = Math.max(0, game.coins[i] + (k === 'red' ? -3 : 3)); tone(k === 'red' ? 330 : 1320, k === 'red' ? 220 : 1760, 0.12, 'square', 0.02); game.turn++; game.rollT = 1.2; } }
+  } else {
+    game.rollT -= dt;
+    if (game.rollT > 0) { if ((game.tick = (game.tick + 1) % 4) === 0) game.roll = 1 + (Math.random() * 6 | 0); }   // dice spinning
+    else { game.hop = game.roll; game.hopT = 0; }
+  }
+}
+function gameJingle() { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, f, 0.1, 'square', 0.025, i * 0.09)); }
 const tvAudio = { node: null, gain: null, nextLine: 0 };
 function tvHiss(on) {                                                     // quiet looping static while the static channel is up
   if (tvAudio.node) { try { tvAudio.node.stop(); } catch (e) {} tvAudio.node = null; }
@@ -1238,7 +1321,9 @@ function setTV(on) { setTVMode(on ? 1 : 0); }
 function setTVMode(m) {
   if (tvBroken) m = 0;
   tvMode = m; tvOn = m > 0;
-  screen.material = tvBroken ? tvBrokenMat : m === 1 ? tvStaticMat : m === 2 ? tvShowMat : tvOffMat;
+  screen.material = tvBroken ? tvBrokenMat : m === 1 ? tvStaticMat : m === 2 ? tvShowMat : m === 3 ? tvGameMat : tvOffMat;
+  tvLight.color.setHex(m === 3 ? 0x9fd6ff : 0xd6e4ff);
+  if (m === 3) { game.rollT = 1.2; drawGame(clock); }
   tvHiss(m === 1);
   tvAudio.nextLine = 0; showCast.forEach(c => { c.talk = 0; c.arm = 0; });
 }
@@ -1247,6 +1332,12 @@ function updateTV(dt) {
   if (tvBroken) { tvLight.intensity = 0; if (Math.random() < dt * 0.5) tvSpark(true); return; }   // broken: the odd little spark
   if (!tvOn) { tvLight.intensity = 0; return; }
   if (tvAudio.gain) tvAudio.gain.gain.value = state === 'playing' || state === 'debug' ? 0.03 : 0;   // hush while paused
+  if (tvMode === 3) {                                                     // the console game: tokens hop round the board
+    updateGame(dt);
+    if ((staticTick = (staticTick + 1) % 3) === 0) drawGame(clock);
+    tvLight.intensity = 0.4 + Math.sin(clock * 3) * 0.05;
+    return;
+  }
   if (tvMode === 2) {                                                     // cartoon: they take turns talking over each other
     tvAudio.nextLine -= dt;
     if (tvAudio.nextLine <= 0 && (state === 'playing' || state === 'debug')) {
@@ -3536,6 +3627,9 @@ function claimCrown(m) {
   if (!catCrown) {
     catCrown = m.crown.clone(true); catCrown.visible = true; scene.add(catCrown);
   }
+  {
+    catCrown.userData.claimed = true;
+  }
   m.crown.updateMatrixWorld(true);
   const from = m.crown.getWorldPosition(new THREE.Vector3());
   catCard.updateMatrixWorld(true);
@@ -3559,7 +3653,7 @@ function updateCatCrown(dt) {
     catCrown.position.y = catCrown.userData.y + catBounce;
   }
 }
-function resetCatCrown() { if (catCrown) catCrown.visible = false; crownFlight = null; }
+function resetCatCrown() { if (catCrown) { catCrown.visible = false; catCrown.userData.claimed = false; } crownFlight = null; }
 function hurtBoss(m, dmg) {                                         // returns true once he's beaten
   m.hp -= dmg;
   if (m.hp > 0) {
@@ -4323,7 +4417,8 @@ const CAM_PULLBACK = 1.32, CAM_PULLBACK_PORTRAIT = 1.0;   // >1 = camera further
 const fc = { on: false, focus: new THREE.Vector3(), yaw: 0, zoom: 1, tilt: 0, el0: 40, dist0: 20,
              s: { focus: new THREE.Vector3(), yaw: 0, zoom: 1, tilt: 0 } };   // targets, and the smoothed values actually shown
 const vcam = new THREE.PerspectiveCamera(), _fcPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _fcN = new THREE.Vector2(), _fcRay = new THREE.Raycaster();
-const POV_EYE_Y = 1.55;                                               // the cat's eye height, just over the rim of her box
+const isPov = () => !!CAM_VIEWS[camView].pov && !fc.on;          // looking through the cat's eyes (she's not in her box)
+const POV_EYE_Y = 1.45;                                               // the cat's eye height (sat up tall on the carpet)
 // cat's eye: little arrows round the screen edge point at mice she can't see
 const edgeArrows = Array.from({ length: 8 }, () => { const e = document.createElement('div'); e.className = 'edge-arrow'; e.hidden = true; document.body.appendChild(e); return e; });
 const _ea = new THREE.Vector3();
@@ -4347,13 +4442,16 @@ let fitW = 0, fitH = 0;
 function fitCamera() {
   const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
   if (w !== fitW || h !== fitH) { renderer.setSize(w, h); fitW = w; fitH = h; }   // (resizing the canvas is costly: only when the window changes)
-  if (povEndWall) povEndWall.visible = !!CAM_VIEWS[camView].pov && !fc.on;
+  const povOn = !!CAM_VIEWS[camView].pov && !fc.on;
+  if (povEndWall) povEndWall.visible = false;                          // (she's sat at the open end: nothing behind her to see)
+  catCard.visible = catTail.visible = !povOn && !blanketRigs.some(r => r.state === 'cat');   // in her own view she isn't in the box
+  if (catCrown) catCrown.visible = !!catCrown.userData.claimed && !povOn;
   if (CAM_VIEWS[camView].pov && !fc.on) {                             // cat's eye: looking out from her box over the rim, down the room
     camera.aspect = aspect; camSqueeze = 1;
     camera.fov = THREE.MathUtils.clamp((aspect < 0.75 ? 86 : aspect < 1 ? 74 : 60) * camZoom, 40, 100);   // pinch = zoom the lens
     camera.clearViewOffset(); camera.updateProjectionMatrix();
-    camera.position.set(CAT_POS.x, POV_EYE_Y, CAT_POS.z + 0.5);
-    camera.lookAt(0, 0.35 - camTilt * 0.06, 9);                         // two-finger drag tips the gaze up / down
+    camera.position.set(0.3, POV_EYE_Y, ROOM.visDepth - 1.4);          // she's sat at the open end of the room, facing the TV
+    camera.lookAt(0, 1.2 - camTilt * 0.06, 0);                          // two-finger drag tips the gaze up / down
     camera.updateMatrixWorld(); camBase.copy(camera.position); catCard.rotation.y = 0;
     return;
   }
