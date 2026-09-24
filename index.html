@@ -159,7 +159,7 @@
                      -webkit-backdrop-filter:saturate(.3) contrast(1.08);backdrop-filter:saturate(.3) contrast(1.08)}
   #catnipFx.k-giant{background:radial-gradient(ellipse at 50% 60%,rgba(0,0,0,0) 42%,rgba(255,110,30,.6) 100%);animation:giantPulse 1.4s ease-in-out infinite}
   @keyframes giantPulse{50%{transform:scale(1.05)}}
-  #catnipFx.k-zen{mix-blend-mode:screen;background:radial-gradient(ellipse at 50% 50%,rgba(255,190,230,.16) 0%,rgba(190,160,255,.38) 100%);animation:zenGlow 4s ease-in-out infinite}
+  #catnipFx.k-zen{mix-blend-mode:overlay;background:radial-gradient(ellipse at 50% 50%,rgba(255,170,220,.45) 0%,rgba(180,140,255,.6) 100%);animation:zenGlow 4s ease-in-out infinite}
   @keyframes zenGlow{50%{filter:brightness(1.5)}}
   @keyframes nip{0%{filter:hue-rotate(0deg);transform:scale(1) rotate(0deg)}50%{transform:scale(1.06) rotate(4deg)}100%{filter:hue-rotate(360deg);transform:scale(1) rotate(0deg)}}
   /* the paint jar: splats hit the screen, then drip and fade */
@@ -4355,7 +4355,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 16:18';                                              // stamped when the site is published
+const BUILD = '2026-09-24 18:21';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5566,7 +5566,7 @@ function updateCatnip(dt) {
     burst(new THREE.Vector3((Math.random() * 2 - 1) * (ROOM.halfW - 0.5), 0.6 + Math.random() * 2.6, 2.5 + Math.random() * 10), cols[(Math.random() * cols.length) | 0], 2, 0.4, 0.5, 0.35);
     if (inWalk && Math.hypot(walk.vel.x, walk.vel.z) > 0.8 && k === 'zoomies') burst(walk.pos.clone().setY(walk.pos.y + 0.35), new THREE.Color().setHSL(Math.random(), 1, 0.65).getHex(), 3, 0.6, 0.8, 0.35);   // a rainbow trail behind her
   }
-  if (k !== 'slowmo') { catCard.rotation.z += Math.sin(clock * (k === 'zen' ? 1.5 : 4)) * 0.012; tailWag = Math.max(tailWag, 0.8); }   // she sways happily in her box
+  if (k !== 'slowmo') { catCard.rotation.z += Math.sin(clock * (k === 'zen' ? 1.5 : 4)) * 0.72 * dt; tailWag = Math.max(tailWag, 0.8); }   // she sways happily in her box (scaled by dt: a frame-rate-independent nudge that can never pile up)
 }
 function resetCatnip() {
   catnip.active = false; catnip.readyAt = 0; catnip.whacks = 0;
@@ -6680,7 +6680,7 @@ function updateWalk(dt) {
   } else {
     const up = THREE.MathUtils.clamp(walk.vy / WALK.jumpV, -1, 1);
     W.legs[0].rotation.x = W.legs[1].rotation.x = -0.9 + up * 0.3; W.legs[2].rotation.x = W.legs[3].rotation.x = 0.9 - up * 0.3;
-    W.body.rotation.x = -up * 0.25;
+    W.body.rotation.x = -up * 0.25; W.body.position.y = 0;
   }
   if (walk.batT > 0) W.legs[1].rotation.x = -Math.sin((1 - walk.batT / 0.35) * Math.PI) * 1.8;
   walk.meowT = Math.max(0, walk.meowT - dt); walk.puff = Math.max(0, walk.puff - dt * 0.8);
@@ -6743,6 +6743,7 @@ function mirrorPortals() {
   const list = [], m = mirrorRig, mm = mantleMirror;
   if (m && m.glass.visible && (m.hits || 0) < 3) list.push(new THREE.Box3().setFromObject(m.glass).expandByScalar(0.15));
   if (mm && mm.state === 'wall') list.push(new THREE.Box3().setFromObject(mm.mh).expandByScalar(0.15));
+  if (mirrorWorld && !list.length && m) list.push(new THREE.Box3().setFromObject(m.lean).expandByScalar(0.15));   // both mirrors smashed while inside: the empty frame still takes you home
   return list;
 }
 function mirrorHud() {
