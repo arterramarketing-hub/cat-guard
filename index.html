@@ -361,7 +361,7 @@ function getDifficulty(t) {
    WORLD LAYOUT  (x: left/right, z: back wall = 0 → toward camera)
    ===================================================================== */
 const ROOM = { halfW: 5.2, depth: 13, wallH: 18, visDepth: 18.4 };  // visDepth: the room ends about 4 ft past the fireplace
-const CEIL_H = 5.65;                                                // low ceiling, ~7.3 ft (1 unit = 1.3 ft): just clears the mantle mirror  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
+const CEIL_H = 84 / 15.6;                                           // 7 ft ceiling (84"), a few inches over the door frame  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
 /* ACCESS POINTS — where mice come in and go home.
    kind 'couch': out from under a sofa · 'wall': a mouse hole · 'door': through the doorway from the hall.
    x/z is the point on the edge, n is the direction the mouse walks out. */
@@ -1030,7 +1030,7 @@ function makePistol() {
 }
 // three zip-up fabric blanket organizers stacked on the cabinet, clear vinyl windows showing the blankets inside;
 // the top one has a clear lid, so you can see the striped blanket's four lines of colour from above
-const blankX = LEFT_X0 + LEFT_W * 0.45;
+const blankX = LEFT_X0 + IN(3) + FT(2.0) / 2;                          // pushed to the left end, leaving room for the console
 {
   const fabricTex = canvasTex(64, 64, (g, w, h) => {                  // heathered linen-look fabric
     g.fillStyle = '#d9d4cc'; g.fillRect(0, 0, w, h);
@@ -1039,26 +1039,48 @@ const blankX = LEFT_X0 + LEFT_W * 0.45;
   const foldTex = (cols) => canvasTex(64, 64, (g, w, h) => {          // folded blankets seen edge-on: soft stacked bands
     cols.forEach((c, i) => { g.fillStyle = c; g.fillRect(0, i * h / cols.length, w, h / cols.length); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, (i + 1) * h / cols.length - 2, w, 2); });
   }, 1, 1);
-  const fabric = lam(0xffffff, { map: fabricTex }), trim = lam(0x6b645c), strap = lam(0x4a443e);
-  const vinyl = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, shininess: 120, specular: 0xffffff, depthWrite: false });
-  const insides = [lam(0xffffff, { map: foldTex(['#9a9ca0', '#c9c6bf', '#7f8388', '#b5b3ad']) }), lam(0xffffff, { map: foldTex(['#b9a88f', '#2f6f73', '#c9c6bf', '#8d8f93']) }), lam(0xffffff, { map: stripeTex })];
-  const OW = FT(2.2), OD = IN(15), OH = IN(9.5), z = IN(9.5);
+  // frosted, translucent white shells: the folded blankets inside show through softly
+  const frost = new THREE.MeshPhongMaterial({ color: 0xfbfbfa, map: fabricTex, transparent: true, opacity: 0.58, shininess: 30, specular: 0x333333, depthWrite: false });
+  const clear = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, shininess: 120, specular: 0xffffff, depthWrite: false });
+  const trim = lam(0xe2e2e0), strap = lam(0xd2d2cf);
+  const folds = [foldTex(['#9a9ca0', '#c9c6bf', '#7f8388', '#b5b3ad']), foldTex(['#b9a88f', '#2f6f73', '#c9c6bf', '#8d8f93']), foldTex(['#efe7d6', '#1f7a4a', '#efe7d6', '#c8322b'])];
+  const OW = FT(2.0), OD = IN(15), OH = IN(9.5), z = IN(9.5);
   for (let i = 0; i < 3; i++) {
-    const x = blankX + (i % 2 ? IN(0.7) : 0), y0 = CAB_H + i * OH;
-    box(OW, OH - IN(0.2), OD, fabric, x, y0 + OH / 2, z);                                               // the fabric box
-    box(OW + IN(0.2), IN(0.35), OD + IN(0.2), trim, x, y0 + OH - IN(0.9), z);                         // zip line round the top
-    for (const sx of [-1, 1]) box(IN(0.5), IN(1.2), IN(4.5), strap, x + sx * (OW / 2 + IN(0.2)), y0 + OH * 0.62, z);   // carry handles
-    const fw = OW * 0.78, fh = OH * 0.56, fy = y0 + OH * 0.44, fz = z + OD / 2;
-    box(fw + IN(1), fh + IN(1), IN(0.2), trim, x, fy, fz);                                             // window binding
-    const win = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), insides[i]); win.position.set(x, fy, fz + IN(0.12)); scene.add(win);
-    const gloss = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), vinyl); gloss.position.set(x, fy, fz + IN(0.16)); scene.add(gloss);
-    if (i === 2) {                                                    // clear lid: the striped blanket, folded flat, seen from above
-      const tw = OW * 0.84, td = OD * 0.78, ty = y0 + OH - IN(0.1);
-      box(tw + IN(1), IN(0.2), td + IN(1), trim, x, ty, z);
-      const top = new THREE.Mesh(new THREE.PlaneGeometry(tw, td), lam(0xffffff, { map: stripeTex })); top.rotation.x = -Math.PI / 2; top.position.set(x, ty + IN(0.12), z); scene.add(top);
-      const lid = new THREE.Mesh(new THREE.PlaneGeometry(tw, td), vinyl); lid.rotation.x = -Math.PI / 2; lid.position.set(x, ty + IN(0.16), z); scene.add(lid);
-    }
+    const x = blankX + (i % 2 ? IN(0.6) : 0), y0 = CAB_H + i * OH, top = i === 2;
+    const side = lam(0xffffff, { map: folds[i] });                    // the blankets inside (folded edges on the sides, the striped one flat on top)
+    const inner = new THREE.Mesh(new THREE.BoxGeometry(OW - IN(1.4), OH - IN(1.6), OD - IN(1.4)), [side, side, top ? lam(0xffffff, { map: stripeTex }) : side, side, side, side]);
+    inner.position.set(x, y0 + (OH - IN(1.6)) / 2 + IN(0.3), z); scene.add(inner);
+    const shell = new THREE.Mesh(new THREE.BoxGeometry(OW, OH - IN(0.2), OD), [frost, frost, top ? clear : frost, frost, frost, frost]);   // only the top one's lid is clear
+    shell.position.set(x, y0 + OH / 2, z); shell.renderOrder = 1; scene.add(shell);
+    const zy = y0 + OH - IN(0.9);                                      // zip line: a thin band round the outside (not a slab across the middle)
+    for (const [w, d, dx, dz] of [[OW + IN(0.2), IN(0.2), 0, OD / 2 + IN(0.05)], [OW + IN(0.2), IN(0.2), 0, -OD / 2 - IN(0.05)], [IN(0.2), OD + IN(0.2), OW / 2 + IN(0.05), 0], [IN(0.2), OD + IN(0.2), -OW / 2 - IN(0.05), 0]]) box(w, IN(0.3), d, trim, x + dx, zy, z + dz);
+    for (const sx of [-1, 1]) box(IN(0.45), IN(1.1), IN(4.5), strap, x + sx * (OW / 2 + IN(0.2)), y0 + OH * 0.62, z);   // carry handles
+    if (top) { const ty = y0 + OH - IN(0.15); for (const [w, d, dx, dz] of [[OW, IN(0.8), 0, OD / 2 - IN(0.4)], [OW, IN(0.8), 0, -OD / 2 + IN(0.4)], [IN(0.8), OD, OW / 2 - IN(0.4), 0], [IN(0.8), OD, -OW / 2 + IN(0.4), 0]]) box(w, IN(0.25), d, trim, x + dx, ty, z + dz); }   // binding round the clear lid
   }
+}
+// games console in its dock (Switch-style: black dock, neon blue & red controllers either side). Tap it: power light + a click.
+let consoleRig = null;
+{
+  const cx = LEFT_X0 + LEFT_W - IN(13), cz = IN(8), g = new THREE.Group(); g.position.set(cx, CAB_H, cz); g.rotation.y = 0.12; scene.add(g);
+  const black = new THREE.MeshPhongMaterial({ color: 0x1c1c1e, shininess: 40, specular: 0x222222 }), glass = new THREE.MeshPhongMaterial({ color: 0x0b0c0f, shininess: 90, specular: 0x555555 });
+  const blue = new THREE.MeshPhongMaterial({ color: 0x0ab9e6, shininess: 50, specular: 0x333333 }), red = new THREE.MeshPhongMaterial({ color: 0xff3c28, shininess: 50, specular: 0x333333 }), nub = lam(0x222226);
+  box(IN(6.6), IN(3.1), IN(2.1), glass, 0, IN(1.1) + IN(3.1) / 2 + IN(0.8), -IN(0.2), g);              // the console's screen, sitting in the dock
+  box(IN(6.9), IN(4.1), IN(2.1), black, 0, IN(2.05), IN(0.25), g);                                      // dock
+  box(IN(1.3), IN(0.5), IN(0.15), lam(0x3a3a3e), IN(2.3), IN(0.8), IN(1.31), g);                         // logo plate on the dock
+  for (const [sx, mat] of [[-1, blue], [1, red]]) {                                                     // controllers clipped to each side
+    const jc = box(IN(1.35), IN(4), IN(0.6), mat, sx * (IN(3.3) + IN(0.675)), IN(1.1) + IN(2), -IN(0.2), g);
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.34), IN(0.38), IN(0.3), 12), nub); stick.rotation.x = Math.PI / 2; stick.position.set(sx * (IN(3.3) + IN(0.7)), IN(1.1) + (sx < 0 ? IN(3) : IN(1.5)), IN(0.2)); g.add(stick);
+    for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.15), IN(0.15), IN(0.2), 8), nub); b.rotation.x = Math.PI / 2; const a = k * Math.PI / 2; b.position.set(sx * (IN(3.3) + IN(0.7)) + Math.cos(a) * IN(0.3), IN(1.1) + (sx < 0 ? IN(1.5) : IN(3)) + Math.sin(a) * IN(0.3), IN(0.18)); g.add(b); }
+  }
+  const led = new THREE.Mesh(new THREE.SphereGeometry(IN(0.18), 8, 6), basic(0x2a2a2a)); led.position.set(-IN(3), IN(0.5), IN(1.32)); g.add(led);
+  consoleRig = { g, led, on: false };
+  g.traverse(o => { if (o.isMesh) { o.userData.gameConsole = true; tapTargets.push(o); } });
+}
+function tapConsole() {
+  const c = consoleRig; if (!c) return;
+  c.on = !c.on; c.led.material.color.setHex(c.on ? 0x3cff6a : 0x2a2a2a);
+  tone(1200, 1500, 0.05, 'square', 0.03); if (c.on) tone(900, 1800, 0.12, 'sine', 0.04, 0.06);   // the little 'click-click' boot chime
+  bonus(5);
 }
 // 55" TV (48" x 28"), switched off
 const MAIN_CX = MAIN_X0 + MAIN_W * 0.46;
@@ -1272,7 +1294,7 @@ const candleLight = new THREE.PointLight(0xffb45a, 0.32, 6, 2); candleLight.posi
   diffuserRig = { vase, broken, puddle, state: 'rest', v: new THREE.Vector3(), w: new THREE.Vector3(), wet: 0, home: vase.position.clone(), center: new THREE.Vector3(vase.position.x, CAB_H + IN(4.5), vase.position.z) };
   vase.traverse(o => { if (o.isMesh) { o.userData.diffuser = true; tapTargets.push(o); } });
 }
-box(IN(4), IN(4), IN(4), lam(0xf0b8a0), LEFT_X0 + LEFT_W - IN(14), CAB_H + IN(2), IN(12));   // pink salt lamp
+box(IN(4), IN(4), IN(4), lam(0xf0b8a0), LEFT_X0 + LEFT_W - IN(2.6), CAB_H + IN(2), IN(14));   // pink salt lamp (front corner, clear of the console)
 // right-corner black shelf (~4' tall, 14" wide) with a plant, and the paper star lamp (2' star on a 5' pole)
 // levelled shelving: black metal frame, five open shelves with odds and ends, plant on top
 const SHELF_H = FT(4), SHELF_D = IN(13), shelfMat = lam(0x1c1c1e), shZ = 0.03 + SHELF_D / 2;
@@ -1731,7 +1753,7 @@ let fireRig = null, mantleMirror = null;
   box(W + IN(4), IN(3), D + IN(3.5), lam(0xffffff, { map: slabTex }), 0, H + IN(1.5), (D + IN(3.5)) / 2, fp);   // flat stone mantle shelf
   const MT = H + IN(3);                                                                                   // mantle top
   // mirror above the mantle
-  const MW = IN(40), MH = IN(30), MY = MT + IN(6) + MH / 2;
+  const MW = IN(40), MH = IN(30), MY = MT + IN(2) + MH / 2;   // hung low so it clears the 7 ft ceiling
   const mh = new THREE.Group(); mh.position.set(0, MY, 0); fp.add(mh);   // frame + glass move together (it can be blasted off the wall)
   box(MW + IN(3), MH + IN(3), IN(1), lam(0x3b3029), 0, 0, IN(0.5), mh);
   const mg = THREE.Reflector                                             // a real planar reflection of the room (falls back to a silvered look)
@@ -1744,7 +1766,15 @@ let fireRig = null, mantleMirror = null;
       const m = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts)), i % 3 ? shardMat : shardMat2); m.visible = false; scene.add(m);
       shards.push({ mesh: m, v: new THREE.Vector3(), w: new THREE.Vector3(), down: false, lift: 0.002 * (i % 7) });
     }
-    mantleMirror = { mh, home: mh.position.clone(), v: new THREE.Vector3(), state: 'wall', shards, MW, MH };
+    const crackTex = canvasTex(256, 192, (g2, w, h) => {              // spiderweb crack laid over the glass
+      g2.clearRect(0, 0, w, h); const cx = w * 0.58, cy = h * 0.42, rays = [];
+      const line = (pts, dark) => { g2.beginPath(); pts.forEach(([x, y], i) => i ? g2.lineTo(x, y) : g2.moveTo(x, y)); g2.strokeStyle = dark ? 'rgba(70,80,88,.85)' : 'rgba(255,255,255,.95)'; g2.lineWidth = dark ? 2 : 1.3; g2.stroke(); };
+      for (let i = 0; i < 12; i++) { let a = i / 12 * Math.PI * 2 + Math.random() * 0.3, x = cx, y = cy; const pts = [[x, y]], len = 50 + Math.random() * 130; for (let d = 0; d < len; d += 9) { a += (Math.random() - 0.5) * 0.35; x += Math.cos(a) * 10; y += Math.sin(a) * 10; pts.push([x, y]); } rays.push(pts); line(pts.map(([x, y]) => [x + 1, y + 1]), true); line(pts, false); }
+      for (const r of [2, 4]) { const pts = rays.map(p => p[Math.min(p.length - 1, r)]); pts.push(pts[0]); line(pts, false); }
+    }, 1, 1);
+    const cracks = new THREE.Mesh(new THREE.PlaneGeometry(MW, MH), basic(0xffffff, { map: crackTex, transparent: true, depthWrite: false })); cracks.position.set(0, 0, IN(1.12)); cracks.visible = false; mh.add(cracks);
+    mh.traverse(o => { if (o.isMesh) { o.userData.mantleMirror = true; tapTargets.push(o); } });
+    mantleMirror = { mh, home: mh.position.clone(), v: new THREE.Vector3(), state: 'wall', shards, MW, MH, cracks, hits: 0, world: toWorld(0, MY, 0) };
   }
   // mantle décor: each piece is a knock-off-able prop in world space
   const onMantle = (g, x, z) => { g.position.copy(toWorld(x, MT, z)); scene.add(g); return g; };
@@ -1947,6 +1977,8 @@ let wallRig = null;
 }
 function hitWallpaper(point, normal) {
   const w = wallRig; if (!w) return;
+  const mm = mantleMirror;                                            // the mirror covers the wall behind it until it's knocked down
+  if (mm && mm.state === 'wall' && point.x < -ROOM.halfW + 0.4 && Math.abs(point.z - mm.world.z) < mm.MW / 2 + IN(3) && Math.abs(point.y - mm.world.y) < mm.MH / 2 + IN(3)) { sfx.thump(); return; }
   let r = w.rips.find(q => q.at.distanceTo(point) < 0.6);
   if (!r) {                                                           // a fresh spot: claw marks
     if (w.rips.length >= 14) { sfx.rustle(); return; }
@@ -2160,8 +2192,15 @@ function updateMantleMirror(dt) {
     if (o.position.y <= gy) { o.position.y = gy; if (sh.v.y < -2.5) { sh.v.y *= -0.2; sh.v.x *= 0.4; sh.v.z *= 0.4; sh.w.multiplyScalar(0.3); } else { sh.down = true; o.rotation.set(-Math.PI / 2, 0, Math.random() * 6); } }
   }
 }
+function hitMantleMirror() {
+  const mm = mantleMirror; if (!mm || mm.state !== 'wall') return;
+  mm.hits++;
+  if (mm.hits === 1) { mm.cracks.visible = true; sfx.crack(); shake = Math.max(shake, reduceMotion ? 0.03 : 0.12); bonus(40, mm.world, 'Crack!'); }
+  else blastMantleMirror();
+}
 function resetMantleMirror() {
   const mm = mantleMirror; if (!mm) return;
+  mm.hits = 0; mm.cracks.visible = false;
   mm.state = 'wall'; mm.mh.position.copy(mm.home); mm.mh.rotation.set(0, 0, 0); mm.mh.visible = true; mm.v.set(0, 0, 0);
   for (const sh of mm.shards) sh.mesh.visible = false;
 }
@@ -2195,7 +2234,7 @@ const discoGlints = [], DISCO_ZONE = { z0: 0, z1: 0, y0: 0, y1: 0 };
   // even, organic scatter: random "darts" that must keep a minimum distance from every ball already placed
   // (blue-noise), so there are no rows and no clumps. From just past the door casing to the end of the sofa.
   // only on the plain run of wall above the sofa, none on the panelled wallpaper
-  const Z0 = COUCH_RIGHT_Z0 - IN(7) + 0.3, Z1 = COUCH_RIGHT_Z0 + FT(2.85) * 3 - 0.2, Y0 = 3.0, Y1 = DOOR_H + 0.12, COUNT = Math.round(22 * (Z1 - Z0) / (Z1 - (DOOR_Z1 + CASING + 0.35)));
+  const Z0 = COUCH_RIGHT_Z0 - IN(7) + 0.3, Z1 = COUCH_RIGHT_Z0 + FT(2.85) * 3 - 0.2, Y0 = 2.9, Y1 = DOOR_H - 0.12, COUNT = Math.round(22 * (Z1 - Z0) / (Z1 - (DOOR_Z1 + CASING + 0.35)));
   Object.assign(DISCO_ZONE, { z0: Z0 - 0.4, z1: Z1 + 0.4, y0: Y0 - 0.6, y1: Y1 + 0.6 });
   const spots = [];
   for (let minD = 0.95; spots.length < COUNT && minD > 0.3; minD *= 0.93) {
@@ -3264,6 +3303,11 @@ function interact(o, point, face) {
   if (o.userData.wallpaper) { if (!point) return false; startSwipe(point, true); const n = o.userData.normal; setTimeout(() => hitWallpaper(point, n), 90); tapShake(); return true; }
   if (o.userData.dresserDoor || o.userData.dresser) { startSwipe(point, true); setTimeout(() => toggleDresserDoor(o.userData.dresserDoor ? o.userData.dresserDoor.x : point.x), 90); tapShake(); return true; }
   if (o.userData.blanket) { if (!blanketRig || blanketRig.state === 'flying' || blanketRig.state === 'gone' || blanketRig.state === 'burrito') return false; startSwipe(point, true); setTimeout(() => blanketToCat(point.clone()), 90); return true; }
+  if (o.userData.gameConsole) { startSwipe(point, true); setTimeout(tapConsole, 90); tapShake(); return true; }
+  if (o.userData.mantleMirror) {                                     // chaos only: one hit cracks it, the second knocks it off the wall
+    const mm = mantleMirror; if (gameMode !== 'chaos' || !mm || mm.state !== 'wall') return false;
+    startSwipe(point, true); setTimeout(hitMantleMirror, 90); tapShake(); return true;
+  }
   if (o.userData.diffuser) { startSwipe(point, true); setTimeout(knockDiffuser, 90); tapShake(); return true; }
   if (o.userData.table) { if (tableRig && tableRig.broken) return false; startSwipe(point, true); setTimeout(breakTable, 90); return true; }
   if (o.userData.window) { startSwipe(point, true); setTimeout(toggleBlinds, 90); tapShake(); return true; }
