@@ -129,6 +129,12 @@
   #walkSwipe:active{transform:translateY(4px);box-shadow:0 1px 0 #6a34b8}
   #walkMeow{right:calc(34px + env(safe-area-inset-right,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px));width:68px;height:68px;background:#f0a23a;box-shadow:0 5px 0 #b06a14,0 10px 18px rgba(0,0,0,.3)}
   #walkMeow:active{transform:translateY(4px);box-shadow:0 1px 0 #b06a14}
+  #heistDash{display:none;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(38px + env(safe-area-inset-bottom,0px));width:96px;height:96px;background:#3fa9f5;box-shadow:0 5px 0 #1f6fae,0 10px 20px rgba(0,0,0,.3)}
+  #heistDash:active{transform:translateY(4px);box-shadow:0 1px 0 #1f6fae}
+  #heistDash.cool{filter:grayscale(.8) brightness(.8)}
+  body.heist-ui #heistDash{display:grid}
+  body.heist-ui #walkJump,body.heist-ui #walkSwipe,body.heist-ui #walkMeow,body.heist-ui #walkCaption{display:none}
+  body.heist-ui .hud{top:0;bottom:auto;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 0}
   #walkCaption{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translateX(-50%);z-index:7;pointer-events:none;white-space:nowrap;opacity:0;
                background:rgba(58,20,52,.88);color:#fff;border:2px solid rgba(255,244,248,.45);border-radius:999px;padding:7px 18px;font:800 17px var(--body)}
   #walkCaption.show{animation:caption 2.4s ease forwards}
@@ -145,6 +151,15 @@
   #mirrorHud .row{display:flex;justify-content:space-between;gap:10px;align-items:center}
   #mirrorHud .hp{font-size:12px;letter-spacing:1px}
   #mirrorFlash{position:fixed;inset:0;z-index:8;pointer-events:none;opacity:0}
+  #mirrorRipple{position:fixed;inset:-20%;z-index:8;pointer-events:none;opacity:0;
+                background:radial-gradient(circle at 50% 45%,rgba(255,255,255,.95) 0,rgba(235,225,255,.55) 18%,rgba(255,255,255,0) 60%),
+                           repeating-radial-gradient(circle at 50% 45%,rgba(255,255,255,0) 0 22px,rgba(210,200,255,.45) 28px,rgba(255,255,255,0) 36px)}
+  #karenBubble{position:fixed;left:0;top:0;z-index:6;pointer-events:none;transform:translate(-50%,-100%);background:#fff;color:#2a1a22;font:800 14px var(--body);
+               padding:7px 12px;border-radius:14px;border:2px solid #2a1a22;white-space:nowrap;box-shadow:0 3px 8px rgba(0,0,0,.3)}
+  #karenBubble::after{content:'';position:absolute;left:50%;bottom:-9px;margin-left:-7px;border:7px solid transparent;border-top-color:#2a1a22;border-bottom:0}
+  #karenBubble.mad{background:#ff3b3b;color:#fff;font-size:16px;letter-spacing:.02em;animation:karenShake .12s linear infinite}
+  #karenBubble[hidden]{display:none}
+  @keyframes karenShake{0%{margin-left:-2px}50%{margin-left:2px}100%{margin-left:-2px}}
   #mirrorFlash.go{background:radial-gradient(circle,rgba(255,255,255,1),rgba(200,170,255,.9));animation:mflash .8s ease-out forwards}
   #mirrorFlash.hurt{background:radial-gradient(ellipse at 50% 50%,rgba(255,0,0,0) 35%,rgba(255,20,40,.7) 100%);animation:mflash .5s ease-out forwards}
   @keyframes mflash{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
@@ -319,8 +334,10 @@
 <div id="blanketCover" hidden><span>Mmmph! Tap to fling it off</span></div>
 <div id="fx"></div>
 <div id="paintSplash"></div>
-<div id="walkUI" hidden><div id="walkStick"><div id="walkKnob"></div></div><button id="walkJump">Jump</button><button class="walk-btn" id="walkSwipe"><span><b>🐾</b>Swipe</span></button><button class="walk-btn" id="walkMeow"><span><b>😺</b>Meow</span></button><div id="walkCaption"></div><div id="mirrorHud" hidden></div></div>
+<div id="walkUI" hidden><div id="walkStick"><div id="walkKnob"></div></div><button id="walkJump">Jump</button><button class="walk-btn" id="heistDash"><span><b>💨</b>Dash</span></button><button class="walk-btn" id="walkSwipe"><span><b>🐾</b>Swipe</span></button><button class="walk-btn" id="walkMeow"><span><b>😺</b>Meow</span></button><div id="walkCaption"></div><div id="mirrorHud" hidden></div></div>
 <div id="mirrorFlash"></div>
+<div id="mirrorRipple"></div>
+<div id="karenBubble" hidden></div>
 
 <!-- HUD: one bar across the top -->
 <div class="hud" id="hud" hidden>
@@ -522,6 +539,7 @@ const CEIL_H = ROOM.wallH;                                          // ceiling s
 const FIRE_END = 13.3 + (58 + 4) / 15.6 / 2;                              // front edge of the fireplace hearth (see FIRE below)
 const COUCH_DEPTH = 2.1, COUCH_LEFT_Z0 = 3.47, COUCH_RIGHT_Z0 = FIRE_END - 2.85 * 3 / 1.3 - 7 / 15.6;   // its far arm lines up with the hearth   // left sofa + fireplace sit further down their wall; right sofa pushed down to make room for the acrylic table
 const FIRE = { z: 13.3, w: 58 / 15.6, d: 7 / 15.6, h: 46 / 15.6 };   // built in: only 7" proud of the wall   // stone fireplace on the left wall (58" wide, 15" deep, 44" to the mantle)
+const ARMCHAIR = { x: 2.15, z: ROOM.visDepth - 1.2, rot: Math.PI - 0.35, half: 1.0 };   // the armchair at the back (only seen from inside the room)
 const HOLES = [
   { kind: 'couch', x: -ROOM.halfW + COUCH_DEPTH, z: COUCH_LEFT_Z0 + 1.6, n: [1, 0] },   // under the left sofa
   { kind: 'couch', x: -ROOM.halfW + COUCH_DEPTH, z: COUCH_LEFT_Z0 + 5.1, n: [1, 0] },
@@ -530,7 +548,7 @@ const HOLES = [
   { kind: 'fire',  x: -ROOM.halfW + FIRE.d + 0.02,      z: FIRE.z, n: [1, 0] },   // out of the fireplace past the end of the left sofa
   { kind: 'door',  x:  ROOM.halfW + 0.6,         z: 5.4 / 1.3, n: [-1, 0] }, // through the doorway (DOOR_Z)
   { kind: 'couch', x: -3.55, z: 18 / 12 / 1.3, n: [0, 1] },                     // out from under the left cabinet
-  { kind: 'wall',  x:  ROOM.halfW, z: 16.4, n: [-1, 0] },                        // a mouse hole in the right wall, past the sofa
+  { kind: 'door',  x:  ROOM.halfW + 0.6, z: 16.9, n: [-1, 0] },                  // through the second doorway, in the corner past the sofa (DOOR2_Z)
 ];
 const CHEESE_SPOTS = [ { x: -0.7, z: 4.9 }, { x: 0.8, z: 7.5 }, { x: -0.35, z: 10.3 } ];   // a tall zig-zag down the middle of the room   // an even triangle in the open middle of the room
 const CAT_POS = new THREE.Vector3(0, 0, 2.2);   // cat guards from the top of the screen, swiping down
@@ -1907,8 +1925,8 @@ function drawKart() {
    ===================================================================== */
 const TV_GAMES = ['kart', 'party', 'flappy'];
 const tvNextGame = () => TV_GAMES[tvPlays % TV_GAMES.length];
-function speak(line) {                                                // narration: spoken aloud (where the device can) + subtitles on screen
-  try { if (!window.speechSynthesis) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(line); u.rate = 0.95; u.pitch = 1.05; u.volume = 0.9; speechSynthesis.speak(u); } catch (e) {}
+function speak(line, v) {                                             // narration: spoken aloud (where the device can) + subtitles on screen; v = { pitch, rate } for characters
+  try { if (!window.speechSynthesis) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(line); u.rate = (v && v.rate) || 0.95; u.pitch = (v && v.pitch) || 1.05; u.volume = 1; speechSynthesis.speak(u); } catch (e) {}
 }
 function hush() { try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {} }
 
@@ -2361,12 +2379,14 @@ SECT = 'Wall';
 const WIN_W = IN(66), WIN_H = IN(30), WIN_SILL = FT(4), CASING = IN(3), WALL_T = IN(5);
 const DOOR_W = IN(32), DOOR_H = IN(80), DOOR_Z = FT(5.4);
 const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // opening edges along the wall
+const DOOR2_Z = 16.9, DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DOOR2_Z1 = DOOR2_Z + DOOR_W / 2;   // a second doorway in the far corner of the same wall, into another room
 (() => {
   /* ---- right wall with the door opening notched out ---- */
   const L = ROOM.visDepth, Hh = ROOM.wallH, ox = L / 2, oy = Hh / 2;   // shape coords are centred like a plane
   const s = new THREE.Shape();
   s.moveTo(-ox, -oy); s.lineTo(DOOR_Z0 - ox, -oy); s.lineTo(DOOR_Z0 - ox, DOOR_H - oy); s.lineTo(DOOR_Z1 - ox, DOOR_H - oy);
-  s.lineTo(DOOR_Z1 - ox, -oy); s.lineTo(ox, -oy); s.lineTo(ox, oy); s.lineTo(-ox, oy); s.lineTo(-ox, -oy);
+  s.lineTo(DOOR_Z1 - ox, -oy); s.lineTo(DOOR2_Z0 - ox, -oy); s.lineTo(DOOR2_Z0 - ox, DOOR_H - oy); s.lineTo(DOOR2_Z1 - ox, DOOR_H - oy); s.lineTo(DOOR2_Z1 - ox, -oy);
+  s.lineTo(ox, -oy); s.lineTo(ox, oy); s.lineTo(-ox, oy); s.lineTo(-ox, -oy);
   const wt = panelTexSide.clone(); wt.needsUpdate = true; wt.repeat.set(1 / (IN(8) * 4), 1 / Hh);   // shape UVs are in world units
   const rw = new THREE.Mesh(new THREE.ShapeGeometry(s), lam(0xf2efe8, { map: wt })); rw.userData.rightWall = true;
   rw.rotation.y = -Math.PI / 2; rw.position.set(ROOM.halfW, oy, L / 2); scene.add(rw);
@@ -2377,7 +2397,8 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
     pw.rotation.y = -Math.PI / 2; pw.position.set(ROOM.halfW - 0.008, ROOM.wallH / 2, (z0 + z1) / 2); scene.add(pw);
   }
   box(0.05, 0.26, DOOR_Z0 - CASING, trimMat, ROOM.halfW - 0.025, 0.13, (DOOR_Z0 - CASING) / 2);                  // baseboard, split at the door
-  box(0.05, 0.26, L - DOOR_Z1 - CASING, trimMat, ROOM.halfW - 0.025, 0.13, (L + DOOR_Z1 + CASING) / 2);
+  box(0.05, 0.26, DOOR2_Z0 - DOOR_Z1 - CASING * 2, trimMat, ROOM.halfW - 0.025, 0.13, (DOOR2_Z0 + DOOR_Z1) / 2);
+  box(0.05, 0.26, L - DOOR2_Z1 - CASING, trimMat, ROOM.halfW - 0.025, 0.13, (L + DOOR2_Z1 + CASING) / 2);
   // jambs + header give the opening its thickness
   const jambMat = lam(0xe4e0d8);
   box(WALL_T, DOOR_H, 0.03, jambMat, ROOM.halfW + WALL_T / 2, DOOR_H / 2, DOOR_Z0);
@@ -2406,6 +2427,27 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   box(CASING, DOOR_H + CASING, IN(0.8), trimMat, -DOOR_W / 2 - CASING / 2, (DOOR_H + CASING) / 2, IN(0.4), d);
   box(CASING, DOOR_H + CASING, IN(0.8), trimMat, DOOR_W / 2 + CASING / 2, (DOOR_H + CASING) / 2, IN(0.4), d);
   box(DOOR_W + CASING * 2, CASING, IN(0.8), trimMat, 0, DOOR_H + CASING / 2, IN(0.4), d);
+  SECT = 'Doorway';
+  { // the second doorway, in the far corner: the same open door frame, into a warm lamplit den beyond
+    box(WALL_T, DOOR_H, 0.03, jambMat, ROOM.halfW + WALL_T / 2, DOOR_H / 2, DOOR2_Z0); box(WALL_T, DOOR_H, 0.03, jambMat, ROOM.halfW + WALL_T / 2, DOOR_H / 2, DOOR2_Z1);
+    box(WALL_T, 0.03, DOOR_W, jambMat, ROOM.halfW + WALL_T / 2, DOOR_H, DOOR2_Z);
+    const RD = FT(8), RW = FT(4.6), rz = DOOR2_Z;
+    const denWall = basic(0x5a4636), denFloor = basic(0x3a2c22);
+    const df = new THREE.Mesh(new THREE.PlaneGeometry(RD, RW), denFloor); df.rotation.x = -Math.PI / 2; df.position.set(hx + RD / 2, 0.005, rz); scene.add(df);
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(FT(3), FT(2)), basic(0x7a3b3b)); rug.rotation.x = -Math.PI / 2; rug.position.set(hx + RD * 0.45, 0.01, rz); scene.add(rug);
+    const fw = new THREE.Mesh(new THREE.PlaneGeometry(RW, ROOM.wallH), basic(0x4e3c2e)); fw.rotation.y = -Math.PI / 2; fw.position.set(hx + RD, ROOM.wallH / 2, rz); scene.add(fw); addBack(fw);
+    for (const z of [rz - RW / 2, rz + RW / 2]) { const sw = new THREE.Mesh(new THREE.PlaneGeometry(RD, ROOM.wallH), denWall); sw.rotation.y = z < rz ? 0 : Math.PI; sw.position.set(hx + RD / 2, ROOM.wallH / 2, z); scene.add(sw); addBack(sw); }
+    const dlid = new THREE.Mesh(new THREE.PlaneGeometry(RD + WALL_T, RW), basic(0x2b2520, { side: THREE.DoubleSide })); dlid.rotation.x = Math.PI / 2; dlid.position.set(hx - WALL_T / 2 + RD / 2, ROOM.wallH, rz); scene.add(dlid);
+    const shelf = new THREE.Mesh(new THREE.PlaneGeometry(FT(2.4), FT(4.5)), basic(0x2e231b)); shelf.rotation.y = -Math.PI / 2; shelf.position.set(hx + RD - 0.02, FT(2.4), rz - FT(0.9)); scene.add(shelf);   // a bookcase silhouette
+    for (let i = 0; i < 4; i++) { const row = new THREE.Mesh(new THREE.PlaneGeometry(FT(2.1), IN(7)), basic([0x7a3b3b, 0x2f4f6f, 0xc9a45a, 0x3d5a3d][i])); row.rotation.y = -Math.PI / 2; row.position.set(hx + RD - 0.03, FT(1) + i * IN(12), rz - FT(0.9)); scene.add(row); }
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(FT(1.6), 24), basic(0xd8a860, { transparent: true, opacity: 0.35 })); glow.rotation.y = -Math.PI / 2; glow.position.set(hx + RD - 0.04, FT(4.2), rz + FT(1.2)); scene.add(glow);   // lamp glow on the far wall
+    const shade = new THREE.Mesh(new THREE.CylinderGeometry(IN(5), IN(8), IN(9), 16, 1, true), basic(0xf2d49a, { side: THREE.DoubleSide })); shade.position.set(hx + RD - FT(0.8), FT(4.2), rz + FT(1.2)); scene.add(shade);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.5), IN(0.5), FT(4), 6), basic(0x1f1a16)); pole.position.set(hx + RD - FT(0.8), FT(2), rz + FT(1.2)); scene.add(pole);
+    const d2 = new THREE.Group(); d2.position.set(ROOM.halfW - 0.02, 0, DOOR2_Z); d2.rotation.y = -Math.PI / 2; scene.add(d2);   // casing on the room side
+    box(CASING, DOOR_H + CASING, IN(0.8), trimMat, -DOOR_W / 2 - CASING / 2, (DOOR_H + CASING) / 2, IN(0.4), d2);
+    box(CASING, DOOR_H + CASING, IN(0.8), trimMat, DOOR_W / 2 + CASING / 2, (DOOR_H + CASING) / 2, IN(0.4), d2);
+    box(DOOR_W + CASING * 2, CASING, IN(0.8), trimMat, 0, DOOR_H + CASING / 2, IN(0.4), d2);
+  }
 
   SECT = 'Window';
   /* ---- window: starts where the door starts ---- */
@@ -3195,15 +3237,20 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     }
     const named = (g, name) => { g.userData.name = name; povEndWall.add(g); return g; };
     const BX = (g, w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
-    { // a closed door on the right: a white six-panel door (it doesn't open)
-      const g = named(new THREE.Group(), 'Closet door'), CW = FT(2.67), CX = 3.05, paint = lam(0xf4f1ea), z0 = VD - IN(0.8);
-      BX(g, CW, DH, IN(1.4), paint, CX, DH / 2, z0);
-      for (const [py, ph] of [[IN(8), IN(28)], [IN(39), IN(22)], [IN(64), IN(12)]]) for (const sx of [-1, 1]) BX(g, CW * 0.36, ph, IN(0.5), lam(0xfbf9f4), CX + sx * CW * 0.22, py + ph / 2, z0 - IN(0.8));   // raised panels
-      BX(g, IN(3.5), DH + IN(3.5), IN(0.8), trim, CX - CW / 2 - IN(1.75), (DH + IN(3.5)) / 2, VD - IN(0.4)); BX(g, IN(3.5), DH + IN(3.5), IN(0.8), trim, CX + CW / 2 + IN(1.75), (DH + IN(3.5)) / 2, VD - IN(0.4));
-      BX(g, CW + IN(7), IN(3.5), IN(0.8), trim, CX, DH + IN(1.75), VD - IN(0.4));
-      const brass = new THREE.MeshPhongMaterial({ color: 0xc9a24a, shininess: 90, specular: 0xffffff });
-      const knob = new THREE.Mesh(new THREE.SphereGeometry(IN(1.2), 14, 10), brass); knob.position.set(CX - CW / 2 + IN(3), IN(36), z0 - IN(2.2)); g.add(knob);
-      BX(g, IN(0.6), IN(0.6), IN(1.6), brass, CX - CW / 2 + IN(3), IN(36), z0 - IN(1.2));
+    { // a single armchair in the corner (back-left, seen from her box): sage velvet, rolled arms, wooden legs, a mustard cushion
+      const g = named(new THREE.Group(), 'Armchair'); g.position.set(ARMCHAIR.x, 0, ARMCHAIR.z); g.rotation.y = ARMCHAIR.rot;
+      const velvet = new THREE.MeshPhongMaterial({ color: 0x86a288, shininess: 18, specular: 0x223322 }), deep = lam(0x6f8a72), wood = lam(0x6b4a2b);
+      const CW = IN(30), CD = IN(30), AW = IN(5), LEG = IN(6);
+      for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.9), IN(0.6), LEG, 8), wood); l.position.set(lx * (CW / 2 - IN(2)), LEG / 2, lz * (CD / 2 - IN(2))); g.add(l); }
+      BX(g, CW, IN(6), CD, velvet, 0, LEG + IN(3), 0);                                                   // base
+      BX(g, CW - AW * 2, IN(5), CD - IN(7), velvet, 0, LEG + IN(8.5), IN(3));                             // seat cushion
+      BX(g, CW, IN(20), IN(6), deep, 0, LEG + IN(16), -CD / 2 + IN(3));                                   // back
+      BX(g, CW - AW * 2, IN(15), IN(4), velvet, 0, LEG + IN(16.5), -CD / 2 + IN(8));                      // back cushion
+      for (const sx of [-1, 1]) {
+        BX(g, AW, IN(11), CD, deep, sx * (CW / 2 - AW / 2), LEG + IN(11.5), 0);                          // arms
+        const roll = new THREE.Mesh(new THREE.CylinderGeometry(AW * 0.62, AW * 0.62, CD, 14), velvet); roll.rotation.x = Math.PI / 2; roll.position.set(sx * (CW / 2 - AW / 2), LEG + IN(17), 0); g.add(roll);
+      }
+      const pil = new THREE.Mesh(new THREE.SphereGeometry(IN(6), 14, 10), lam(0xe0b040)); pil.scale.set(1, 0.85, 0.35); pil.position.set(IN(7), LEG + IN(15), -CD / 2 + IN(11)); pil.rotation.z = 0.25; g.add(pil);
     }
     { // litter box along the left wall, past the fireplace: a grey tray of litter with a scoop
       const g = named(new THREE.Group(), 'Litter box'); g.position.set(-hw + IN(9.5), 0, VD - FT(2.6)); g.rotation.y = Math.PI / 2;
@@ -4126,7 +4173,9 @@ class Mouse {
     if (paintUntil > clock) paintMouse(this);
     if (this.kind === 'laser' && !this.pointer) this.pointer = makeLaserPointer(this.model, 0.06, 0.31, 0.6, 1);   // the laser mouse: a laser pointer clamped in its teeth
     if (this.pointer) this.pointer.visible = this.kind === 'laser';
-    if (this.kind === 'laser') this.willRetreat = false;               // it never just ducks back in: it comes out to play                          // the paint jar smashed: every mouse comes out a different colour
+    if (this.kind === 'laser') this.willRetreat = false;               // it never just ducks back in: it comes out to play
+    if (this.kind === 'karen' && !this.karenHair) this.karenHair = makeKarenHair(this.model);
+    if (this.karenHair) this.karenHair.visible = this.kind === 'karen';                          // the paint jar smashed: every mouse comes out a different colour
     this.ring.visible = false;     // coloured threat rings removed; threat reads through size, shadows stay
     this.ringMat.opacity = 0;
     this.setState('emerge');
@@ -4139,6 +4188,7 @@ class Mouse {
   dropCheese() { if (this.target && this.target.claimant === this) this.target.drop(); }
   get hittable() {
     if (!this.active) return false;
+    if (this.kind === 'karen') return this.state === 'kLecture' || this.state === 'kRant' || this.state === 'kLeave';   // (not while she's up on the TV)
     if (this.isBomb) return this.age >= CFG.BOMB_TELEGRAPH && (this.state === 'emerge' || this.state === 'peek' || this.state === 'run' || this.state === 'loiter' || this.state === 'taunt' || this.state === 'home');
     if (this.state === 'retreat') return this.t < 0.18;
     return this.state === 'emerge' || this.state === 'peek' || this.state === 'run' || this.state === 'grab' || this.state === 'carry' || this.state === 'home' || this.state === 'wander';
@@ -4187,6 +4237,39 @@ class Mouse {
 
     switch (this.state) {
       case 'player': bob = this.playerRun ? Math.abs(Math.sin(this.t * 24)) * 0.06 : 0; break;   // steered by you (mouse mode)
+      case 'kRise': {                                                  // Karen: pops up from behind the TV and looks down her nose at everyone
+        const T = karenTV(); this.pop = 1;
+        p.set(T.x, T.top - 0.55 + Math.min(1, this.t / 0.7) * 0.55, T.z); this.root.rotation.y = Math.sin(this.t * 2) * 0.4;
+        if (this.t > 0.7 && !this.saidHi) { this.saidHi = true; karenSay(this, 'Excuse me. EXCUSE me!'); }
+        if (this.t > 2.2) { this.jFrom = p.clone(); this.jTo = new THREE.Vector3(CAT_POS.x + 0.95, 0, CAT_POS.z + 1.35); this.setState('kJump'); tone(500, 900, 0.2, 'triangle', 0.04); }
+        break;
+      }
+      case 'kJump': {                                                  // ...and jumps down to march up to the cat
+        const k = Math.min(1, this.t / 0.9); p.lerpVectors(this.jFrom, this.jTo, k); p.y = this.jFrom.y * (1 - k) + Math.sin(k * Math.PI) * 1.1;
+        this.faceToward(this.jTo.x, this.jTo.z, dt);
+        if (k >= 1) { p.y = 0; this.setState('kLecture'); this.lineT = 0.2; sfx.thump(); }
+        break;
+      }
+      case 'kLecture': {                                               // wagging her finger at the cat
+        this.faceToward(CAT_POS.x, CAT_POS.z, dt); this.model.rotation.z = Math.sin(this.t * 6) * 0.08; bob = Math.abs(Math.sin(this.t * 5)) * 0.03;
+        this.lineT -= dt; if (this.lineT <= 0) { this.lineT = 2.8; karenSay(this, KAREN_LECTURE[this.lineI++ % KAREN_LECTURE.length]); }
+        if (this.t > 17) { this.setState('kLeave'); karenSay(this, "I'm leaving a one-star review!"); }
+        break;
+      }
+      case 'kRant': {                                                  // "LET ME SPEAK TO A MANAGER!": stomping, hopping mad
+        this.faceToward(CAT_POS.x, CAT_POS.z, dt); bob = Math.abs(Math.sin(this.t * 14)) * 0.09; this.model.rotation.z = Math.sin(this.t * 20) * 0.1;
+        p.x += Math.sin(this.t * 3.1) * dt * 0.6;
+        this.lineT -= dt; if (this.lineT <= 0) { this.lineT = 2.6; karenSay(this, KAREN_RANT[this.lineI++ % KAREN_RANT.length], true); }
+        if (this.t > 15) { this.setState('kLeave'); karenSay(this, "Fine! I'm leaving a one-star review!", true); }
+        break;
+      }
+      case 'kLeave': {                                                 // storming off to the nearest hole
+        let bd = Infinity; for (const h of HOLES) { const dd = Math.hypot(h.mouthOut.x - p.x, h.mouthOut.z - p.z); if (dd < bd) { bd = dd; this.hole = h; } }
+        const h = this.hole.mouthOut, aim = this.navAim(h.x, h.z, dt), tx = aim ? aim.x : h.x, tz = aim ? aim.z : h.z, dx = tx - p.x, dz = tz - p.z, dd = Math.hypot(dx, dz) || 0.001;
+        if (bd > 0.08) { const s2 = Math.min(dd, this.speed * 1.1 * dt); p.x += dx / dd * s2; p.z += dz / dd * s2; this.faceToward(tx, tz, dt); bob = Math.abs(Math.sin(this.t * 22)) * 0.06; }
+        else { p.copy(h); this.setState('retreat'); }
+        break;
+      }
       case 'emerge': {
         const k = Math.min(1, this.t / 0.32);
         p.lerpVectors(this.hole.mouthIn, this.hole.mouthOut, 1 - (1 - k) ** 2);
@@ -4451,6 +4534,7 @@ const ACHIEVEMENTS = [
     ['catnipAll', '🎰', 'Catnip connoisseur', 'Try all five catnip effects'],
     ['fishCatch', '🐟', 'Gone fishing', 'Catch 5 hallucinated fish in one trip'],
     ['mirrorEnter', '🪞', 'Mirror, mirror', 'In Free walk, jump into a mirror'],
+    ['karen', '💇‍♀️', 'Complaint dismissed', 'Vanquish the Karen mouse (rare: she turns up around 3,000 points)'],
     ['darkKitty', '😈', 'Through the looking glass', 'Beat the evil dark kitty in the mirror world (9 hits)'],
     ['inception', '🪆', 'Game-ception', 'Win the kart race, then beat the game on the driver\'s Switch'],
   ]],
@@ -4463,7 +4547,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 18:57';                                              // stamped when the site is published
+const BUILD = '2026-09-24 19:18';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -4527,13 +4611,33 @@ function heistBlocked(x, z) {
 function startHeist() {
   const p = heist.player, hole = HOLES.find(h => h.kind === 'fire') || HOLES[0];
   p.spawn(hole, false, D, {}); p.pop = 1; p.setState('player'); p.root.position.copy(hole.mouthOut); p.root.rotation.y = Math.atan2(hole.normal.x, hole.normal.z);
-  Object.assign(heist, { hold: null, strike: null, strikeT: 2.2, invuln: 0, carrying: null, stolen: 0 }); heist.vel.set(0, 0, 0);
+  Object.assign(heist, { hold: null, strike: null, strikeT: 3.0, invuln: 0, carrying: null, stolen: 0, strikes: [], dashT: 0, dashCD: 0, respawnT: 0 }); heist.vel.set(0, 0, 0);
+  if (!heist.rings) { heist.rings = [heist.ring]; for (let i = 0; i < 2; i++) { const r = heist.ring.clone(true); r.children.forEach(c => c.material = c.material.clone()); r.visible = false; scene.add(r); heist.rings.push(r); } }
+  heist.rings.forEach(r => r.visible = false);
+  walk.stick.x = walk.stick.y = 0; document.body.classList.add('heist-ui'); document.getElementById('walkUI').hidden = false;   // the same on-screen stick as Free walk, plus Dash
   lives = HEIST_LIVES; updateHud();
   fcStart(); fc.zoom = 0.55;                                         // the camera follows you, down closer to the floor
 }
+function queueStrike(at, tele) {
+  const ring = heist.rings.find(r => !heist.strikes.some(s2 => s2.ring === r)); if (!ring) return;
+  ring.position.copy(at); ring.visible = true; heist.strikes.push({ at, t: 0, tele, struck: false, ring });
+}
+function heistDash() {                                               // a quick burst of speed to dodge the paw
+  if (gameMode !== 'mouse' || state !== 'playing' || heist.dashCD > 0 || heist.respawnT > 0) return;
+  heist.dashT = 0.32; heist.dashCD = 1.5; noise(0.2, 0.08, 2600); tone(600, 1200, 0.12, 'triangle', 0.03);
+  burst(heist.player.root.position.clone().setY(0.15), 0xb08a64, 5, 1.2, 1, 0.5);
+}
+function heistRespawn() {                                            // back out of a mouse hole, well away from where she got you
+  const p = heist.player, pos = p.root.position, hs = HOLES.slice().sort((a, b) => Math.hypot(b.mouthOut.x - pos.x, b.mouthOut.z - pos.z) - Math.hypot(a.mouthOut.x - pos.x, a.mouthOut.z - pos.z));
+  const h = hs[(Math.random() * Math.min(3, hs.length)) | 0];
+  burst(pos.clone().setY(0.3), 0xffffff, 8, 1.5, 2, 0.5);
+  pos.copy(h.mouthOut); p.root.rotation.y = Math.atan2(h.normal.x, h.normal.z); p.sqY = 1; p.sqXZ = 1; heist.vel.set(0, 0, 0);
+  burst(pos.clone().setY(0.3), 0xff6fae, 10, 1.8, 2.4, 0.6); sfx.squeak(2); floatText(pos.clone().setY(1), 'Respawned!', '');
+  heist.invuln = 1.4;
+}
 function heistHurt() {
   const p = heist.player;
-  lives--; heist.invuln = 1.6; combo = 0;
+  lives--; heist.invuln = 2.2; heist.respawnT = 0.75; combo = 0;       // squashed: drops the mushroom and respawns at a hole a moment later
   if (heist.carrying) { heist.carrying.drop(); heist.carrying = null; p.target = null; }   // you drop what you were carrying
   p.sqY = 0.35; p.sqXZ = 1.5;                                        // squashed flat for a moment
   sfx.whack(true); sfx.squeak(3); vibrate(60); shake = Math.max(shake, reduceMotion ? 0.05 : 0.3);
@@ -4550,10 +4654,12 @@ function updateHeist(dt) {
     _hN.set(heist.hold.x / window.innerWidth * 2 - 1, -(heist.hold.y / window.innerHeight) * 2 + 1); _hRay.setFromCamera(_hN, camera);
     if (_hRay.ray.intersectPlane(floorPlane, _hP)) { _hD.set(_hP.x - pos.x, 0, _hP.z - pos.z); if (_hD.length() < 0.12) _hD.set(0, 0, 0); }
   } else {
-    const k = heist.keys, fx = (k.arrowright || k.d ? 1 : 0) - (k.arrowleft || k.a ? 1 : 0), fz = (k.arrowdown || k.s ? 1 : 0) - (k.arrowup || k.w ? 1 : 0);
-    if (fx || fz) { const y = fc.s.yaw; _hD.set(fx * Math.cos(y) + fz * Math.sin(y), 0, -fx * Math.sin(y) + fz * Math.cos(y)); }
+    const k = heist.keys; let fx = (k.arrowright || k.d ? 1 : 0) - (k.arrowleft || k.a ? 1 : 0), fz = (k.arrowdown || k.s ? 1 : 0) - (k.arrowup || k.w ? 1 : 0);
+    if (!fx && !fz) { fx = walk.stick.x; fz = walk.stick.y; }        // the on-screen stick
+    if (Math.hypot(fx, fz) > 0.12) { const y = fc.s.yaw; _hD.set(fx * Math.cos(y) + fz * Math.sin(y), 0, -fx * Math.sin(y) + fz * Math.cos(y)); }
   }
-  const speed = heist.carrying ? 2.1 : 2.8;
+  if (heist.respawnT > 0) _hD.set(0, 0, 0);                            // flattened: can't move until she's respawned
+  const speed = (heist.carrying ? 2.1 : 2.8) * (heist.dashT > 0 ? 2.1 : 1);
   if (_hD.lengthSq() > 0) {
     _hD.normalize().multiplyScalar(speed * dt);
     const nx = pos.x + _hD.x, nz = pos.z + _hD.z;
@@ -4566,11 +4672,11 @@ function updateHeist(dt) {
   p.sqY += (1 - p.sqY) * Math.min(1, dt * 4); p.sqXZ += (1 - p.sqXZ) * Math.min(1, dt * 4);
   heist.invuln = Math.max(0, heist.invuln - dt); p.root.visible = heist.invuln <= 0 || Math.sin(clock * 30) > 0;   // blinks while safe
   // ---- grab a mushroom, bank it at a hole
-  if (!heist.carrying) {
+  if (!heist.carrying && heist.respawnT <= 0) {                        // (not while squashed: the mushroom she dropped stays dropped)
     for (const c of cheeses) if (c.available && Math.hypot(c.pos.x - pos.x, c.pos.z - pos.z) < 0.55) {
       c.startCarry(p); p.target = c; heist.carrying = c; sfx.squeak(2); floatText(pos.clone().setY(1), 'Got one!', ''); break;
     }
-  } else {
+  } else if (heist.carrying) {
     for (const h of HOLES) if (Math.hypot(h.mouthOut.x - pos.x, h.mouthOut.z - pos.z) < 0.95) {
       const c = heist.carrying; heist.carrying = null; p.target = null; c.lose(); heist.stolen++;
       const pts = 100 * heist.stolen; score += pts; floatText(pos.clone().setY(1.1), `Stolen! +${pts}`, 'clutch');
@@ -4579,25 +4685,31 @@ function updateHeist(dt) {
       break;
     }
   }
-  // ---- the cat hunts you: a red ring shows where the paw will land, then it strikes
-  const tele = 0.8 - 0.35 * D.d;
-  if (!heist.strike) {
-    heist.strikeT -= dt;
-    if (heist.strikeT <= 0) {
-      const lead = 0.35 + Math.random() * 0.35, at = new THREE.Vector3(pos.x + heist.vel.x * lead + (Math.random() - 0.5) * 0.4, 0.02, pos.z + heist.vel.z * lead + (Math.random() - 0.5) * 0.4);
-      at.x = THREE.MathUtils.clamp(at.x, -ROOM.halfW + 0.4, ROOM.halfW - 0.4); at.z = THREE.MathUtils.clamp(at.z, DEPTH + 0.3, ROOM.visDepth - 0.5);
-      heist.strike = { at, t: 0, struck: false }; heist.ring.position.copy(at); heist.ring.visible = true; sfx.angryMeow && Math.random() < 0.3 && sfx.angryMeow();
-    }
-  } else {
-    const st = heist.strike; st.t += dt;
-    const k = Math.min(1, st.t / tele); heist.ring.scale.setScalar(1.25 - 0.25 * k); heist.ring.children[0].material.opacity = 0.5 + 0.5 * Math.abs(Math.sin(st.t * 18));
-    if (!st.struck && st.t >= tele) { st.struck = true; startSwipe(st.at); sfx.whoosh(); }
-    if (st.struck && st.t >= tele + 0.12) {                             // the paw lands
-      heist.ring.visible = false; heist.strike = null; heist.strikeT = 1.4 - 0.7 * D.d + Math.random() * 0.6;
-      burst(st.at.clone().setY(0.15), 0xb08a64, 5, 1.4, 1.5, 0.7);
-      if (heist.invuln <= 0 && Math.hypot(pos.x - st.at.x, pos.z - st.at.z) < 0.55) heistHurt(); else sfx.miss();
+  // ---- the cat hunts you: red rings show where her paw will land, then it strikes. She gets quicker and trickier the
+  // longer the heist goes on, and later on she swipes twice: once where you're heading and once where you are
+  heist.dashT = Math.max(0, heist.dashT - dt); heist.dashCD = Math.max(0, heist.dashCD - dt);
+  const dashBtn = document.getElementById('heistDash'); if (dashBtn) dashBtn.classList.toggle('cool', heist.dashCD > 0);
+  if (heist.respawnT > 0) { heist.respawnT -= dt; if (heist.respawnT <= 0) heistRespawn(); }
+  const tele = Math.max(0.38, 0.72 - 0.3 * D.d - elapsed * 0.002);
+  heist.strikeT -= dt;
+  if (heist.strikeT <= 0 && heist.respawnT <= 0) {
+    const aim = (lead, jit) => { const at = new THREE.Vector3(pos.x + heist.vel.x * lead + (Math.random() - 0.5) * jit, 0.02, pos.z + heist.vel.z * lead + (Math.random() - 0.5) * jit);
+      at.x = THREE.MathUtils.clamp(at.x, -ROOM.halfW + 0.4, ROOM.halfW - 0.4); at.z = THREE.MathUtils.clamp(at.z, DEPTH + 0.3, ROOM.visDepth - 0.5); return at; };
+    queueStrike(aim(0.5 + Math.random() * 0.35, 0.35), tele);
+    if (elapsed > 25 && Math.random() < Math.min(0.55, 0.2 + elapsed * 0.004)) queueStrike(aim(0, 0.2), tele + 0.28);   // a second paw, right where you are
+    heist.strikeT = Math.max(0.45, 1.15 - 0.6 * D.d - elapsed * 0.004) + Math.random() * 0.45 + tele;
+    if (sfx.angryMeow && Math.random() < 0.25) sfx.angryMeow();
+  }
+  for (const st of heist.strikes) {
+    st.t += dt; const k = Math.min(1, st.t / st.tele);
+    st.ring.scale.setScalar(1.25 - 0.25 * k); st.ring.children[0].material.opacity = 0.5 + 0.5 * Math.abs(Math.sin(st.t * 18));
+    if (!st.struck && st.t >= st.tele) { st.struck = true; startSwipe(st.at); sfx.whoosh(); }
+    if (st.struck && st.t >= st.tele + 0.12) {                          // the paw lands
+      st.done = true; st.ring.visible = false; burst(st.at.clone().setY(0.15), 0xb08a64, 5, 1.4, 1.5, 0.7);
+      if (heist.invuln <= 0 && heist.respawnT <= 0 && Math.hypot(pos.x - st.at.x, pos.z - st.at.z) < 0.6) heistHurt(); else sfx.miss();
     }
   }
+  heist.strikes = heist.strikes.filter(s2 => !s2.done);
   // ---- where to go: the nearest mushroom (gold), or once you've got one, the nearest mouse hole (green)
   let goal = null, best = Infinity;
   if (heist.carrying) { for (const h of HOLES) { const d = Math.hypot(h.mouthOut.x - pos.x, h.mouthOut.z - pos.z); if (d < best) { best = d; goal = h.mouthOut; } } }
@@ -4744,7 +4856,7 @@ function handleTap(clientX, clientY) {
     if (sc < bestScore) { bestScore = sc; best = m; }
   }
   if (best) {
-    const extra = nipK().swat ? mice.filter(m => m !== best && m.hittable && !m.isBomb && !m.boss && m.root.position.distanceTo(best.root.position) < nipK().swat) : [];   // catnip: one big swat takes out the mice beside it too
+    const extra = nipK().swat ? mice.filter(m => m !== best && m.hittable && !m.isBomb && !m.boss && m.kind !== 'karen' && m.root.position.distanceTo(best.root.position) < nipK().swat) : [];   // catnip: one big swat takes out the mice beside it too
     whack(best); extra.forEach(m => whack(m));
     if (extra.length) floatText(best.center.clone().setY(1.4), 'Catnip swat!', 'clutch');
     return;
@@ -4956,6 +5068,7 @@ function knockHelmet(m) {                                           // first tap
 function whack(m) {
   if (m.helmetHP > 0) { startSwipe(m.root.position); knockHelmet(m); return; }
   if (m.boss) { startSwipe(m.root.position); if (!hurtBoss(m, 1)) return; }
+  if (m.kind === 'karen') { startSwipe(m.root.position); if (!hurtKaren(m)) return; }
   startSwipe(m.root.position);
   if (m.isBomb) {
     explode(m.root.position);
@@ -5053,6 +5166,7 @@ function rollBlocked(x, z) {
   if (fanRig && fanRig.state !== 'broken' && Math.hypot(x - fanRig.tip.position.x + IN(5.5), z - fanRig.tip.position.z) < IN(6) + R) return true;
   if (Math.abs(x - CAT_POS.x) < BOX.w / 2 + R && Math.abs(z - CAT_POS.z) < BOX.d / 2 + R) return true;
   if (z < IN(22) + R) return true;
+  if (Math.abs(x - ARMCHAIR.x) < ARMCHAIR.half + R && Math.abs(z - ARMCHAIR.z) < ARMCHAIR.half + R) return true;   // the armchair in the back corner
   return false;
 }
 
@@ -5266,6 +5380,7 @@ function shootMouse(m) {
   if (!m.active || !m.hittable) return;
   if (!m.isBomb || m.boss) spawnBlood(m.root.position, m.boss ? 2.2 : 1.4);
   if (m.boss && !hurtBoss(m, 3)) return;                            // a bullet does 3 damage to the Rat King
+  if (m.kind === 'karen' && !hurtKaren(m)) return;
   if (m.kind === 'laser' && m.pointer && m.pointer.visible) dropLaser(m);
   if (m.isBomb && !m.boss) {                                                   // shot bombs just fizzle out: no life lost
     burst(m.center.clone().setY(0.4), 0x3a3434, 8, 2, 2.5, 1.2); floatText(m.center.clone().setY(0.9), 'Defused!', ''); m.release(); return;
@@ -5436,7 +5551,7 @@ function checkLaserMouse() {
   if (state !== 'playing' || mice.some(x => x.active && x.boss)) return;   // (not while the Rat King is out)
   const m = spawnMouse({ safe: true, kind: 'laser' }); if (!m) return;
   laserMouseDone = true; laserMousePending = false;
-  showBanner('Laser mouse!'); camToast('🔴 Whack the laser mouse for its laser pointer!', 3000); sfx.sparkle && sfx.sparkle();
+  sfx.sparkle && sfx.sparkle();                                        // (no announcement: spotting the red dot is the surprise)
 }
 function dropLaser(m) {
   if (!m.pointer || !m.pointer.visible) return;
@@ -5461,6 +5576,7 @@ function zapMouse(m) {                                               // a laser 
   if (!m.active || !m.hittable) return;
   burst(m.center.clone().setY(0.45), 0xff3030, 10, 2.6, 3, 0.6); burst(m.center.clone().setY(0.4), 0x444444, 6, 1.2, 2.2, 1.2);
   if (m.boss && !hurtBoss(m, 2)) return;                             // two laser hits' worth on the Rat King
+  if (m.kind === 'karen' && !hurtKaren(m)) return;
   if (m.isBomb && !m.boss) { floatText(m.center.clone().setY(0.9), 'Fuse zapped!', ''); m.release(); return; }
   const saved = m.state === 'carry' || m.state === 'grab';
   if (saved) { m.dropCheese(); tailWag = 1.4; }
@@ -5600,7 +5716,7 @@ function makePuffer() {
 }
 function updateCostumes(on) {
   mice.forEach((m, i) => {
-    const show = on && m.active && !m.boss;
+    const show = on && m.active && !m.boss && m.kind !== 'karen';
     if (!show) { if (m.costumes) for (const k in m.costumes) m.costumes[k].visible = false; if (m._hid) { m.model.visible = true; m._hid = false; } return; }
     if (!m.costumes) { m.costumes = { fish: makeFish(), bfly: makeButterfly(), puffer: makePuffer() }; for (const k in m.costumes) { m.costumes[k].visible = false; m.root.add(m.costumes[k]); } }
     const kind = m.isBomb ? 'puffer' : i % 2 ? 'bfly' : 'fish';
@@ -5705,6 +5821,61 @@ function resetCatnip() {
   updateCostumes(false); updateWalkCritters(false); cat.scale.setScalar(1); if (walk) walk.gScale = 1;
   const fx = document.getElementById('catnipFx'); if (fx) fx.className = '';
 }
+
+/* =====================================================================
+   THE KAREN MOUSE: a 1-in-5 chance, once a game, when the score passes 3,000. She pops up from behind the TV
+   (asymmetric blonde bob, pearls), jumps down and lectures the cat to stop hitting the mice. Hit her and she
+   demands to speak to the manager; two more hits and she's gone. Leave her be and she storms off.
+   ===================================================================== */
+const KAREN_CHANCE = 0.2;
+const KAREN_LECTURE = ['Stop hitting the mice this instant!', 'This is a mouse-friendly household!', 'Do you know who I am?', "I'm writing all of this down.", 'Absolutely unacceptable behaviour!'];
+const KAREN_RANT = ['LET ME SPEAK TO A MANAGER!', 'I WANT YOUR MANAGER! NOW!', 'Where is your SUPERVISOR?!'];
+const karenState = { rolled: false, pending: false };
+function makeKarenHair(model) {                                       // the haircut: a sleek angled bob, one side longer, spiky stacked back, highlights, and pearls
+  const g = new THREE.Group(); model.add(g);
+  const blonde = new THREE.MeshPhongMaterial({ color: 0xe6c46a, shininess: 60, specular: 0x665522 }), low = lam(0xa88838), hi = lam(0xfff0b8);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.23, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), blonde); cap.position.set(0, 0.4, 0.32); cap.scale.set(1.12, 0.95, 1.18); g.add(cap);
+  const longSide = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), blonde); longSide.scale.set(0.55, 1.35, 1.2); longSide.position.set(-0.2, 0.3, 0.38); longSide.rotation.z = 0.25; g.add(longSide);
+  const shortSide = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), blonde); shortSide.scale.set(0.55, 0.9, 1.05); shortSide.position.set(0.19, 0.37, 0.35); g.add(shortSide);
+  const sweep = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), blonde); sweep.scale.set(1.5, 0.45, 0.8); sweep.position.set(-0.06, 0.52, 0.47); sweep.rotation.z = 0.35; g.add(sweep);   // the side-swept fringe
+  for (let i = 0; i < 6; i++) { const sp = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.16, 6), i % 2 ? low : blonde); const a = (i - 2.5) * 0.28; sp.position.set(Math.sin(a) * 0.12, 0.52 + Math.cos(i) * 0.02, 0.14); sp.rotation.set(-1.9, 0, -a * 0.8); g.add(sp); }   // spiky stacked back
+  for (let i = 0; i < 4; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.012, 0.22), hi); st.position.set(-0.1 + i * 0.065, 0.61 - Math.abs(i - 1.5) * 0.015, 0.32); g.add(st); }   // highlights
+  for (let i = 0; i < 9; i++) { const a = (i / 8 - 0.5) * 2.2, pl = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), new THREE.MeshPhongMaterial({ color: 0xfdfaf2, shininess: 120, specular: 0xffffff })); pl.position.set(Math.sin(a) * 0.17, 0.2 - Math.cos(a) * 0.03, 0.42 + Math.cos(a) * 0.08); g.add(pl); }   // pearls
+  return g;
+}
+function karenTV() { const b = new THREE.Box3().setFromObject(screen); return { x: (b.min.x + b.max.x) / 2 + 0.25, top: b.max.y, z: (b.min.z + b.max.z) / 2 - 0.05 }; }
+function karenSay(m, line, mad) {
+  m.karenLine = line; m.karenMad = !!mad || m.karenMad;
+  speak(line, mad ? { pitch: 1.9, rate: 1.25 } : { pitch: 1.7, rate: 1.1 });
+  if (!mad) tone(900, 1100, 0.08, 'square', 0.02); else { tone(700, 1300, 0.15, 'sawtooth', 0.03); shake = Math.max(shake, reduceMotion ? 0.02 : 0.08); }
+}
+function checkKaren() {
+  if (gameMode !== 'classic' || state !== 'playing') return;
+  if (!karenState.rolled && score >= 3000) { karenState.rolled = true; karenState.pending = score < 4000 && Math.random() < KAREN_CHANCE; }
+  if (!karenState.pending || mice.some(x => x.active && (x.boss || x.kind === 'karen'))) return;
+  const m = spawnMouse({ safe: true, kind: 'karen' }); if (!m) return;
+  karenState.pending = false;
+  Object.assign(m, { hp: 3, karenMad: false, karenLine: '', lineI: 0, lineT: 0, saidHi: false, willRetreat: false });
+  const T = karenTV(); m.root.position.set(T.x, T.top - 0.55, T.z); m.root.rotation.y = 0; m.setState('kRise');
+}
+function hurtKaren(m) {                                              // true once she's vanquished
+  m.hp--; m.hitT = 0.3; m.sqY = 0.7; m.sqXZ = 1.2; burst(m.center.clone().setY(0.7), 0xe6c46a, 8, 2.4, 3, 0.5); sfx.squeak(3);
+  if (m.state !== 'kRant') { m.setState('kRant'); m.lineT = 0; m.lineI = 0; floatText(m.center.clone().setY(1.4), 'How DARE you!', 'bad'); return false; }
+  if (m.hp > 0) { floatText(m.center.clone().setY(1.4), `${m.hp} more!`, 'warn'); return false; }
+  hush(); unlock('karen'); score += 300; showBanner('Complaint dismissed!'); floatText(m.center.clone().setY(1.5), 'Karen vanquished! +300', 'clutch');
+  m.karenLine = ''; burst(m.center.clone().setY(0.6), 0xfdfaf2, 14, 3, 3.5, 0.6);
+  return true;
+}
+function updateKarenBubble() {
+  const el = document.getElementById('karenBubble'); if (!el) return;
+  const m = mice.find(x => x.active && x.kind === 'karen' && x.state !== 'whacked' && x.state !== 'retreat' && x.karenLine);
+  if (!m || state === 'tvgame') { if (!el.hidden) el.hidden = true; return; }
+  const v = m.root.position.clone().setY(m.root.position.y + 1.25 * Math.max(0.6, m.visScale)).project(camera);
+  if (v.z > 1) { el.hidden = true; return; }
+  el.hidden = false; if (el.textContent !== m.karenLine) el.textContent = m.karenLine; el.classList.toggle('mad', m.state === 'kRant' || /[A-Z]{5}/.test(m.karenLine));
+  el.style.left = `${(v.x * 0.5 + 0.5) * window.innerWidth}px`; el.style.top = `${(-v.y * 0.5 + 0.5) * window.innerHeight}px`;
+}
+function resetKaren() { karenState.rolled = false; karenState.pending = false; const el = document.getElementById('karenBubble'); if (el) el.hidden = true; }
 function onCheeseGrabbed(m, c) {
   if (state !== 'playing' && state !== 'ending') return;
   floatText(c.pos.clone().setY(1.1), 'Thief!', 'warn');
@@ -5739,7 +5910,7 @@ function endGame(reason) {
   if (reason === 'chaos') unlock('chaos');
   if (reason === 'heist') { unlock('heist'); if (lives >= HEIST_LIVES) unlock('ghost'); }
   state = 'ending'; endReason = reason; endTimer = 1.2;
-  heist.ring.visible = false; heist.strike = null; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true;
+  (heist.rings || [heist.ring]).forEach(r => r.visible = false); heist.strikes = []; heist.strike = null; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true;
   sfx.over();
 }
 
@@ -5771,7 +5942,7 @@ const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStar
 let lastTimeShown = -1;
 function updateHud() {
   if (score >= 5000 && state === 'playing') unlock('score5k');
-  checkBoss(); checkLaserMouse();
+  checkBoss(); checkLaserMouse(); checkKaren();
   ui.score.textContent = score;
   const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
   ui.combo.hidden = mult <= 1; ui.combo.textContent = `x${mult}`;
@@ -5822,7 +5993,7 @@ function resetGame() {
   cheeses.forEach(c => c.reset());
   if (gameMode === 'chaos') cheeses.forEach(c => c.lose());
   document.querySelector('.c-cheese').style.visibility = gameMode === 'chaos' ? 'hidden' : '';
-  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); clearPaint(); resetLaser(); resetCatnip(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
+  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); clearPaint(); resetLaser(); resetCatnip(); resetKaren(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false; bossDone = false; bossLevel = 0; waveNo = 1;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -5837,7 +6008,7 @@ function startGame(mode) {
   state = 'playing';
   resetChaosCam();
   if (gameMode === 'chaos') showBanner('Chaos mode!');
-  if (gameMode === 'mouse') { startHeist(); showBanner('Mouse mode!'); camToast('Hold to run · steal the mushrooms', 3200); }
+  if (gameMode === 'mouse') { startHeist(); showBanner('Mouse mode!'); camToast('Stick to run · Dash to dodge · steal the mushrooms', 3400); }
   if (gameMode === 'walk') startWalk();
 }
 function pauseGame() {
@@ -6738,9 +6909,10 @@ function startWalk() {
 function endWalk() {
   walk.on = false; walkPtr = null; walk.stick.x = walk.stick.y = 0;
   if (walk.poops) { walk.poops.forEach(o => scene.remove(o)); walk.poops = []; }
-  if (mirrorWorld) exitMirror(null, true);
+  if (mirrorWorld || MW.trans) exitMirror(null, true);
+  walk.frozen = false;
   if (walk.rig) { walk.rig.g.visible = false; walk.rig.shadow.visible = false; }
-  cat.visible = true; catTail.visible = true; document.body.classList.remove('walking');
+  cat.visible = true; catTail.visible = true; document.body.classList.remove('walking', 'heist-ui');
   const ui = document.getElementById('walkUI'); if (ui) ui.hidden = true;
   const knob = document.getElementById('walkKnob'); if (knob) knob.style.transform = '';
 }
@@ -6749,8 +6921,9 @@ function updateWalk(dt) {
   cat.visible = false;
   const K = heist.keys, p = walk.pos, W = walk.rig;
   let sx = walk.stick.x, sy = walk.stick.y;
+  if (walk.frozen) { sx = sy = 0; walk.jumpQ = -1; }                   // (stepping through the mirror)
   const kx = (K.arrowright || K.d ? 1 : 0) - (K.arrowleft || K.a ? 1 : 0), ky = (K.arrowdown || K.s ? 1 : 0) - (K.arrowup || K.w ? 1 : 0);
-  if (kx || ky) { const l = Math.hypot(kx, ky); sx = kx / l; sy = ky / l; }
+  if ((kx || ky) && !walk.frozen) { const l = Math.hypot(kx, ky); sx = kx / l; sy = ky / l; }
   if (mirrorWorld) sx = -sx;                                          // the picture is flipped, so left/right are too
   const yaw = fc.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);   // stick up = away from the camera
   _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * nipK().walk);   // catnip: zoomies / a floaty drift / a slow zen amble
@@ -6906,23 +7079,21 @@ function walkName(h) {                                               // what did
    ===================================================================== */
 let mirrorWorld = false;
 const MW = { dk: null, hp: 9, you: 5, portalCD: 0, hurtT: 0, done: false };
-function mirrorPortals() {
-  const list = [], m = mirrorRig, mm = mantleMirror;
-  if (m && m.glass.visible && (m.hits || 0) < 3) list.push(new THREE.Box3().setFromObject(m.glass).expandByScalar(0.15));
-  if (mm && mm.state === 'wall') list.push(new THREE.Box3().setFromObject(mm.mh).expandByScalar(0.15));
-  if (mirrorWorld && !list.length && m) list.push(new THREE.Box3().setFromObject(m.lean).expandByScalar(0.15));   // both mirrors smashed while inside: the empty frame still takes you home
-  return list;
+function mirrorPortals() {                                            // only the mirror over the fireplace is a way through
+  const mm = mantleMirror; if (!mm) return [];
+  if (mm.state === 'wall') { MW.homeBox = new THREE.Box3().setFromObject(mm.mh).expandByScalar(0.15); return [MW.homeBox]; }
+  return mirrorWorld && MW.homeBox ? [MW.homeBox] : [];              // smashed while you're inside: where it hung still takes you home
 }
 function mirrorHud() {
   const el = document.getElementById('mirrorHud'); if (!el) return;
-  el.hidden = !mirrorWorld;
+  el.hidden = !mirrorWorld || !MW.battle;
   el.innerHTML = `<div class="row"><span>😈 Dark kitty</span><span class="hp">${'🖤'.repeat(Math.max(0, MW.hp))}${'🤍'.repeat(9 - Math.max(0, MW.hp))}</span></div>`
                + `<div class="row"><span>👑 You</span><span class="hp">${'💗'.repeat(Math.max(0, MW.you))}${'🤍'.repeat(5 - Math.max(0, MW.you))}</span></div>`;
 }
 function mirrorFlash(kind) { const el = document.getElementById('mirrorFlash'); el.className = ''; void el.offsetWidth; el.className = kind; }
 function shimmer() { [1568, 1319, 1047, 784, 1175, 1568, 2093].forEach((f, i) => tone(f, f * 1.02, 0.35, 'sine', 0.035, i * 0.05)); noise(0.5, 0.05, 5000); }
 function throughMirror() {                                           // step through: she comes out facing back into the room
-  MW.portalCD = 1.6; mirrorFlash('go'); shimmer();
+  MW.portalCD = 1.6;
   const fx = Math.sin(walk.face), fz = Math.cos(walk.face), p = walk.pos;
   p.x = THREE.MathUtils.clamp(p.x - fx * 0.8, -ROOM.halfW + 0.3, ROOM.halfW - 0.3); p.z = THREE.MathUtils.clamp(p.z - fz * 0.8, 0.3, ROOM.visDepth - 0.45);
   p.y = surfaceTop(p.x, p.z, p.y + WALK.step); walk.grounded = true; walk.vy = 0; walk.vel.set(0, 0, 0);
@@ -6931,28 +7102,47 @@ function throughMirror() {                                           // step thr
 function enterMirror() {
   throughMirror();
   mirrorWorld = true; document.body.classList.add('mirror-world'); unlock('mirrorEnter');
-  MW.hp = 9; MW.you = 5; MW.done = false; MW.hurtT = 0;
+  MW.hp = 9; MW.you = 5; MW.done = false; MW.hurtT = 0; MW.battle = false;
   if (!MW.dk) { MW.dk = { rig: makeWalker(true), pos: new THREE.Vector3(), vel: new THREE.Vector3(), vy: 0, grounded: true, face: 0, state: 'lurk', t: 0, cd: 0, phase: 0 }; MW.dk.rig.g.userData.name = 'Evil dark kitty'; }
   const d = MW.dk; d.pos.set(CAT_POS.x, surfaceTop(CAT_POS.x, CAT_POS.z, 0.5), CAT_POS.z); d.vel.set(0, 0, 0); d.vy = 0; d.grounded = true; d.state = 'lurk'; d.t = 0; d.cd = 0;
   d.face = Math.atan2(walk.pos.x - d.pos.x, walk.pos.z - d.pos.z); d.rig.g.scale.setScalar(1); d.rig.g.visible = true; d.rig.shadow.visible = true;
-  mirrorHud(); showBanner('The mirror world!'); showWalkName('Someone is waiting in your box...');
+  mirrorHud(); showWalkName('The mirror world... something is waiting in your box');
 }
 function exitMirror(msg, quiet) {
   if (!quiet) throughMirror();
+  if (quiet && MW.trans) { MW.trans = null; walk.frozen = false; renderer.domElement.style.filter = ''; const rp = document.getElementById('mirrorRipple'); if (rp) rp.style.opacity = 0; }
   mirrorWorld = false; document.body.classList.remove('mirror-world');
   if (MW.dk) { MW.dk.rig.g.visible = false; MW.dk.rig.shadow.visible = false; }
   mirrorHud(); if (!quiet) showWalkName(msg || 'Back home');
+}
+// going through the glass: she presses into it, the room blurs and brightens as silvery ripples wash out across the
+// screen, the worlds swap at the brightest moment, then everything settles on the other side (about 1.5 s)
+function startMirrorTrans(dir, msg) {
+  if (MW.trans) return;
+  MW.trans = { t: 0, dir, msg, swapped: false, z0: fc.zoom }; walk.frozen = true; MW.portalCD = 3;
+  shimmer(); noise(1.2, 0.05, 900); tone(220, 440, 1.1, 'sine', 0.035);
+}
+function updateMirrorTrans(dt) {
+  const T = MW.trans, DUR = 1.5, MID = 0.65; T.t += dt;
+  const k = T.t < MID ? T.t / MID : Math.max(0, 1 - (T.t - MID) / (DUR - MID)), e = k * k * (3 - 2 * k);
+  if (T.t < MID) { const p = walk.pos, lx = ROOM.halfW - 0.3; p.x = THREE.MathUtils.clamp(p.x + Math.sin(walk.face) * 0.5 * dt, -lx, lx); p.z = THREE.MathUtils.clamp(p.z + Math.cos(walk.face) * 0.5 * dt, 0.3, ROOM.visDepth - 0.45); }   // pressing into the glass
+  fc.zoom = T.z0 * (1 - 0.45 * e);
+  const cv = renderer.domElement, base = mirrorWorld ? 'hue-rotate(180deg) saturate(1.25) brightness(.72) contrast(1.15) ' : '';
+  cv.style.filter = base + `blur(${(e * 7).toFixed(2)}px) brightness(${(1 + e * 1.1).toFixed(2)}) saturate(${(1 + e * 0.6).toFixed(2)})`;
+  const rp = document.getElementById('mirrorRipple'); rp.style.opacity = e.toFixed(3); rp.style.transform = `scale(${(1 + T.t * 0.7).toFixed(3)})`;
+  if (!T.swapped && T.t >= MID) { T.swapped = true; if (T.dir === 'in') enterMirror(); else exitMirror(T.msg); }
+  if (T.t >= DUR) { MW.trans = null; walk.frozen = false; fc.zoom = T.z0; cv.style.filter = ''; rp.style.opacity = 0; }
 }
 function hurtPlayer(dx, dz, dist) {
   MW.you--; MW.hurtT = 1.1; mirrorFlash('hurt');
   walk.vel.set(dx / (dist || 1) * 6, 0, dz / (dist || 1) * 6); walk.vy = 5; walk.grounded = false;
   shake = Math.max(shake, reduceMotion ? 0.06 : 0.4); vibrate(80); noise(0.2, 0.2, 1400); sfx.meow(false);
   floatText(walk.pos.clone().setY(walk.pos.y + 1.1), 'Ouch!', 'bad'); mirrorHud();
-  if (MW.you <= 0) { showBanner('The dark kitty wins!'); MW.done = true; setTimeout(() => { if (mirrorWorld) exitMirror('Thrown out of the mirror... try again!'); }, 1300); }
+  if (MW.you <= 0) { showBanner('The dark kitty wins!'); MW.done = true; setTimeout(() => { if (mirrorWorld) startMirrorTrans('out', 'Thrown out of the mirror... try again!'); }, 1300); }
 }
 function hitDark() {
   const d = MW.dk; if (!d || d.state === 'dead' || MW.done) return;
-  MW.hp--; mirrorHud();
+  MW.hp--; if (!MW.battle) { MW.battle = true; hush(); } mirrorHud();
   const dx = d.pos.x - walk.pos.x, dz = d.pos.z - walk.pos.z, dist = Math.hypot(dx, dz) || 1;
   d.state = 'stun'; d.t = 0; d.cd = Math.max(d.cd, 0.5); d.vel.set(dx / dist * 5, 0, dz / dist * 5); d.vy = 3.5; d.grounded = false;   // knocked back, dazed
   const at = d.pos.clone().setY(d.pos.y + 0.5);
@@ -6964,7 +7154,7 @@ function hitDark() {
     for (let i = 0; i < 4; i++) burst(at, [0x2a2733, 0x19e6d0, 0x3cb043, 0xffffff][i], 12, 3, 3, 0.8);
     [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f, 0.18, 'triangle', 0.05, i * 0.1));
     unlock('darkKitty'); showBanner('Dark kitty defeated!');
-    setTimeout(() => { if (mirrorWorld) exitMirror('You beat the dark kitty! 👑'); }, 2300);
+    setTimeout(() => { if (mirrorWorld) startMirrorTrans('out', 'You beat the dark kitty! 👑'); }, 2300);
   } else floatText(at.setY(at.y + 0.8), `${MW.hp} to go!`, 'clutch');
 }
 function darkBlocked(q, grounded, nx, nz) {
@@ -6980,8 +7170,13 @@ function updateDarkKitty(dt) {
   d.t += dt; d.cd = Math.max(0, d.cd - dt);
   let speed = 0, face = Math.atan2(dx, dz);
   switch (d.state) {
-    case 'lurk':                                                     // crouched in the box, eyes on you
-      if (dist < 5.5 && !MW.done) { d.state = 'leap'; d.t = 0; d.vy = 9.5; d.grounded = false; d.vel.set(dx / dist * 3.2, 0, dz / dist * 3.2); sfx.meow(true); floatText(q.clone().setY(q.y + 1.4), '!!', 'bad'); showWalkName('The dark kitty sees you!'); }
+    case 'lurk':                                                     // crouched in the box, eyes on you, until you come close
+      if (dist < 2.8 && !MW.done) { d.state = 'taunt'; d.t = 0; d.said = 0; }
+      break;
+    case 'taunt':                                                    // rises up in the box and speaks, two lines, then pounces
+      if (d.said === 0) { d.said = 1; const l = "I've been waiting for you..."; speak(l, { pitch: 0.45, rate: 0.8 }); showWalkName('😈 ' + l); floatText(q.clone().setY(q.y + 1.5), l, 'name'); tone(110, 80, 1.2, 'sawtooth', 0.04); }
+      if (d.said === 1 && d.t > 2.2) { d.said = 2; const l = 'Time to take your place!'; speak(l, { pitch: 0.45, rate: 0.85 }); showWalkName('😈 ' + l); floatText(q.clone().setY(q.y + 1.5), l, 'bad'); }
+      if (d.t > 4.2) { d.state = 'leap'; d.t = 0; d.vy = 9.5; d.grounded = false; d.vel.set(dx / dist * 3.2, 0, dz / dist * 3.2); sfx.meow(true); MW.battle = true; mirrorHud(); }
       break;
     case 'leap': if (d.grounded && d.t > 0.2) { d.state = 'hunt'; d.t = 0; } break;
     case 'hunt':
@@ -7019,7 +7214,8 @@ function updateDarkKitty(dt) {
   const spd = Math.hypot(d.vel.x, d.vel.z), a = Math.min(1, spd / 2); d.phase += dt * (5 + spd * 3.4); const sw = Math.sin(d.phase);
   R.g.position.copy(q); R.g.rotation.y = d.face;
   R.body.rotation.x = 0; R.body.position.y = 0;
-  if (d.state === 'lurk') {                                          // crouched low in the box, peeking over the rim
+  if (d.state === 'taunt') { R.body.position.y = -0.04 + Math.min(1, d.t / 1.5) * 0.04; R.body.rotation.x = -0.35; R.legs[2].rotation.x = R.legs[3].rotation.x = -1.1; R.legs[0].rotation.x = R.legs[1].rotation.x = 0; }   // sitting up tall in the box
+  else if (d.state === 'lurk') {                                          // crouched low in the box, peeking over the rim
     R.body.position.y = -0.12; R.body.rotation.x = -0.25;
     R.legs[0].rotation.x = R.legs[1].rotation.x = 0.2; R.legs[2].rotation.x = R.legs[3].rotation.x = -1.1;
   } else if (!d.grounded) { R.legs[0].rotation.x = R.legs[1].rotation.x = -0.9; R.legs[2].rotation.x = R.legs[3].rotation.x = 0.9; R.body.rotation.x = -0.2; }
@@ -7028,7 +7224,7 @@ function updateDarkKitty(dt) {
   if (d.state === 'recover' && d.t < 0.2) R.legs[1].rotation.x = -1.9 + d.t * 9;
   R.g.position.x += d.state === 'stun' ? Math.sin(d.t * 60) * 0.03 : 0;
   R.tail.forEach((sg, i) => { sg.rotation.x = (i ? 0.25 : 0.9); sg.rotation.y = Math.sin(clock * (d.state === 'lurk' ? 3 : 7) - i * 0.55) * (0.15 + i * 0.04); });   // an angry lashing tail
-  R.eyes.forEach(e => e.scale.setScalar(0.12 + (d.state === 'windup' ? 0.1 : 0) + Math.sin(clock * 6) * 0.015));
+  R.eyes.forEach(e => e.scale.setScalar(0.12 + (d.state === 'windup' || d.state === 'taunt' ? 0.1 : 0) + Math.sin(clock * 6) * 0.015));
   const gy = surfaceTop(q.x, q.z, q.y + 0.05), hgt = q.y - gy;
   R.shadow.position.set(q.x, gy + 0.012, q.z); R.shadow.scale.set(1, 1.5, 1).multiplyScalar(1 / (1 + hgt * 0.4)); R.shadow.rotation.z = -d.face;
 }
@@ -7037,8 +7233,9 @@ function updateMirrorWorld(dt) {
   const p = walk.pos, spd = Math.hypot(walk.vel.x, walk.vel.z);
   if (MW.portalCD <= 0 && (spd > 0.4 || !walk.grounded)) {           // walking or jumping into a mirror: through you go
     const ahead = new THREE.Vector3(p.x + Math.sin(walk.face) * 0.45, p.y + 0.4, p.z + Math.cos(walk.face) * 0.45);
-    if (mirrorPortals().some(b => b.containsPoint(ahead))) { if (mirrorWorld) exitMirror(MW.done ? null : 'You escaped the mirror world'); else enterMirror(); return; }
+    if (!MW.trans && mirrorPortals().some(b => b.containsPoint(ahead))) { startMirrorTrans(mirrorWorld ? 'out' : 'in', MW.done ? null : 'You escaped the mirror world'); }
   }
+  if (MW.trans) updateMirrorTrans(dt);
   if (!mirrorWorld) return;
   updateDarkKitty(dt);
   if (walk.rig && MW.hurtT > 0) walk.rig.g.visible = !walk.fp && Math.sin(clock * 30) > 0;   // blinks while she recovers
@@ -7143,8 +7340,9 @@ function walkMeow() {
 }
 {
   const hold = (id, fn) => document.getElementById(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(); });
-  hold('walkSwipe', walkSwipe); hold('walkMeow', walkMeow);
+  hold('walkSwipe', walkSwipe); hold('walkMeow', walkMeow); hold('heistDash', heistDash);
   window.addEventListener('keydown', e => {
+    if (gameMode === 'mouse' && state === 'playing' && (e.key === ' ' || e.key === 'Shift')) { e.preventDefault(); heistDash(); return; }
     if (gameMode !== 'walk' || state !== 'playing' || e.repeat) return;
     const k = e.key.toLowerCase(); if (k === 'e' || k === 'f') walkSwipe(); if (k === 'm' || k === 'q') walkMeow();
   });
@@ -7209,6 +7407,7 @@ function frame(now) {
       if (gameMode === 'mouse') updateHeist(dt);
       if (gameMode === 'walk') updateWalk(dt);
       if (laserMousePending) checkLaserMouse();
+      if (karenState.pending) checkKaren();
     }
     for (const m of mice) if (m.active) { m.update(sdt * nipK().mice, clock); m.root.rotation.z = nipK().wobble && m.state !== 'whacked' ? Math.sin(clock * 7 + m.gait * 0.1) * 0.16 : 0; }   // catnip: to her the mice are slow and wobbly
     separateMice(); separateMice();                                  // two relaxation passes: crowds settle in a frame
@@ -7269,7 +7468,7 @@ function frame(now) {
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
 
   if (povEndWall) povEndWall.visible = camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02;   // the end wall + door: only from inside the room
-  updateBlanketCover();
+  updateBlanketCover(); updateKarenBubble();
   if (state !== 'tvgame') renderer.render(scene, camera);           // (the room is hidden behind the full-screen TV)
 }
 requestAnimationFrame(frame);
