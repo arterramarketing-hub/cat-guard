@@ -360,7 +360,7 @@ function getDifficulty(t) {
 /* =====================================================================
    WORLD LAYOUT  (x: left/right, z: back wall = 0 → toward camera)
    ===================================================================== */
-const ROOM = { halfW: 5.2, depth: 13, wallH: 10 / 1.3, visDepth: 18.4 };  // walls stop at the 10 ft ceiling; the room ends about 4 ft past the fireplace
+const ROOM = { halfW: 5.2, depth: 13, wallH: 8 / 1.3, visDepth: 18.4 };  // walls stop at the 8 ft ceiling; the room ends about 4 ft past the fireplace
 const CEIL_H = ROOM.wallH;                                          // ceiling sits right on top of the walls (an open-topped box seen from above)  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
 /* ACCESS POINTS — where mice come in and go home.
    kind 'couch': out from under a sofa · 'wall': a mouse hole · 'door': through the doorway from the hall.
@@ -3873,6 +3873,7 @@ renderer.domElement.addEventListener('pointerdown', e => {
   if (!e.isPrimary) return;                                            // second finger = camera gesture, not a swipe
   if (e.button === 2) return;                                          // right button = chaos camera orbit
   e.preventDefault();
+  if (gameMode === 'chaos') { pendingTap = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), ok: true }; return; }   // chaos: fires on release (see endTouch)
   handleTap(e.clientX, e.clientY);
 }, { passive: false });
 renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
@@ -4189,16 +4190,25 @@ const FIT_POINTS = [
 const ESSENTIAL_POINTS = [...HOLES.map(h => h.mouthOut.clone()), ...CHEESE_SPOTS.map(c => new THREE.Vector3(c.x, 0.3, c.z)), new THREE.Vector3(CAT_POS.x, 1.3, CAT_POS.z)];
 // camera views (the 📷 button cycles them) and the player's own pinch zoom / two-finger tilt, remembered on this device
 const CAM_VIEWS = [{ name: 'Auto view', el: null }, { name: 'Overhead', el: 70 }, { name: 'Angled', el: 44 }, { name: 'Low', el: 24 }];
-let camView = 0, camZoom = 1, camTilt = 0, camYaw = 0, camFocus = null, chaosFree = false, baseCamDist = 20;   // chaos: free look (yaw + focus point)
+let camView = 0, camZoom = 1, camTilt = 0;
 try { const sv = JSON.parse(localStorage.getItem('catguard.cam') || '{}'); camView = sv.v | 0; camZoom = sv.z || 1; camTilt = sv.t || 0; } catch (e) {}
 const saveCam = () => { try { localStorage.setItem('catguard.cam', JSON.stringify({ v: camView, z: camZoom, t: camTilt })); } catch (e) {} };
 let camSqueeze = 1;
 { const up = camera.updateProjectionMatrix.bind(camera);             // every projection update keeps the squeeze (raycasts use the same matrix)
   camera.updateProjectionMatrix = function () { up(); if (camSqueeze !== 1) { this.projectionMatrix.elements[0] *= camSqueeze; this.projectionMatrixInverse.copy(this.projectionMatrix).invert(); } }; }
 const CAM_PULLBACK = 1.32, CAM_PULLBACK_PORTRAIT = 1.0;   // >1 = camera further back than the tightest fit (phones need less)                              // >1 = camera further back than the tightest fit
+// chaos free-look state (see the chaos camera below): targets, and the smoothed values actually shown
+const fc = { on: false, focus: new THREE.Vector3(), yaw: 0, zoom: 1, tilt: 0, el0: 40, dist0: 20,
+             s: { focus: new THREE.Vector3(), yaw: 0, zoom: 1, tilt: 0 } };   // targets, and the smoothed values actually shown
+const vcam = new THREE.PerspectiveCamera(), _fcPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _fcN = new THREE.Vector2(), _fcRay = new THREE.Raycaster();
+let fitW = 0, fitH = 0;
 function fitCamera() {
   const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
-  renderer.setSize(w, h);
+  if (w !== fitW || h !== fitH) { renderer.setSize(w, h); fitW = w; fitH = h; }   // (resizing the canvas is costly: only when the window changes)
+  if (fc.on) {                                                        // chaos free look owns the camera: just keep the lens right for the window
+    camera.aspect = aspect; camSqueeze = aspect < 0.75 ? 0.8 : 1; camera.fov = aspect < 0.75 ? 66 : aspect < 1 ? 48 : 40;
+    camera.clearViewOffset(); camera.updateProjectionMatrix(); vcam.copy(camera); updateFreeCam(1); return;
+  }
   camera.aspect = aspect;
   camSqueeze = aspect < 0.75 ? 0.8 : 1;                               // portrait: see 25% more width, things drawn a little slimmer
   camera.fov = aspect < 0.75 ? 66 : aspect < 1 ? 48 : 40;   // phones: a wider lens so the camera can stand closer, down in the room
@@ -4206,9 +4216,7 @@ function fitCamera() {
   camera.clearViewOffset();
   const phoneLand = aspect > 1.3 && h < 520;                           // phone on its side
   const pre = CAM_VIEWS[camView].el;                                  // chosen view (Auto = the device's default angle)
-  const free = gameMode === 'chaos' && chaosFree;
-  const autoTilt = free ? (camZoom < 1 ? -34 * (1 - camZoom) / 0.9 : 12 * (camZoom - 1) / 0.7) : 0;   // free look: zoom in = lower, eye-level view
-  const el = THREE.MathUtils.degToRad(THREE.MathUtils.clamp((pre != null ? pre : (aspect < 0.75 ? 30 : phoneLand ? 17 : aspect < 1.3 ? 46 : 40)) + camTilt + autoTilt, free ? 3 : 12, 82));   // phones: a low 30° view down the room towards the cat   // camera tilt: lower = more 'standing in the room'
+  const el = THREE.MathUtils.degToRad(THREE.MathUtils.clamp((pre != null ? pre : (aspect < 0.75 ? 30 : phoneLand ? 17 : aspect < 1.3 ? 46 : 40)) + camTilt, 12, 82));   // phones: a low 30° view down the room towards the cat   // camera tilt: lower = more 'standing in the room'
   const dir = new THREE.Vector3(0, Math.sin(el), Math.cos(el));
   const topLimit = aspect < 0.75 ? 0.97 : phoneLand ? 0.6 : aspect < 1 ? 0.66 : 0.74;   // phones: the HUD sits at the bottom, so the room can use the full top   // leave room for the HUD
   const bottom = aspect < 0.75 ? -0.8 : -0.97, v = new THREE.Vector3();   // (phones leave room for the bottom HUD)
@@ -4229,8 +4237,7 @@ function fitCamera() {
   if (phoneLand) dist *= 1.0;                                         // phone on its side: tight fit, no extra breathing room
   else dist *= aspect < 0.75 ? CAM_PULLBACK_PORTRAIT : CAM_PULLBACK;
   // pinch zoom: closer or further, but never so close that a hole, a mushroom or the cat drops off screen
-  const baseDist = dist; baseCamDist = dist;
-  const custom = !free && (camZoom !== 1 || camTilt !== 0);
+  const custom = camZoom !== 1 || camTilt !== 0;
   if (custom) {
     dist *= camZoom;
     const pts = custom ? ESSENTIAL_POINTS : FIT_POINTS;
@@ -4250,85 +4257,119 @@ function fitCamera() {
   camera.setViewOffset(w, h, 0, shift * h / 2, w, h);
   catCard.scale.y = Math.min(2.2, 1 / Math.cos(el));   // undo the downward view's squash on the cat photo
   catCard.rotation.y = 0;
-  if (free) {                                                         // chaos free look: orbit round the focus point, no framing rules
-    const tgt = camFocus || camTarget, yd = new THREE.Vector3(Math.sin(camYaw) * Math.cos(el), Math.sin(el), Math.cos(camYaw) * Math.cos(el));
-    camera.clearViewOffset(); camera.position.copy(tgt).addScaledVector(yd, baseDist * camZoom); camera.lookAt(tgt); camera.updateMatrixWorld();
-    catCard.rotation.y = camYaw;                                      // her photo keeps facing you
-  }
   camBase.copy(camera.position);
 }
 window.addEventListener('resize', fitCamera);
 fitCamera();
 function camToast(text, ms) { document.querySelectorAll('.cam-toast').forEach(e => e.remove()); const el = document.createElement('div'); el.className = 'cam-toast'; el.textContent = text; if (ms) el.style.animationDuration = (ms - 100) / 1000 + 's'; document.body.appendChild(el); setTimeout(() => el.remove(), ms || 1500); }
 $('camBtn').addEventListener('click', e => {                          // cycle views; switching view also clears any pinch/tilt
-  camView = (camView + 1) % CAM_VIEWS.length; camZoom = 1; camTilt = 0; camYaw = 0; camFocus = null; chaosFree = false; saveCam(); fitCamera(); camToast(CAM_VIEWS[camView].name); e.currentTarget.blur();
+  camView = (camView + 1) % CAM_VIEWS.length; camZoom = 1; camTilt = 0; fc.on = false; saveCam(); fitCamera(); camToast(CAM_VIEWS[camView].name); e.currentTarget.blur();
 });
 // two fingers on the game: pinch to zoom, drag up/down together to tilt the camera
 const touches = new Map(); let gesture = null, gestureQueued = false;
 const gestureInfo = () => { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), y: (a.y + b.y) / 2, x: (a.x + b.x) / 2, a: Math.atan2(b.y - a.y, b.x - a.x) }; };
-// the world point under a screen position (what you're pinching / scrolling toward)
-const _pickRay = new THREE.Raycaster(), _pickN = new THREE.Vector2();
-function pickPoint(cx, cy) {
-  _pickN.set(cx / window.innerWidth * 2 - 1, -(cy / window.innerHeight) * 2 + 1); _pickRay.setFromCamera(_pickN, camera); _pickRay.layers.enable(1);
-  const hit = _pickRay.intersectObjects(scene.children, true).find(h => h.object.isMesh && h.object.visible && !h.object.material.transparent);
-  if (hit) return hit.point.clone();
-  const p = new THREE.Vector3(); return _pickRay.ray.intersectPlane(floorPlane, p) ? p : camTarget.clone();
+/* ---------- chaos free look: a maps-style camera. Two fingers: drag slides the room with your fingers, pinch zooms
+   about the point between them, twist turns the room; zooming in also lowers the view toward eye level.
+   Gestures only move the *target*; the real camera glides after it every frame, so it never judders. ---------- */
+const fcEl = (zoom, tilt) => THREE.MathUtils.clamp(fc.el0 + tilt + (zoom < 1 ? -30 * (1 - zoom) / 0.88 : 10 * (zoom - 1) / 0.6), 4, 84);
+function fcPlace(cam, focus, yaw, zoom, tilt) {
+  const el = THREE.MathUtils.degToRad(fcEl(zoom, tilt)), d = fc.dist0 * zoom;
+  cam.position.set(focus.x + Math.sin(yaw) * Math.cos(el) * d, focus.y + Math.sin(el) * d, focus.z + Math.cos(yaw) * Math.cos(el) * d);
+  cam.lookAt(focus); cam.updateMatrixWorld();
+  return el;
 }
-// chaos free look: zooming in slides the focus toward what's under your fingers, zooming back out drifts home
-function chaosZoomTo(z, at) {
-  const z0 = camZoom, from = (camFocus || camTarget).clone();
-  camZoom = THREE.MathUtils.clamp(z, 0.1, 1.7);
-  if (camZoom < z0 && at) camFocus = from.lerp(at, 1 - camZoom / z0);
-  else if (camZoom > z0) camFocus = from.lerp(camTarget, THREE.MathUtils.clamp((camZoom - z0) / Math.max(0.05, 1 - z0), 0, 1));
+function fcStart() {                                                  // take over from the fitted view without a jump
+  if (fc.on) return;
+  _fcN.set(0, 0); _fcRay.setFromCamera(_fcN, camera);
+  const p = new THREE.Vector3(); if (!_fcRay.ray.intersectPlane(floorPlane, p)) p.copy(camTarget);
+  const v = camera.position.clone().sub(p), d = v.length();
+  Object.assign(fc, { dist0: d, zoom: 1, tilt: 0, yaw: Math.atan2(v.x, v.z), el0: THREE.MathUtils.radToDeg(Math.asin(v.y / d)) });
+  fc.focus.copy(p); fc.s.focus.copy(p); Object.assign(fc.s, { yaw: fc.yaw, zoom: 1, tilt: 0 });
+  fc.on = true; camera.clearViewOffset(); camera.updateProjectionMatrix(); vcam.copy(camera);
+}
+function fcGround(cx, cy) {                                           // where a screen point lands on the focus's height, seen by the target camera
+  _fcN.set(cx / window.innerWidth * 2 - 1, -(cy / window.innerHeight) * 2 + 1); _fcRay.setFromCamera(_fcN, vcam);
+  _fcPlane.constant = -fc.focus.y; const p = new THREE.Vector3();
+  return _fcRay.ray.intersectPlane(_fcPlane, p) ? p : null;
+}
+function fcClamp() {
+  fc.focus.x = THREE.MathUtils.clamp(fc.focus.x, -ROOM.halfW + 0.2, ROOM.halfW - 0.2);
+  fc.focus.z = THREE.MathUtils.clamp(fc.focus.z, 0.2, ROOM.visDepth - 0.2);
+}
+function fcZoomAbout(factor, cx, cy) {                                // zoom so the point under (cx, cy) stays put
+  fcPlace(vcam, fc.focus, fc.yaw, fc.zoom, fc.tilt);
+  const nz = THREE.MathUtils.clamp(fc.zoom * factor, 0.12, 1.6); if (nz === fc.zoom) return;
+  const p = fcGround(cx, cy); if (p) fc.focus.lerp(p, 1 - nz / fc.zoom);
+  fc.zoom = nz; fcClamp();
+}
+function fcPan(x0, y0, x1, y1) {                                      // the floor under your fingers follows them
+  fcPlace(vcam, fc.focus, fc.yaw, fc.zoom, fc.tilt);
+  const a = fcGround(x0, y0), b = fcGround(x1, y1); if (a && b) { fc.focus.add(a.sub(b)); fcClamp(); }
+}
+function updateFreeCam(dt) {
+  if (!fc.on) return;
+  const k = dt >= 1 ? 1 : 1 - Math.exp(-dt * 16), S = fc.s;             // ~60 ms glide toward the target
+  S.focus.lerp(fc.focus, k); S.yaw += (fc.yaw - S.yaw) * k; S.zoom += (fc.zoom - S.zoom) * k; S.tilt += (fc.tilt - S.tilt) * k;
+  const el = fcPlace(camera, S.focus, S.yaw, S.zoom, S.tilt);
+  camBase.copy(camera.position);
+  catCard.rotation.y = S.yaw; catCard.scale.y = Math.min(2.2, 1 / Math.cos(el));   // her photo keeps facing you
 }
 function resetChaosCam() {
-  camYaw = 0; camFocus = null; chaosFree = false;   // (camTilt is reloaded below)
+  fc.on = false;
   try { const sv = JSON.parse(localStorage.getItem('catguard.cam') || '{}'); camZoom = sv.z || 1; camTilt = sv.t || 0; } catch (e) { camZoom = 1; camTilt = 0; }
   fitCamera();
 }
+// chaos taps land on release, so the first finger of a two-finger move never swipes or smashes anything by accident
+let pendingTap = null;
 renderer.domElement.addEventListener('pointerdown', e => {
+  try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {}   // keep getting this finger's moves/lift even off the canvas
   touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  if (touches.size === 2) { const gi = gestureInfo(); gesture = { ...gi, z: camZoom, t: camTilt, yaw: camYaw, at: gameMode === 'chaos' ? pickPoint(gi.x, gi.y) : null, lastD: gi.d, lastA: gi.a, lastX: gi.x, lastY: gi.y }; }
+  if (touches.size === 2) {
+    if (pendingTap) pendingTap.ok = false;
+    const gi = gestureInfo(); gesture = { ...gi, z: camZoom, t: camTilt, lastD: gi.d, lastA: gi.a, lastX: gi.x, lastY: gi.y };
+  }
 });
-renderer.domElement.addEventListener('pointermove', e => {
-  if (!touches.has(e.pointerId)) return; touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+function chaosGestureStep() {                                         // once per frame: both fingers have moved by now, so the midpoint doesn't wobble
+  gestureQueued = false;
   if (!gesture || touches.size < 2) return;
   const g = gestureInfo();
-  if (gameMode === 'chaos') {                                         // chaos: pinch to zoom in on anything, drag sideways to walk round, up/down to tilt
-    // map-style: pinch = zoom toward your fingers, twist = turn, drag = slide across the room (all at once, like a maps app)
-    chaosFree = true;
-    const dZ = gesture.lastD / Math.max(20, g.d);                     // incremental: each move applies only what changed since the last
-    if (Math.abs(dZ - 1) > 0.002) chaosZoomTo(camZoom * dZ, gesture.at);
-    let dA = g.a - gesture.lastA; dA = Math.atan2(Math.sin(dA), Math.cos(dA));
-    camYaw += dA;
-    const k = baseCamDist * camZoom / window.innerHeight * 1.4, dx = g.x - gesture.lastX, dy = g.y - gesture.lastY;
-    const f = (camFocus || camTarget).clone();
-    f.x += (-Math.cos(camYaw) * dx - Math.sin(camYaw) * dy) * k;      // drag the room under your fingers
-    f.z += (Math.sin(camYaw) * dx - Math.cos(camYaw) * dy) * k;
-    f.x = THREE.MathUtils.clamp(f.x, -ROOM.halfW + 0.3, ROOM.halfW - 0.3); f.z = THREE.MathUtils.clamp(f.z, 0.3, ROOM.visDepth - 0.3);
-    camFocus = f;
-    Object.assign(gesture, { lastD: g.d, lastA: g.a, lastX: g.x, lastY: g.y });
-  } else {
+  fcStart();
+  fcPan(gesture.lastX, gesture.lastY, g.x, g.y);
+  let dA = g.a - gesture.lastA; dA = Math.atan2(Math.sin(dA), Math.cos(dA)); fc.yaw += dA;   // twist turns the room
+  if (g.d > 20) fcZoomAbout(gesture.lastD / g.d, g.x, g.y);
+  Object.assign(gesture, { lastD: g.d, lastA: g.a, lastX: g.x, lastY: g.y });
+}
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!touches.has(e.pointerId)) return; touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pendingTap && e.pointerId === pendingTap.id && Math.hypot(e.clientX - pendingTap.x, e.clientY - pendingTap.y) > 14) pendingTap.ok = false;
+  if (!gesture || touches.size < 2) return;
+  if (gameMode === 'chaos') { if (!gestureQueued) { gestureQueued = true; requestAnimationFrame(chaosGestureStep); } return; }
+  const g = gestureInfo();
   camZoom = THREE.MathUtils.clamp(gesture.z * gesture.d / Math.max(20, g.d), 0.45, 1.7);
   camTilt = THREE.MathUtils.clamp(gesture.t + (g.y - gesture.y) * 0.12, -30, 40);
-  }
   if (!gestureQueued) { gestureQueued = true; requestAnimationFrame(() => { gestureQueued = false; fitCamera(); }); }
 });
-const endTouch = e => { touches.delete(e.pointerId); if (orbit && e.pointerId === orbit.id) orbit = null; if (touches.size < 2 && gesture) { gesture = null; if (gameMode !== 'chaos') saveCam(); } };
-// desktop chaos: scroll to zoom toward the cursor, right-drag to walk round / tilt
+const endTouch = e => {
+  if (pendingTap && e.pointerId === pendingTap.id) {                  // a clean single tap: now it counts
+    const t = pendingTap; pendingTap = null;
+    if (e.type === 'pointerup' && t.ok && state === 'playing' && performance.now() - t.t < 600) handleTap(t.x, t.y);
+  }
+  touches.delete(e.pointerId); if (orbit && e.pointerId === orbit.id) orbit = null;
+  if (touches.size < 2 && gesture) { gesture = null; if (gameMode !== 'chaos') saveCam(); }
+};
+// desktop chaos: scroll to zoom toward the cursor, right-drag to turn and tilt
 let orbit = null;
 renderer.domElement.addEventListener('wheel', e => {
   if (gameMode !== 'chaos' || state !== 'playing') return;
-  e.preventDefault(); chaosFree = true;
-  chaosZoomTo(camZoom * Math.exp(e.deltaY * 0.0015), pickPoint(e.clientX, e.clientY)); fitCamera();
+  e.preventDefault(); fcStart(); fcZoomAbout(Math.exp(e.deltaY * 0.0015), e.clientX, e.clientY);
 }, { passive: false });
 renderer.domElement.addEventListener('contextmenu', e => { if (gameMode === 'chaos') e.preventDefault(); });
-renderer.domElement.addEventListener('pointerdown', e => { if (e.button === 2 && gameMode === 'chaos') orbit = { id: e.pointerId, x: e.clientX, y: e.clientY, yaw: camYaw, t: camTilt }; });
+renderer.domElement.addEventListener('pointerdown', e => { if (e.button === 2 && gameMode === 'chaos') { fcStart(); orbit = { id: e.pointerId, x: e.clientX, y: e.clientY, yaw: fc.yaw, t: fc.tilt }; } });
 renderer.domElement.addEventListener('pointermove', e => {
   if (!orbit || e.pointerId !== orbit.id) return;
-  chaosFree = true; camYaw = orbit.yaw - (e.clientX - orbit.x) * 0.008; camTilt = THREE.MathUtils.clamp(orbit.t + (e.clientY - orbit.y) * 0.15, -40, 45); fitCamera();
+  fc.yaw = orbit.yaw - (e.clientX - orbit.x) * 0.008; fc.tilt = THREE.MathUtils.clamp(orbit.t + (e.clientY - orbit.y) * 0.15, -40, 40);
 });
-renderer.domElement.addEventListener('pointerup', endTouch); renderer.domElement.addEventListener('pointercancel', endTouch);
+renderer.domElement.addEventListener('pointerup', endTouch); renderer.domElement.addEventListener('pointercancel', endTouch); renderer.domElement.addEventListener('lostpointercapture', endTouch);
 
 /* =====================================================================
    MAIN LOOP
@@ -4388,6 +4429,7 @@ function frame(now) {
   updateBombFx(dt);
 
   shake = Math.max(0, shake - dt * 1.4);
+  if (fc.on && !cine) updateFreeCam(dt);
   camera.position.copy(camBase);
   if (cine) camera.lookAt(cine.look);
   if (shake > 0) camera.position.add(new THREE.Vector3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0));
