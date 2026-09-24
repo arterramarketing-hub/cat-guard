@@ -135,6 +135,13 @@
   @keyframes caption{0%{opacity:0;transform:translate(-50%,-6px) scale(.9)}8%,78%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0}}
   .float.name{font-family:var(--body);font-weight:800;font-size:15px;color:#fff;background:rgba(58,20,52,.82);border:1.5px solid rgba(255,244,248,.35);
               padding:4px 12px;border-radius:999px;-webkit-text-stroke:0;animation-duration:1.9s}
+  /* catnip mode: a dreamy rainbow haze over everything */
+  #catnipFx{position:fixed;inset:-10%;pointer-events:none;z-index:3;opacity:0;transition:opacity 1.2s ease;mix-blend-mode:overlay;
+            background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 30%,rgba(90,255,120,.55) 100%),
+                       conic-gradient(from 0deg,rgba(255,60,170,.5),rgba(255,210,60,.5),rgba(70,255,140,.5),rgba(60,170,255,.5),rgba(190,90,255,.5),rgba(255,60,170,.5));
+            animation:nip 5s linear infinite}
+  #catnipFx.on{opacity:1}
+  @keyframes nip{0%{filter:hue-rotate(0deg);transform:scale(1) rotate(0deg)}50%{transform:scale(1.06) rotate(4deg)}100%{filter:hue-rotate(360deg);transform:scale(1) rotate(0deg)}}
   /* the paint jar: splats hit the screen, then drip and fade */
   #paintSplash{position:fixed;inset:0;z-index:7;pointer-events:none;overflow:hidden}
   .splat{position:absolute;width:var(--s);height:calc(var(--s) * 1.3);margin:calc(var(--s) * -.5) 0 0 calc(var(--s) * -.5);opacity:0;
@@ -281,6 +288,7 @@
   <div class="tv-mid"><div class="tv-frame" id="tvScreenHost"></div><div class="tv-btns"><button class="tv-exit" id="tvSwap">🔄 Other game</button><button class="tv-exit" id="tvExit">✕ Exit game</button></div></div>
   <div class="tv-joy tv-right"><div class="abxy"><button data-k="b" class="kb">B</button><button data-k="a" class="ka">A</button></div><span class="joy-lbl">A: select · B: back</span></div>
 </section>
+<div id="catnipFx"></div>
 <div id="fx"></div>
 <div id="paintSplash"></div>
 <div id="walkUI" hidden><div id="walkStick"><div id="walkKnob"></div></div><button id="walkJump">Jump</button><button class="walk-btn" id="walkSwipe"><span><b>🐾</b>Swipe</span></button><button class="walk-btn" id="walkMeow"><span><b>😺</b>Meow</span></button><div id="walkCaption"></div></div>
@@ -649,7 +657,8 @@ function toggleDresserDoor(x) {
   if (!dresserDoors.length) return;
   let best = dresserDoors[0];
   for (const d of dresserDoors) if (Math.abs(d.x - x) < Math.abs(best.x - x)) best = d;
-  best.target = best.target ? 0 : -1.66; bonus(5);                             // ~95°: square to the front, clear of its own contents and the neighbour's
+  best.target = best.target ? 0 : best.maxOpen || -1.66; bonus(5);            // ~95°: square to the front, clear of its own contents and the neighbour's (the ones behind her box only open as far as the box lets them)
+  if (best === catnip.door && best.target) { unlock('catnipFound'); if (catnipReady()) floatText(catnip.door.center.clone().setY(CAB_H + 0.4), 'Catnip!', 'warn'); }
   sfx.creak(); if (best.target) setTimeout(sfx.rustle, 220);
 }
 function updateDresser(dt) {
@@ -1061,13 +1070,14 @@ const CAB_H = IN(30);                                                  // 30" ta
 const LEFT_X0 = -ROOM.halfW, LEFT_W = FT(3.8);                         // 3'10" cabinet
 const SHELF_W = IN(16), SHELF_X = ROOM.halfW - SHELF_W / 2 - 0.02;                 // black shelf tucked into the back-right corner
 const MAIN_X0 = LEFT_X0 + LEFT_W + IN(1), MAIN_W = SHELF_X - SHELF_W / 2 - IN(1) - MAIN_X0;   // credenza fills the wall up to the shelf
-credenza(LEFT_X0, LEFT_W, CAB_H, 2);
+const leftDoors = credenza(LEFT_X0, LEFT_W, CAB_H, 2, true);           // (hollow now: both its doors open onto cupboards)
 const mainDoors = credenza(MAIN_X0, MAIN_W, CAB_H, 5, true);
 SECT = 'Credenza';
 /* Dresser doors: the three the cat's box doesn't block can swing open (tap the dresser near one).
    Each hides a stuffed cupboard: dark cavity, a shelf, folded blankets bulging out, papers and crumpled balls. */
 const dresserDoors = [];
 let cupboardPistol = null, pistolDoor = null;
+const catnip = { door: null, jar: null, fill: [], sparkles: [], targets: [], active: false, until: 0, readyAt: 0, whacks: 0, purrT: 0, fxT: 0 };
 SECT = 'Pistol';
 // a chunky cartoon pistol, barrel along +z: slide, frame, angled wooden grip, trigger guard, hammer, sights
 function makePistol() {
@@ -1153,18 +1163,75 @@ function makePistol() {
       [pistol, velvet].forEach(o => o.traverse(m => { if (m.isMesh) m.userData.pistol = true; }));
     },
   ];
-  mainDoors.forEach(d => {
-    const m = d.mesh;
-    if (Math.abs(m.position.x - CAT_POS.x) < 1.05) return;             // blocked by the cat's box
+  const S = IN(0.4);                                                   // top of the mid shelf
+  const labelTex = (text, bg, fg, font) => canvasTex(128, 48, (c, w, h) => { c.fillStyle = bg; c.fillRect(0, 0, w, h); c.fillStyle = fg; c.font = font || 'bold 26px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, w / 2, h / 2 + 1); }, 1, 1);
+  // 4) the cat's pantry (left cabinet): stacked tins of cat food below, a bag of treats and her bowl up top
+  const foodStage = (g, w, h) => {
+    const canTex = canvasTex(128, 32, (c, W, H) => { c.fillStyle = '#e8eef2'; c.fillRect(0, 0, W, H); c.fillStyle = '#2f7fc1'; c.fillRect(0, 0, W, 7); c.fillRect(0, H - 7, W, 7);
+      c.fillStyle = '#f08a2a'; c.beginPath(); c.ellipse(40, 16, 13, 6, 0, 0, 7); c.fill(); c.beginPath(); c.moveTo(52, 16); c.lineTo(60, 10); c.lineTo(60, 22); c.fill(); }, 1, 1);   // a little orange fish
+    const tin = (x, y) => { const t = new THREE.Mesh(new THREE.CylinderGeometry(IN(1.6), IN(1.6), IN(1.9), 18), [lam(0xffffff, { map: canTex }), lam(0xc9ced3), lam(0xc9ced3)]); t.position.set(x, y, IN(1.3)); g.add(t); };
+    const y0 = -h / 2 + IN(1) + IN(0.95);
+    tin(-w * 0.22, y0); tin(w * 0.02, y0); tin(w * 0.26, y0); tin(-w * 0.1, y0 + IN(1.95)); tin(w * 0.14, y0 + IN(1.95));
+    const bag = box(IN(3.6), IN(4.8), IN(1.6), lam(0xffffff, { map: labelTex('TREATS', '#e8577e', '#fff4f8') }), -w * 0.18, S + IN(2.4), IN(1.2), g); bag.rotation.z = 0.12;
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.4), IN(1.8), IN(1.2), 20, 1, true), lam(0xff9ec4, { side: THREE.DoubleSide })); bowl.position.set(w * 0.22, S + IN(0.6), IN(1.3)); g.add(bowl);
+    const kib = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.1), IN(2.1), IN(0.3), 20), lam(0x9a5a2a)); kib.position.set(w * 0.22, S + IN(0.9), IN(1.3)); g.add(kib);
+  };
+  // 5) the catnip stash (left cabinet): a glass jar of it on the shelf, glinting, a pouch below. Tap the jar: catnip mode.
+  const catnipStage = (g, w, h) => {
+    const jar = new THREE.Group(); jar.position.set(w * 0.04, S + IN(2.3), IN(1.2)); g.add(jar);
+    const leafTex = canvasTex(64, 64, (c, W, H) => { c.fillStyle = '#5c8a2e'; c.fillRect(0, 0, W, H); for (let i = 0; i < 420; i++) { c.fillStyle = Math.random() < 0.5 ? '#3f6b1f' : '#8dbf4a'; c.fillRect(Math.random() * W, Math.random() * H, 2, 1.5); } }, 2, 1);
+    const fill = new THREE.Mesh(new THREE.CylinderGeometry(IN(1.8), IN(1.85), IN(3.3), 18), lam(0xffffff, { map: leafTex })); fill.position.y = -IN(0.55); jar.add(fill);
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.05), IN(2.1), IN(4.6), 20), new THREE.MeshPhongMaterial({ color: 0xe8f4fa, transparent: true, opacity: 0.3, shininess: 120, specular: 0xffffff, depthWrite: false })); jar.add(glass);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(IN(1.7), IN(1.6), IN(1), 16), lam(0xb88a5a)); lid.position.y = IN(2.8); jar.add(lid);
+    const label = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.12), IN(2.12), IN(1.5), 20, 1, true, -0.9, 1.8), lam(0xffffff, { map: labelTex('CATNIP', '#f6efd9', '#2f6b25', 'bold 24px sans-serif'), side: THREE.DoubleSide })); label.position.y = IN(0.2); jar.add(label);
+    const spill = [];
+    for (let i = 0; i < 9; i++) { const l = new THREE.Mesh(new THREE.SphereGeometry(IN(0.45 + Math.random() * 0.3), 6, 4), lam(i % 2 ? 0x5c8a2e : 0x7fae45)); l.scale.y = 0.35; l.position.set(w * 0.04 + (Math.random() - 0.5) * IN(7), S + IN(0.15), IN(2.4) + Math.random() * IN(1.2)); g.add(l); spill.push(l); }
+    const pouch = box(IN(4), IN(3), IN(1.5), lam(0xffffff, { map: labelTex('NIP', '#3d7a34', '#e9f7d8', 'bold 30px sans-serif') }), -w * 0.1, -h / 2 + IN(2.6), IN(1.3), g); pouch.rotation.z = -0.15;
+    const starTex = canvasTex(64, 64, (c, W, H) => {
+      const gr = c.createRadialGradient(32, 32, 0, 32, 32, 30); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(230,255,200,.8)'); gr.addColorStop(1, 'rgba(200,255,160,0)');
+      c.fillStyle = gr; c.beginPath(); c.moveTo(32, 0); c.quadraticCurveTo(35, 29, 64, 32); c.quadraticCurveTo(35, 35, 32, 64); c.quadraticCurveTo(29, 35, 0, 32); c.quadraticCurveTo(29, 29, 32, 0); c.fill();
+    }, 1, 1);
+    for (let i = 0; i < 7; i++) {                                                                        // sparkles twinkling round the jar
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: starTex, color: i % 2 ? 0xd8ff8a : 0xffe27a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+      sp.userData.home = new THREE.Vector3(w * 0.04 + (Math.random() - 0.5) * IN(8), S + IN(0.5) + Math.random() * IN(6), IN(3) + Math.random() * IN(1)); sp.userData.phase = Math.random();
+      sp.position.copy(sp.userData.home); sp.renderOrder = 9; g.add(sp); catnip.sparkles.push(sp);
+    }
+    catnip.jar = jar; catnip.fill = [fill, ...spill];
+    [jar, pouch, ...spill].forEach(o => o.traverse(m => { if (m.isMesh) { m.userData.catnip = true; catnip.targets.push(m); } }));
+  };
+  // behind her box: the two doors there only open a crack, so just glimpses: photo albums, and a biscuit tin with a sewing kit
+  const albumStage = (g, w, h) => {
+    [0x7a3b3b, 0x2f4f6f, 0xc9a45a, 0x3d5a3d, 0x6b4f8a].forEach((c, i) => box(IN(1.6), IN(9), IN(2.8), lam(c), -w * 0.3 + i * IN(1.8), -h / 2 + IN(1) + IN(4.5), IN(1.3), g));
+    box(w * 0.7, IN(3.5), IN(2.8), lam(0xd8cbb5), 0, S + IN(1.75), IN(1.3), g); box(w * 0.72, IN(0.8), IN(3), lam(0xc4b59c), 0, S + IN(3.6), IN(1.3), g);   // shoebox of photos
+  };
+  const tinStage = (g, w, h) => {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(IN(3), IN(3), IN(2.4), 22), new THREE.MeshPhongMaterial({ color: 0x2c5aa0, shininess: 80, specular: 0x888888 })); t.position.set(0, -h / 2 + IN(1) + IN(1.2), IN(1.3)); g.add(t);
+    box(w * 0.7, IN(2.5), IN(2.6), lam(0xe9dfd0), 0, S + IN(1.25), IN(1.3), g);                                  // folded tablecloth
+  };
+  let usedMain = 0, usedBoxed = 0;
+  [...leftDoors, ...mainDoors].forEach(d => {
+    const m = d.mesh, isLeft = leftDoors.includes(d), boxed = !isLeft && Math.abs(m.position.x - CAT_POS.x) < 1.05;   // boxed = the cat's box is in front of it
+    const stageFn = isLeft ? (leftDoors.indexOf(d) === 0 ? foodStage : catnipStage) : boxed ? [albumStage, tinStage][usedBoxed++ % 2] : stages[usedMain++ % stages.length];
     const n = dresserDoors.length;
     const hinge = new THREE.Group(); hinge.position.set(m.position.x - d.w / 2, m.position.y, m.position.z); scene.add(hinge);
     scene.remove(m); m.position.set(d.w / 2, 0, 0); hinge.add(m);          // door swings on its left edge
     const inside = new THREE.Group(); inside.position.set(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.02); inside.visible = false; scene.add(inside);
     box(d.w - IN(0.2), IN(0.8), DEPTH - IN(2.5), shelfMat, 0, 0, -(DEPTH - IN(2.5)) / 2 - IN(1), inside);   // mid shelf, running back into the cupboard
     const stage = new THREE.Group(); stage.position.z = -IN(4.2); inside.add(stage);                       // contents sit well inside, behind the door line
-    stages[n % stages.length](stage, d.w * 0.78, d.h);
-    const rig = { hinge, inside, stage, angle: 0, target: 0, x: hinge.position.x + d.w / 2, center: new THREE.Vector3(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.1) };
-    if (n === 2) { pistolDoor = rig; stage.traverse(o => { if (o.isMesh && o.userData.pistol) tapTargets.push(o); }); }
+    stageFn(stage, d.w * 0.78, d.h);
+    const rig = { hinge, inside, stage, angle: 0, target: 0, x: hinge.position.x + d.w / 2, center: new THREE.Vector3(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.1), maxOpen: -1.66 };
+    if (boxed) {                                                         // swing it only until it would touch the box (hard-coded box size: BOX isn't built yet here)
+      const BW = 1.45 / 2 + 0.04, BD = 1.1 / 2 + 0.04, hx = hinge.position.x, hz = hinge.position.z;
+      let a = 0;
+      for (; a > -1.66; a -= 0.02) {
+        let hit = false;
+        for (let t = 0.2; t <= 1.001 && !hit; t += 0.2) { const x = hx + d.w * Math.cos(a) * t, z = hz - d.w * Math.sin(a) * t; if (Math.abs(x - CAT_POS.x) < BW && Math.abs(z - CAT_POS.z) < BD) hit = true; }
+        if (hit) break;
+      }
+      rig.maxOpen = Math.min(-0.2, a + 0.04);
+    }
+    if (stageFn === stages[2]) { pistolDoor = rig; stage.traverse(o => { if (o.isMesh && o.userData.pistol) tapTargets.push(o); }); }
+    if (stageFn === catnipStage) { catnip.door = rig; catnip.targets.forEach(o => tapTargets.push(o)); }
     m.userData.dresserDoor = rig; tapTargets.push(m);
     dresserDoors.push(rig);
   });
@@ -4241,6 +4308,10 @@ const ACHIEVEMENTS = [
     ['hiss', '😾', 'Drama queen', 'In Free walk, meow ten times in a row'],
     ['poop', '💩', 'The Royal Throne', 'In Free walk, meow while sitting in the litter box'],
     ['laser', '🔴', 'Laser eyes', 'Swipe the laser pointer off the laser mouse and take it'],
+    ['catnipFound', '🌿', 'Secret stash', 'Find the catnip hidden in a cupboard'],
+    ['catnipHigh', '😵‍💫', 'Zoomies!', 'Get into the catnip'],
+    ['catnipFrenzy', '💫', 'Catnip frenzy', 'Whack 10 mice in one catnip high'],
+    ['catnipWalk', '🌀', 'Free-range zoomies', 'Get into the catnip in Free walk'],
     ['inception', '🪆', 'Game-ception', 'Win the kart race, then beat the game on the driver\'s Switch'],
   ]],
   ['Other modes', [
@@ -4252,7 +4323,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 15:19';                                              // stamped when the site is published
+const BUILD = '2026-09-24 15:28';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -4508,7 +4579,7 @@ const _hit = new THREE.Vector3();
 let pawReadyAt = 0;
 function handleTap(clientX, clientY) {
   if (clock < pawReadyAt) return;                                   // paw still recovering from the last swipe
-  pawReadyAt = clock + CFG.SWIPE_COOLDOWN;
+  pawReadyAt = clock + CFG.SWIPE_COOLDOWN * (catnip.active ? 0.35 : 1);   // catnip: a turbo paw
   const onCat = blanketRigs.find(r => r.state === 'cat');
   if (onCat) {                                                        // cat is under a blanket: this tap is where it gets flung
     ndc.set(clientX / window.innerWidth * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
@@ -4532,7 +4603,12 @@ function handleTap(clientX, clientY) {
     const sc = n + (m.isBomb ? CFG.BOMB_TAP_PENALTY : 0);
     if (sc < bestScore) { bestScore = sc; best = m; }
   }
-  if (best) { whack(best); return; }
+  if (best) {
+    const extra = catnip.active ? mice.filter(m => m !== best && m.hittable && !m.isBomb && !m.boss && m.root.position.distanceTo(best.root.position) < 1.4) : [];   // catnip: one big swat takes out the mice beside it too
+    whack(best); extra.forEach(m => whack(m));
+    if (extra.length) floatText(best.center.clone().setY(1.4), 'Catnip swat!', 'clutch');
+    return;
+  }
   // 1) a direct hit on something interactive
   const shown = o => { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true; };
   const hits = raycaster.intersectObjects(tapTargets, false).filter(h => shown(h.object) && !(h.face && Array.isArray(h.object.material) && h.object.material[h.face.materialIndex] === noFace));   // taps pass through open cupboard fronts
@@ -4580,7 +4656,9 @@ function interactables() {
   }
   screen.getWorldPosition(_ip); list.push({ obj: screen, pos: _ip.clone(), r: 1.4 });
   if (starMesh) list.push({ obj: starMesh, pos: starMesh.position.clone(), r: 1.0 });
-  for (const d of dresserDoors) if (!(d === pistolDoor && gunReady())) list.push({ obj: d.hinge.children[0], pos: d.center, r: 0.55 });   // (that door's bubble goes to the gun instead)
+  const nipOpen = catnip.door && catnip.door.angle < -0.6 && catnipReady();
+  for (const d of dresserDoors) if (!(d === pistolDoor && gunReady()) && !(d === catnip.door && nipOpen)) list.push({ obj: d.hinge.children[0], pos: d.center, r: 0.55 });   // (that door's bubble goes to the gun instead)
+  if (nipOpen) { catnip.jar.getWorldPosition(_ip); list.push({ obj: catnip.targets[0], pos: _ip.clone(), r: 0.7 }); }   // the open catnip cupboard: a big target on the jar
   if (diffuserRig && diffuserRig.state === 'rest') list.push({ obj: diffuserRig.vase.children[0], pos: diffuserRig.center, r: 0.45 });
   if (tableRig && !tableRig.broken) list.push({ obj: tableRig.pieces[0].mesh, pos: tableRig.center, r: 0.9 });
   if (laser.state === 'floor') list.push({ obj: laser.pickupMesh, pos: laser.pickup.position.clone(), r: 0.9 });   // a big, forgiving target on the dropped laser pointer
@@ -4609,6 +4687,7 @@ function interact(o, point, face) {
   if (gunReady() && ((o.userData.dresserDoor === pistolDoor) || (o.userData.dresser && point && Math.abs(point.x - pistolDoor.x) < pistolDoor.hinge.children[0].geometry.parameters.width * 0.8))) {
     startSwipe(point || pistolDoor.center, true); setTimeout(takeGun, 90); return true;   // anywhere on the open gun cupboard (its door too) grabs the gun
   }
+  if (o.userData.catnip) { if (!catnip.door || catnip.door.angle > -0.6 || !catnipReady()) return false; startSwipe(point, true); setTimeout(startCatnip, 90); tapShake(); return true; }   // the second hit: into the catnip
   if (o.userData.dresserDoor || o.userData.dresser) { startSwipe(point, true); setTimeout(() => toggleDresserDoor(o.userData.dresserDoor ? o.userData.dresserDoor.x : point.x), 90); tapShake(); return true; }
   if (o.userData.blanket) { const br = o.userData.blanketRig || blanketRig; if (!br || br.state === 'flying' || br.state === 'gone' || br.state === 'burrito') return false; startSwipe(point, true); setTimeout(() => blanketToCat(point.clone(), br), 90); return true; }
   if (o.userData.fireHit) { if (!fireRig || fireRig.target === 0 || fireRig.level < 0.4) return false; startSwipe(point, true); setTimeout(burnPaw, 90); return true; }
@@ -4757,7 +4836,8 @@ function whack(m) {
   const clutch = m.threat >= CFG.CLUTCH_THREAT;
   combo++;
   const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
-  const rb = m.kind === 'rainbow', pts = (CFG.SCORE_WHACK + (clutch ? CFG.SCORE_CLUTCH : 0)) * mult * (rb ? 5 : 1);
+  const rb = m.kind === 'rainbow', pts = (CFG.SCORE_WHACK + (clutch ? CFG.SCORE_CLUTCH : 0)) * mult * (rb ? 5 : 1) * (catnip.active ? 2 : 1);   // catnip doubles every whack
+  if (catnip.active && ++catnip.whacks >= 10) unlock('catnipFrenzy');
   unlock('firstWhack'); if (mult >= 5) unlock('combo'); if (clutch) unlock('clutch'); if (saved) unlock('save');
   score += pts; whackedCount++;
   m.setState('whacked');
@@ -5313,6 +5393,64 @@ function resetLaser() {
   for (const e of laser.eyes) e.visible = false;
   laserMouseDone = false; laserMousePending = false; laserRetryAt = 0;
 }
+
+/* =====================================================================
+   CATNIP MODE (25 s, like the rave): open the catnip cupboard, tap the jar. A dreamy rainbow haze, the room drifting,
+   purring; the paw goes turbo, each swat catches the mice beside it too, every whack scores double, and the mice
+   are slow and dizzy. In Free walk: zoomies (super speed, bigger jumps, a trail of sparkles). The jar refills in 30 s.
+   ===================================================================== */
+const CATNIP_SECS = 25, CATNIP_REFILL = 30;
+const catnipReady = () => !catnip.active && clock >= catnip.readyAt;
+function purr(dur) {                                                 // a low rumbly purr: filtered noise pulsing ~25 times a second
+  if (!actx || !soundOn) return;
+  const t = actx.currentTime + 0.01, n = Math.floor(actx.sampleRate * dur), b = actx.createBuffer(1, n, actx.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  const src = actx.createBufferSource(), lp = actx.createBiquadFilter(), g = actx.createGain(), am = actx.createOscillator(), amg = actx.createGain();
+  src.buffer = b; lp.type = 'lowpass'; lp.frequency.value = 220; am.frequency.value = 24; amg.gain.value = 0.05;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.2); g.gain.setValueAtTime(0.07, t + dur - 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  am.connect(amg); amg.connect(g.gain); src.connect(lp); lp.connect(g); g.connect(actx.destination); src.start(t); am.start(t); am.stop(t + dur); src.stop(t + dur);
+}
+function startCatnip() {
+  if (!catnipReady() || (state !== 'playing' && state !== 'ending')) return;
+  catnip.active = true; catnip.until = clock + CATNIP_SECS; catnip.whacks = 0; catnip.purrT = 0;
+  unlock('catnipHigh'); if (gameMode === 'walk') unlock('catnipWalk');
+  catnip.fill.forEach(o => o.visible = false);                        // she's had the lot
+  if (catnip.jar) { const p = catnip.jar.getWorldPosition(new THREE.Vector3()); for (let i = 0; i < 4; i++) burst(p, [0x7fae45, 0xd8ff8a, 0xffe27a, 0xff6fae][i], 8, 2, 2.5, 0.45); }
+  showBanner('Catnip zoomies!'); camToast(gameMode === 'walk' ? '🌿 Zoomies! Super speed for 25 s' : '🌿 Turbo paw & double points for 25 s', 2800);
+  [523, 659, 784, 988, 1175].forEach((f, i) => tone(f, f * 1.01, 0.3, 'sine', 0.035, i * 0.07));
+  tailWag = 3; document.getElementById('catnipFx').classList.add('on');
+}
+function endCatnip() {
+  catnip.active = false; catnip.readyAt = clock + CATNIP_REFILL;
+  document.getElementById('catnipFx').classList.remove('on');
+  const at = gameMode === 'walk' && walk.on ? walk.pos.clone().setY(walk.pos.y + 1.2) : new THREE.Vector3(CAT_POS.x, BOX.h + 1.5, CAT_POS.z);
+  floatText(at, 'zzz... it wore off', 'warn'); tone(660, 330, 0.5, 'sine', 0.03);
+}
+function updateCatnip(dt) {
+  const ready = catnipReady(), open = catnip.door && catnip.door.inside.visible;
+  if (ready && catnip.fill.length && !catnip.fill[0].visible) catnip.fill.forEach(o => o.visible = true);   // refilled
+  catnip.sparkles.forEach(sp => {                                    // the jar twinkles while it's full
+    sp.visible = open && ready; if (!sp.visible) return;
+    const k = (clock * 0.8 + sp.userData.phase) % 1; sp.scale.setScalar(IN(3.2) * Math.sin(k * Math.PI)); sp.material.rotation = k * 2;
+    sp.position.copy(sp.userData.home); sp.position.y += k * IN(1.5);
+  });
+  if (!catnip.active) return;
+  if (clock >= catnip.until || state === 'menu' || state === 'over') { endCatnip(); return; }
+  catnip.purrT -= dt; if (catnip.purrT <= 0) { catnip.purrT = 4.5; purr(2.2); }
+  catnip.fxT -= dt;
+  if (catnip.fxT <= 0) {                                             // drifting sparkles and leaves all over the room
+    catnip.fxT = 0.12;
+    const cols = [0x7fae45, 0xd8ff8a, 0xffe27a, 0xff9ed2, 0x9ad8ff];
+    burst(new THREE.Vector3((Math.random() * 2 - 1) * (ROOM.halfW - 0.5), 0.6 + Math.random() * 2.6, 2.5 + Math.random() * 10), cols[(Math.random() * cols.length) | 0], 2, 0.4, 0.5, 0.35);
+    if (gameMode === 'walk' && walk.on && Math.hypot(walk.vel.x, walk.vel.z) > 0.8) burst(walk.pos.clone().setY(walk.pos.y + 0.35), new THREE.Color().setHSL(Math.random(), 1, 0.65).getHex(), 3, 0.6, 0.8, 0.35);   // a rainbow trail behind her
+  }
+  catCard.rotation.z += Math.sin(clock * 4) * 0.012; tailWag = Math.max(tailWag, 0.8);   // she sways happily in her box
+}
+function resetCatnip() {
+  catnip.active = false; catnip.readyAt = 0; catnip.whacks = 0;
+  catnip.fill.forEach(o => o.visible = true);
+  const fx = document.getElementById('catnipFx'); if (fx) fx.classList.remove('on');
+}
 function onCheeseGrabbed(m, c) {
   if (state !== 'playing' && state !== 'ending') return;
   floatText(c.pos.clone().setY(1.1), 'Thief!', 'warn');
@@ -5430,7 +5568,7 @@ function resetGame() {
   cheeses.forEach(c => c.reset());
   if (gameMode === 'chaos') cheeses.forEach(c => c.lose());
   document.querySelector('.c-cheese').style.visibility = gameMode === 'chaos' ? 'hidden' : '';
-  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); clearPaint(); resetLaser(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
+  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); clearPaint(); resetLaser(); resetCatnip(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false; bossDone = false; bossLevel = 0; waveNo = 1;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -6263,10 +6401,10 @@ function updateWalk(dt) {
   const kx = (K.arrowright || K.d ? 1 : 0) - (K.arrowleft || K.a ? 1 : 0), ky = (K.arrowdown || K.s ? 1 : 0) - (K.arrowup || K.w ? 1 : 0);
   if (kx || ky) { const l = Math.hypot(kx, ky); sx = kx / l; sy = ky / l; }
   const yaw = fc.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);   // stick up = away from the camera
-  _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed);
+  _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * (catnip.active ? 1.7 : 1));   // catnip: zoomies
   walk.vel.lerp(_wv, 1 - Math.exp(-dt * (walk.grounded ? 12 : 8)));
   if (walk.jumpQ > 0 && clock - walk.jumpQ < 0.2 && walk.grounded) {   // (a press just before landing still counts)
-    walk.vy = WALK.jumpV; walk.grounded = false; walk.jumpQ = -1; tone(520, 940, 0.11, 'triangle', 0.035);
+    walk.vy = WALK.jumpV * (catnip.active ? 1.18 : 1); walk.grounded = false; walk.jumpQ = -1; tone(520, 940, 0.11, 'triangle', 0.035);
   }
   // across: blocked by anything taller than a step (or, mid-air, anything at her height)
   const dx = walk.vel.x * dt, dz = walk.vel.z * dt;
@@ -6546,7 +6684,7 @@ function frame(now) {
       if (gameMode === 'walk') updateWalk(dt);
       if (laserMousePending) checkLaserMouse();
     }
-    for (const m of mice) if (m.active) m.update(sdt, clock);
+    for (const m of mice) if (m.active) { m.update(sdt * (catnip.active ? 0.65 : 1), clock); m.root.rotation.z = catnip.active && m.state !== 'whacked' ? Math.sin(clock * 7 + m.gait * 0.1) * 0.16 : 0; }   // catnip: to her the mice are slow and wobbly
     separateMice(); separateMice();                                  // two relaxation passes: crowds settle in a frame
     if (heist.player.active) heist.player.update(sdt, clock);
     if (state === 'ending') { endTimer -= dt; if (endTimer <= 0) showGameOver(); }
@@ -6578,7 +6716,7 @@ function frame(now) {
   updateBoom(dt);
   updateCatCrown(dt);
   updateRoomFx(dt);
-  updateWallpaper(dt); updateBlood(dt); updatePaint(dt); updateLaser(dt); updateFire(dt); updateMantleMirror(dt);
+  updateWallpaper(dt); updateBlood(dt); updatePaint(dt); updateLaser(dt); updateCatnip(dt); updateFire(dt); updateMantleMirror(dt);
   updateFan(dt);
   updateBombFx(dt);
 
@@ -6587,6 +6725,7 @@ function frame(now) {
   updateEdgeArrows();
   camera.position.copy(camBase);
   if (cine) camera.lookAt(cine.look);
+  if (catnip.active && !cine) { camera.position.x += Math.sin(clock * 1.3) * 0.06; camera.position.y += Math.cos(clock * 1.7) * 0.04; }   // catnip: the whole room drifts dreamily
   if (shake > 0) camera.position.add(new THREE.Vector3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0));
   lamp.intensity = (0.5 + Math.sin(clock * 1.3) * 0.03) * lightF;
   // candle flicker: layered sines per flame so they never pulse in sync
