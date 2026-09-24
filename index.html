@@ -2344,9 +2344,10 @@ function updateRoomFx(dt) {
   g.level += ((galaxyOn ? 1 : 0) - g.level) * Math.min(1, dt * 3);
   const on = g.level > 0.01;
   for (const pl of g.planes) pl.visible = on;
-  g.nebMat.opacity = 0.75 * g.level; g.starMat.opacity = (0.75 + 0.25 * Math.sin(clock * 3)) * g.level;
+  const dark = 0.3 + 0.7 * Math.min(1, (1 - lightF) / 0.84);          // a faint wash with the lights on; full strength in the dark / rave
+  g.nebMat.opacity = 0.75 * g.level * dark; g.starMat.opacity = (0.75 + 0.25 * Math.sin(clock * 3)) * g.level * dark;
   g.nebula.offset.x += dt * 0.012; g.stars.offset.x -= dt * 0.02; g.stars.offset.y += dt * 0.006;
-  for (const d of g.domes) { d.glow.material.opacity = 0.85 * g.level; d.dome.material.color.setHex(g.level > 0.5 ? 0xc9b8ff : 0x6f62c8); }
+  for (const d of g.domes) { d.glow.material.opacity = 0.85 * g.level * dark; d.dome.material.color.setHex(g.level > 0.5 ? 0xc9b8ff : 0x6f62c8); }
   const beat = actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 7) : 0;
   g.rave.forEach((l, i) => {
     const a = clock * (0.7 + i * 0.25) + i * 2.1;
