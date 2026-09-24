@@ -535,7 +535,6 @@ function updateDresser(dt) {
     d.angle += (d.target - d.angle) * Math.min(1, dt * 6);
     d.hinge.rotation.y = d.angle;
     d.inside.visible = d.angle < -0.04;
-    d.stage.scale.z = Math.max(0.02, Math.min(1, 0.4 * Math.tan(Math.min(1.5, -d.angle))));   // contents ease out only as far as the opening door has cleared
   }
 }
 function knockDiffuser() {
@@ -907,9 +906,23 @@ box(0.05, 0.26, ROOM.visDepth, trimMat, -ROOM.halfW + 0.025, 0.13, ROOM.visDepth
 const FT = f => f / 1.3, IN = i => i / 12 / 1.3;
 const woodMat = lam(0x3b261c), woodTopMat = lam(0x2e1c14), doorMat = lam(0xffffff, { map: carvedTex, side: THREE.DoubleSide });   // double-sided so an open door still shows
 const DEPTH = IN(18);                              // credenza depth
-function credenza(x0, width, height, doors) {
+const noFace = new THREE.MeshBasicMaterial({ visible: false });     // an open side of a box (still tappable)
+const cupboardDark = basic(0x140c08, { side: THREE.BackSide });       // inside faces of a cupboard
+function credenza(x0, width, height, doors, hollow) {
   const x = x0 + width / 2;
   const body = box(width, height - IN(3), DEPTH, woodMat, x, (height - IN(3)) / 2 + IN(2), DEPTH / 2 + 0.02);
+  if (hollow) {                                                       // real cupboards: the front is a frame round the door openings, with a cavity behind each door
+    body.material = [woodMat, woodMat, woodMat, woodMat, noFace, woodMat];
+    const zf = DEPTH + 0.02 - IN(0.4), dh = height - IN(8), dy = height / 2 + IN(1), dw0 = (width - IN(3)) / doors, xl = x - width / 2 + IN(1.5);
+    const tappable = m => { m.userData.dresser = true; tapTargets.push(m); return m; };                     // tapping the frame or into a cupboard works the nearest door
+    tappable(box(width, height - IN(1) - (dy + dh / 2), IN(0.8), woodMat, x, (height - IN(1) + dy + dh / 2) / 2, zf));   // top rail
+    tappable(box(width, dy - dh / 2 - IN(2), IN(0.8), woodMat, x, (dy - dh / 2 + IN(2)) / 2, zf));                     // bottom rail
+    for (let i = 0; i <= doors; i++) {                                                                        // stiles between the doors
+      const a = i === 0 ? x - width / 2 : xl + dw0 * i - IN(0.75), b = i === doors ? x + width / 2 : xl + dw0 * i + IN(0.75);
+      tappable(box(b - a, dh, IN(0.8), woodMat, (a + b) / 2, dy, zf));
+    }
+    for (let i = 0; i < doors; i++) tappable(box(dw0 - IN(1.5), dh, DEPTH - IN(1.5), cupboardDark, xl + dw0 * (i + 0.5), dy, (DEPTH - IN(1.5)) / 2 + IN(1)));   // the cavity
+  }
   if (x0 > -ROOM.halfW + 0.1) { body.userData.dresser = true; tapTargets.push(body); }            // main credenza body is tappable
   box(width, IN(2), DEPTH - IN(2), woodTopMat, x, IN(1), DEPTH / 2);                       // plinth
   box(width + IN(1), IN(1), DEPTH + IN(1), woodTopMat, x, height - IN(0.5), DEPTH / 2 + 0.02); // top slab
@@ -926,7 +939,7 @@ const LEFT_X0 = -ROOM.halfW, LEFT_W = FT(3.8);                         // 3'10" 
 const SHELF_W = IN(16), SHELF_X = ROOM.halfW - SHELF_W / 2 - 0.02;                 // black shelf tucked into the back-right corner
 const MAIN_X0 = LEFT_X0 + LEFT_W + IN(1), MAIN_W = SHELF_X - SHELF_W / 2 - IN(1) - MAIN_X0;   // credenza fills the wall up to the shelf
 credenza(LEFT_X0, LEFT_W, CAB_H, 2);
-const mainDoors = credenza(MAIN_X0, MAIN_W, CAB_H, 5);
+const mainDoors = credenza(MAIN_X0, MAIN_W, CAB_H, 5, true);
 /* Dresser doors: the three the cat's box doesn't block can swing open (tap the dresser near one).
    Each hides a stuffed cupboard: dark cavity, a shelf, folded blankets bulging out, papers and crumpled balls. */
 const dresserDoors = [];
@@ -1020,10 +1033,9 @@ function makePistol() {
     const n = dresserDoors.length;
     const hinge = new THREE.Group(); hinge.position.set(m.position.x - d.w / 2, m.position.y, m.position.z); scene.add(hinge);
     scene.remove(m); m.position.set(d.w / 2, 0, 0); hinge.add(m);          // door swings on its left edge
-    const inside = new THREE.Group(); inside.position.set(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.021); inside.visible = false; scene.add(inside);
-    inside.add(new THREE.Mesh(new THREE.PlaneGeometry(d.w, d.h), dark));
-    box(d.w, IN(0.8), IN(2.5), shelfMat, 0, 0, IN(0.9), inside);                                          // mid shelf edge
-    const stage = new THREE.Group(); inside.add(stage);                                                   // contents kept to the middle 78%: clear of both door swings
+    const inside = new THREE.Group(); inside.position.set(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.02); inside.visible = false; scene.add(inside);
+    box(d.w - IN(0.2), IN(0.8), DEPTH - IN(2.5), shelfMat, 0, 0, -(DEPTH - IN(2.5)) / 2 - IN(1), inside);   // mid shelf, running back into the cupboard
+    const stage = new THREE.Group(); stage.position.z = -IN(4.2); inside.add(stage);                       // contents sit well inside, behind the door line
     stages[n % stages.length](stage, d.w * 0.78, d.h);
     const rig = { hinge, inside, stage, angle: 0, target: 0, x: hinge.position.x + d.w / 2, center: new THREE.Vector3(hinge.position.x + d.w / 2, hinge.position.y, DEPTH + 0.1) };
     if (n === 2) { pistolDoor = rig; stage.traverse(o => { if (o.isMesh && o.userData.pistol) tapTargets.push(o); }); }
@@ -2070,7 +2082,6 @@ const galaxyRig = (() => {
   add(VD, WH, new THREE.Vector3(ROOM.halfW - 0.04, WH / 2, VD / 2), -Math.PI / 2);                  // right wall
   add(ROOM.halfW * 2, VD, new THREE.Vector3(0, 0.02, VD / 2), 0, -Math.PI / 2);                     // stars across the carpet
   add(ROOM.halfW * 2, VD, new THREE.Vector3(0, CEIL_H - 0.04, VD / 2), 0, Math.PI / 2);            // ...and the ceiling
-  add(ROOM.halfW * 2, WH, new THREE.Vector3(0, WH / 2, VD - 0.04), Math.PI);                         // ...and the end wall
   // the projectors themselves: a little dark base and a translucent dome that lights up
   const domes = [];
   const projector = (pos) => {
@@ -2121,13 +2132,12 @@ function updateRoomFx(dt) {
     l.intensity = roomMode === 2 ? 0.9 + 1.6 * beat : Math.max(0, l.intensity - dt * 4);
   });
 }
-/* ---------- low ceiling with three frosted dome lights, and the end wall 4 ft past the fireplace. Both face into
+/* ---------- 8 ft ceiling with three frosted dome lights (the near end of the room is left open, dollhouse style). Both face into
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
   const VD = ROOM.visDepth, WH = ROOM.wallH;
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, VD), ceilMat); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, CEIL_H, VD / 2); scene.add(ceil);
-  const endWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, WH), lam(0xf2efe8, { map: panelTex })); endWall.rotation.y = Math.PI; endWall.position.set(0, WH / 2, VD); scene.add(endWall);
   const ringMat = lam(0xb89a5e), domeMat = basic(0xfff6e2);
   for (const z of [1.9, 6.6, 11.6]) {                                // one near the back, over the cat, then down the room
     const g = new THREE.Group(); g.position.set(0, CEIL_H, z); scene.add(g);
@@ -3293,7 +3303,7 @@ function handleTap(clientX, clientY) {
   if (best) { whack(best); return; }
   // 1) a direct hit on something interactive
   const shown = o => { for (let q = o; q; q = q.parent) if (!q.visible) return false; return true; };
-  const hits = raycaster.intersectObjects(tapTargets, false).filter(h => shown(h.object));
+  const hits = raycaster.intersectObjects(tapTargets, false).filter(h => shown(h.object) && !(h.face && Array.isArray(h.object.material) && h.object.material[h.face.materialIndex] === noFace));   // taps pass through open cupboard fronts
   if (hits.length && hits[0].object.userData.wallpaper) {           // the wall is behind everything: a near miss on something in front wins
     for (const it of interactables()) if (ray.distanceSqToPoint(it.pos) < it.r * it.r * 0.6) { interact(it.obj, it.pos); return; }
   }
