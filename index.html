@@ -122,6 +122,17 @@
   #walkJump{position:fixed;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(38px + env(safe-area-inset-bottom,0px));z-index:6;width:96px;height:96px;border-radius:50%;
             background:#ff6fae;color:#fff;font:800 18px var(--body);letter-spacing:.04em;border:3px solid #fff4f8;box-shadow:0 5px 0 #b13f78,0 10px 20px rgba(0,0,0,.3);touch-action:none;cursor:pointer}
   #walkJump:active{transform:translateY(4px);box-shadow:0 1px 0 #b13f78,0 4px 10px rgba(0,0,0,.3)}
+  .walk-btn{position:fixed;z-index:6;border-radius:50%;color:#fff;font:800 14px var(--body);letter-spacing:.03em;border:3px solid #fff4f8;touch-action:none;cursor:pointer;
+            display:grid;place-items:center;line-height:1.05;padding:0}
+  .walk-btn b{display:block;font-size:22px;line-height:1}
+  #walkSwipe{right:calc(134px + env(safe-area-inset-right,0px));bottom:calc(30px + env(safe-area-inset-bottom,0px));width:74px;height:74px;background:#9b5cf0;box-shadow:0 5px 0 #6a34b8,0 10px 18px rgba(0,0,0,.3)}
+  #walkSwipe:active{transform:translateY(4px);box-shadow:0 1px 0 #6a34b8}
+  #walkMeow{right:calc(34px + env(safe-area-inset-right,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px));width:68px;height:68px;background:#f0a23a;box-shadow:0 5px 0 #b06a14,0 10px 18px rgba(0,0,0,.3)}
+  #walkMeow:active{transform:translateY(4px);box-shadow:0 1px 0 #b06a14}
+  #walkCaption{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translateX(-50%);z-index:7;pointer-events:none;white-space:nowrap;opacity:0;
+               background:rgba(58,20,52,.88);color:#fff;border:2px solid rgba(255,244,248,.45);border-radius:999px;padding:7px 18px;font:800 17px var(--body)}
+  #walkCaption.show{animation:caption 2.4s ease forwards}
+  @keyframes caption{0%{opacity:0;transform:translate(-50%,-6px) scale(.9)}8%,78%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0}}
   .float.name{font-family:var(--body);font-weight:800;font-size:15px;color:#fff;background:rgba(58,20,52,.82);border:1.5px solid rgba(255,244,248,.35);
               padding:4px 12px;border-radius:999px;-webkit-text-stroke:0;animation-duration:1.9s}
   /* the paint jar: splats hit the screen, then drip and fade */
@@ -272,7 +283,7 @@
 </section>
 <div id="fx"></div>
 <div id="paintSplash"></div>
-<div id="walkUI" hidden><div id="walkStick"><div id="walkKnob"></div></div><button id="walkJump">Jump</button></div>
+<div id="walkUI" hidden><div id="walkStick"><div id="walkKnob"></div></div><button id="walkJump">Jump</button><button class="walk-btn" id="walkSwipe"><span><b>🐾</b>Swipe</span></button><button class="walk-btn" id="walkMeow"><span><b>😺</b>Meow</span></button><div id="walkCaption"></div></div>
 
 <!-- HUD: one bar across the top -->
 <div class="hud" id="hud" hidden>
@@ -2958,7 +2969,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
   // a two-panel sliding glass door looking out onto the backyard lawn. From the usual camera outside it's not drawn.
   povEndWall = new THREE.Group(); povEndWall.visible = false; povEndWall.userData.name = 'Sliding glass door';
   {
-    const hw = ROOM.halfW, DW = FT(6), DH = FT(6.67), DX = 0.9, L0 = -(DX + DW / 2), L1 = -(DX - DW / 2);   // (the wall faces back into the room, so its local x runs the other way)
+    const hw = ROOM.halfW, DW = FT(6), DH = FT(6.67), DX = -1.6, L0 = -(DX + DW / 2), L1 = -(DX - DW / 2);   // (the wall faces back into the room, so its local x runs the other way)
     const sh = new THREE.Shape(); sh.moveTo(-hw, 0); sh.lineTo(L0, 0); sh.lineTo(L0, DH); sh.lineTo(L1, DH); sh.lineTo(L1, 0); sh.lineTo(hw, 0); sh.lineTo(hw, WH); sh.lineTo(-hw, WH); sh.closePath();
     const wg = new THREE.ShapeGeometry(sh), uv = wg.attributes.uv, ps = wg.attributes.position;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (ps.getX(i) + hw) / (2 * hw), ps.getY(i) / WH);   // same paneling as the other walls
@@ -2978,6 +2989,63 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       B(PW, ST, IN(1.4), bronze, px, P0 + ST / 2, pz); B(PW, ST, IN(1.4), bronze, px, P0 + PH - ST / 2, pz);
       const glass = new THREE.Mesh(new THREE.PlaneGeometry(PW - ST * 2, PH - ST * 2), gl); glass.position.set(px, P0 + PH / 2, pz); povEndWall.add(glass);
       if (slide) B(IN(0.9), IN(11), IN(1), bronze, px + PW / 2 - ST - IN(1.4), IN(38), pz - IN(1.3));                         // pull handle
+    }
+    const named = (g, name) => { g.userData.name = name; povEndWall.add(g); return g; };
+    const BX = (g, w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
+    { // a closed door on the right: a white six-panel door (it doesn't open)
+      const g = named(new THREE.Group(), 'Closet door'), CW = FT(2.67), CX = 3.05, paint = lam(0xf4f1ea), z0 = VD - IN(0.8);
+      BX(g, CW, DH, IN(1.4), paint, CX, DH / 2, z0);
+      for (const [py, ph] of [[IN(8), IN(28)], [IN(39), IN(22)], [IN(64), IN(12)]]) for (const sx of [-1, 1]) BX(g, CW * 0.36, ph, IN(0.5), lam(0xfbf9f4), CX + sx * CW * 0.22, py + ph / 2, z0 - IN(0.8));   // raised panels
+      BX(g, IN(3.5), DH + IN(3.5), IN(0.8), trim, CX - CW / 2 - IN(1.75), (DH + IN(3.5)) / 2, VD - IN(0.4)); BX(g, IN(3.5), DH + IN(3.5), IN(0.8), trim, CX + CW / 2 + IN(1.75), (DH + IN(3.5)) / 2, VD - IN(0.4));
+      BX(g, CW + IN(7), IN(3.5), IN(0.8), trim, CX, DH + IN(1.75), VD - IN(0.4));
+      const brass = new THREE.MeshPhongMaterial({ color: 0xc9a24a, shininess: 90, specular: 0xffffff });
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(IN(1.2), 14, 10), brass); knob.position.set(CX - CW / 2 + IN(3), IN(36), z0 - IN(2.2)); g.add(knob);
+      BX(g, IN(0.6), IN(0.6), IN(1.6), brass, CX - CW / 2 + IN(3), IN(36), z0 - IN(1.2));
+    }
+    { // litter box along the left wall, past the fireplace: a grey tray of litter with a scoop
+      const g = named(new THREE.Group(), 'Litter box'); g.position.set(-hw + IN(9.5), 0, VD - FT(2.6)); g.rotation.y = Math.PI / 2;
+      const plastic = new THREE.MeshPhongMaterial({ color: 0x9fb2bd, shininess: 50, specular: 0x444444 }), L = IN(22), Wd = IN(16), H = IN(6), T = IN(0.5);
+      BX(g, L, T, Wd, plastic, 0, T / 2, 0); BX(g, L, H, T, plastic, 0, H / 2, Wd / 2 - T / 2); BX(g, L, H, T, plastic, 0, H / 2, -Wd / 2 + T / 2);
+      BX(g, T, H, Wd, plastic, L / 2 - T / 2, H / 2, 0); BX(g, T, H, Wd, plastic, -L / 2 + T / 2, H / 2, 0);
+      const litTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#cfc6b4'; c.fillRect(0, 0, w, h); for (let i = 0; i < 500; i++) { const v = 150 + Math.random() * 90 | 0; c.fillStyle = `rgb(${v},${v - 6},${v - 18})`; c.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5); } }, 3, 2);
+      BX(g, L - T * 2, IN(0.4), Wd - T * 2, lam(0xffffff, { map: litTex }), 0, H - IN(1.4), 0);
+      const scoop = new THREE.Group(); scoop.position.set(L / 2 + IN(4), IN(0.4), Wd / 2 - IN(3)); scoop.rotation.y = 0.5; g.add(scoop);
+      const green = lam(0x5fbf6a); BX(scoop, IN(5), IN(0.4), IN(4.5), green, 0, 0, 0); BX(scoop, IN(6), IN(0.5), IN(1.2), green, -IN(5), 0, 0);
+    }
+    { // scratching post in the corner: carpeted base, sisal post, a little cat house on top with a round doorway, and a dangling pom-pom
+      const g = named(new THREE.Group(), 'Scratching post'); g.position.set(-hw + IN(10), 0, VD - IN(10));
+      const carpet = lam(0xcbbba6), sisalTex = canvasTex(32, 64, (c, w, h) => { c.fillStyle = '#d6bb8a'; c.fillRect(0, 0, w, h); c.fillStyle = '#a88a58'; for (let y = 0; y < h; y += 4) c.fillRect(0, y, w, 1.5); }, 1, 5);
+      BX(g, IN(18), IN(1.5), IN(18), carpet, 0, IN(0.75), 0);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(IN(2), IN(2), IN(20), 16), lam(0xffffff, { map: sisalTex })); post.position.y = IN(1.5) + IN(10); g.add(post);
+      const HB = IN(21.5), HS = IN(14);
+      const house = BX(g, HS, HS, HS, carpet, 0, HB + HS / 2, 0); house.userData.name = 'Cat house';
+      BX(g, HS + IN(1.5), IN(1), HS + IN(1.5), lam(0xbfae97), 0, HB + HS + IN(0.5), 0);                             // roof platform
+      const hole = new THREE.Mesh(new THREE.CircleGeometry(IN(4), 20), basic(0x2a2018)); hole.rotation.y = Math.PI / 2; hole.position.set(HS / 2 + IN(0.05), HB + HS * 0.45, 0); g.add(hole);   // doorway, facing the room
+      const str = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.12), IN(0.12), IN(7), 4), lam(0x333333)); str.position.set(HS / 2 + IN(0.6), HB + HS - IN(3.5), -HS / 3); g.add(str);
+      const pom = new THREE.Mesh(new THREE.SphereGeometry(IN(1.2), 10, 8), lam(0xff6fae)); pom.position.set(HS / 2 + IN(0.6), HB + HS - IN(7.5), -HS / 3); g.add(pom);
+    }
+    { // outside: a 2 x 2 patch of concrete pads on the grass at the door, and a little kettle BBQ beside them
+      const padTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#bdb9b1'; c.fillRect(0, 0, w, h); for (let i = 0; i < 700; i++) { const v = 150 + Math.random() * 70 | 0; c.fillStyle = `rgba(${v},${v},${v - 4},.7)`; c.fillRect(Math.random() * w, Math.random() * h, 1, 1); } }, 1, 1);
+      const pads = named(new THREE.Group(), 'Concrete pads'), PS = FT(2.6), GAP = IN(2.5), padMat = new THREE.MeshBasicMaterial({ map: padTex, color: 0xf2f0ec, fog: false }), edgeMat = new THREE.MeshBasicMaterial({ color: 0x8e8a83, fog: false });
+      for (const ix of [-0.5, 0.5]) for (const iz of [0, 1]) {
+        const x = DX + ix * (PS + GAP), z = VD + IN(4) + PS / 2 + iz * (PS + GAP);
+        const top = new THREE.Mesh(new THREE.PlaneGeometry(PS, PS), padMat); top.rotation.x = -Math.PI / 2; top.position.set(x, IN(1.2), z); pads.add(top);
+        BX(pads, PS, IN(1.2), PS, edgeMat, x, IN(0.6) - 0.004, z);
+      }
+      const bbq = named(new THREE.Group(), 'Kettle BBQ'); bbq.position.set(DX + PS * 0.72, IN(1.2), VD + IN(4) + PS * 1.45 + GAP);   // standing on the far corner of the pads, where it shows through the glass
+      const black = new THREE.MeshPhongMaterial({ color: 0x151515, shininess: 90, specular: 0x777777 }), steel = new THREE.MeshPhongMaterial({ color: 0xb8bcc2, shininess: 80, specular: 0xffffff });
+      const KR = IN(9), KY = IN(27);
+      const bowl = new THREE.Mesh(new THREE.SphereGeometry(KR, 26, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), black); bowl.position.y = KY; bowl.scale.y = 0.9; bbq.add(bowl);
+      const lid = new THREE.Mesh(new THREE.SphereGeometry(KR * 1.01, 26, 12, 0, Math.PI * 2, 0, Math.PI / 2), black); lid.position.y = KY + IN(0.3); lid.scale.y = 0.85; bbq.add(lid);
+      const vent = new THREE.Mesh(new THREE.CylinderGeometry(IN(1.6), IN(1.6), IN(0.3), 16), steel); vent.position.y = KY + KR * 0.85 + IN(0.4); bbq.add(vent);
+      BX(bbq, IN(4.5), IN(0.9), IN(1), lam(0x2a2a2a), 0, KY + KR * 0.85 + IN(2), 0);                                                   // lid handle
+      for (const sx of [-1, 1]) BX(bbq, IN(1), IN(0.8), IN(4), lam(0x2a2a2a), sx * (KR + IN(0.5)), KY - IN(1), 0);                        // side handles
+      const ash = new THREE.Mesh(new THREE.CylinderGeometry(IN(4.5), IN(4), IN(0.8), 20), steel); ash.position.y = IN(9); bbq.add(ash);
+      for (let i = 0; i < 3; i++) {                                                                                                          // three splayed legs, wheels on two
+        const a = i / 3 * Math.PI * 2 + 0.4, leg = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.45), IN(0.45), KY, 8), steel);
+        leg.position.set(Math.cos(a) * IN(5.5), KY / 2, Math.sin(a) * IN(5.5)); leg.rotation.set(Math.sin(a) * 0.22, 0, -Math.cos(a) * 0.22); bbq.add(leg);
+        if (i < 2) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.2), IN(2.2), IN(0.9), 16), black); wh.rotation.z = Math.PI / 2; wh.position.set(Math.cos(a) * IN(8.5), IN(2.2), Math.sin(a) * IN(8.5)); bbq.add(wh); }
+      }
     }
     // the backyard: a freshly mown lawn out to the horizon under a clear sky
     const grassTex = canvasTex(256, 256, (g, w, h) => {
@@ -3567,6 +3635,7 @@ const _sh = new THREE.Vector3(), _pp = new THREE.Vector3(), _dir = new THREE.Vec
 let tailWag = 0;
 
 function startSwipe(p, keepY) {
+  if (gameMode === 'walk' && walk.on) { walk.batT = 0.35; walk.look = p.clone(); return; }   // free walk: Princess bats it herself, no arm from the empty box
   swipe.active = true; swipe.t = 0; swipe.target.copy(p); swipe.target.y = keepY ? Math.min(p.y, 7) : 0.25;
   catLean = -Math.sign(p.x - CAT_POS.x) * 0.07;     // the card tips toward the target
   catIdle = 0.5;
@@ -4142,6 +4211,8 @@ const ACHIEVEMENTS = [
     ['flappy', '🐦', 'Flappy champ', 'Score 10 in Flappy Kitty'],
     ['paint', '🎨', 'Abstract art', 'Smash the jar of paint on the mantle'],
     ['walkTop', '🐾', 'Top cat', 'In Free walk, leap up onto the mantle'],
+    ['boxJump', '📦', 'If I fits, I sits', 'In Free walk, jump back into your box'],
+    ['hiss', '😾', 'Drama queen', 'In Free walk, meow ten times in a row'],
     ['inception', '🪆', 'Game-ception', 'Win the kart race, then beat the game on the driver\'s Switch'],
   ]],
   ['Other modes', [
@@ -4153,7 +4224,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 09:57';                                              // stamped when the site is published
+const BUILD = '2026-09-24 13:50';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5220,10 +5291,12 @@ window.addEventListener('keydown', e => {
 
 renderer.domElement.addEventListener('pointerdown', e => {
   if (state !== 'playing') return;
+  if (gameMode === 'walk' && e.button !== 2) {                        // free walk: drag looks around, a tap names things (even with a thumb on the stick, when this touch isn't the 'primary' one)
+    e.preventDefault(); if (!walkPtr && touches.size <= 1) walkPtr = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t: performance.now(), moved: false, yaw: fc.yaw, tilt: fc.tilt }; return;
+  }
   if (!e.isPrimary) return;                                            // second finger = camera gesture, not a swipe
   if (e.button === 2) return;                                          // right button = chaos camera orbit
   e.preventDefault();
-  if (gameMode === 'walk') { walkPtr = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t: performance.now(), moved: false, yaw: fc.yaw, tilt: fc.tilt }; return; }   // free walk: drag looks around, a tap names things
   if (gameMode === 'mouse') { heist.hold = { id: e.pointerId, x: e.clientX, y: e.clientY }; return; }   // mouse mode: hold to run toward your finger
   if (gameMode === 'chaos') { pendingTap = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), ok: true }; return; }   // chaos: fires on release (see endTouch)
   handleTap(e.clientX, e.clientY);
@@ -5433,6 +5506,36 @@ const sfx = {
     src.connect(hh); hh.connect(hg); hg.connect(actx.destination); src.start(th);
   },
 
+  meow: angry => {                                                  // Princess: a sweet 'mi-aow' (a little different every time), or the full furious yowl
+    if (!actx || !soundOn) return;
+    const t = actx.currentTime + 0.01, k = angry ? 1 : 0.9 + Math.random() * 0.25, dur = angry ? 1.2 : 0.36 + Math.random() * 0.14;
+    const fr = angry ? [360, 820, 700, 320] : [620 * k, 950 * k, 820 * k, 560 * k];
+    const o = actx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(fr[0], t); o.frequency.exponentialRampToValueAtTime(fr[1], t + dur * 0.25);
+    o.frequency.exponentialRampToValueAtTime(fr[2], t + dur * 0.55); o.frequency.exponentialRampToValueAtTime(fr[3], t + dur);
+    const vib = actx.createOscillator(), vg = actx.createGain(); vib.frequency.value = angry ? 12 : 6; vg.gain.value = angry ? 30 : 7; vib.connect(vg); vg.connect(o.frequency);
+    const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = angry ? 300 : 430;
+    const out = actx.createGain(), pk = angry ? 0.75 : 0.2;
+    out.gain.setValueAtTime(0.0001, t); out.gain.exponentialRampToValueAtTime(pk, t + 0.03); out.gain.setValueAtTime(pk, t + dur * 0.6); out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    for (const [q, pts, lvl] of angry ? [[3, [700, 1500, 1200, 600], 1], [5, [2100, 3300, 2700, 1600], 0.8]] : [[5, [1000, 1500, 1150, 800], 1], [7, [2400, 3200, 2600, 2000], 0.5]]) {
+      const bp = actx.createBiquadFilter(), g = actx.createGain(); bp.type = 'bandpass'; bp.Q.value = q; g.gain.value = lvl;
+      bp.frequency.setValueAtTime(pts[0], t); bp.frequency.linearRampToValueAtTime(pts[1], t + dur * 0.25); bp.frequency.linearRampToValueAtTime(pts[2], t + dur * 0.55); bp.frequency.linearRampToValueAtTime(pts[3], t + dur);
+      hp.connect(bp); bp.connect(g); g.connect(out);
+    }
+    o.connect(hp); out.connect(actx.destination);
+    o.start(t); vib.start(t); o.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
+    if (!angry) return;
+    const gr = actx.createOscillator(), gl = actx.createBiquadFilter(), gg = actx.createGain();   // a low 'mrrrr' growl under it
+    gr.type = 'sawtooth'; gr.frequency.value = 92; gl.type = 'lowpass'; gl.frequency.value = 800;
+    gg.gain.setValueAtTime(0.0001, t); gg.gain.exponentialRampToValueAtTime(0.28, t + 0.05); gg.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    gr.connect(gl); gl.connect(gg); gg.connect(actx.destination); gr.start(t); gr.stop(t + 0.6);
+    const n = Math.floor(actx.sampleRate * 0.6), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);   // and a long hiss after
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const src = actx.createBufferSource(), hh = actx.createBiquadFilter(), hg = actx.createGain(), th = t + dur - 0.1;
+    src.buffer = buf; hh.type = 'highpass'; hh.frequency.value = 2600;
+    hg.gain.setValueAtTime(0.0001, th); hg.gain.exponentialRampToValueAtTime(0.3, th + 0.03); hg.gain.exponentialRampToValueAtTime(0.0001, th + 0.6);
+    src.connect(hh); hh.connect(hg); hg.connect(actx.destination); src.start(th);
+  },
   bite: gone => { sfx.squeak(4); tone(140, 90, 0.18, 'sawtooth', 0.05, 0.3); if (gone) tone(300, 80, 0.45, 'triangle', 0.07, 0.4); },
   over: () => { tone(440, 220, 0.3, 'triangle', 0.08); tone(330, 110, 0.5, 'triangle', 0.08, 0.25); },
 };
@@ -5783,7 +5886,8 @@ renderer.domElement.addEventListener('pointerup', endTouch); renderer.domElement
    ===================================================================== */
 const WALK = { speed: 3.4, jumpV: 12.4, grav: 22, step: 0.32, height: 0.78, reach: 0.3 };
 const walk = { on: false, rig: null, meshes: [], pos: new THREE.Vector3(), vel: new THREE.Vector3(), vy: 0, grounded: true, face: Math.PI, phase: 0,
-               batT: 0, squash: 0, fp: false, stick: { x: 0, y: 0 }, jumpQ: -1, burnCD: 0, look: null };
+               batT: 0, squash: 0, fp: false, stick: { x: 0, y: 0 }, jumpQ: -1, burnCD: 0, look: null, hitObj: null, tableHops: 0, swipeReady: 0,
+               meowRun: 0, lastMeow: -9, meowT: 0, puff: 0, inBox: false };
 let walkPtr = null;
 const _wRay = new THREE.Raycaster(), _wO = new THREE.Vector3(), _wDown = new THREE.Vector3(0, -1, 0), _wv = new THREE.Vector3(), _wc = new THREE.Vector3();
 const _wTap = new THREE.Raycaster(); _wTap.layers.enable(1);
@@ -5832,9 +5936,9 @@ function surfaceTop(x, z, fromY) {                                   // the high
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY + 0.5;
   for (const h of _wRay.intersectObjects(walk.meshes, false)) {
     let shown = true; for (let q = h.object; q; q = q.parent) if (!q.visible) { shown = false; break; }
-    if (shown) return h.point.y;
+    if (shown) { walk.hitObj = h.object; return h.point.y; }
   }
-  return 0;
+  walk.hitObj = null; return 0;
 }
 function walkBlocked(nx, nz, ox, oz) {
   const p = walk.pos, lim = p.y + (walk.grounded ? WALK.step : 0.05), top = p.y + WALK.height;
@@ -5844,16 +5948,19 @@ function walkBlocked(nx, nz, ox, oz) {
 }
 function startWalk() {
   if (!walk.rig) walk.rig = makeWalker();
-  const skip = new Set([walk.rig.g, cat, povEndWall, heist.player.root, heistGoal.g, heist.ring, ...mice.map(m => m.root)]);
+  const skip = new Set([walk.rig.g, cat, heist.player.root, heistGoal.g, heist.ring, ...mice.map(m => m.root)]);
   walk.meshes = [];
   scene.traverse(o => {
     if (!o.isMesh) return;
     for (let q = o; q; q = q.parent) if (skip.has(q)) return;
+    if (o.userData.name === 'Sky' || o.userData.name === 'Backyard lawn') return;
+    if (o.userData.table) { walk.meshes.push(o); return; }             // the acrylic table is see-through, but she can stand on it
     const m = o.material;
     if (!Array.isArray(m) && (m.visible === false || m.blending === THREE.AdditiveBlending || (m.transparent && (m.opacity < 0.3 || m.depthWrite === false)))) return;
     walk.meshes.push(o);
   });
-  Object.assign(walk, { on: true, vy: 0, grounded: true, face: Math.PI, phase: 0, batT: 0, squash: 0, fp: false, jumpQ: -1, burnCD: 0, look: null });
+  Object.assign(walk, { on: true, vy: 0, grounded: true, face: Math.PI, phase: 0, batT: 0, squash: 0, fp: false, jumpQ: -1, burnCD: 0, look: null, tableHops: 0, meowRun: 0, lastMeow: -9, meowT: 0, puff: 0, inBox: false });
+  catTail.visible = false;
   walk.vel.set(0, 0, 0); walk.stick.x = walk.stick.y = 0;
   walk.pos.set(0.9, 0, 4.4); walk.pos.y = surfaceTop(walk.pos.x, walk.pos.z, 0.9);
   walk.rig.g.visible = true; walk.rig.shadow.visible = true; cat.visible = false;
@@ -5866,7 +5973,7 @@ function startWalk() {
 function endWalk() {
   walk.on = false; walkPtr = null; walk.stick.x = walk.stick.y = 0;
   if (walk.rig) { walk.rig.g.visible = false; walk.rig.shadow.visible = false; }
-  cat.visible = true; document.body.classList.remove('walking');
+  cat.visible = true; catTail.visible = true; document.body.classList.remove('walking');
   const ui = document.getElementById('walkUI'); if (ui) ui.hidden = true;
   const knob = document.getElementById('walkKnob'); if (knob) knob.style.transform = '';
 }
@@ -5910,7 +6017,7 @@ function updateWalk(dt) {
     let ny = p.y + walk.vy * dt; if (ny > cap) { ny = cap; walk.vy = Math.min(walk.vy, 0); }
     if (walk.vy <= 0) {
       const g = surfaceTop(p.x, p.z, p.y + 0.02);
-      if (ny <= g) { p.y = g; walk.vy = 0; walk.grounded = true; walk.squash = 1; sfx.padThud(0.35); } else p.y = ny;
+      if (ny <= g) { p.y = g; walk.vy = 0; walk.grounded = true; walk.squash = 1; sfx.padThud(0.35); walkLanded(); } else p.y = ny;
     } else p.y = ny;
   }
   // which way she faces: where she's going (or toward the last thing tapped)
@@ -5926,6 +6033,25 @@ function updateWalk(dt) {
     const ax = p.x - f.center.x, az = p.z - f.center.z, al = Math.hypot(ax, az) || 1; walk.vel.set(ax / al * 5, 0, az / al * 5); walk.vy = 5.5; walk.grounded = false;
   }
   if (walk.grounded && p.y > FIRE.h && p.x < -ROOM.halfW + 1.3 && Math.abs(p.z - FIRE.z) < FIRE.w / 2 + 0.4) unlock('walkTop');
+  // back in her box?
+  const inBox = walk.grounded && p.y < BOX.h * 0.5 && Math.abs(p.x - CAT_POS.x) < BOX.w / 2 - 0.1 && Math.abs(p.z - CAT_POS.z) < BOX.d / 2 - 0.1;
+  if (inBox && !walk.inBox) { unlock('boxJump'); showWalkName('Home sweet box!'); tailWag = 2; }
+  walk.inBox = inBox;
+  // bumping into things: anything loose she walks or jumps into gets knocked flying (off the mantle, the credenza, the sofa...)
+  if (spd > 0.6 || !walk.grounded) {
+    const fx0 = Math.sin(walk.face), fz0 = Math.cos(walk.face), bx = p.x + fx0 * 0.2, bz = p.z + fz0 * 0.2;
+    for (const pr of props) {
+      if (pr.state !== 'rest' || pr.broken || pr.restHalf === 0) continue;   // (the disco balls are glued to the wall)
+      const o = pr.obj.position, dy = o.y - p.y;
+      if (dy < -0.1 || dy > 0.9 || Math.hypot(o.x - bx, o.z - bz) > pr.restHalf + 0.3) continue;
+      knockProp(pr);
+      let ax = o.x - bx, az = o.z - bz; const al = Math.hypot(ax, az) || 1; ax /= al; az /= al;
+      let ix = -o.x, iz = ROOM.visDepth / 2 - o.z; const il = Math.hypot(ix, iz) || 1; ix /= il; iz /= il;   // ...and out toward the middle of the room so it falls off its ledge
+      pr.v.set(ax * 1.5 + ix * 1.1 + walk.vel.x * 0.3, 1.1, az * 1.5 + iz * 1.1 + walk.vel.z * 0.3); sfx.clink();
+    }
+    const dr = diffuserRig;
+    if (dr && dr.state === 'rest' && Math.abs(dr.center.y - p.y) < 0.9 && Math.hypot(dr.center.x - bx, dr.center.z - bz) < 0.4) interact(dr.vase.children[0], dr.center);
+  }
   // animate: trot, tuck in the air, bat with a front paw, tail sways
   walk.phase += dt * (5 + spd * 3.4); walk.batT = Math.max(0, walk.batT - dt); walk.squash = Math.max(0, walk.squash - dt * 5);
   const a = Math.min(1, spd / 2), sw = Math.sin(walk.phase);
@@ -5941,7 +6067,11 @@ function updateWalk(dt) {
     W.body.rotation.x = -up * 0.25;
   }
   if (walk.batT > 0) W.legs[1].rotation.x = -Math.sin((1 - walk.batT / 0.35) * Math.PI) * 1.8;
-  W.body.scale.set(1 + walk.squash * 0.12, 1 - walk.squash * 0.18, 1);
+  walk.meowT = Math.max(0, walk.meowT - dt); walk.puff = Math.max(0, walk.puff - dt * 0.8);
+  const pf = 1 + walk.puff * 0.28;                                   // the big yowl: she puffs right up
+  W.body.scale.set((1 + walk.squash * 0.12) * pf, (1 - walk.squash * 0.18) * pf, pf);
+  W.head.rotation.x = -Math.sin(Math.min(1, walk.meowT / 0.4) * Math.PI) * 0.35;   // chin up for a meow
+  catTail.visible = false;
   W.head.rotation.y = walk.look && spd < 0.25 ? THREE.MathUtils.clamp(Math.atan2(walk.look.x - p.x, walk.look.z - p.z) - walk.face, -0.6, 0.6) * 0.5 : 0;
   W.tail.forEach((sg, i) => { sg.rotation.x = (i ? 0.2 : 0.75) + (walk.grounded ? 0 : 0.15); sg.rotation.y = Math.sin(clock * (spd > 0.3 ? 5 : 2.2) - i * 0.55) * (0.1 + i * 0.03); });
   const gy = surfaceTop(p.x, p.z, p.y + 0.05), hgt = p.y - gy;
@@ -5979,6 +6109,73 @@ function walkName(h) {                                               // what did
   }
   return surface();
 }
+function walkLanded() {                                              // landing on the acrylic table: first time it creaks, second time it shatters
+  const o = walk.hitObj;
+  if (o && o.userData.table && tableRig && !tableRig.broken) {
+    walk.tableHops++;
+    if (walk.tableHops === 1) { sfx.crack ? sfx.crack() : sfx.clack(); showWalkName('Crack... careful!'); floatText(walk.pos.clone().setY(walk.pos.y + 0.8), 'Creak!', 'warn'); }
+    else { breakTable(); walk.tableHops = 0; walk.grounded = false; walk.vy = 1.5; showWalkName('Smash! The table shattered'); }
+  }
+}
+function showWalkName(text) {
+  const el = document.getElementById('walkCaption'); if (!el) return;
+  el.textContent = text; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+function walkSwipe() {                                               // swipe at whatever is right in front of her paw
+  if (!walk.on || state !== 'playing' || clock < walk.swipeReady) return;
+  walk.swipeReady = clock + 0.3; walk.batT = 0.35; noise(0.12, 0.05, 1800);
+  const p = walk.pos, fx = Math.sin(walk.face), fz = Math.cos(walk.face);
+  const paw = new THREE.Vector3(p.x + fx * 0.45, p.y + 0.35, p.z + fz * 0.45);
+  let best = null, bd = Infinity;
+  for (const it of interactables()) {
+    const d = it.pos.distanceTo(paw), reach = Math.min(it.r, 0.7) + 0.45;
+    if (d < reach && d < bd && it.obj) { bd = d; best = it; }
+  }
+  if (best) {
+    showWalkName(walkName({ object: best.obj, point: best.pos }));
+    if (!interact(best.obj, best.pos)) sfx.miss();
+    return;
+  }
+  const hits = [];                                                   // nothing loose: claw whatever surface is there (sofa, wallpaper, blanket, the TV...)
+  for (const dyv of [0.35, 0.1, 0.6]) {
+    raycaster.set(new THREE.Vector3(p.x, p.y + dyv, p.z), new THREE.Vector3(fx, -0.1, fz).normalize()); raycaster.far = 0.95; raycaster.camera = camera;
+    const h = raycaster.intersectObjects(scene.children, true).find(h => {
+      if (!h.object.isMesh) return false;
+      for (let q = h.object; q; q = q.parent) if (!q.visible || q === walk.rig.g) return false;
+      const m = Array.isArray(h.object.material) ? h.object.material[h.face ? h.face.materialIndex : 0] : h.object.material;
+      return m && m.visible !== false && m.blending !== THREE.AdditiveBlending && !(m.transparent && m.opacity < 0.1);
+    });
+    if (h) { hits.push(h); break; }
+  }
+  raycaster.far = Infinity;
+  const h = hits[0];
+  if (!h) { sfx.miss(); return; }
+  const name = walkName(h); showWalkName(name);
+  if (name === 'Closet door') { sfx.rattle(); floatText(h.point.clone().setY(h.point.y + 0.3), "It's shut!", 'warn'); return; }
+  if (!(tapTargets.includes(h.object) && interact(h.object, h.point, h.face))) sfx.miss();
+}
+function walkMeow() {
+  if (!walk.on || state !== 'playing') return;
+  initAudio();
+  walk.meowRun = clock - walk.lastMeow < 1.8 ? walk.meowRun + 1 : 1; walk.lastMeow = clock;
+  const head = walk.pos.clone().setY(walk.pos.y + 1.05);
+  if (walk.meowRun >= 10) {                                          // the tenth in a row: a furious, LOUD yowl
+    walk.meowRun = 0; walk.meowT = 1.1; walk.puff = 1;
+    sfx.meow(true); vibrate(120); shake = Math.max(shake, reduceMotion ? 0.06 : 0.45);
+    floatText(head.setY(head.y + 0.2), 'MRRRAAOWW!!', 'bad'); showWalkName('😾 MRRRAAOWW!!'); unlock('hiss');
+  } else {
+    walk.meowT = 0.4; sfx.meow(false);
+    floatText(head, walk.meowRun >= 7 ? 'Meow!!' : 'Meow', 'name');
+  }
+}
+{
+  const hold = (id, fn) => document.getElementById(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(); });
+  hold('walkSwipe', walkSwipe); hold('walkMeow', walkMeow);
+  window.addEventListener('keydown', e => {
+    if (gameMode !== 'walk' || state !== 'playing' || e.repeat) return;
+    const k = e.key.toLowerCase(); if (k === 'e' || k === 'f') walkSwipe(); if (k === 'm' || k === 'q') walkMeow();
+  });
+}
 function walkTap(x, y) {
   _wTap.setFromCamera(_wv.set(x / window.innerWidth * 2 - 1, -(y / window.innerHeight) * 2 + 1, 0), camera);
   const h = _wTap.intersectObjects(scene.children, true).find(h => {
@@ -5988,7 +6185,7 @@ function walkTap(x, y) {
     return m && m !== noFace && m.visible !== false && m.blending !== THREE.AdditiveBlending && !(m.transparent && m.opacity < 0.1);
   });
   if (h) {
-    floatText(h.point.clone().setY(h.point.y + 0.3), walkName(h), 'name');
+    const name = walkName(h); floatText(h.point.clone().setY(h.point.y + 0.3), name, 'name'); showWalkName(name);
     walk.look = h.point.clone(); walk.batT = 0.35;
   }
   handleTap(x, y);                                                   // and she still bats it, knocks it, opens it... (no points)
