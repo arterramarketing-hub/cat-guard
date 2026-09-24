@@ -49,6 +49,8 @@
   .hud-btns{display:flex;gap:6px;pointer-events:none}
   .edge-arrow{position:fixed;left:0;top:0;width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:20px solid #ffd23a;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
   .edge-arrow.bomb{border-bottom-color:#ff3b3b}
+  .edge-arrow.goal{border-bottom-color:#ffd23a;border-left-width:14px;border-right-width:14px;border-bottom-width:26px}
+  .edge-arrow.goal.home{border-bottom-color:#43e27a}
   .cam-toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:8;pointer-events:none;background:var(--hud);color:var(--paper);border:1.5px solid rgba(255,244,248,.25);border-radius:999px;padding:7px 16px;font:800 14px var(--body);letter-spacing:.04em;animation:toast 1.4s ease forwards}
   @keyframes toast{0%{opacity:0;transform:translate(-50%,6px)}12%,75%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
   .val-row{display:flex;align-items:center;gap:6px}
@@ -3425,6 +3427,14 @@ const mice = Array.from({ length: 14 }, () => new Mouse());
    Steal all three to win; three hits and she's got you.
    ===================================================================== */
 const HEIST_LIVES = 3;
+const heistGoal = (() => {
+  const g = new THREE.Group(); g.visible = false; scene.add(g);
+  const mat = basic(0xffd23a, { transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 40), mat); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; ring.renderOrder = 3; g.add(ring);
+  const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.42, 4), basic(0xffd23a)); arrow.rotation.x = Math.PI; g.add(arrow);   // points down at the goal
+  const edge = document.createElement('div'); edge.className = 'edge-arrow goal'; edge.hidden = true; document.body.appendChild(edge);
+  return { g, ring, arrow, mat, edge };
+})();
 const heist = { player: new Mouse(), hold: null, keys: {}, strike: null, strikeT: 2, invuln: 0, carrying: null, stolen: 0, vel: new THREE.Vector3(),
   ring: (() => { const g = new THREE.Group(); g.visible = false; scene.add(g);
     g.add(new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 40), basic(0xff2a2a, { transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide })));
@@ -3512,6 +3522,26 @@ function updateHeist(dt) {
       if (heist.invuln <= 0 && Math.hypot(pos.x - st.at.x, pos.z - st.at.z) < 0.55) heistHurt(); else sfx.miss();
     }
   }
+  // ---- where to go: the nearest mushroom (gold), or once you've got one, the nearest mouse hole (green)
+  let goal = null, best = Infinity;
+  if (heist.carrying) { for (const h of HOLES) { const d = Math.hypot(h.mouthOut.x - pos.x, h.mouthOut.z - pos.z); if (d < best) { best = d; goal = h.mouthOut; } } }
+  else for (const c of cheeses) if (c.available) { const d = Math.hypot(c.pos.x - pos.x, c.pos.z - pos.z); if (d < best) { best = d; goal = c.pos; } }
+  const G = heistGoal; G.g.visible = !!goal;
+  if (goal) {
+    const home = !!heist.carrying, col = home ? 0x43e27a : 0xffd23a;
+    G.mat.color.setHex(col); G.arrow.material.color.setHex(col);
+    G.g.position.set(goal.x, 0, goal.z); G.arrow.position.y = 1.15 + Math.abs(Math.sin(clock * 4)) * 0.25; G.arrow.rotation.y = clock * 2;
+    G.ring.scale.setScalar(1 + Math.sin(clock * 5) * 0.08); G.mat.opacity = 0.6 + 0.3 * Math.abs(Math.sin(clock * 5));
+    // off screen? an arrow at the edge points the way
+    _ea.set(goal.x, 0.3, goal.z).project(camera);
+    let x = _ea.x, y = _ea.y; const behind = _ea.z > 1;
+    if (behind || Math.abs(x) > 0.92 || Math.abs(y) > 0.88) {
+      if (behind) { x = -x; y = -y; }
+      const k = 0.88 / Math.max(Math.abs(x), Math.abs(y), 1e-3); x *= k; y *= k;
+      const W = window.innerWidth, H = window.innerHeight, sx = (x * 0.5 + 0.5) * W, sy = Math.min(H - 120, Math.max(70, (-y * 0.5 + 0.5) * H));
+      G.edge.hidden = false; G.edge.classList.toggle('home', home); G.edge.style.transform = `translate(${sx - 14}px, ${sy - 13}px) rotate(${Math.atan2(x, y)}rad)`;
+    } else G.edge.hidden = true;
+  } else G.edge.hidden = true;
   // ---- the camera follows along
   fc.focus.set(pos.x, 0.2, pos.z);
 }
@@ -4068,7 +4098,7 @@ function checkEnd() {
 }
 function endGame(reason) {
   state = 'ending'; endReason = reason; endTimer = 1.2;
-  heist.ring.visible = false; heist.strike = null; heist.hold = null;
+  heist.ring.visible = false; heist.strike = null; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true;
   sfx.over();
 }
 
@@ -4144,7 +4174,7 @@ function showBestOnStart() { const b = getBest(); $('bestStart').textContent = b
 showBestOnStart();
 
 /* ---------- screens ---------- */
-function clearField() { if (state === 'tvgame' || tvCine) { tvCine = null; if (tvPad) tvPad.visible = false; $('tvPlay').hidden = true; $('tvFade').classList.remove('on'); game.player = false; } for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.strike = null; heist.ring.visible = false; heist.hold = null; } }
+function clearField() { if (state === 'tvgame' || tvCine) { tvCine = null; if (tvPad) tvPad.visible = false; $('tvPlay').hidden = true; $('tvFade').classList.remove('on'); game.player = false; } for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.strike = null; heist.ring.visible = false; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true; } }
 function resetGame() {
   clearField();
   cheeses.forEach(c => c.reset());
