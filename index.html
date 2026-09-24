@@ -47,6 +47,8 @@
   .c-time{grid-area:time}.c-cheese{grid-area:cheese}.c-lives{grid-area:lives}.c-heat{grid-area:heat;padding-right:4px}   /* heat stretches across all the room between lives and the buttons */
   .c-pause{grid-area:pause;margin-left:6px}
   .hud-btns{display:flex;gap:6px;pointer-events:none}
+  .edge-arrow{position:fixed;left:0;top:0;width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:20px solid #ffd23a;z-index:6;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+  .edge-arrow.bomb{border-bottom-color:#ff3b3b}
   .cam-toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:8;pointer-events:none;background:var(--hud);color:var(--paper);border:1.5px solid rgba(255,244,248,.25);border-radius:999px;padding:7px 16px;font:800 14px var(--body);letter-spacing:.04em;animation:toast 1.4s ease forwards}
   @keyframes toast{0%{opacity:0;transform:translate(-50%,6px)}12%,75%{opacity:1;transform:translate(-50%,0)}100%{opacity:0}}
   .val-row{display:flex;align-items:center;gap:6px}
@@ -169,6 +171,7 @@
   .float.shot{color:#ff2a2a;font-size:24px}
   .foot-3{display:grid;grid-template-columns:1fr auto 1fr;gap:8px}.foot-3>:last-child{justify-self:end}   /* Best | Chaos mode | Music, chaos dead centre */
   .chaos-link{color:#7a3fb8}
+  .alt-row{display:flex;justify-content:center;font-size:14px;font-weight:700;color:#8a4a70;margin-top:-4px}
   .float.bad{color:var(--danger);font-size:26px}
   .float.warn{color:#ffd3e8;font-size:17px;animation-duration:1.6s}
   @keyframes rise{0%{opacity:0;transform:translate(-50%,-30%) scale(.5)}15%{opacity:1;transform:translate(-50%,-70%) scale(1.12)}100%{opacity:0;transform:translate(-50%,-180%) scale(1)}}
@@ -254,6 +257,7 @@
       <div><dt>Best</dt><dd id="oBest">0</dd></div>
     </dl>
     <button class="btn" id="againBtn">Play again</button>
+    <div class="alt-row"><button class="link-btn" id="overTitleBtn">Return to title</button></div>
   </div>
 </section>
 
@@ -2134,9 +2138,11 @@ function updateRoomFx(dt) {
 }
 /* ---------- 8 ft ceiling with three frosted dome lights (the near end of the room is left open, dollhouse style). Both face into
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
+let povEndWall = null;
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
   const VD = ROOM.visDepth, WH = ROOM.wallH;
+  povEndWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, WH), lam(0xf2efe8, { map: panelTex })); povEndWall.rotation.y = Math.PI; povEndWall.position.set(0, WH / 2, VD); povEndWall.visible = false; scene.add(povEndWall);   // only in cat's eye (the room is open at this end otherwise)
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, VD), ceilMat); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, CEIL_H, VD / 2); scene.add(ceil);
   const ringMat = lam(0xb89a5e), domeMat = basic(0xfff6e2);
   for (const z of [1.9, 6.6, 11.6]) {                                // one near the back, over the cat, then down the room
@@ -3870,6 +3876,7 @@ function showGameOver() {
 $('startBtn').addEventListener('click', () => startGame('classic'));
 $('chaosBtn').addEventListener('click', () => startGame('chaos'));
 $('againBtn').addEventListener('click', () => startGame(gameMode));
+$('overTitleBtn').addEventListener('click', () => { ui.over.hidden = true; quitToTitle(); });
 $('pauseBtn').addEventListener('click', pauseGame);
 $('resumeBtn').addEventListener('click', resumeGame);
 $('quitBtn').addEventListener('click', quitToTitle);
@@ -4199,7 +4206,7 @@ const FIT_POINTS = [
 // what must always stay on screen when the player zooms/tilts: every hole, every mushroom and the cat
 const ESSENTIAL_POINTS = [...HOLES.map(h => h.mouthOut.clone()), ...CHEESE_SPOTS.map(c => new THREE.Vector3(c.x, 0.3, c.z)), new THREE.Vector3(CAT_POS.x, 1.3, CAT_POS.z)];
 // camera views (the 📷 button cycles them) and the player's own pinch zoom / two-finger tilt, remembered on this device
-const CAM_VIEWS = [{ name: 'Auto view', el: null }, { name: 'Overhead', el: 70 }, { name: 'Angled', el: 44 }, { name: 'Low', el: 24 }];
+const CAM_VIEWS = [{ name: 'Auto view', el: null }, { name: 'Overhead', el: 70 }, { name: 'Angled', el: 44 }, { name: 'Low', el: 24 }, { name: "Cat's eye", pov: true }];
 let camView = 0, camZoom = 1, camTilt = 0;
 try { const sv = JSON.parse(localStorage.getItem('catguard.cam') || '{}'); camView = sv.v | 0; camZoom = sv.z || 1; camTilt = sv.t || 0; } catch (e) {}
 const saveCam = () => { try { localStorage.setItem('catguard.cam', JSON.stringify({ v: camView, z: camZoom, t: camTilt })); } catch (e) {} };
@@ -4211,10 +4218,40 @@ const CAM_PULLBACK = 1.32, CAM_PULLBACK_PORTRAIT = 1.0;   // >1 = camera further
 const fc = { on: false, focus: new THREE.Vector3(), yaw: 0, zoom: 1, tilt: 0, el0: 40, dist0: 20,
              s: { focus: new THREE.Vector3(), yaw: 0, zoom: 1, tilt: 0 } };   // targets, and the smoothed values actually shown
 const vcam = new THREE.PerspectiveCamera(), _fcPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _fcN = new THREE.Vector2(), _fcRay = new THREE.Raycaster();
+const POV_EYE_Y = 1.55;                                               // the cat's eye height, just over the rim of her box
+// cat's eye: little arrows round the screen edge point at mice she can't see
+const edgeArrows = Array.from({ length: 8 }, () => { const e = document.createElement('div'); e.className = 'edge-arrow'; e.hidden = true; document.body.appendChild(e); return e; });
+const _ea = new THREE.Vector3();
+function updateEdgeArrows() {
+  const on = CAM_VIEWS[camView].pov && !fc.on && (state === 'playing' || state === 'ending');
+  let n = 0;
+  if (on) for (const m of mice) {
+    if (!m.active || n >= edgeArrows.length || m.state === 'whacked' || m.state === 'retreat') continue;
+    _ea.copy(m.center).setY(0.3).project(camera);
+    let x = _ea.x, y = _ea.y; const behind = _ea.z > 1;
+    if (!behind && Math.abs(x) < 0.94 && Math.abs(y) < 0.9) continue;   // she can see this one
+    if (behind) { x = -x; y = -y; }
+    const k = 0.9 / Math.max(Math.abs(x), Math.abs(y), 1e-3); x *= k; y *= k;
+    const W = window.innerWidth, H = window.innerHeight, sx = (x * 0.5 + 0.5) * W, sy = Math.min(H - 120, Math.max(70, (-y * 0.5 + 0.5) * H));
+    const el = edgeArrows[n++]; el.hidden = false; el.classList.toggle('bomb', m.isBomb);
+    el.style.transform = `translate(${sx - 11}px, ${sy - 10}px) rotate(${Math.atan2(x, y)}rad)`;
+  }
+  for (; n < edgeArrows.length; n++) edgeArrows[n].hidden = true;
+}
 let fitW = 0, fitH = 0;
 function fitCamera() {
   const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
   if (w !== fitW || h !== fitH) { renderer.setSize(w, h); fitW = w; fitH = h; }   // (resizing the canvas is costly: only when the window changes)
+  if (povEndWall) povEndWall.visible = !!CAM_VIEWS[camView].pov && !fc.on;
+  if (CAM_VIEWS[camView].pov && !fc.on) {                             // cat's eye: looking out from her box over the rim, down the room
+    camera.aspect = aspect; camSqueeze = 1;
+    camera.fov = THREE.MathUtils.clamp((aspect < 0.75 ? 86 : aspect < 1 ? 74 : 60) * camZoom, 40, 100);   // pinch = zoom the lens
+    camera.clearViewOffset(); camera.updateProjectionMatrix();
+    camera.position.set(CAT_POS.x, POV_EYE_Y, CAT_POS.z + 0.5);
+    camera.lookAt(0, 0.35 - camTilt * 0.06, 9);                         // two-finger drag tips the gaze up / down
+    camera.updateMatrixWorld(); camBase.copy(camera.position); catCard.rotation.y = 0;
+    return;
+  }
   if (fc.on) {                                                        // chaos free look owns the camera: just keep the lens right for the window
     camera.aspect = aspect; camSqueeze = aspect < 0.75 ? 0.8 : 1; camera.fov = aspect < 0.75 ? 66 : aspect < 1 ? 48 : 40;
     camera.clearViewOffset(); camera.updateProjectionMatrix(); vcam.copy(camera); updateFreeCam(1); return;
@@ -4440,6 +4477,7 @@ function frame(now) {
 
   shake = Math.max(0, shake - dt * 1.4);
   if (fc.on && !cine) updateFreeCam(dt);
+  updateEdgeArrows();
   camera.position.copy(camBase);
   if (cine) camera.lookAt(cine.look);
   if (shake > 0) camera.position.add(new THREE.Vector3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0));
