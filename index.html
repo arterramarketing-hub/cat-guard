@@ -305,27 +305,28 @@
    ===================================================================== */
 const CFG = {
   // ---- Difficulty ramp ----------------------------------------------
-  RAMP_SECONDS: 120,        // seconds of play until the base ramp tops out (d = 1)
-  RAMP_CURVE: 1.0,          // >1 = gentler start, steeper late game; 1 = linear
 
   // ---- Overtime: after the ramp it never stops getting harder --------
-  OVERTIME_STEP: 30,        // every N seconds past RAMP_SECONDS…
-  OVERTIME_SPEED: 0.08,     // …mice move 8% faster (run + carry)
-  OVERTIME_SPEED_MAX: 1.8,  //    capped at 180% of the ramp's top speed
-  OVERTIME_SPAWN: 0.06,     // …spawn interval shrinks by 6%
-  OVERTIME_SPAWN_MIN: 0.55, //    down to 55% of the ramp's fastest interval
+  OVERTIME_START: 240,      // the ramps top out at 4:00; after that…
+  OVERTIME_STEP: 30,        // every N seconds…
+  OVERTIME_SPEED: 0.06,     // …mice move 6% faster (run + carry)
+  OVERTIME_SPEED_MAX: 1.4,  //    capped at 140% of the ramp's top speed (was 180%: runs no longer end on a wall)
+  OVERTIME_SPAWN: 0.05,     // …spawn interval shrinks by 5%
+  OVERTIME_SPAWN_MIN: 0.7,  //    down to 70% of the ramp's fastest interval
   OVERTIME_EXTRA_MICE: 1,   // …one more mouse allowed on the field
-  MAX_ACTIVE_CAP: 11,
+  MAX_ACTIVE_CAP: 10,
+  WAVE_EVERY: 45,           // every 45 s the spawns pause for a breather…
+  WAVE_LULL: 3,             // …of 3 s, then 'Wave N!'
 
   // ---- Spawning (interpolated by d) --------------------------------
-  spawnInterval:   [1.5, 0.45], // seconds between spawn events
+  spawnInterval:   [1.5, 0.5],  // seconds between spawn events
   spawnJitter:     0.3,         // ± fraction of randomness applied to each interval
   maxActive:       [1, 8.99],   // cap on mice on the field (floored → 1..8)
-  multiSpawnChance:[0.05, 0.45], // chance a spawn event releases 2 mice at once
+  multiSpawnChance:[0.05, 0.4], // chance a spawn event releases 2 mice at once
   FIRST_SPAWN_DELAY: 0.8,       // grace period at the start of a run
 
   // ---- Bombs --------------------------------------------------------
-  bombRatio:       [0.10, 0.34],// probability any given spawn is a bomb mouse
+  bombRatio:       [0.10, 0.25],// probability any given spawn is a bomb mouse (capped at 25%)
   SAFE_OPENING_MICE: 3,         // the first N mice of a run are never bombs
   MAX_BOMB_STREAK: 2,           // never more than this many bombs in a row
   BOMB_FIELD_SHARE: 0.5,        // bombs can't exceed this share of maxActive
@@ -336,7 +337,9 @@ const CFG = {
   // ---- Mouse behaviour (interpolated by d) --------------------------
   pauseTime:       [0.8, 0.3], // how long a mouse peeks out of its hole before deciding
   retreatChance:   [0.3, 0.08], // chance a normal mouse ducks back in instead of charging
-  runSpeed:        [2.2, 4.4],  // world units per second toward the cheese
+  runSpeed:        [2.2, 4.2],  // world units per second toward the cheese
+  helmetChance:    [0, 0.2],    // chance a normal mouse wears a helmet (takes 2 taps)
+  RAINBOW_CHANCE:  0.035,       // a rare rainbow-eyed mouse: worth 5x
   grabTime:        [0.7, 0.35], // seconds a mouse tugs at the cheese before hauling it off
   CARRY_SPEED:     0.6,         // carrying speed as a fraction of runSpeed
   SPEED_VARIANCE:  0.15,        // ± per-mouse speed randomness
@@ -368,27 +371,31 @@ const lerpPair = (pair, d) => pair[0] + (pair[1] - pair[0]) * d;
 /* ---------------------------------------------------------------------
    DIFFICULTY SCALING
    elapsed seconds → d in [0,1] → a bundle of live parameters.
-   To make the game harder faster, lower RAMP_SECONDS; to hold the gentle
-   opening longer, raise RAMP_CURVE. Each parameter's range is in CFG.
+   Each pressure has its own time window (see getDifficulty); each parameter's
+   range is in CFG. Overtime settings cap how far it keeps climbing after 4:00.
    --------------------------------------------------------------------- */
+const rampT = (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
 function getDifficulty(t) {
-  const x = Math.min(1, t / CFG.RAMP_SECONDS);
-  const d = Math.pow(x, CFG.RAMP_CURVE);
-  // overtime: how many OVERTIME_STEPs we are past the end of the ramp (0 during the ramp)
-  const over = Math.max(0, t - CFG.RAMP_SECONDS) / CFG.OVERTIME_STEP;
+  // each pressure ramps on its own clock so they don't all spike together:
+  // more mice first, then tighter timing, then bombs, then speed. Everything is maxed by ~4 minutes.
+  const d = rampT(t, 0, 240);                                          // the heat bar
+  const count = rampT(t, 0, 150), timing = rampT(t, 20, 180), bombs = rampT(t, 45, 210), speed = rampT(t, 60, 240), armour = rampT(t, 30, 210);
+  // overtime (after 4:00): keeps creeping up, but with a ceiling so a skilled player can hold on
+  const over = Math.max(0, t - CFG.OVERTIME_START) / CFG.OVERTIME_STEP;
   const speedMul = Math.min(CFG.OVERTIME_SPEED_MAX, 1 + CFG.OVERTIME_SPEED * over);
   const spawnMul = Math.max(CFG.OVERTIME_SPAWN_MIN, 1 - CFG.OVERTIME_SPAWN * over);
   return {
     d, over,
-    spawnInterval:    lerpPair(CFG.spawnInterval, d) * spawnMul,
-    maxActive:        Math.min(CFG.MAX_ACTIVE_CAP, Math.floor(lerpPair(CFG.maxActive, d)) + Math.floor(over) * CFG.OVERTIME_EXTRA_MICE),
-    multiSpawnChance: lerpPair(CFG.multiSpawnChance, d),
-    bombRatio:        lerpPair(CFG.bombRatio, d),
-    bombLifetime:     lerpPair(CFG.bombLifetime, d),
-    pauseTime:        lerpPair(CFG.pauseTime, d),
-    retreatChance:    lerpPair(CFG.retreatChance, d),
-    runSpeed:         lerpPair(CFG.runSpeed, d) * speedMul,
-    grabTime:         lerpPair(CFG.grabTime, d),
+    spawnInterval:    lerpPair(CFG.spawnInterval, count) * spawnMul,
+    maxActive:        Math.min(CFG.MAX_ACTIVE_CAP, Math.floor(lerpPair(CFG.maxActive, count)) + Math.floor(over) * CFG.OVERTIME_EXTRA_MICE),
+    multiSpawnChance: lerpPair(CFG.multiSpawnChance, count),
+    bombRatio:        lerpPair(CFG.bombRatio, bombs),
+    bombLifetime:     lerpPair(CFG.bombLifetime, bombs),
+    pauseTime:        lerpPair(CFG.pauseTime, timing),
+    retreatChance:    lerpPair(CFG.retreatChance, timing),
+    grabTime:         lerpPair(CFG.grabTime, timing),
+    runSpeed:         lerpPair(CFG.runSpeed, speed) * speedMul,
+    helmetChance:     lerpPair(CFG.helmetChance, armour),
   };
 }
 
@@ -410,6 +417,8 @@ const HOLES = [
   { kind: 'couch', x:  ROOM.halfW - COUCH_DEPTH, z: COUCH_RIGHT_Z0 + 4.15, n: [-1, 0] },
   { kind: 'fire',  x: -ROOM.halfW + FIRE.d + 0.02,      z: FIRE.z, n: [1, 0] },   // out of the fireplace past the end of the left sofa
   { kind: 'door',  x:  ROOM.halfW + 0.6,         z: 5.4 / 1.3, n: [-1, 0] }, // through the doorway (DOOR_Z)
+  { kind: 'couch', x: -3.55, z: 18 / 12 / 1.3, n: [0, 1] },                     // out from under the left cabinet
+  { kind: 'wall',  x:  ROOM.halfW, z: 16.4, n: [-1, 0] },                        // a mouse hole in the right wall, past the sofa
 ];
 const CHEESE_SPOTS = [ { x: -0.7, z: 4.9 }, { x: 0.8, z: 7.5 }, { x: -0.35, z: 10.3 } ];   // a tall zig-zag down the middle of the room   // an even triangle in the open middle of the room
 const CAT_POS = new THREE.Vector3(0, 0, 2.2);   // cat guards from the top of the screen, swiping down
@@ -3121,6 +3130,11 @@ class Mouse {
     const wh = new THREE.LineSegments(MG.whiskers, MM.whisker); wh.position.set(0, 0.33, 0.58); this.model.add(wh);
     this.feet = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([sx, sz]) => { const f = add(MG.foot, MM.foot, sx * 0.15, 0.03, sz * 0.17); f.scale.set(1, 0.5, 1.5); f.userData.home = f.position.clone(); return f; });
     // the Rat King's crown (hidden on ordinary mice)
+    this.helmet = new THREE.Group(); this.helmet.position.set(0, 0.53, 0.3); this.helmet.rotation.x = -0.2; this.helmet.visible = false; this.model.add(this.helmet);   // a little steel helmet: takes a tap to knock off
+    { const shell = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), MM.helmet); shell.scale.set(1.05, 0.8, 1.15); this.helmet.add(shell);
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.025, 18), MM.helmet); brim.scale.z = 1.12; this.helmet.add(brim);
+      const stud = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), MM.helmetStud); stud.position.set(0, 0.16, 0.05); this.helmet.add(stud); }
+    this.rainbowEye = new THREE.MeshBasicMaterial({ color: 0xff00ff });   // rainbow mouse: its eyes cycle through the colours
     this.crown = new THREE.Group(); this.crown.position.set(0, 0.58, 0.3); this.crown.rotation.x = -0.15; this.crown.visible = false; this.model.add(this.crown);
     const gold = new THREE.MeshPhongMaterial({ color: 0xf2c14a, shininess: 90, specular: 0xfff0b0, side: THREE.DoubleSide });
     this.crown.add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.12, 0.08, 14, 1, true), gold));
@@ -3183,16 +3197,18 @@ class Mouse {
     for (const e of this.ears) e.material = isBomb ? MM.bombEar : MM.ear;
     for (const e of this.eyes) e.material = isBomb ? MM.bombEye : MM.eye;
     this.bombRig.visible = isBomb;
-    this.boss = !!opts.boss; this.hp = this.boss ? 8 : 1; this.crown.visible = this.boss; this.meanBits.visible = this.boss;
+    this.boss = !!opts.boss; this.bossLevel = opts.level || 0; this.hp = this.boss ? BOSS_HP[this.bossLevel] || 8 : 1; this.crown.visible = this.boss; this.meanBits.visible = this.boss;
     if (this.boss) {                                                   // scruffy dark fur, red eyes, a torn left ear
       for (const f of this.furParts) f.material = MM.bossFur;
       this.belly.material = MM.bossBelly; this.tail.material = MM.bossTail;
       for (const e of this.eyes) e.material = MM.bombEye;
     }
     this.ears[0].parent.scale.set(this.boss ? 0.75 : 1, this.boss ? 0.6 : 1, 1);
-    if (this.boss) { this.willRetreat = false; this.speed *= 0.55; } this.baseSpeed = this.speed;
+    if (this.boss) { this.willRetreat = false; this.speed *= 0.55 + 0.1 * this.bossLevel; } this.baseSpeed = this.speed;   // each return he's quicker
     this.xEyes.visible = false;
     for (const e of this.eyes) e.visible = true;
+    this.kind = opts.kind || 'normal'; this.helmetHP = this.kind === 'helmet' ? 1 : 0; this.helmet.visible = this.kind === 'helmet';
+    if (this.kind === 'rainbow') { for (const e of this.eyes) e.material = this.rainbowEye; for (const f of this.furParts) f.material = MM.rainbowFur; this.rbPhase = Math.random(); }
     this.ring.visible = false;     // coloured threat rings removed; threat reads through size, shadows stay
     this.ringMat.opacity = 0;
     this.setState('emerge');
@@ -3215,6 +3231,7 @@ class Mouse {
     this.root.rotation.y += diff * Math.min(1, dt * 12);
   }
   update(dt, time) {
+    if (this.kind === 'rainbow') { this.rainbowEye.color.setHSL((time * 0.9 + this.rbPhase) % 1, 1, 0.55); if (Math.random() < dt * 5 && this.pop > 0.5) burst(this.center.clone().setY(0.55), new THREE.Color().setHSL(Math.random(), 1, 0.65).getHex(), 1, 0.6, 1.4, 0.18); }   // sparkles
     // rave mode: everyone on screen stands up on their hind legs and dances to the beat for a while
     if (danceUntil > clock && this.state !== 'whacked' && this.state !== 'emerge' && this.state !== 'home' && !this.attract
         && this.state !== 'player' && (gameMode !== 'chaos' || (this.state === 'wander' && !this.wp && this.hops >= 1))) {   // chaos: scamper out onto the carpet first, then dance
@@ -3420,7 +3437,9 @@ class Mouse {
     this.center.set(p.x, 0.3 * s, p.z);
   }
 }
+MM.helmet = new THREE.MeshPhongMaterial({ color: 0x8e979f, shininess: 90, specular: 0xcccccc }); MM.helmetStud = lam(0x5c646b);
 const mice = Array.from({ length: 14 }, () => new Mouse());
+MM.rainbowFur = lam(0xf3ecf6);
 // mice out on the floor don't pile on top of each other: overlapping pairs get nudged apart (bigger mice push harder),
 // never into furniture. Keeps bombs from hiding right on top of normal mice late in the game.
 const SEP_STATES = new Set(['peek', 'run', 'grab', 'carry', 'loiter', 'taunt', 'home', 'wander']);
@@ -3444,6 +3463,7 @@ function separateMice() {
    mouth, get it back to any mouse hole. The cat hunts you: a red ring marks where her paw is about to land.
    Steal all three to win; three hits and she's got you.
    ===================================================================== */
+function unlock(id) {}                                               // (achievements: filled in later)
 const HEIST_LIVES = 3;
 const heistGoal = (() => {
   const g = new THREE.Group(); g.visible = false; scene.add(g);
@@ -3571,7 +3591,8 @@ let gameMode = 'classic';       // classic | chaos (no mushrooms: just mice runn
 const CHAOS_SECS = 120;
 let state = 'menu';            // menu | playing | paused | ending | over
 let elapsed = 0, score = 0, lives = CFG.LIVES, combo = 0, whackedCount = 0;
-let spawnTimer = 0, bombStreak = 0, spawnedCount = 0, seenBomb = false, bossDone = false;
+let spawnTimer = 0, bombStreak = 0, spawnedCount = 0, seenBomb = false, bossDone = false, bossLevel = 0;
+const BOSS_SCORES = [1500, 3500, 7000], BOSS_HP = [8, 10, 12];
 let endTimer = 0, endReason = '', attractTimer = 0;
 let D = getDifficulty(0);
 
@@ -3588,8 +3609,14 @@ function isHoleFree(h) {
    a time from one hole, every ~2s. Holes that currently have a mouse in
    their mouth are skipped so two mice never stack in one hole.
    --------------------------------------------------------------------- */
+let waveNo = 1;
 function updateSpawner(dt) {
   if (gameMode === 'mouse') return;                                  // mouse mode: you're the only mouse
+  if (gameMode === 'classic' && elapsed > CFG.WAVE_EVERY) {         // waves: a short breather every 45 s, then 'Wave N!'
+    const phase = elapsed % CFG.WAVE_EVERY, w = 1 + Math.floor(elapsed / CFG.WAVE_EVERY);
+    if (phase < CFG.WAVE_LULL) return;
+    if (w > waveNo) { waveNo = w; showBanner(`Wave ${w}!`); sfx.sparkle && sfx.sparkle(); }
+  }
   spawnTimer -= dt;
   if (spawnTimer > 0) return;
   if (gameMode === 'chaos') {                                      // chaos: no thieves at all, the mice only come out to party during a rave
@@ -3636,7 +3663,12 @@ function spawnMouse(opts) {
     bombStreak = isBomb ? bombStreak + 1 : 0;
     spawnedCount++;
   }
-  m.spawn(hole, isBomb, D, opts);
+  let kind = 'normal';
+  if (!isBomb && !opts.boss && !opts.attract) {
+    if (Math.random() < CFG.RAINBOW_CHANCE) kind = 'rainbow';
+    else if (gameMode === 'classic' && spawnedCount > 8 && Math.random() < (D.helmetChance || 0)) kind = 'helmet';
+  }
+  m.spawn(hole, isBomb, D, { ...opts, kind });
   return m;
 }
 
@@ -3771,9 +3803,10 @@ function tapShake() { shake = Math.max(shake, reduceMotion ? 0.03 : 0.13); }
 
 
 function checkBoss() {                                             // 1000 points: the Rat King comes for the mushrooms
-  if (bossDone || score < 1000 || state !== 'playing' || gameMode === 'mouse') return;
-  const m = spawnMouse({ boss: true }); if (!m) return;
-  bossDone = true; startCutscene(m);
+  if (bossLevel >= BOSS_SCORES.length || score < BOSS_SCORES[bossLevel] || state !== 'playing' || gameMode === 'mouse') return;
+  if (mice.some(x => x.active && x.boss)) return;                    // one king at a time
+  const m = spawnMouse({ boss: true, level: bossLevel }); if (!m) return;
+  bossLevel++; bossDone = true; startCutscene(m);
 }
 /* Rat King cutscene: play freezes, letterbox bars slide in, the camera swoops down to his hole as he climbs out,
    he roars, his name slams onto the screen, then the camera pulls back and play resumes. */
@@ -3781,7 +3814,7 @@ let cine = null;
 function startCutscene(m) {
   cine = { m, t: 0, fromPos: camBase.clone(), fromLook: camTarget.clone(), look: new THREE.Vector3(), pos: new THREE.Vector3(), roared: false };
   state = 'cutscene'; camera.clearViewOffset(); ui.hud.hidden = true;
-  const bars = document.createElement('div'); bars.className = 'cine'; bars.id = 'cineBars'; bars.innerHTML = '<i></i><i></i><b>The Rat King</b>'; document.body.appendChild(bars);
+  const bars = document.createElement('div'); bars.className = 'cine'; bars.id = 'cineBars'; bars.innerHTML = '<i></i><i></i><b>' + (m.bossLevel ? 'The Rat King returns!' : 'The Rat King') + '</b>'; document.body.appendChild(bars);
   sfx.bossHorn();
 }
 function updateCutscene(dt) {
@@ -3837,6 +3870,12 @@ function updateCatCrown(dt) {
   }
 }
 function resetCatCrown() { if (catCrown) { catCrown.visible = false; catCrown.userData.claimed = false; } crownFlight = null; }
+function returnMushroom(at) {
+  const c = cheeses.find(x => x.state === 'gone');
+  if (!c || gameMode !== 'classic') { bonus(300, at, 'King\'s ransom!'); return; }
+  c.reset(); burst(c.pos.clone().setY(0.5), 0xff6fae, 16, 2.4, 3, 0.7); sfx.sparkle && sfx.sparkle();
+  floatText(c.pos.clone().setY(1.4), 'Mushroom returned!', 'clutch'); showBanner('A mushroom is back!'); updateHud();
+}
 function hurtBoss(m, dmg) {                                         // returns true once he's beaten
   m.hp -= dmg;
   if (m.hp > 0) {
@@ -3849,10 +3888,21 @@ function hurtBoss(m, dmg) {                                         // returns t
     return false;
   }
   score += 500; showBanner('Rat King defeated! +500'); burst(m.center.clone().setY(0.6), 0xf2c14a, 16, 3.5, 4, 1.2); sfx.gasp();
-  claimCrown(m);
+  if (!m.bossLevel) claimCrown(m);                                    // first win: his crown goes on the cat
+  else { m.crown.visible = false; returnMushroom(m.center.clone()); }   // later wins: he coughs up a stolen mushroom
+  unlock && unlock(m.bossLevel ? 'kingAgain' : 'king');
   return true;
 }
+function knockHelmet(m) {                                           // first tap on a helmet mouse: the helmet goes flying
+  m.helmetHP = 0; m.helmet.visible = false; m.hitT = 0.3; m.sqY = 0.7; m.sqXZ = 1.2;
+  burst(m.center.clone().setY(0.7), 0x9aa3ab, 8, 2.6, 3.5, 0.5); sfx.clack(); tone(1400, 900, 0.08, 'square', 0.03);
+  floatText(m.center.clone().setY(1.1), 'Clonk! Again!', 'warn');
+  const p = m.root.position, d = Math.hypot(p.x - CAT_POS.x, p.z - CAT_POS.z) || 1;   // knocked back a step
+  const nx = p.x + (p.x - CAT_POS.x) / d * 0.35, nz = p.z + (p.z - CAT_POS.z) / d * 0.35; if (!rollBlocked(nx, nz)) { p.x = nx; p.z = nz; }
+  unlock && unlock('helmet');
+}
 function whack(m) {
+  if (m.helmetHP > 0) { startSwipe(m.root.position); knockHelmet(m); return; }
   if (m.boss) { startSwipe(m.root.position); if (!hurtBoss(m, 1)) return; }
   startSwipe(m.root.position);
   if (m.isBomb) {
@@ -3874,11 +3924,12 @@ function whack(m) {
   const clutch = m.threat >= CFG.CLUTCH_THREAT;
   combo++;
   const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
-  const pts = (CFG.SCORE_WHACK + (clutch ? CFG.SCORE_CLUTCH : 0)) * mult;
+  const rb = m.kind === 'rainbow', pts = (CFG.SCORE_WHACK + (clutch ? CFG.SCORE_CLUTCH : 0)) * mult * (rb ? 5 : 1);
   score += pts; whackedCount++;
   m.setState('whacked');
   burst(m.center.clone().setY(0.4), 0xffe07a, 7, 2.2, 3.2, 0.9);
-  floatText(m.center.clone().setY(0.9), saved ? `Dropped! +${pts}` : clutch ? `Clutch +${pts}` : `+${pts}`, clutch ? 'clutch' : '');
+  if (rb) { for (let k = 0; k < 6; k++) burst(m.center.clone().setY(0.5), new THREE.Color().setHSL(k / 6, 1, 0.6).getHex(), 3, 3, 3.5, 0.4); unlock && unlock('rainbow'); }
+  floatText(m.center.clone().setY(0.9), rb ? `RAINBOW x5! +${pts}` : saved ? `Dropped! +${pts}` : clutch ? `Clutch +${pts}` : `+${pts}`, clutch || rb ? 'clutch' : '');
   sfx.whack(clutch);
   vibrate(18);
   updateHud();
@@ -3986,8 +4037,8 @@ function shootMouse(m) {
   const saved = m.state === 'carry' || m.state === 'grab';
   if (saved) { m.dropCheese(); tailWag = 1.4; }
   combo++;
-  const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP)), pts = CFG.SCORE_WHACK * mult;
-  score += pts; whackedCount++;
+  const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP)), pts = CFG.SCORE_WHACK * mult * (m.kind === 'rainbow' ? 5 : 1);
+  score += pts; whackedCount++; m.helmet.visible = false;
   m.setState('whacked');
   burst(m.center.clone().setY(0.4), 0xe01818, 12, 2.8, 3.4, 0.9); burst(m.center.clone().setY(0.3), 0x6a0008, 6, 1.6, 2.2, 1.1);   // red spray for drama
   floatText(m.center.clone().setY(0.9), saved ? `Dropped! +${pts}` : `Bang! +${pts}`, 'shot');
@@ -4201,7 +4252,7 @@ function showBestOnStart() { const b = getBest(); $('bestStart').textContent = b
 showBestOnStart();
 
 /* ---------- screens ---------- */
-function clearField() { if (state === 'tvgame' || tvCine) { tvCine = null; if (tvPad) tvPad.visible = false; $('tvPlay').hidden = true; $('tvFade').classList.remove('on'); game.player = false; } for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.strike = null; heist.ring.visible = false; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true; } }
+function clearField() { if (typeof cine !== 'undefined' && cine) { cine = null; document.querySelectorAll('.cine').forEach(e => e.remove()); } if (state === 'tvgame' || tvCine) { tvCine = null; if (tvPad) tvPad.visible = false; $('tvPlay').hidden = true; $('tvFade').classList.remove('on'); game.player = false; } for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.strike = null; heist.ring.visible = false; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true; } }
 function resetGame() {
   clearField();
   cheeses.forEach(c => c.reset());
@@ -4209,7 +4260,7 @@ function resetGame() {
   document.querySelector('.c-cheese').style.visibility = gameMode === 'chaos' ? 'hidden' : '';
   resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
-  spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false; bossDone = false;
+  spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false; bossDone = false; bossLevel = 0; waveNo = 1;
   lastTimeShown = -1; D = getDifficulty(0);
   ui.fx.innerHTML = '';
   updateHud(); updateClockHud();
