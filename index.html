@@ -1042,12 +1042,14 @@ const blankX = LEFT_X0 + IN(1.5) + FT(2.45) / 2;                          // pus
   const foldTex = (cols) => canvasTex(64, 64, (g, w, h) => {          // folded blankets seen edge-on: soft stacked bands
     cols.forEach((c, i) => { g.fillStyle = c; g.fillRect(0, i * h / cols.length, w, h / cols.length); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, (i + 1) * h / cols.length - 2, w, 2); });
   }, 1, 1);
-  // white fabric organizers (solid: you can't see in), zip line and handles; a folded striped blanket sits on the top one
-  const white = lam(0xffffff, { map: fabricTex }), trim = lam(0xe4e3df), strap = lam(0xd2d2cf);
+  // translucent white organizers: frosted shells with the folded white blankets inside showing through softly
+  const white = new THREE.MeshPhongMaterial({ color: 0xffffff, map: fabricTex, transparent: true, opacity: 0.55, shininess: 40, specular: 0x444444, depthWrite: false }),
+        inside = lam(0xffffff, { map: foldTex(['#f7f6f3', '#e9e7e2', '#fbfaf8', '#e4e2dc']) }), trim = lam(0xe4e3df), strap = lam(0xd2d2cf);
   const OW = FT(2.45), OD = IN(15), OH = IN(9.5), z = IN(9.5);
   for (let i = 0; i < 3; i++) {
     const x = blankX + (i % 2 ? IN(0.6) : 0), y0 = CAB_H + i * OH;
-    box(OW, OH - IN(0.2), OD, white, x, y0 + OH / 2, z);
+    box(OW - IN(1.4), OH - IN(1.8), OD - IN(1.4), inside, x, y0 + (OH - IN(1.8)) / 2 + IN(0.3), z);   // the folded white blankets inside
+    box(OW, OH - IN(0.2), OD, white, x, y0 + OH / 2, z).renderOrder = 1;
     const zy = y0 + OH - IN(0.9);                                      // zip line: a thin band round the outside
     for (const [w, d, dx, dz] of [[OW + IN(0.2), IN(0.2), 0, OD / 2 + IN(0.05)], [OW + IN(0.2), IN(0.2), 0, -OD / 2 - IN(0.05)], [IN(0.2), OD + IN(0.2), OW / 2 + IN(0.05), 0], [IN(0.2), OD + IN(0.2), -OW / 2 - IN(0.05), 0]]) box(w, IN(0.3), d, trim, x + dx, zy, z + dz);
     for (const sx of [-1, 1]) box(IN(0.45), IN(1.1), IN(4.5), strap, x + sx * (OW / 2 + IN(0.2)), y0 + OH * 0.62, z);   // carry handles
