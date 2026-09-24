@@ -4582,7 +4582,7 @@ const fc = { on: false, focus: new THREE.Vector3(), yaw: 0, zoom: 1, tilt: 0, el
              s: { focus: new THREE.Vector3(), yaw: 0, zoom: 1, tilt: 0 } };   // targets, and the smoothed values actually shown
 const vcam = new THREE.PerspectiveCamera(), _fcPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _fcN = new THREE.Vector2(), _fcRay = new THREE.Raycaster();
 const isPov = () => !!CAM_VIEWS[camView].pov && !fc.on;          // looking through the cat's eyes (she's not in her box)
-const POV_EYE_Y = 1.45;                                               // the cat's eye height (sat up tall on the carpet)
+const POV_EYE_Y = 1.55;                                               // the cat's eye height, just over the rim of her box
 // cat's eye: little arrows round the screen edge point at mice she can't see
 const edgeArrows = Array.from({ length: 8 }, () => { const e = document.createElement('div'); e.className = 'edge-arrow'; e.hidden = true; document.body.appendChild(e); return e; });
 const _ea = new THREE.Vector3();
@@ -4607,15 +4607,15 @@ function fitCamera() {
   const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
   if (w !== fitW || h !== fitH) { renderer.setSize(w, h); fitW = w; fitH = h; }   // (resizing the canvas is costly: only when the window changes)
   const povOn = !!CAM_VIEWS[camView].pov && !fc.on;
-  if (povEndWall) povEndWall.visible = false;                          // (she's sat at the open end: nothing behind her to see)
+  if (povEndWall) povEndWall.visible = povOn;                          // she's facing the open end of the room: close it off in her view
   catCard.visible = catTail.visible = !povOn && !blanketRigs.some(r => r.state === 'cat');   // in her own view she isn't in the box
   if (catCrown) catCrown.visible = !!catCrown.userData.claimed && !povOn;
   if (CAM_VIEWS[camView].pov && !fc.on) {                             // cat's eye: looking out from her box over the rim, down the room
     camera.aspect = aspect; camSqueeze = 1;
     camera.fov = THREE.MathUtils.clamp((aspect < 0.75 ? 86 : aspect < 1 ? 74 : 60) * camZoom, 40, 100);   // pinch = zoom the lens
     camera.clearViewOffset(); camera.updateProjectionMatrix();
-    camera.position.set(0.3, POV_EYE_Y, ROOM.visDepth - 1.4);          // she's sat at the open end of the room, facing the TV
-    camera.lookAt(0, 1.2 - camTilt * 0.06, 0);                          // two-finger drag tips the gaze up / down
+    camera.position.set(CAT_POS.x, POV_EYE_Y, CAT_POS.z + 0.5);        // from the cat in her box, peering over the rim down the room
+    camera.lookAt(0, 0.35 - camTilt * 0.06, 9);                         // two-finger drag tips the gaze up / down
     camera.updateMatrixWorld(); camBase.copy(camera.position); catCard.rotation.y = 0;
     return;
   }
