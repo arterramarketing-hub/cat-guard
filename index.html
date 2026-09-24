@@ -3906,13 +3906,19 @@ class Mouse {
     for (const e of this.eyes) e.visible = true;
     this.kind = opts.kind || 'normal'; this.helmetHP = this.kind === 'helmet' ? 1 : 0; this.helmet.visible = this.kind === 'helmet';
     if (this.kind === 'rainbow') { for (const e of this.eyes) e.material = this.rainbowEye; for (const f of this.furParts) f.material = MM.rainbowFur; this.rbPhase = Math.random(); }
-    if (paintUntil > clock) paintMouse(this);                          // the paint jar smashed: every mouse comes out a different colour
+    if (paintUntil > clock) paintMouse(this);
+    if (this.kind === 'laser' && !this.pointer) this.pointer = makeLaserPointer(this.model, 0.06, 0.31, 0.6, 1);   // the laser mouse: a laser pointer clamped in its teeth
+    if (this.pointer) this.pointer.visible = this.kind === 'laser';
+    if (this.kind === 'laser') this.willRetreat = false;               // it never just ducks back in: it comes out to play                          // the paint jar smashed: every mouse comes out a different colour
     this.ring.visible = false;     // coloured threat rings removed; threat reads through size, shadows stay
     this.ringMat.opacity = 0;
     this.setState('emerge');
   }
-  setState(s) { this.state = s; this.t = 0; }
-  release() { this.dropCheese(); this.active = false; this.root.visible = false; }
+  setState(s) { this.state = s; this.t = 0; if (s === 'whacked' && this.kind === 'laser' && this.pointer && this.pointer.visible) dropLaser(this); }
+  release() {
+    if (this.kind === 'laser' && this.pointer && this.pointer.visible) { this.pointer.visible = false; laserMouseDone = false; laserMousePending = true; laserRetryAt = elapsed + 20; }   // got away with the laser: it'll be back
+    this.dropCheese(); this.active = false; this.root.visible = false;
+  }
   dropCheese() { if (this.target && this.target.claimant === this) this.target.drop(); }
   get hittable() {
     if (!this.active) return false;
@@ -4213,6 +4219,8 @@ const ACHIEVEMENTS = [
     ['walkTop', '🐾', 'Top cat', 'In Free walk, leap up onto the mantle'],
     ['boxJump', '📦', 'If I fits, I sits', 'In Free walk, jump back into your box'],
     ['hiss', '😾', 'Drama queen', 'In Free walk, meow ten times in a row'],
+    ['poop', '💩', 'The Royal Throne', 'In Free walk, meow while sitting in the litter box'],
+    ['laser', '🔴', 'Laser eyes', 'Swipe the laser pointer off the laser mouse and take it'],
     ['inception', '🪆', 'Game-ception', 'Win the kart race, then beat the game on the driver\'s Switch'],
   ]],
   ['Other modes', [
@@ -4224,7 +4232,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 13:50';                                              // stamped when the site is published
+const BUILD = '2026-09-24 14:09';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -4462,8 +4470,8 @@ function spawnMouse(opts) {
     bombStreak = isBomb ? bombStreak + 1 : 0;
     spawnedCount++;
   }
-  let kind = 'normal';
-  if (!isBomb && !opts.boss && !opts.attract) {
+  let kind = opts.kind || 'normal';
+  if (!opts.kind && !isBomb && !opts.boss && !opts.attract) {
     if (Math.random() < CFG.RAINBOW_CHANCE) kind = 'rainbow';
     else if (gameMode === 'classic' && spawnedCount > 8 && Math.random() < (D.helmetChance || 0)) kind = 'helmet';
   }
@@ -4488,6 +4496,7 @@ function handleTap(clientX, clientY) {
     if (raycaster.ray.intersectPlane(floorPlane, _hit)) throwBlanket(_hit.clone(), onCat);
     return;
   }
+  if (laser.state === 'cat') { fireLaser(clientX, clientY); return; }   // laser eyes: every tap is a zap
   if (gunRig.state === 'cat') { fireGun(); return; }                // armed: every tap is a shot
   ndc.set(clientX / window.innerWidth * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
@@ -4554,6 +4563,7 @@ function interactables() {
   for (const d of dresserDoors) if (!(d === pistolDoor && gunReady())) list.push({ obj: d.hinge.children[0], pos: d.center, r: 0.55 });   // (that door's bubble goes to the gun instead)
   if (diffuserRig && diffuserRig.state === 'rest') list.push({ obj: diffuserRig.vase.children[0], pos: diffuserRig.center, r: 0.45 });
   if (tableRig && !tableRig.broken) list.push({ obj: tableRig.pieces[0].mesh, pos: tableRig.center, r: 0.9 });
+  if (laser.state === 'floor') list.push({ obj: laser.pickupMesh, pos: laser.pickup.position.clone(), r: 0.9 });   // a big, forgiving target on the dropped laser pointer
   if (windowRig) { windowRig.bl.getWorldPosition(_ip); list.push({ obj: windowRig.bl, pos: _ip.clone(), r: 1.2 }); }
   if (mirrorRig) { mirrorRig.glass.getWorldPosition(_ip); list.push({ obj: mirrorRig.glass, pos: _ip.clone(), r: 1.1 }); }
   if (gloveRig) { gloveRig.pivots[0].getWorldPosition(_ip); list.push({ obj: gloveRig.pivots[0].children[0], pos: _ip.clone().setY(_ip.y - IN(8)), r: 0.45 }); }
@@ -4596,6 +4606,7 @@ function interact(o, point, face) {
   if (o.userData.galaxy) { startSwipe(point, true); setTimeout(() => { galaxyOn = !galaxyOn; sfx.remoteClick(); if (galaxyOn) unlock('galaxy'); }, 90); tapShake(); return true; }
   if (o.userData.fan) { if (fanRig.state === 'falling' || fanRig.state === 'broken') return false; startSwipe(point, true); setTimeout(hitFan, 90); tapShake(); return true; }
   if (o.userData.prop) { const pr = o.userData.prop; startSwipe(point, true); setTimeout(() => knockProp(pr), 90); tapShake(); return true; }
+  if (o.userData.laserPickup) { if (laser.state !== 'floor') return false; startSwipe(point, true); setTimeout(takeLaser, 90); return true; }
   return false;
 }
 function tapShake() { shake = Math.max(shake, reduceMotion ? 0.03 : 0.13); }
@@ -4758,16 +4769,21 @@ const ammoTex = new THREE.CanvasTexture(ammoCanvas);
 const ammoTag = new THREE.Sprite(new THREE.SpriteMaterial({ map: ammoTex, depthTest: false, transparent: true })); ammoTag.renderOrder = 10; ammoTag.visible = false; scene.add(ammoTag);
 let ammoPop = 0;
 function showFireBtn() {
-  const n = gunRig.ammo, g = ammoCanvas.getContext('2d');
+  const las = laser.state === 'cat', n = las ? laser.ammo : gunRig.ammo, g = ammoCanvas.getContext('2d');
   g.clearRect(0, 0, 128, 128);
   g.fillStyle = '#1f1712'; g.beginPath(); g.arc(64, 64, 58, 0, 7); g.fill();
-  g.fillStyle = n <= 1 ? '#e2452c' : '#f4c13d'; g.beginPath(); g.arc(64, 64, 50, 0, 7); g.fill();
+  g.fillStyle = las ? '#ff3b4e' : n <= 1 ? '#e2452c' : '#f4c13d'; g.beginPath(); g.arc(64, 64, 50, 0, 7); g.fill();
   g.fillStyle = '#1f1712'; g.font = '800 72px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(n), 64, 70);
-  ammoTex.needsUpdate = true; ammoTag.visible = gunRig.state === 'cat'; ammoPop = 1;
+  ammoTex.needsUpdate = true; ammoTag.visible = gunRig.state === 'cat' || las; ammoPop = 1;
 }
-function showBanner(text) {
-  const el = document.createElement('div'); el.className = 'banner'; el.textContent = text; document.body.appendChild(el);
-  setTimeout(() => el.remove(), 2500);
+let bannerFreeAt = 0;
+function showBanner(text) {                                          // one at a time: a second banner waits its turn (e.g. 'Rat King defeated!' then 'A mushroom is back!')
+  const now = performance.now(), at = Math.max(now, bannerFreeAt); bannerFreeAt = at + 1700;
+  setTimeout(() => {
+    document.querySelectorAll('.banner').forEach(b => b.remove());   // (clear the last one's fading tail)
+    const el = document.createElement('div'); el.className = 'banner'; el.textContent = text; document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+  }, at - now);
 }
 function takeGun() {
   const gr = gunRig; if (gr.state !== 'cupboard' || state !== 'playing') return;
@@ -4922,6 +4938,7 @@ function shootMouse(m) {
   if (!m.active || !m.hittable) return;
   if (!m.isBomb || m.boss) spawnBlood(m.root.position, m.boss ? 2.2 : 1.4);
   if (m.boss && !hurtBoss(m, 3)) return;                            // a bullet does 3 damage to the Rat King
+  if (m.kind === 'laser' && m.pointer && m.pointer.visible) dropLaser(m);
   if (m.isBomb && !m.boss) {                                                   // shot bombs just fizzle out: no life lost
     burst(m.center.clone().setY(0.4), 0x3a3434, 8, 2, 2.5, 1.2); floatText(m.center.clone().setY(0.9), 'Defused!', ''); m.release(); return;
   }
@@ -5036,6 +5053,159 @@ function resetGun() {
   tvBroken = false; showFireBtn();
 }
 
+
+/* =====================================================================
+   THE LASER MOUSE (5000 points): a mouse with a laser pointer in its teeth, the red dot dancing over the carpet.
+   Whack it and it drops the pointer; tap the pointer and the cat takes it: 10 shots of laser beams from her eyes.
+   ===================================================================== */
+const LASER_SCORE = 5000, LASER_SHOTS = 10;
+let laserMouseDone = false, laserMousePending = false, laserRetryAt = 0;
+function makeLaserPointer(parent, x, y, z, sc) {                     // a little silver pen with a red glowing tip, pointing along +z
+  const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(sc); parent.add(g);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.34, 12), new THREE.MeshPhongMaterial({ color: 0xb9bec6, shininess: 100, specular: 0xffffff })); body.rotation.x = Math.PI / 2; g.add(body);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.05, 12), lam(0x222226)); band.rotation.x = Math.PI / 2; band.position.z = -0.1; g.add(band);
+  const btn = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.012, 0.04), basic(0xff2a2a)); btn.position.set(0, 0.034, -0.02); g.add(btn);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.026, 10, 8), basic(0xff2020)); tip.position.z = 0.175; g.add(tip);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xff2a2a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); glow.position.z = 0.19; glow.scale.setScalar(0.22); g.add(glow);
+  g.userData.tip = tip;
+  return g;
+}
+// laser beams: a pool of glowing red rods (lines are only 1px, so these are thin stretched cylinders)
+const beamGeo = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true); beamGeo.translate(0, 0.5, 0);
+function makeBeam() {
+  const g = new THREE.Group(); g.visible = false; scene.add(g);
+  const outer = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xff1a2a, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const core = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xffd0d4, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+  outer.scale.set(0.075, 1, 0.075); core.scale.set(0.022, 1, 0.022); g.add(outer, core);
+  return { g, outer, core, life: 0 };
+}
+const _bUp = new THREE.Vector3(0, 1, 0), _bD = new THREE.Vector3();
+function aimBeam(b, a, c, width) {
+  _bD.subVectors(c, a); const len = _bD.length(); if (len < 1e-4) return;
+  b.g.position.copy(a); b.g.quaternion.setFromUnitVectors(_bUp, _bD.divideScalar(len)); b.g.scale.set(width || 1, len, width || 1);
+}
+const laser = { state: 'none', ammo: 0, beams: Array.from({ length: 14 }, makeBeam), eyes: [], eyeT: 0, t: 0,
+                pickup: null, pickupMesh: null, ring: null, v: new THREE.Vector3(), mouseBeam: makeBeam(), dot: null, dotPos: new THREE.Vector3() };
+{
+  laser.mouseBeam.outer.scale.set(0.018, 1, 0.018); laser.mouseBeam.core.scale.set(0.006, 1, 0.006);
+  const dot = new THREE.Group(); dot.visible = false; scene.add(dot);                                   // the red dot on the carpet
+  const d0 = new THREE.Mesh(new THREE.CircleGeometry(0.045, 16), basic(0xff2a2a)); d0.rotation.x = -Math.PI / 2; dot.add(d0);
+  const d1 = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xff3030, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); d1.scale.setScalar(0.45); d1.position.y = 0.02; dot.add(d1);
+  laser.dot = dot;
+  laser.pickup = new THREE.Group(); laser.pickup.visible = false; laser.pickup.userData.name = 'Laser pointer'; scene.add(laser.pickup);   // the dropped pointer, lying on the floor
+  const pen = makeLaserPointer(laser.pickup, 0, 0.06, 0, 1.7);
+  pen.traverse(o => { if (o.isMesh) { o.userData.laserPickup = true; tapTargets.push(o); if (!laser.pickupMesh) laser.pickupMesh = o; } });
+  laser.ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 36), basic(0xff3b4e, { transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
+  laser.ring.rotation.x = -Math.PI / 2; laser.ring.position.y = 0.02; laser.pickup.add(laser.ring);
+  for (const [px, py] of [[200, 113], [283, 110]]) {                                                        // her eyes, glowing red while she has the laser (pixel spots on the 400 x 460 photo)
+    const e = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xff2030, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true }));
+    e.position.set((px / 400 - 0.5) * CAT_W, (1 - py / 460) * CAT_SPRITE.height, 0.03); e.scale.setScalar(0.2); e.visible = false; e.renderOrder = 8; catCard.add(e); laser.eyes.push(e);
+  }
+}
+function checkLaserMouse() {
+  if (laserMouseDone || gameMode !== 'classic' || score < LASER_SCORE || elapsed < laserRetryAt) return;
+  laserMousePending = true;
+  if (state !== 'playing' || mice.some(x => x.active && x.boss)) return;   // (not while the Rat King is out)
+  const m = spawnMouse({ safe: true, kind: 'laser' }); if (!m) return;
+  laserMouseDone = true; laserMousePending = false;
+  showBanner('Laser mouse!'); camToast('🔴 Whack the laser mouse for its laser pointer!', 3000); sfx.sparkle && sfx.sparkle();
+}
+function dropLaser(m) {
+  if (!m.pointer || !m.pointer.visible) return;
+  m.pointer.visible = false; laser.dot.visible = false; laser.mouseBeam.g.visible = false;
+  const p = m.root.position;
+  let x = THREE.MathUtils.clamp(p.x, -ROOM.halfW + 0.5, ROOM.halfW - 0.5), z = THREE.MathUtils.clamp(p.z, DEPTH + 0.4, ROOM.depth - 0.4);
+  for (let k = 0; k < 40 && rollBlocked(x, z); k++) { x += (0 - x) * 0.15; z += (ROOM.depth * 0.5 - z) * 0.15; }   // never under a sofa or the table: out on open carpet where she can reach it
+  laser.pickup.position.set(x, 0.5, z);
+  laser.pickup.rotation.set(0, Math.random() * 6, 0); laser.pickup.visible = true; laser.v.set(0, 2.6, 0);   // (straight up and down: it lands where it's safe)
+  laser.state = 'drop';
+  floatText(laser.pickup.position.clone().setY(1.2), 'It dropped the laser!', 'clutch'); tone(1600, 900, 0.1, 'triangle', 0.04);
+}
+function takeLaser() {
+  if (laser.state !== 'floor' || state !== 'playing') return;
+  unlock('laser');
+  laser.state = 'cat'; laser.ammo = LASER_SHOTS; laser.pickup.visible = false; laser.eyeT = 1;
+  sfx.sparkle && sfx.sparkle(); tone(300, 1800, 0.35, 'sawtooth', 0.04); tailWag = 1.6;
+  showBanner('Laser eyes!'); floatText(new THREE.Vector3(CAT_POS.x, BOX.h + 1.5, CAT_POS.z), 'Tap to zap', 'clutch');
+  showFireBtn();
+}
+function zapMouse(m) {                                               // a laser hit: no blood, just a sizzle and a puff of smoke
+  if (!m.active || !m.hittable) return;
+  burst(m.center.clone().setY(0.45), 0xff3030, 10, 2.6, 3, 0.6); burst(m.center.clone().setY(0.4), 0x444444, 6, 1.2, 2.2, 1.2);
+  if (m.boss && !hurtBoss(m, 2)) return;                             // two laser hits' worth on the Rat King
+  if (m.isBomb && !m.boss) { floatText(m.center.clone().setY(0.9), 'Fuse zapped!', ''); m.release(); return; }
+  const saved = m.state === 'carry' || m.state === 'grab';
+  if (saved) { m.dropCheese(); tailWag = 1.4; }
+  combo++;
+  const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP)), pts = CFG.SCORE_WHACK * mult * (m.kind === 'rainbow' ? 5 : 1);
+  score += pts; whackedCount++; m.helmet.visible = false;
+  m.setState('whacked');
+  floatText(m.center.clone().setY(0.9), saved ? `Dropped! +${pts}` : `Zap! +${pts}`, 'shot');
+  updateHud();
+}
+function eyeOrigins() {                                              // where the beams start: her glowing eyes (or just under the camera in her own view)
+  if (isPov()) { const c = camera.position.clone(), r = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); return [c.clone().addScaledVector(r, -0.08).setY(c.y - 0.12), c.clone().addScaledVector(r, 0.08).setY(c.y - 0.12)]; }
+  return laser.eyes.map(e => e.getWorldPosition(new THREE.Vector3()));
+}
+function fireBeams(to, delay) {
+  setTimeout(() => {
+    for (const o of eyeOrigins()) { const b = laser.beams.find(b => b.life <= 0); if (!b) return; aimBeam(b, o, to); b.g.visible = true; b.life = 0.18; }
+  }, delay || 0);
+}
+function fireLaser(cx, cy) {
+  if (laser.state !== 'cat' || laser.ammo <= 0 || state !== 'playing') return;
+  laser.ammo--; laser.eyeT = 1; catFlinch = Math.max(catFlinch, 0.12);
+  tone(2300, 420, 0.16, 'sawtooth', 0.045); tone(1500, 260, 0.2, 'square', 0.02, 0.01);
+  shake = Math.max(shake, reduceMotion ? 0.03 : 0.12);
+  const targets = mice.filter(m => m.active && m.hittable && onScreen(m.center));
+  let smash = null;
+  if (!targets.length && gameMode === 'chaos') { const list = chaosGunTargets(); if (list.length) smash = list[(Math.random() * list.length) | 0]; }
+  targets.forEach((m, i) => { fireBeams(m.center.clone(), i * 30); setTimeout(() => zapMouse(m), 40 + i * 30); });
+  if (smash) { fireBeams(smash.pos.clone(), 0); setTimeout(() => { burst(smash.pos.clone(), 0xff3030, 8, 2, 2, 0.4); smash.hit(); }, 45); }
+  if (!targets.length && !smash) {                                  // nothing to hit: scorch the spot she was looking at
+    ndc.set(cx / window.innerWidth * 2 - 1, -(cy / window.innerHeight) * 2 + 1); raycaster.setFromCamera(ndc, camera);
+    const at = new THREE.Vector3(); if (!raycaster.ray.intersectPlane(floorPlane, at)) at.set(CAT_POS.x, 0, CAT_POS.z + 4);
+    at.x = THREE.MathUtils.clamp(at.x, -ROOM.halfW + 0.3, ROOM.halfW - 0.3); at.z = THREE.MathUtils.clamp(at.z, 0.4, ROOM.depth - 0.3); at.y = 0.02;
+    fireBeams(at.clone(), 0); setTimeout(() => { burst(at.clone().setY(0.1), 0xff5a30, 6, 1.6, 1.8, 0.35); burst(at.clone().setY(0.1), 0x333333, 4, 0.8, 1.6, 0.9); }, 45);
+  }
+  if (laser.ammo === 0) setTimeout(() => {
+    if (laser.state !== 'cat') return;
+    laser.state = 'done'; floatText(new THREE.Vector3(CAT_POS.x, BOX.h + 1.5, CAT_POS.z), 'Laser eyes out!', 'warn'); tone(900, 120, 0.4, 'sawtooth', 0.03); showFireBtn();
+  }, 350);
+  showFireBtn();
+}
+function updateLaser(dt) {
+  laser.t += dt;
+  for (const b of laser.beams) if (b.life > 0) { b.life -= dt; const k = Math.max(0, b.life / 0.18); b.outer.material.opacity = 0.55 * k; b.core.material.opacity = 0.9 * k; if (b.life <= 0) b.g.visible = false; }
+  // the laser mouse's dot, dancing over the carpet ahead of it
+  const lm = mice.find(m => m.active && m.kind === 'laser' && m.pointer && m.pointer.visible && m.state !== 'whacked');
+  if (lm && lm.root.visible) {
+    const p = lm.root.position, yaw = lm.root.rotation.y, t = laser.t;
+    const want = new THREE.Vector3(p.x + Math.sin(yaw) * 1.5 + Math.sin(t * 2.3) * 0.9, 0.015, p.z + Math.cos(yaw) * 1.5 + Math.cos(t * 1.7) * 0.7);
+    want.x = THREE.MathUtils.clamp(want.x, -ROOM.halfW + 0.2, ROOM.halfW - 0.2); want.z = THREE.MathUtils.clamp(want.z, DEPTH + 0.1, ROOM.depth);
+    if (!laser.dot.visible) laser.dotPos.copy(want); else laser.dotPos.lerp(want, Math.min(1, dt * 6));
+    laser.dot.position.copy(laser.dotPos); laser.dot.visible = true;
+    lm.pointer.userData.tip.getWorldPosition(_bD); const from = _bD.clone();
+    aimBeam(laser.mouseBeam, from, laser.dotPos); laser.mouseBeam.g.visible = true; laser.mouseBeam.outer.material.opacity = 0.35 + Math.sin(t * 20) * 0.1;
+  } else { laser.dot.visible = false; laser.mouseBeam.g.visible = false; }
+  // the dropped pointer: a hop, then it lies there pulsing until she swipes it
+  if (laser.state === 'drop') {
+    const o = laser.pickup; laser.v.y -= 9.8 * dt; o.position.addScaledVector(laser.v, dt); o.rotation.y += dt * 6;
+    if (o.position.y <= 0 && laser.v.y < 0) { o.position.y = 0; if (laser.v.y < -2) { laser.v.y *= -0.35; laser.v.x *= 0.5; laser.v.z *= 0.5; sfx.clack(); } else { laser.state = 'floor'; floatText(o.position.clone().setY(0.9), 'Tap the laser!', 'warn'); } }
+  }
+  if (laser.state === 'floor') { const k = 1 + Math.sin(laser.t * 5) * 0.12; laser.ring.scale.setScalar(k); laser.ring.material.opacity = 0.5 + 0.35 * Math.abs(Math.sin(laser.t * 5)); }
+  // her eyes: a steady red glow while armed, a flare with every shot
+  laser.eyeT = Math.max(0, laser.eyeT - dt * 5);
+  const armed = laser.state === 'cat';
+  for (const e of laser.eyes) { e.visible = armed; const k = 0.16 + laser.eyeT * 0.28 + Math.sin(laser.t * 8) * 0.015; e.scale.set(k, k / (catCard.scale.y || 1), 1); e.material.opacity = 0.75 + laser.eyeT * 0.25; }   // (undo the card's upright stretch so the glow stays round)
+  if (armed && gunRig.state !== 'cat') { const gr = gunRig; ammoPop = Math.max(0, ammoPop - dt * 4); ammoTag.position.set(gr.hand.x + 0.75, gr.hand.y + 0.55 + Math.sin(clock * 3) * 0.05, gr.hand.z + 0.1); ammoTag.scale.setScalar(0.85 * (1 + ammoPop * 0.35)); }
+}
+function resetLaser() {
+  laser.state = 'none'; laser.ammo = 0; laser.pickup.visible = false; laser.dot.visible = false; laser.mouseBeam.g.visible = false;
+  for (const b of laser.beams) { b.life = 0; b.g.visible = false; }
+  for (const e of laser.eyes) e.visible = false;
+  laserMouseDone = false; laserMousePending = false; laserRetryAt = 0;
+}
 function onCheeseGrabbed(m, c) {
   if (state !== 'playing' && state !== 'ending') return;
   floatText(c.pos.clone().setY(1.1), 'Thief!', 'warn');
@@ -5102,7 +5272,7 @@ const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStar
 let lastTimeShown = -1;
 function updateHud() {
   if (score >= 5000 && state === 'playing') unlock('score5k');
-  checkBoss();
+  checkBoss(); checkLaserMouse();
   ui.score.textContent = score;
   const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
   ui.combo.hidden = mult <= 1; ui.combo.textContent = `x${mult}`;
@@ -5153,7 +5323,7 @@ function resetGame() {
   cheeses.forEach(c => c.reset());
   if (gameMode === 'chaos') cheeses.forEach(c => c.lose());
   document.querySelector('.c-cheese').style.visibility = gameMode === 'chaos' ? 'hidden' : '';
-  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); clearPaint(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
+  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); clearPaint(); resetLaser(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false; bossDone = false; bossLevel = 0; waveNo = 1;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -5972,6 +6142,7 @@ function startWalk() {
 }
 function endWalk() {
   walk.on = false; walkPtr = null; walk.stick.x = walk.stick.y = 0;
+  if (walk.poops) { walk.poops.forEach(o => scene.remove(o)); walk.poops = []; }
   if (walk.rig) { walk.rig.g.visible = false; walk.rig.shadow.visible = false; }
   cat.visible = true; catTail.visible = true; document.body.classList.remove('walking');
   const ui = document.getElementById('walkUI'); if (ui) ui.hidden = true;
@@ -6071,6 +6242,9 @@ function updateWalk(dt) {
   const pf = 1 + walk.puff * 0.28;                                   // the big yowl: she puffs right up
   W.body.scale.set((1 + walk.squash * 0.12) * pf, (1 - walk.squash * 0.18) * pf, pf);
   W.head.rotation.x = -Math.sin(Math.min(1, walk.meowT / 0.4) * Math.PI) * 0.35;   // chin up for a meow
+  walk.squatT = Math.max(0, (walk.squatT || 0) - dt);
+  W.body.position.y -= Math.sin(Math.min(1, walk.squatT / 0.8) * Math.PI) * 0.1;          // a little squat in the litter
+  if (walk.poopPop) { const s = walk.poopPop.scale.x + dt * 5; walk.poopPop.scale.setScalar(Math.min(1.5, s)); if (s >= 1.5) walk.poopPop = null; }
   catTail.visible = false;
   W.head.rotation.y = walk.look && spd < 0.25 ? THREE.MathUtils.clamp(Math.atan2(walk.look.x - p.x, walk.look.z - p.z) - walk.face, -0.6, 0.6) * 0.5 : 0;
   W.tail.forEach((sg, i) => { sg.rotation.x = (i ? 0.2 : 0.75) + (walk.grounded ? 0 : 0.15); sg.rotation.y = Math.sin(clock * (spd > 0.3 ? 5 : 2.2) - i * 0.55) * (0.1 + i * 0.03); });
@@ -6154,11 +6328,35 @@ function walkSwipe() {                                               // swipe at
   if (name === 'Closet door') { sfx.rattle(); floatText(h.point.clone().setY(h.point.y + 0.3), "It's shut!", 'warn'); return; }
   if (!(tapTargets.includes(h.object) && interact(h.object, h.point, h.face))) sfx.miss();
 }
+function walkInLitter() {
+  const lb = povEndWall && povEndWall.children.find(c => c.userData.name === 'Litter box'); if (!lb) return false;
+  const b = new THREE.Box3().setFromObject(lb), p = walk.pos;
+  return walk.grounded && p.y < 0.6 && p.x > b.min.x - 0.05 && p.x < b.max.x + 0.05 && p.z > b.min.z - 0.05 && p.z < b.max.z + 0.05;
+}
+function dropPoop() {
+  if (!walk.on) return;
+  const p = walk.pos, g = new THREE.Group(); g.userData.name = 'Poop';
+  const brown = new THREE.MeshPhongMaterial({ color: 0x6b4423, shininess: 45, specular: 0x332211 });
+  const tiers = [[0.075, 0.03], [0.058, 0.075], [0.04, 0.113]];                                       // a cartoon swirl: three squashed tiers and a little curl on top
+  for (const [r, y] of tiers) { const t = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), brown); t.scale.y = 0.62; t.position.y = y; g.add(t); }
+  const curl = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.05, 10), brown); curl.position.set(0.008, 0.145, 0); curl.rotation.z = -0.5; g.add(curl);
+  g.position.set(p.x - Math.sin(walk.face) * 0.55, p.y, p.z - Math.cos(walk.face) * 0.55);   // just behind her tail...
+  const lb = povEndWall.children.find(c => c.userData.name === 'Litter box');
+  if (lb) { const bb = new THREE.Box3().setFromObject(lb); g.position.x = THREE.MathUtils.clamp(g.position.x, bb.min.x + 0.18, bb.max.x - 0.18); g.position.z = THREE.MathUtils.clamp(g.position.z, bb.min.z + 0.18, bb.max.z - 0.18); }   // ...but always in the tray
+  g.rotation.y = Math.random() * 6; g.scale.setScalar(0.2); scene.add(g);
+  walk.poops = walk.poops || []; walk.poops.push(g); if (walk.poops.length > 6) scene.remove(walk.poops.shift());
+  walk.squatT = 0.8; walk.poopPop = g;
+  tone(260, 80, 0.14, 'sine', 0.09); noise(0.08, 0.05, 500);
+  for (let i = 0; i < 3; i++) setTimeout(() => burst(g.position.clone().setY(g.position.y + 0.15), 0x9acd32, 2, 0.25, 0.9, 0.35), 300 + i * 350);   // stink wafts
+  floatText(g.position.clone().setY(g.position.y + 0.55), '💩 Plop!', 'name'); showWalkName('💩 Plop! Business done');
+  unlock('poop');
+}
 function walkMeow() {
   if (!walk.on || state !== 'playing') return;
   initAudio();
   walk.meowRun = clock - walk.lastMeow < 1.8 ? walk.meowRun + 1 : 1; walk.lastMeow = clock;
   const head = walk.pos.clone().setY(walk.pos.y + 1.05);
+  if (walkInLitter() && clock > (walk.poopReady || 0)) { walk.poopReady = clock + 2; setTimeout(dropPoop, 450); }   // a meow in the litter box... and then a little present
   if (walk.meowRun >= 10) {                                          // the tenth in a row: a furious, LOUD yowl
     walk.meowRun = 0; walk.meowT = 1.1; walk.puff = 1;
     sfx.meow(true); vibrate(120); shake = Math.max(shake, reduceMotion ? 0.06 : 0.45);
@@ -6230,6 +6428,7 @@ function frame(now) {
       updateClockHud();
       if (gameMode === 'mouse') updateHeist(dt);
       if (gameMode === 'walk') updateWalk(dt);
+      if (laserMousePending) checkLaserMouse();
     }
     for (const m of mice) if (m.active) m.update(sdt, clock);
     separateMice(); separateMice();                                  // two relaxation passes: crowds settle in a frame
@@ -6263,7 +6462,7 @@ function frame(now) {
   updateBoom(dt);
   updateCatCrown(dt);
   updateRoomFx(dt);
-  updateWallpaper(dt); updateBlood(dt); updatePaint(dt); updateFire(dt); updateMantleMirror(dt);
+  updateWallpaper(dt); updateBlood(dt); updatePaint(dt); updateLaser(dt); updateFire(dt); updateMantleMirror(dt);
   updateFan(dt);
   updateBombFx(dt);
 
