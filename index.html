@@ -135,6 +135,19 @@
   @keyframes caption{0%{opacity:0;transform:translate(-50%,-6px) scale(.9)}8%,78%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0}}
   .float.name{font-family:var(--body);font-weight:800;font-size:15px;color:#fff;background:rgba(58,20,52,.82);border:1.5px solid rgba(255,244,248,.35);
               padding:4px 12px;border-radius:999px;-webkit-text-stroke:0;animation-duration:1.9s}
+  /* the mirror world (Free walk): the room flipped left-to-right, colours turned opposite, darker, with a purple vignette */
+  body.mirror-world #stage canvas{transform:scaleX(-1);filter:hue-rotate(180deg) saturate(1.25) brightness(.72) contrast(1.15)}
+  body.mirror-world #stage::after{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 45%,rgba(25,0,45,.65) 100%)}
+  body.mirror-world #walkCaption{top:calc(env(safe-area-inset-top,0px) + 96px)}
+  #mirrorHud{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:7;pointer-events:none;white-space:nowrap;
+             background:rgba(20,8,32,.88);color:#fff;border:2px solid rgba(255,244,248,.35);border-radius:14px;padding:6px 14px;font:800 13px var(--body);display:grid;gap:3px}
+  #mirrorHud[hidden]{display:none}
+  #mirrorHud .row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+  #mirrorHud .hp{font-size:12px;letter-spacing:1px}
+  #mirrorFlash{position:fixed;inset:0;z-index:8;pointer-events:none;opacity:0}
+  #mirrorFlash.go{background:radial-gradient(circle,rgba(255,255,255,1),rgba(200,170,255,.9));animation:mflash .8s ease-out forwards}
+  #mirrorFlash.hurt{background:radial-gradient(ellipse at 50% 50%,rgba(255,0,0,0) 35%,rgba(255,20,40,.7) 100%);animation:mflash .5s ease-out forwards}
+  @keyframes mflash{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
   /* catnip mode: a dreamy rainbow haze over everything */
   #catnipFx{position:fixed;inset:-10%;pointer-events:none;z-index:3;opacity:0;transition:opacity 1.2s ease;mix-blend-mode:overlay;
             background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 30%,rgba(90,255,120,.55) 100%),
@@ -263,17 +276,19 @@
   .tv-frame{width:100%;aspect-ratio:16/9;background:#000;border:10px solid #121212;border-radius:10px;box-shadow:0 0 0 2px #2a2a2a,0 10px 40px rgba(0,0,0,.6);overflow:hidden}
   .tv-frame canvas{width:100%;height:100%;display:block}
   .tv-btns{display:flex;gap:10px}
-  .tv-exit{appearance:none;border:2px solid #555;background:#222;color:#eee;font:800 14px var(--body);border-radius:999px;padding:8px 18px;cursor:pointer}
-  .tv-joy{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 18px;border-radius:28px;min-width:150px}
+  .tv-exit{appearance:none;border:2px solid #555;background:#222;color:#eee;font:800 15px var(--body);border-radius:999px;padding:11px 20px;cursor:pointer;touch-action:manipulation}
+  #tvPlay{--b:clamp(44px,min(7vw,13vh),76px)}                           /* controller button size: big thumb targets, but the TV stays the star (upright phones: see below) */
+  .tv-joy{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 16px;border-radius:32px;min-width:150px}
   .tv-left{background:#0ab9e6;order:1}.tv-right{background:#ff3c28;order:2}
-  .joy-lbl{font:800 11px var(--body);color:rgba(0,0,0,.55);letter-spacing:.04em}
-  .dpad{display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px)}
-  .dpad button,.abxy button{appearance:none;border:none;background:#1c1c1e;color:#ddd;font:800 16px var(--body);border-radius:50%;cursor:pointer;touch-action:none}
+  .joy-lbl{font:800 13px var(--body);color:rgba(0,0,0,.62);letter-spacing:.03em;text-align:center}
+  .dpad{display:grid;grid-template-columns:repeat(3,var(--b));grid-template-rows:repeat(3,var(--b))}
+  .dpad button,.abxy button{appearance:none;border:none;background:#1c1c1e;color:#ddd;font:800 calc(var(--b) * .4) var(--body);border-radius:50%;cursor:pointer;touch-action:none;box-shadow:0 3px 0 rgba(0,0,0,.35)}
+  .dpad button{border-radius:28%}
   .dpad button:active,.abxy button:active{transform:scale(.92);background:#3a3a3e}
   .dpad [data-k=up]{grid-area:1/2}.dpad [data-k=left]{grid-area:2/1}.dpad [data-k=right]{grid-area:2/3}.dpad [data-k=down]{grid-area:3/2}
-  .abxy{display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px)}
-  .abxy .ka{grid-area:2/3;width:52px;height:52px;margin:-5px}.abxy .kb{grid-area:3/2}
-  @media (max-aspect-ratio:5/4){ #tvPlay{flex-direction:row;flex-wrap:wrap;align-content:center} .tv-mid{order:0;flex:0 0 100%} .tv-joy{min-width:0;flex:1 1 40%;max-width:46%} }   /* upright: TV on top, a controller in each hand below */
+  .abxy{display:grid;grid-template-columns:repeat(3,var(--b));grid-template-rows:repeat(3,var(--b))}
+  .abxy .ka{grid-area:2/3;width:calc(var(--b) * 1.3);height:calc(var(--b) * 1.3);margin:calc(var(--b) * -.15)}.abxy .kb{grid-area:3/2;width:calc(var(--b) * 1.15);height:calc(var(--b) * 1.15);margin:calc(var(--b) * -.075)}
+  @media (max-aspect-ratio:5/4){ #tvPlay{flex-direction:row;flex-wrap:wrap;align-content:center;--b:clamp(44px,13.5vw,68px)} .tv-mid{order:0;flex:0 0 100%} .tv-joy{min-width:0;flex:1 1 40%;max-width:48%;padding:14px 8px} }   /* upright: TV on top, a controller in each hand below */
   @media (min-aspect-ratio:5/4){ #tvPlay{flex-direction:row} .tv-left{order:0}.tv-mid{order:1;flex:1;min-width:0}.tv-right{order:2} }   /* sideways: controllers either side of the TV */
   #flash.on{animation:flash .4s ease-out}
   #stage.quake{animation:quake .5s cubic-bezier(.36,.07,.19,.97)}
@@ -298,7 +313,8 @@
 <div id="catnipFx"></div>
 <div id="fx"></div>
 <div id="paintSplash"></div>
-<div id="walkUI" hidden><div id="walkStick"><div id="walkKnob"></div></div><button id="walkJump">Jump</button><button class="walk-btn" id="walkSwipe"><span><b>🐾</b>Swipe</span></button><button class="walk-btn" id="walkMeow"><span><b>😺</b>Meow</span></button><div id="walkCaption"></div></div>
+<div id="walkUI" hidden><div id="walkStick"><div id="walkKnob"></div></div><button id="walkJump">Jump</button><button class="walk-btn" id="walkSwipe"><span><b>🐾</b>Swipe</span></button><button class="walk-btn" id="walkMeow"><span><b>😺</b>Meow</span></button><div id="walkCaption"></div><div id="mirrorHud" hidden></div></div>
+<div id="mirrorFlash"></div>
 
 <!-- HUD: one bar across the top -->
 <div class="hud" id="hud" hidden>
@@ -1467,8 +1483,8 @@ function drawGame(t) {
     g.fillStyle = '#fff'; g.fillText('● ' + game.coins[i], x + 24, 27);
   });
   // side menu
-  g.fillStyle = 'rgba(10,40,40,.7)'; g.fillRect(0, 0, 88, 62);
-  g.font = 'bold 11px sans-serif'; g.textAlign = 'left'; g.fillStyle = '#ffd23a'; g.fillText('▶', 4, 17 + game.cursor * 18); g.fillStyle = '#fff'; g.fillText('Dice Block', 16, 17); g.fillText('Items', 16, 35); g.fillText('Map', 16, 53);
+  g.fillStyle = 'rgba(10,30,40,.85)'; g.fillRect(0, 0, 90, 62); g.strokeStyle = 'rgba(255,255,255,.3)'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, 89, 61);
+  g.font = 'bold 12px sans-serif'; g.textAlign = 'left'; g.fillStyle = '#ffd23a'; g.fillText('▶', 4, 17 + game.cursor * 18); g.fillStyle = '#fff'; g.fillText('Dice Block', 16, 17); g.fillText('Items', 16, 35); g.fillText('Map', 16, 53);
   if (game.player) { g.fillStyle = '#ffd23a'; g.font = 'bold 8px sans-serif'; g.textAlign = 'center'; g.fillText('YOU', 114, 30); }
   // dice block held up by the current player, bottom-left
   const p = GAME_PLAYERS[game.turn % 4]; drawPawn(g, 40, 196, p, true);
@@ -1618,7 +1634,7 @@ function exitTvPlay() {
 /* ---------- the console's first game: a kart racer (pseudo-3D road, 3 laps vs 3 CPU karts, coins, ? boxes, mushroom boost) ---------- */
 let tvGame = 'kart', tvPlays = 0;                                     // which game the console is showing; plays alternate kart → party
 const tvHeld = {};                                                    // buttons / keys currently held (for steering and gas)
-const KART = { W: 384, H: 216, SEG: 200, ROAD: 2000, CAM_H: 1000, DEPTH: 1 / Math.tan(50 * Math.PI / 180), DRAW: 110, LAPS: 3, MAX: 6200 };
+const KART = { W: 384, H: 216, SEG: 200, ROAD: 2400, CAM_H: 1000, DEPTH: 1 / Math.tan(50 * Math.PI / 180), DRAW: 110, LAPS: 3, MAX: 6200 };
 KART.PZ = KART.CAM_H * KART.DEPTH;                                    // how far ahead of the camera the player's kart sits
 const kSegs = [];
 (() => {
@@ -1656,8 +1672,8 @@ function updateKart(dt) {
   let steer = 0, gas = false, brake = false;
   if (auto) { gas = true; steer = Math.max(-1, Math.min(1, -K.x * 1.5 + seg.curve * 0.35)); if (K.item && Math.random() < dt) kartUseItem(); }
   else { steer = (tvHeld.right ? 1 : 0) - (tvHeld.left ? 1 : 0); gas = !!tvHeld.a || !!tvHeld.up; brake = !!tvHeld.down; }
-  K.x += steer * dt * 2.2 * Math.max(0.35, pct);
-  K.x -= dt * 2 * pct * seg.curve * 0.32;                             // centrifugal drift on the bends
+  K.x += steer * dt * 3.4 * Math.max(0.35, pct);                     // (steering always beats the bends' pull: max drift 2.0/s vs 3.4/s)
+  K.x -= dt * 2 * pct * seg.curve * 0.2;                              // centrifugal drift on the bends
   const top = KART.MAX * (K.boost > 0 ? 1.4 : 1) * (1 + Math.min(10, K.coins) * 0.012);
   K.speed += (gas ? 2600 : brake ? -6000 : -1600) * dt;
   if (Math.abs(K.x) > 1 && K.speed > KART.MAX * 0.35) K.speed -= 7000 * dt;   // off the road: grass slows you right down
@@ -1726,14 +1742,17 @@ function drawKart() {
     if (p2.y >= maxy) { drawn.push(null); continue; }
     const dark = Math.floor(sg.i / 3) % 2;
     g.fillStyle = dark ? '#36a843' : '#3fb84a'; g.fillRect(0, p2.y, W, p1.y - p2.y + 1);
-    const quad = (c, x1, w1, x2, w2) => { g.fillStyle = c; g.beginPath(); g.moveTo(x1 - w1, p1.y); g.lineTo(x1 + w1, p1.y); g.lineTo(x2 + w2, p2.y); g.lineTo(x2 - w2, p2.y); g.fill(); };
-    quad(dark ? '#e23a32' : '#ffffff', p1.x, p1.w * 1.12, p2.x, p2.w * 1.12);                        // kerbs
-    quad(dark ? '#6b6b73' : '#707078', p1.x, p1.w, p2.x, p2.w);                                      // tarmac
-    if (dark) quad('#f4f4f4', p1.x, p1.w * 0.02, p2.x, p2.w * 0.02);                                 // centre line
+    const y1 = p1.y + 1;                                                // (1px overlap with the slice in front: no grass seams across the road)
+    const quad = (c, x1, w1, x2, w2) => { g.fillStyle = c; g.beginPath(); g.moveTo(x1 - w1, y1); g.lineTo(x1 + w1, y1); g.lineTo(x2 + w2, p2.y); g.lineTo(x2 - w2, p2.y); g.fill(); };
+    quad(dark ? '#e23a32' : '#ffffff', p1.x, p1.w * 1.16, p2.x, p2.w * 1.16);                        // red-and-white kerbs
+    quad(dark ? '#4e4e57' : '#55555e', p1.x, p1.w, p2.x, p2.w);                                      // tarmac: darker, so it stands out from the grass
+    quad('#e9e9ec', p1.x, p1.w, p2.x, p2.w); quad(dark ? '#4e4e57' : '#55555e', p1.x, p1.w * 0.95, p2.x, p2.w * 0.95);   // white edge lines
+    if (dark) for (const l of [-1 / 3, 1 / 3]) quad('#f4f4f4', p1.x + p1.w * l, p1.w * 0.018, p2.x + p2.w * l, p2.w * 0.018);   // lane dashes
     if (sg.i < 6) quad(Math.floor(sg.i) % 2 ? '#111' : '#fff', p1.x, p1.w, p2.x, p2.w);              // start / finish
     drawn.push({ sg, p1, clip: maxy });
     maxy = p2.y;
   }
+  { const hz = g.createLinearGradient(0, H / 2 - 2, 0, H / 2 + 34); hz.addColorStop(0, 'rgba(205,239,255,.85)'); hz.addColorStop(1, 'rgba(205,239,255,0)'); g.fillStyle = hz; g.fillRect(0, H / 2 - 2, W, 36); }   // haze: the far road fades into the distance
   // scenery, coins, boxes and the other karts, far to near
   for (let n = drawn.length - 1; n >= 0; n--) {
     const d = drawn[n]; if (!d) continue;
@@ -1884,7 +1903,7 @@ function retroSwipe(x, y) {
   if (retro.state !== 'play') { if (retro.state === 'lost') resetRetro(); return; }
   if (x != null) { retro.cx = x; retro.cy = y; }
   retro.swipe = 0.16; tone(700, 300, 0.05, 'square', 0.025);
-  let best = null, bd = 11;
+  let best = null, bd = 14;                                            // (bigger mice, a bigger target)
   for (const m of retro.mice) { const d = Math.hypot(m.x - retro.cx, m.y - retro.cy); if (d < bd) { bd = d; best = m; } }
   if (!best) return;
   if (best.carry) { best.carry.by = null; best.carry.x = best.x; best.carry.y = best.y; }   // it drops the mushroom where it was
@@ -1931,11 +1950,12 @@ function drawRetroFrame() {                                           // the pix
   g.fillStyle = '#c98e4a'; g.fillRect(89, 28, 14, 8); g.fillStyle = '#8a8f98'; g.fillRect(92, 22, 8, 8); g.fillStyle = '#6b6f78'; g.fillRect(92, 20, 2, 3); g.fillRect(98, 20, 2, 3);   // cat in her box
   g.fillStyle = '#111'; g.fillRect(94, 25, 1, 1); g.fillRect(97, 25, 1, 1);
   for (const [x, y] of R_HOLES) { g.fillStyle = '#1a1310'; g.beginPath(); g.arc(x, y, 3.5, 0, 7); g.fill(); }
-  for (const s of R.shrooms) if (s.alive) { g.fillStyle = '#f4efe2'; g.fillRect(s.x - 1, s.y, 3, 3); g.fillStyle = '#e03a3a'; g.fillRect(s.x - 4, s.y - 3, 9, 4); g.fillStyle = '#fff'; g.fillRect(s.x - 2, s.y - 3, 1, 1); g.fillRect(s.x + 2, s.y - 2, 1, 1); }
+  for (const s of R.shrooms) if (s.alive) { g.fillStyle = '#f4efe2'; g.fillRect(s.x - 2, s.y, 4, 5); g.fillStyle = '#e03a3a'; g.fillRect(s.x - 6, s.y - 4, 13, 5); g.fillRect(s.x - 4, s.y - 6, 9, 2); g.fillStyle = '#fff'; g.fillRect(s.x - 3, s.y - 4, 2, 2); g.fillRect(s.x + 2, s.y - 3, 2, 2); g.fillRect(s.x, s.y - 6, 1, 1); }   // (bigger: they read on a phone)
   for (const m of R.mice) {
     const dir = m.st === 'home' ? Math.sign(m.hx - m.x) || 1 : Math.sign((m.tgt || R.shrooms[0]).x - m.x) || 1, wig = Math.sin(t * 20) > 0 ? 1 : 0;
-    g.fillStyle = '#9a9a9a'; g.fillRect(m.x - 3, m.y - 2 + wig * 0, 7, 4); g.fillRect(m.x + dir * 3, m.y - 2, 2, 3);
-    g.fillStyle = '#f0a0b0'; g.fillRect(m.x + dir * 3, m.y - 3, 1, 1); g.fillRect(m.x - dir * 5, m.y, 3, 1);
+    g.fillStyle = '#8c8c94'; g.fillRect(m.x - 5, m.y - 3, 11, 6); g.fillRect(m.x + dir * 5 - (dir < 0 ? 3 : 0), m.y - 3, 3, 4);   // body + head, twice the old size
+    g.fillStyle = '#f0a0b0'; g.fillRect(m.x + dir * 4 - (dir < 0 ? 1 : 0), m.y - 5, 2, 2); g.fillRect(m.x + dir * 7 - (dir < 0 ? 1 : 0), m.y - 2, 1, 1); g.fillRect(m.x - dir * 8 - (dir > 0 ? 3 : 0), m.y + 1 - wig, 4, 1);   // ear, nose, tail
+    g.fillStyle = '#111'; g.fillRect(m.x + dir * 6 - (dir < 0 ? 1 : 0), m.y - 2, 1, 1);                                                    // eye
   }
   for (const p of R.poofs) { g.fillStyle = `rgba(255,255,255,${p.t * 2.5})`; const r = (0.35 - p.t) * 20; g.fillRect(p.x - r, p.y - 1, r * 2, 2); g.fillRect(p.x - 1, p.y - r, 2, r * 2); }
   if (R.state === 'play') {                                           // the paw cursor
@@ -1945,7 +1965,7 @@ function drawRetroFrame() {                                           // the pix
     g.fillStyle = '#ff8fb8'; g.fillRect(x - 2, y + 1, 5, 2);
     for (const dx of [-4, -1.5, 1.5, 4]) { g.fillStyle = '#3a1434'; g.fillRect(x + dx - 1.5, y - 5 - big, 3, 3); g.fillStyle = '#ffffff'; g.fillRect(x + dx - 0.5, y - 4 - big, 1.5, 1.5); }
   }
-  g.font = 'bold 8px monospace'; g.textAlign = 'left'; g.fillStyle = '#3a1434'; g.fillText(`WHACKED ${R.whacked}/${R_GOAL}`, 26, 104 - 1);
+  g.font = 'bold 8px monospace'; g.textAlign = 'left'; g.fillStyle = 'rgba(58,20,52,.8)'; g.fillRect(2, 2, 70, 11); g.fillStyle = '#ffd23a'; g.fillText(`WHACKED ${R.whacked}/${R_GOAL}`, 5, 10);   // up in the corner, clear of the mouse holes
   g.textAlign = 'center';
   if (R.state === 'title') { g.fillStyle = 'rgba(40,10,40,.8)'; g.fillRect(20, 36, 152, 42); g.fillStyle = '#ffd23a'; g.fillText('PRINCESS KITTY', 96, 52); g.fillStyle = '#ff8fb8'; g.fillText('DEFENDER', 96, 62); g.fillStyle = '#fff'; g.fillText(`WHACK ${R_GOAL} MICE!`, 96, 73); }
   if (R.state === 'lost') { g.fillStyle = 'rgba(40,10,40,.85)'; g.fillRect(24, 40, 144, 32); g.fillStyle = '#ff6b6b'; g.fillText('GAME OVER', 96, 54); g.fillStyle = '#fff'; g.fillText('A: TRY AGAIN', 96, 66); }
@@ -4322,6 +4342,8 @@ const ACHIEVEMENTS = [
     ['catnipWalk', '🌀', 'Free-range zoomies', 'Get into the catnip in Free walk'],
     ['catnipAll', '🎰', 'Catnip connoisseur', 'Try all five catnip effects'],
     ['fishCatch', '🐟', 'Gone fishing', 'Catch 5 hallucinated fish in one trip'],
+    ['mirrorEnter', '🪞', 'Mirror, mirror', 'In Free walk, jump into a mirror'],
+    ['darkKitty', '😈', 'Through the looking glass', 'Beat the evil dark kitty in the mirror world (9 hits)'],
     ['inception', '🪆', 'Game-ception', 'Win the kart race, then beat the game on the driver\'s Switch'],
   ]],
   ['Other modes', [
@@ -4333,7 +4355,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 16:05';                                              // stamped when the site is published
+const BUILD = '2026-09-24 16:18';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5648,7 +5670,7 @@ function floatText(worldPos, text, cls) {
   const el = document.createElement('div');
   el.className = 'float ' + (cls || '');
   el.textContent = text;
-  el.style.left = `${(v.x * 0.5 + 0.5) * window.innerWidth}px`;
+  el.style.left = `${((mirrorWorld ? -v.x : v.x) * 0.5 + 0.5) * window.innerWidth}px`;   // (the mirror world's picture is flipped)
   el.style.top = `${(-v.y * 0.5 + 0.5) * window.innerHeight}px`;
   ui.fx.appendChild(el);
   el.addEventListener('animationend', () => el.remove());
@@ -6417,7 +6439,7 @@ renderer.domElement.addEventListener('pointermove', e => {
   if (walkPtr && walkPtr.id === e.pointerId && touches.size === 1) {   // free walk: one finger drags the camera round her
     const dx = e.clientX - walkPtr.x0, dy = e.clientY - walkPtr.y0;
     if (Math.hypot(dx, dy) > 10) walkPtr.moved = true;
-    if (walkPtr.moved) { fc.yaw = walkPtr.yaw - dx * 0.009; fc.tilt = THREE.MathUtils.clamp(walkPtr.tilt + dy * 0.18, -16, 62); }
+    if (walkPtr.moved) { fc.yaw = walkPtr.yaw - dx * 0.009 * (mirrorWorld ? -1 : 1); fc.tilt = THREE.MathUtils.clamp(walkPtr.tilt + dy * 0.18, -16, 62); }
   }
   if (pendingTap && e.pointerId === pendingTap.id && Math.hypot(e.clientX - pendingTap.x, e.clientY - pendingTap.y) > 14) pendingTap.ok = false;
   if (!gesture || touches.size < 2) return;
@@ -6468,10 +6490,11 @@ const walk = { on: false, rig: null, meshes: [], pos: new THREE.Vector3(), vel: 
 let walkPtr = null;
 const _wRay = new THREE.Raycaster(), _wO = new THREE.Vector3(), _wDown = new THREE.Vector3(0, -1, 0), _wv = new THREE.Vector3(), _wc = new THREE.Vector3();
 const _wTap = new THREE.Raycaster(); _wTap.layers.enable(1);
-function makeWalker() {
+function makeWalker(dark) {                                          // dark = the mirror world's evil twin: black fur, glowing eyes, a spiky dark crown
   const g = new THREE.Group(); g.visible = false; scene.add(g);
-  const fur = new THREE.MeshLambertMaterial({ color: 0xece6dd, map: furTex }), point = lam(0x9a8c82), pink = lam(0xf2a3b0), eyeM = basic(0x4a9ff0), pupil = basic(0x111111);
-  const gold = new THREE.MeshPhongMaterial({ color: 0xf7c948, shininess: 90, specular: 0xffffff, emissive: 0x3a2a00, side: THREE.DoubleSide });
+  const fur = new THREE.MeshLambertMaterial({ color: dark ? 0x2a2733 : 0xece6dd, map: furTex }), point = lam(dark ? 0x0c0b10 : 0x9a8c82), pink = lam(dark ? 0x3a2f45 : 0xf2a3b0);
+  const eyeM = basic(dark ? 0x19e6d0 : 0x4a9ff0), pupil = basic(0x111111);   // (cyan here: the mirror world's colour flip turns it blood red)
+  const gold = new THREE.MeshPhongMaterial({ color: dark ? 0x3cb043 : 0xf7c948, shininess: 90, specular: 0xffffff, emissive: dark ? 0x0a2a0a : 0x3a2a00, side: THREE.DoubleSide });
   const body = new THREE.Group(); g.add(body);
   const add = (geo, mat, x, y, z, par) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); (par || body).add(m); return m; };
   add(new THREE.SphereGeometry(0.2, 18, 14), fur, 0, 0.42, -0.02).scale.set(1, 0.95, 1.95);          // body
@@ -6507,7 +6530,12 @@ function makeWalker() {
     tail.push(seg); par = seg;
   }
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20), basic(0x000000, { transparent: true, opacity: 0.25, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.visible = false; scene.add(shadow);
-  return { g, body, head, legs, tail, shadow };
+  const eyes = [];
+  if (dark) for (const sx of [-1, 1]) {                                // glowing eyes
+    const e = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0x19e6d0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    e.position.set(sx * 0.07, 0.02, 0.15); e.scale.setScalar(0.14); head.add(e); eyes.push(e);
+  }
+  return { g, body, head, legs, tail, shadow, eyes };
 }
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY + 0.5;
@@ -6525,7 +6553,7 @@ function walkBlocked(nx, nz, ox, oz) {
 }
 function startWalk() {
   if (!walk.rig) walk.rig = makeWalker();
-  const skip = new Set([walk.rig.g, cat, heist.player.root, heistGoal.g, heist.ring, ...mice.map(m => m.root)]);
+  const skip = new Set([walk.rig.g, cat, heist.player.root, heistGoal.g, heist.ring, ...mice.map(m => m.root), ...(MW.dk ? [MW.dk.rig.g] : [])]);
   walk.meshes = [];
   scene.traverse(o => {
     if (!o.isMesh) return;
@@ -6550,6 +6578,7 @@ function startWalk() {
 function endWalk() {
   walk.on = false; walkPtr = null; walk.stick.x = walk.stick.y = 0;
   if (walk.poops) { walk.poops.forEach(o => scene.remove(o)); walk.poops = []; }
+  if (mirrorWorld) exitMirror(null, true);
   if (walk.rig) { walk.rig.g.visible = false; walk.rig.shadow.visible = false; }
   cat.visible = true; catTail.visible = true; document.body.classList.remove('walking');
   const ui = document.getElementById('walkUI'); if (ui) ui.hidden = true;
@@ -6562,6 +6591,7 @@ function updateWalk(dt) {
   let sx = walk.stick.x, sy = walk.stick.y;
   const kx = (K.arrowright || K.d ? 1 : 0) - (K.arrowleft || K.a ? 1 : 0), ky = (K.arrowdown || K.s ? 1 : 0) - (K.arrowup || K.w ? 1 : 0);
   if (kx || ky) { const l = Math.hypot(kx, ky); sx = kx / l; sy = ky / l; }
+  if (mirrorWorld) sx = -sx;                                          // the picture is flipped, so left/right are too
   const yaw = fc.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);   // stick up = away from the camera
   _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * nipK().walk);   // catnip: zoomies / a floaty drift / a slow zen amble
   walk.vel.lerp(_wv, 1 - Math.exp(-dt * (walk.grounded ? 12 : 8)));
@@ -6667,6 +6697,7 @@ function updateWalk(dt) {
   W.shadow.position.set(p.x, gy + 0.012, p.z); W.shadow.rotation.z = -walk.face; W.shadow.scale.set(1, 1.5, 1).multiplyScalar(1 / (1 + hgt * 0.4)); W.shadow.material.opacity = 0.25 / (1 + hgt);
   W.shadow.visible = !walk.fp;
   fc.focus.set(p.x, p.y + 0.55, p.z);
+  updateMirrorWorld(dt);
 }
 function walkCam(S) {                                                // keep the follow camera inside the room, or look out through her eyes
   if (walk.fp && walk.rig) {
@@ -6698,6 +6729,151 @@ function walkName(h) {                                               // what did
   }
   return surface();
 }
+
+/* =====================================================================
+   THE MIRROR WORLD (Free walk): walk or jump into either mirror (the tall one leaning on the right wall, or the
+   one over the mantle) and you come out in the opposite world: the room flipped left-to-right, its colours turned
+   inside out. The evil dark kitty is waiting in YOUR box. When it sees you it leaps out and hunts you, winding up
+   big swipes that knock you back. Nine hits beats it; five hits on you and you're thrown back out. Jump back into a
+   mirror any time to escape.
+   ===================================================================== */
+let mirrorWorld = false;
+const MW = { dk: null, hp: 9, you: 5, portalCD: 0, hurtT: 0, done: false };
+function mirrorPortals() {
+  const list = [], m = mirrorRig, mm = mantleMirror;
+  if (m && m.glass.visible && (m.hits || 0) < 3) list.push(new THREE.Box3().setFromObject(m.glass).expandByScalar(0.15));
+  if (mm && mm.state === 'wall') list.push(new THREE.Box3().setFromObject(mm.mh).expandByScalar(0.15));
+  return list;
+}
+function mirrorHud() {
+  const el = document.getElementById('mirrorHud'); if (!el) return;
+  el.hidden = !mirrorWorld;
+  el.innerHTML = `<div class="row"><span>😈 Dark kitty</span><span class="hp">${'🖤'.repeat(Math.max(0, MW.hp))}${'🤍'.repeat(9 - Math.max(0, MW.hp))}</span></div>`
+               + `<div class="row"><span>👑 You</span><span class="hp">${'💗'.repeat(Math.max(0, MW.you))}${'🤍'.repeat(5 - Math.max(0, MW.you))}</span></div>`;
+}
+function mirrorFlash(kind) { const el = document.getElementById('mirrorFlash'); el.className = ''; void el.offsetWidth; el.className = kind; }
+function shimmer() { [1568, 1319, 1047, 784, 1175, 1568, 2093].forEach((f, i) => tone(f, f * 1.02, 0.35, 'sine', 0.035, i * 0.05)); noise(0.5, 0.05, 5000); }
+function throughMirror() {                                           // step through: she comes out facing back into the room
+  MW.portalCD = 1.6; mirrorFlash('go'); shimmer();
+  const fx = Math.sin(walk.face), fz = Math.cos(walk.face), p = walk.pos;
+  p.x = THREE.MathUtils.clamp(p.x - fx * 0.8, -ROOM.halfW + 0.3, ROOM.halfW - 0.3); p.z = THREE.MathUtils.clamp(p.z - fz * 0.8, 0.3, ROOM.visDepth - 0.45);
+  p.y = surfaceTop(p.x, p.z, p.y + WALK.step); walk.grounded = true; walk.vy = 0; walk.vel.set(0, 0, 0);
+  walk.face += Math.PI; fc.yaw += Math.PI; fc.s.yaw = fc.yaw;
+}
+function enterMirror() {
+  throughMirror();
+  mirrorWorld = true; document.body.classList.add('mirror-world'); unlock('mirrorEnter');
+  MW.hp = 9; MW.you = 5; MW.done = false; MW.hurtT = 0;
+  if (!MW.dk) { MW.dk = { rig: makeWalker(true), pos: new THREE.Vector3(), vel: new THREE.Vector3(), vy: 0, grounded: true, face: 0, state: 'lurk', t: 0, cd: 0, phase: 0 }; MW.dk.rig.g.userData.name = 'Evil dark kitty'; }
+  const d = MW.dk; d.pos.set(CAT_POS.x, surfaceTop(CAT_POS.x, CAT_POS.z, 0.5), CAT_POS.z); d.vel.set(0, 0, 0); d.vy = 0; d.grounded = true; d.state = 'lurk'; d.t = 0; d.cd = 0;
+  d.face = Math.atan2(walk.pos.x - d.pos.x, walk.pos.z - d.pos.z); d.rig.g.scale.setScalar(1); d.rig.g.visible = true; d.rig.shadow.visible = true;
+  mirrorHud(); showBanner('The mirror world!'); showWalkName('Someone is waiting in your box...');
+}
+function exitMirror(msg, quiet) {
+  if (!quiet) throughMirror();
+  mirrorWorld = false; document.body.classList.remove('mirror-world');
+  if (MW.dk) { MW.dk.rig.g.visible = false; MW.dk.rig.shadow.visible = false; }
+  mirrorHud(); if (!quiet) showWalkName(msg || 'Back home');
+}
+function hurtPlayer(dx, dz, dist) {
+  MW.you--; MW.hurtT = 1.1; mirrorFlash('hurt');
+  walk.vel.set(dx / (dist || 1) * 6, 0, dz / (dist || 1) * 6); walk.vy = 5; walk.grounded = false;
+  shake = Math.max(shake, reduceMotion ? 0.06 : 0.4); vibrate(80); noise(0.2, 0.2, 1400); sfx.meow(false);
+  floatText(walk.pos.clone().setY(walk.pos.y + 1.1), 'Ouch!', 'bad'); mirrorHud();
+  if (MW.you <= 0) { showBanner('The dark kitty wins!'); MW.done = true; setTimeout(() => { if (mirrorWorld) exitMirror('Thrown out of the mirror... try again!'); }, 1300); }
+}
+function hitDark() {
+  const d = MW.dk; if (!d || d.state === 'dead' || MW.done) return;
+  MW.hp--; mirrorHud();
+  const dx = d.pos.x - walk.pos.x, dz = d.pos.z - walk.pos.z, dist = Math.hypot(dx, dz) || 1;
+  d.state = 'stun'; d.t = 0; d.cd = Math.max(d.cd, 0.5); d.vel.set(dx / dist * 5, 0, dz / dist * 5); d.vy = 3.5; d.grounded = false;   // knocked back, dazed
+  const at = d.pos.clone().setY(d.pos.y + 0.5);
+  burst(at, 0x2a2733, 10, 2.2, 2.4, 0.6); burst(at, 0x19e6d0, 5, 1.6, 2, 0.35);
+  noise(0.35, 0.16, 3200); tone(300, 140, 0.18, 'sawtooth', 0.05);                 // a hiss and a yelp
+  shake = Math.max(shake, reduceMotion ? 0.03 : 0.15);
+  if (MW.hp <= 0) {
+    d.state = 'dead'; d.t = 0; MW.done = true;
+    for (let i = 0; i < 4; i++) burst(at, [0x2a2733, 0x19e6d0, 0x3cb043, 0xffffff][i], 12, 3, 3, 0.8);
+    [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f, 0.18, 'triangle', 0.05, i * 0.1));
+    unlock('darkKitty'); showBanner('Dark kitty defeated!');
+    setTimeout(() => { if (mirrorWorld) exitMirror('You beat the dark kitty! 👑'); }, 2300);
+  } else floatText(at.setY(at.y + 0.8), `${MW.hp} to go!`, 'clutch');
+}
+function darkBlocked(q, grounded, nx, nz) {
+  const lim = q.y + (grounded ? WALK.step : 0.05), top = q.y + WALK.height;
+  if (surfaceTop(q.x, q.z, top) > lim) return false;
+  const mx = nx - q.x, mz = nz - q.z, ml = Math.hypot(mx, mz) || 1;
+  return surfaceTop(nx, nz, top) > lim || surfaceTop(nx + mx / ml * WALK.reach, nz + mz / ml * WALK.reach, top) > lim;
+}
+function updateDarkKitty(dt) {
+  const d = MW.dk; if (!d) return;
+  const p = walk.pos, q = d.pos, R = d.rig, dx = p.x - q.x, dz = p.z - q.z, dist = Math.hypot(dx, dz) || 0.001, dy = p.y - q.y;
+  d.t += dt; d.cd = Math.max(0, d.cd - dt);
+  let speed = 0, face = Math.atan2(dx, dz);
+  switch (d.state) {
+    case 'lurk':                                                     // crouched in the box, eyes on you
+      if (dist < 5.5 && !MW.done) { d.state = 'leap'; d.t = 0; d.vy = 9.5; d.grounded = false; d.vel.set(dx / dist * 3.2, 0, dz / dist * 3.2); sfx.meow(true); floatText(q.clone().setY(q.y + 1.4), '!!', 'bad'); showWalkName('The dark kitty sees you!'); }
+      break;
+    case 'leap': if (d.grounded && d.t > 0.2) { d.state = 'hunt'; d.t = 0; } break;
+    case 'hunt':
+      speed = 3.0;
+      if (dist < 1.0 && Math.abs(dy) < 0.8 && d.cd <= 0 && !MW.done) { d.state = 'windup'; d.t = 0; tone(160, 110, 0.4, 'sawtooth', 0.05); }
+      else if (d.grounded && dy > 0.5 && dist < 2.2) { d.vy = 11.5; d.grounded = false; }   // you're up on something: it jumps after you
+      break;
+    case 'windup':                                                   // paw raised... (dodge now!)
+      if (d.t > 0.42) {
+        noise(0.18, 0.1, 1800);
+        if (dist < 1.2 && Math.abs(dy) < 0.9 && MW.hurtT <= 0 && !MW.done) hurtPlayer(dx, dz, dist);
+        d.state = 'recover'; d.t = 0; d.cd = 0.9;
+      }
+      break;
+    case 'recover': case 'stun': if (d.t > 0.45) { d.state = MW.done ? 'lurk' : 'hunt'; d.t = 0; } break;
+    case 'dead': R.g.scale.setScalar(Math.max(0.01, 1 - d.t * 1.6)); if (d.t > 0.65) { R.g.visible = false; R.shadow.visible = false; } break;
+  }
+  if (d.state === 'dead') return;
+  // move (its own little version of her physics: stands on whatever is under it, hops over what blocks it)
+  const want = _wv.set(dx / dist * speed, 0, dz / dist * speed);
+  if (d.state === 'hunt') d.vel.lerp(want, 1 - Math.exp(-dt * 8)); else if (d.grounded) d.vel.multiplyScalar(Math.exp(-dt * 6));
+  const mx = d.vel.x * dt, mz = d.vel.z * dt;
+  if (mx || mz) {
+    const lx = ROOM.halfW - 0.3, nx = THREE.MathUtils.clamp(q.x + mx, -lx, lx), nz = THREE.MathUtils.clamp(q.z + mz, 0.3, ROOM.visDepth - 0.45);
+    if (!darkBlocked(q, d.grounded, nx, nz)) { q.x = nx; q.z = nz; }
+    else if (d.grounded && d.state === 'hunt') { d.vy = 10.5; d.grounded = false; }   // something in the way: over it
+  }
+  if (d.grounded) { const g = surfaceTop(q.x, q.z, q.y + WALK.step); if (g >= q.y - WALK.step) q.y = g; else { d.grounded = false; d.vy = 0; } }
+  else {
+    d.vy -= WALK.grav * dt; const ny = Math.min(q.y + d.vy * dt, CEIL_H - WALK.height - 0.05);
+    if (d.vy <= 0) { const g = surfaceTop(q.x, q.z, q.y + 0.02); if (ny <= g) { q.y = g; d.vy = 0; d.grounded = true; } else q.y = ny; } else q.y = ny;
+  }
+  // look + animate
+  let df = face - d.face; df = Math.atan2(Math.sin(df), Math.cos(df)); d.face += df * Math.min(1, dt * (d.state === 'windup' ? 14 : 8));
+  const spd = Math.hypot(d.vel.x, d.vel.z), a = Math.min(1, spd / 2); d.phase += dt * (5 + spd * 3.4); const sw = Math.sin(d.phase);
+  R.g.position.copy(q); R.g.rotation.y = d.face;
+  R.body.rotation.x = 0; R.body.position.y = 0;
+  if (d.state === 'lurk') {                                          // crouched low in the box, peeking over the rim
+    R.body.position.y = -0.12; R.body.rotation.x = -0.25;
+    R.legs[0].rotation.x = R.legs[1].rotation.x = 0.2; R.legs[2].rotation.x = R.legs[3].rotation.x = -1.1;
+  } else if (!d.grounded) { R.legs[0].rotation.x = R.legs[1].rotation.x = -0.9; R.legs[2].rotation.x = R.legs[3].rotation.x = 0.9; R.body.rotation.x = -0.2; }
+  else { R.legs[0].rotation.x = R.legs[3].rotation.x = sw * 0.75 * a; R.legs[1].rotation.x = R.legs[2].rotation.x = -sw * 0.75 * a; }
+  if (d.state === 'windup') { R.legs[1].rotation.x = -1.9 * Math.min(1, d.t / 0.2); R.body.rotation.x = -0.15; }
+  if (d.state === 'recover' && d.t < 0.2) R.legs[1].rotation.x = -1.9 + d.t * 9;
+  R.g.position.x += d.state === 'stun' ? Math.sin(d.t * 60) * 0.03 : 0;
+  R.tail.forEach((sg, i) => { sg.rotation.x = (i ? 0.25 : 0.9); sg.rotation.y = Math.sin(clock * (d.state === 'lurk' ? 3 : 7) - i * 0.55) * (0.15 + i * 0.04); });   // an angry lashing tail
+  R.eyes.forEach(e => e.scale.setScalar(0.12 + (d.state === 'windup' ? 0.1 : 0) + Math.sin(clock * 6) * 0.015));
+  const gy = surfaceTop(q.x, q.z, q.y + 0.05), hgt = q.y - gy;
+  R.shadow.position.set(q.x, gy + 0.012, q.z); R.shadow.scale.set(1, 1.5, 1).multiplyScalar(1 / (1 + hgt * 0.4)); R.shadow.rotation.z = -d.face;
+}
+function updateMirrorWorld(dt) {
+  MW.portalCD = Math.max(0, MW.portalCD - dt); MW.hurtT = Math.max(0, MW.hurtT - dt);
+  const p = walk.pos, spd = Math.hypot(walk.vel.x, walk.vel.z);
+  if (MW.portalCD <= 0 && (spd > 0.4 || !walk.grounded)) {           // walking or jumping into a mirror: through you go
+    const ahead = new THREE.Vector3(p.x + Math.sin(walk.face) * 0.45, p.y + 0.4, p.z + Math.cos(walk.face) * 0.45);
+    if (mirrorPortals().some(b => b.containsPoint(ahead))) { if (mirrorWorld) exitMirror(MW.done ? null : 'You escaped the mirror world'); else enterMirror(); return; }
+  }
+  if (!mirrorWorld) return;
+  updateDarkKitty(dt);
+  if (walk.rig && MW.hurtT > 0) walk.rig.g.visible = !walk.fp && Math.sin(clock * 30) > 0;   // blinks while she recovers
+}
 function walkLanded() {                                              // landing on the acrylic table: first time it creaks, second time it shatters
   const o = walk.hitObj;
   if (o && o.userData.table && tableRig && !tableRig.broken) {
@@ -6715,6 +6891,9 @@ function walkSwipe() {                                               // swipe at
   walk.swipeReady = clock + 0.3; walk.batT = 0.35; noise(0.12, 0.05, 1800);
   const p = walk.pos, fx = Math.sin(walk.face), fz = Math.cos(walk.face);
   const paw = new THREE.Vector3(p.x + fx * 0.45, p.y + 0.35, p.z + fz * 0.45);
+  if (mirrorWorld && MW.dk && MW.dk.state !== 'dead') {                // the dark kitty within reach: that's who gets it
+    const q = MW.dk.pos; if (Math.hypot(q.x - paw.x, q.z - paw.z) < 1.0 && Math.abs(q.y + 0.4 - paw.y) < 0.9) { hitDark(); return; }
+  }
   if (p.y < 0.6) {                                                   // a mushroom at her paw: swat it clean across the room
     const c = cheeses.find(c => c.alive && c.state !== 'carried' && !c.fall && Math.hypot(c.pos.x - paw.x, c.pos.z - paw.z) < 0.65);
     if (c) { c.nudge(walk.face, 2.4); c.hitT = 0.3; showWalkName('Mushroom'); return; }
@@ -6802,6 +6981,7 @@ function walkMeow() {
   });
 }
 function walkTap(x, y) {
+  if (mirrorWorld) x = window.innerWidth - x;                        // the picture is flipped: so is where you tapped
   _wTap.setFromCamera(_wv.set(x / window.innerWidth * 2 - 1, -(y / window.innerHeight) * 2 + 1, 0), camera);
   const h = _wTap.intersectObjects(scene.children, true).find(h => {
     if (!h.object.isMesh) return false;
@@ -6809,6 +6989,10 @@ function walkTap(x, y) {
     const m = Array.isArray(h.object.material) ? h.object.material[h.face ? h.face.materialIndex : 0] : h.object.material;
     return m && m !== noFace && m.visible !== false && m.blending !== THREE.AdditiveBlending && !(m.transparent && m.opacity < 0.1);
   });
+  if (h && mirrorWorld && MW.dk && MW.dk.state !== 'dead') {          // tapped the dark kitty: close enough, it's a hit
+    let q = h.object; while (q && q !== MW.dk.rig.g) q = q.parent;
+    if (q) { walk.look = MW.dk.pos.clone(); walk.batT = 0.35; if (MW.dk.pos.distanceTo(walk.pos) < 1.7) hitDark(); else floatText(h.point.clone().setY(h.point.y + 0.4), 'Get closer!', 'warn'); return; }
+  }
   if (h) {
     const name = walkName(h); floatText(h.point.clone().setY(h.point.y + 0.3), name, 'name'); showWalkName(name);
     walk.look = h.point.clone(); walk.batT = 0.35;
