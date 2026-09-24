@@ -3162,6 +3162,7 @@ class Mouse {
     scene.add(this.root);
   }
   spawn(hole, isBomb, D, opts) {
+    if (opts.boss) isBomb = false;                                    // (belt and braces: never a bomb king)
     this.active = true; this.root.visible = true;
     this.hole = hole; this.isBomb = isBomb; this.attract = !!opts.attract;
     this.speed = D.runSpeed * (1 + (Math.random() * 2 - 1) * CFG.SPEED_VARIANCE);
@@ -3605,7 +3606,7 @@ function spawnMouse(opts) {
      ------------------------------------------------------------------- */
   let isBomb;
   if (opts.attract) isBomb = Math.random() < 0.2;
-  else if (opts.safe) isBomb = false;
+  else if (opts.safe || opts.boss) isBomb = false;                  // the Rat King never carries a bomb
   else {
     isBomb = Math.random() < D.bombRatio;
     if (spawnedCount < CFG.SAFE_OPENING_MICE) isBomb = false;
