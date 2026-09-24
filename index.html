@@ -360,8 +360,8 @@ function getDifficulty(t) {
 /* =====================================================================
    WORLD LAYOUT  (x: left/right, z: back wall = 0 → toward camera)
    ===================================================================== */
-const ROOM = { halfW: 5.2, depth: 13, wallH: 18, visDepth: 18.4 };  // visDepth: the room ends about 4 ft past the fireplace
-const CEIL_H = 84 / 15.6;                                           // 7 ft ceiling (84"), a few inches over the door frame  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
+const ROOM = { halfW: 5.2, depth: 13, wallH: 10 / 1.3, visDepth: 18.4 };  // walls stop at the 10 ft ceiling; the room ends about 4 ft past the fireplace
+const CEIL_H = ROOM.wallH;                                          // ceiling sits right on top of the walls (an open-topped box seen from above)  // depth = play area; visDepth/wallH = how far the room extends to fill the screen
 /* ACCESS POINTS — where mice come in and go home.
    kind 'couch': out from under a sofa · 'wall': a mouse hole · 'door': through the doorway from the hall.
    x/z is the point on the edge, n is the direction the mouse walks out. */
@@ -1384,11 +1384,16 @@ const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // openi
   const HALL_D = FT(9), HALL_W = FT(6), hx = ROOM.halfW + WALL_T, hz0 = DOOR_Z - HALL_W / 2;
   const hallWall = basic(0x3c4c57), hallFloor = basic(0x2e2c2a);
   const hf = new THREE.Mesh(new THREE.PlaneGeometry(HALL_D, HALL_W), hallFloor); hf.rotation.x = -Math.PI / 2; hf.position.set(hx + HALL_D / 2, 0.005, DOOR_Z); scene.add(hf);
-  const far = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, FT(9)), basic(0x33424c)); far.rotation.y = -Math.PI / 2; far.position.set(hx + HALL_D, FT(4.5), DOOR_Z); scene.add(far);
+  const far = new THREE.Mesh(new THREE.PlaneGeometry(HALL_W, ROOM.wallH), basic(0x33424c)); far.rotation.y = -Math.PI / 2; far.position.set(hx + HALL_D, ROOM.wallH / 2, DOOR_Z); scene.add(far);
+  const backdrop = basic(0x2b2520, { side: THREE.BackSide });         // outsides of the hall match the backdrop: it only shows through the door
+  const addBack = m => { const b = new THREE.Mesh(m.geometry, backdrop); b.position.copy(m.position); b.rotation.copy(m.rotation); scene.add(b); };
+  addBack(far);
   for (const z of [hz0, hz0 + HALL_W]) {
-    const sw = new THREE.Mesh(new THREE.PlaneGeometry(HALL_D, FT(9)), hallWall);
-    sw.rotation.y = z === hz0 ? 0 : Math.PI; sw.position.set(hx + HALL_D / 2, FT(4.5), z); scene.add(sw);
+    const sw = new THREE.Mesh(new THREE.PlaneGeometry(HALL_D, ROOM.wallH), hallWall);
+    sw.rotation.y = z === hz0 ? 0 : Math.PI; sw.position.set(hx + HALL_D / 2, ROOM.wallH / 2, z); scene.add(sw); addBack(sw);
   }
+  // a lid over the hall the same colour as the backdrop: from above it disappears, through the door it's a dark ceiling
+  const lid = new THREE.Mesh(new THREE.PlaneGeometry(HALL_D + WALL_T, HALL_W), basic(0x2b2520, { side: THREE.DoubleSide })); lid.rotation.x = Math.PI / 2; lid.position.set(hx - WALL_T / 2 + HALL_D / 2, ROOM.wallH, DOOR_Z); scene.add(lid);
   const lit = new THREE.Mesh(new THREE.PlaneGeometry(IN(30), IN(78)), basic(0x8fa3ad)); lit.rotation.y = -Math.PI / 2; lit.position.set(hx + HALL_D - 0.01, IN(39), DOOR_Z + FT(1.2)); scene.add(lit);
   const spill = new THREE.Mesh(new THREE.PlaneGeometry(FT(3), IN(30)), basic(0x5b6c75)); spill.rotation.x = -Math.PI / 2; spill.position.set(hx + HALL_D - FT(1.5), 0.01, DOOR_Z + FT(1.2)); scene.add(spill);
   // casing on the room side
