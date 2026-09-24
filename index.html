@@ -171,6 +171,8 @@
   .float.shot{color:#ff2a2a;font-size:24px}
   .foot-3{display:grid;grid-template-columns:1fr auto 1fr;gap:8px}.foot-3>:last-child{justify-self:end}   /* Best | Chaos mode | Music, chaos dead centre */
   .chaos-link{color:#7a3fb8}
+  .modes{display:flex;align-items:center;gap:5px;white-space:nowrap}.modes .dot{opacity:.5}
+  .heist-ring{}
   .alt-row{display:flex;justify-content:center;font-size:14px;font-weight:700;color:#8a4a70;margin-top:-4px}
   .float.bad{color:var(--danger);font-size:26px}
   .float.warn{color:#ffd3e8;font-size:17px;animation-duration:1.6s}
@@ -230,7 +232,7 @@
       </li>
     </ul>
     <button class="btn" id="startBtn">Start your mission</button>
-    <div class="foot foot-3"><span>Best: <span id="bestStart">—</span></span><button class="link-btn chaos-link" id="chaosBtn">Chaos mode</button><span class="foot-btns"><button class="link-btn" id="musicBtn">Music: on</button></span></div>
+    <div class="foot foot-3"><span>Best: <span id="bestStart">—</span></span><span class="modes"><button class="link-btn chaos-link" id="chaosBtn">Chaos mode</button><span class="dot">·</span><button class="link-btn chaos-link" id="mouseBtn">Mouse mode</button></span><span class="foot-btns"><button class="link-btn" id="musicBtn">Music: on</button></span></div>
   </div>
 </section>
 
@@ -253,7 +255,7 @@
     <dl class="stats">
       <div><dt>Score</dt><dd id="oScore">0</dd></div>
       <div><dt>Survived</dt><dd id="oTime">0:00</dd></div>
-      <div><dt>Mice whacked</dt><dd id="oWhacked">0</dd></div>
+      <div><dt id="oWhackedLbl">Mice whacked</dt><dd id="oWhacked">0</dd></div>
       <div><dt>Best</dt><dd id="oBest">0</dd></div>
     </dl>
     <button class="btn" id="againBtn">Play again</button>
@@ -2995,7 +2997,7 @@ class Mouse {
   update(dt, time) {
     // rave mode: everyone on screen stands up on their hind legs and dances to the beat for a while
     if (danceUntil > clock && this.state !== 'whacked' && this.state !== 'emerge' && this.state !== 'home' && !this.attract
-        && (gameMode !== 'chaos' || (this.state === 'wander' && !this.wp && this.hops >= 1))) {   // chaos: scamper out onto the carpet first, then dance
+        && this.state !== 'player' && (gameMode !== 'chaos' || (this.state === 'wander' && !this.wp && this.hops >= 1))) {   // chaos: scamper out onto the carpet first, then dance
       if (!this.dancing) { this.dancing = true; this.dancePhase = Math.random() * 6; }
       const beat = actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 6) : Math.abs(Math.sin(clock * 8.1));
       const ph = this.dancePhase, s = this.model.scale.y || 1;
@@ -3026,6 +3028,7 @@ class Mouse {
     }
 
     switch (this.state) {
+      case 'player': bob = this.playerRun ? Math.abs(Math.sin(this.t * 24)) * 0.06 : 0; break;   // steered by you (mouse mode)
       case 'emerge': {
         const k = Math.min(1, this.t / 0.32);
         p.lerpVectors(this.hole.mouthIn, this.hole.mouthOut, 1 - (1 - k) ** 2);
@@ -3200,6 +3203,103 @@ class Mouse {
 const mice = Array.from({ length: 14 }, () => new Mouse());
 
 /* =====================================================================
+   MOUSE MODE: you're the mouse. Hold to run toward your finger (or arrows / WASD), grab a mushroom in your
+   mouth, get it back to any mouse hole. The cat hunts you: a red ring marks where her paw is about to land.
+   Steal all three to win; three hits and she's got you.
+   ===================================================================== */
+const HEIST_LIVES = 3;
+const heist = { player: new Mouse(), hold: null, keys: {}, strike: null, strikeT: 2, invuln: 0, carrying: null, stolen: 0, vel: new THREE.Vector3(),
+  ring: (() => { const g = new THREE.Group(); g.visible = false; scene.add(g);
+    g.add(new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 40), basic(0xff2a2a, { transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide })));
+    g.add(new THREE.Mesh(new THREE.CircleGeometry(0.42, 40), basic(0xff2a2a, { transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide })));
+    g.children.forEach(m => { m.rotation.x = -Math.PI / 2; m.renderOrder = 3; }); return g; })() };
+window.addEventListener('keydown', e => { heist.keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keyup', e => { heist.keys[e.key.toLowerCase()] = false; });
+const _hRay = new THREE.Raycaster(), _hN = new THREE.Vector2(), _hP = new THREE.Vector3(), _hD = new THREE.Vector3();
+function heistBlocked(x, z) {
+  if (rollBlocked(x, z)) return true;                                // sofas, fireplace, table, fan, the side walls
+  if (z < DEPTH + 0.25 || z > ROOM.visDepth - 0.4) return true;      // the credenza along the back; the open end
+  return Math.abs(x - CAT_POS.x) < BOX.w / 2 + 0.25 && Math.abs(z - CAT_POS.z) < BOX.d / 2 + 0.25;   // the cat's box
+}
+function startHeist() {
+  const p = heist.player, hole = HOLES.find(h => h.kind === 'fire') || HOLES[0];
+  p.spawn(hole, false, D, {}); p.pop = 1; p.setState('player'); p.root.position.copy(hole.mouthOut); p.root.rotation.y = Math.atan2(hole.normal.x, hole.normal.z);
+  Object.assign(heist, { hold: null, strike: null, strikeT: 2.2, invuln: 0, carrying: null, stolen: 0 }); heist.vel.set(0, 0, 0);
+  lives = HEIST_LIVES; updateHud();
+  fcStart(); fc.zoom = 0.55;                                         // the camera follows you, down closer to the floor
+}
+function heistHurt() {
+  const p = heist.player;
+  lives--; heist.invuln = 1.6; combo = 0;
+  if (heist.carrying) { heist.carrying.drop(); heist.carrying = null; p.target = null; }   // you drop what you were carrying
+  p.sqY = 0.35; p.sqXZ = 1.5;                                        // squashed flat for a moment
+  sfx.whack(true); sfx.squeak(3); vibrate(60); shake = Math.max(shake, reduceMotion ? 0.05 : 0.3);
+  burst(p.root.position.clone().setY(0.3), 0xff6fae, 10, 2.4, 3, 0.8);
+  floatText(p.root.position.clone().setY(1.1), '−1 life', 'bad');
+  updateHud();
+  if (lives <= 0) endGame('caught');
+}
+function updateHeist(dt) {
+  const p = heist.player, pos = p.root.position;
+  // ---- steering: toward the finger on the floor, or the arrow keys (relative to the camera)
+  _hD.set(0, 0, 0);
+  if (heist.hold) {
+    _hN.set(heist.hold.x / window.innerWidth * 2 - 1, -(heist.hold.y / window.innerHeight) * 2 + 1); _hRay.setFromCamera(_hN, camera);
+    if (_hRay.ray.intersectPlane(floorPlane, _hP)) { _hD.set(_hP.x - pos.x, 0, _hP.z - pos.z); if (_hD.length() < 0.12) _hD.set(0, 0, 0); }
+  } else {
+    const k = heist.keys, fx = (k.arrowright || k.d ? 1 : 0) - (k.arrowleft || k.a ? 1 : 0), fz = (k.arrowdown || k.s ? 1 : 0) - (k.arrowup || k.w ? 1 : 0);
+    if (fx || fz) { const y = fc.s.yaw; _hD.set(fx * Math.cos(y) + fz * Math.sin(y), 0, -fx * Math.sin(y) + fz * Math.cos(y)); }
+  }
+  const speed = heist.carrying ? 2.1 : 2.8;
+  if (_hD.lengthSq() > 0) {
+    _hD.normalize().multiplyScalar(speed * dt);
+    const nx = pos.x + _hD.x, nz = pos.z + _hD.z;
+    if (heistBlocked(pos.x, pos.z) || !heistBlocked(nx, nz)) { pos.x = nx; pos.z = nz; }   // (holes sit right by the furniture: you can always walk out)
+    else if (!heistBlocked(nx, pos.z)) pos.x = nx;
+    else if (!heistBlocked(pos.x, nz)) pos.z = nz;
+    p.faceToward(pos.x + _hD.x * 10, pos.z + _hD.z * 10, dt);
+    heist.vel.copy(_hD).divideScalar(Math.max(dt, 1e-3)); p.playerRun = true;
+  } else { heist.vel.multiplyScalar(0.8); p.playerRun = false; }
+  p.sqY += (1 - p.sqY) * Math.min(1, dt * 4); p.sqXZ += (1 - p.sqXZ) * Math.min(1, dt * 4);
+  heist.invuln = Math.max(0, heist.invuln - dt); p.root.visible = heist.invuln <= 0 || Math.sin(clock * 30) > 0;   // blinks while safe
+  // ---- grab a mushroom, bank it at a hole
+  if (!heist.carrying) {
+    for (const c of cheeses) if (c.available && Math.hypot(c.pos.x - pos.x, c.pos.z - pos.z) < 0.55) {
+      c.startCarry(p); p.target = c; heist.carrying = c; sfx.squeak(2); floatText(pos.clone().setY(1), 'Got one!', ''); break;
+    }
+  } else {
+    for (const h of HOLES) if (Math.hypot(h.mouthOut.x - pos.x, h.mouthOut.z - pos.z) < 0.95) {
+      const c = heist.carrying; heist.carrying = null; p.target = null; c.lose(); heist.stolen++;
+      const pts = 100 * heist.stolen; score += pts; floatText(pos.clone().setY(1.1), `Stolen! +${pts}`, 'clutch');
+      burst(pos.clone().setY(0.3), 0xf4c13d, 12, 2, 3, 0.7); sfx.bite(false); updateHud();
+      if (heist.stolen >= cheeses.length) { score += Math.max(0, 600 - Math.round(elapsed) * 3); updateHud(); endGame('heist'); }   // a speed bonus for a quick heist
+      break;
+    }
+  }
+  // ---- the cat hunts you: a red ring shows where the paw will land, then it strikes
+  const tele = 0.8 - 0.35 * D.d;
+  if (!heist.strike) {
+    heist.strikeT -= dt;
+    if (heist.strikeT <= 0) {
+      const lead = 0.35 + Math.random() * 0.35, at = new THREE.Vector3(pos.x + heist.vel.x * lead + (Math.random() - 0.5) * 0.4, 0.02, pos.z + heist.vel.z * lead + (Math.random() - 0.5) * 0.4);
+      at.x = THREE.MathUtils.clamp(at.x, -ROOM.halfW + 0.4, ROOM.halfW - 0.4); at.z = THREE.MathUtils.clamp(at.z, DEPTH + 0.3, ROOM.visDepth - 0.5);
+      heist.strike = { at, t: 0, struck: false }; heist.ring.position.copy(at); heist.ring.visible = true; sfx.angryMeow && Math.random() < 0.3 && sfx.angryMeow();
+    }
+  } else {
+    const st = heist.strike; st.t += dt;
+    const k = Math.min(1, st.t / tele); heist.ring.scale.setScalar(1.25 - 0.25 * k); heist.ring.children[0].material.opacity = 0.5 + 0.5 * Math.abs(Math.sin(st.t * 18));
+    if (!st.struck && st.t >= tele) { st.struck = true; startSwipe(st.at); sfx.whoosh(); }
+    if (st.struck && st.t >= tele + 0.12) {                             // the paw lands
+      heist.ring.visible = false; heist.strike = null; heist.strikeT = 1.4 - 0.7 * D.d + Math.random() * 0.6;
+      burst(st.at.clone().setY(0.15), 0xb08a64, 5, 1.4, 1.5, 0.7);
+      if (heist.invuln <= 0 && Math.hypot(pos.x - st.at.x, pos.z - st.at.z) < 0.55) heistHurt(); else sfx.miss();
+    }
+  }
+  // ---- the camera follows along
+  fc.focus.set(pos.x, 0.2, pos.z);
+}
+
+/* =====================================================================
    GAME STATE
    ===================================================================== */
 let gameMode = 'classic';       // classic | chaos (no mushrooms: just mice running riot for 2 minutes)
@@ -3224,6 +3324,7 @@ function isHoleFree(h) {
    their mouth are skipped so two mice never stack in one hole.
    --------------------------------------------------------------------- */
 function updateSpawner(dt) {
+  if (gameMode === 'mouse') return;                                  // mouse mode: you're the only mouse
   spawnTimer -= dt;
   if (spawnTimer > 0) return;
   if (gameMode === 'chaos') {                                      // chaos: no thieves at all, the mice only come out to party during a rave
@@ -3396,7 +3497,7 @@ function tapShake() { shake = Math.max(shake, reduceMotion ? 0.03 : 0.13); }
 
 
 function checkBoss() {                                             // 1000 points: the Rat King comes for the mushrooms
-  if (bossDone || score < 1000 || state !== 'playing') return;
+  if (bossDone || score < 1000 || state !== 'playing' || gameMode === 'mouse') return;
   const m = spawnMouse({ boss: true }); if (!m) return;
   bossDone = true; startCutscene(m);
 }
@@ -3742,11 +3843,12 @@ function onCheeseStolen(m, c) {
 /* Fail states: cheese loss is the primary loss; lives are the misplay penalty. */
 function checkEnd() {
   if (state !== 'playing') return;
-  if (gameMode !== 'chaos' && !cheeses.some(c => c.alive)) endGame('cheese');
+  if (gameMode === 'classic' && !cheeses.some(c => c.alive)) endGame('cheese');
   else if (lives <= 0) endGame('lives');
 }
 function endGame(reason) {
   state = 'ending'; endReason = reason; endTimer = 1.2;
+  heist.ring.visible = false; heist.strike = null; heist.hold = null;
   sfx.over();
 }
 
@@ -3781,7 +3883,7 @@ function updateHud() {
   ui.score.textContent = score;
   const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
   ui.combo.hidden = mult <= 1; ui.combo.textContent = `x${mult}`;
-  ui.lives.querySelectorAll('.pip').forEach((p, i) => p.classList.toggle('lost', i >= lives));
+  ui.lives.querySelectorAll('.pip').forEach((p, i) => { p.classList.toggle('lost', i >= lives); p.style.display = gameMode === 'mouse' && i >= HEIST_LIVES ? 'none' : ''; });
   const wedges = ui.cheeses.querySelectorAll('.wedge');
   cheeses.forEach((c, i) => {
     wedges[i].classList.toggle('moved', c.state === 'dropped');
@@ -3822,7 +3924,7 @@ function showBestOnStart() { const b = getBest(); $('bestStart').textContent = b
 showBestOnStart();
 
 /* ---------- screens ---------- */
-function clearField() { for (const m of mice) m.release(); }
+function clearField() { for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.strike = null; heist.ring.visible = false; heist.hold = null; } }
 function resetGame() {
   clearField();
   cheeses.forEach(c => c.reset());
@@ -3836,13 +3938,14 @@ function resetGame() {
   updateHud(); updateClockHud();
 }
 function startGame(mode) {
-  gameMode = mode === 'chaos' ? 'chaos' : 'classic';
+  gameMode = mode === 'chaos' || mode === 'mouse' ? mode : 'classic';
   initAudio();
   resetGame();
   ui.start.hidden = true; ui.over.hidden = true; ui.pause.hidden = true; ui.hud.hidden = false;
   state = 'playing';
   resetChaosCam();
   if (gameMode === 'chaos') showBanner('Chaos mode!');
+  if (gameMode === 'mouse') { startHeist(); showBanner('Mouse mode!'); camToast('Hold to run · steal the mushrooms', 3200); }
 }
 function pauseGame() {
   if (state !== 'playing') return;
@@ -3862,11 +3965,11 @@ function showGameOver() {
   const best = getBest(), isNew = score > best;
   if (isNew) setBest(score);
   $('overEyebrow').textContent = isNew && score > 0 ? 'New best!' : 'Game over';
-  $('overTitle').textContent = endReason === 'chaos' ? 'Chaos complete!' : endReason === 'cheese' ? (prizeMode === 'mushroom' ? 'The mushrooms are gone' : 'The cheese is gone') : 'Out of lives';
+  $('overTitle').textContent = endReason === 'heist' ? 'Heist complete!' : endReason === 'caught' ? 'The cat got you' : endReason === 'chaos' ? 'Chaos complete!' : endReason === 'cheese' ? (prizeMode === 'mushroom' ? 'The mushrooms are gone' : 'The cheese is gone') : 'Out of lives';
   $('overReason').textContent = ''; $('overReason').hidden = true;
   $('oScore').textContent = score;
   $('oTime').textContent = fmtTime(elapsed);
-  $('oWhacked').textContent = whackedCount;
+  $('oWhacked').textContent = gameMode === 'mouse' ? heist.stolen : whackedCount; $('oWhackedLbl').textContent = gameMode === 'mouse' ? 'Mushrooms stolen' : 'Mice whacked';
   $('oBest').textContent = Math.max(best, score);
   $('oBest').classList.toggle('new', isNew && score > 0);
   ui.over.hidden = false;
@@ -3875,6 +3978,7 @@ function showGameOver() {
 
 $('startBtn').addEventListener('click', () => startGame('classic'));
 $('chaosBtn').addEventListener('click', () => startGame('chaos'));
+$('mouseBtn').addEventListener('click', () => startGame('mouse'));
 $('againBtn').addEventListener('click', () => startGame(gameMode));
 $('overTitleBtn').addEventListener('click', () => { ui.over.hidden = true; quitToTitle(); });
 $('pauseBtn').addEventListener('click', pauseGame);
@@ -3890,6 +3994,7 @@ renderer.domElement.addEventListener('pointerdown', e => {
   if (!e.isPrimary) return;                                            // second finger = camera gesture, not a swipe
   if (e.button === 2) return;                                          // right button = chaos camera orbit
   e.preventDefault();
+  if (gameMode === 'mouse') { heist.hold = { id: e.pointerId, x: e.clientX, y: e.clientY }; return; }   // mouse mode: hold to run toward your finger
   if (gameMode === 'chaos') { pendingTap = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), ok: true }; return; }   // chaos: fires on release (see endTouch)
   handleTap(e.clientX, e.clientY);
 }, { passive: false });
@@ -4388,6 +4493,7 @@ function chaosGestureStep() {                                         // once pe
 }
 renderer.domElement.addEventListener('pointermove', e => {
   if (!touches.has(e.pointerId)) return; touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (heist.hold && heist.hold.id === e.pointerId) { heist.hold.x = e.clientX; heist.hold.y = e.clientY; }
   if (pendingTap && e.pointerId === pendingTap.id && Math.hypot(e.clientX - pendingTap.x, e.clientY - pendingTap.y) > 14) pendingTap.ok = false;
   if (!gesture || touches.size < 2) return;
   if (gameMode === 'chaos') { if (!gestureQueued) { gestureQueued = true; requestAnimationFrame(chaosGestureStep); } return; }
@@ -4397,6 +4503,7 @@ renderer.domElement.addEventListener('pointermove', e => {
   if (!gestureQueued) { gestureQueued = true; requestAnimationFrame(() => { gestureQueued = false; fitCamera(); }); }
 });
 const endTouch = e => {
+  if (heist.hold && heist.hold.id === e.pointerId) heist.hold = null;
   if (pendingTap && e.pointerId === pendingTap.id) {                  // a clean single tap: now it counts
     const t = pendingTap; pendingTap = null;
     if (e.type === 'pointerup' && t.ok && state === 'playing' && performance.now() - t.t < 600) handleTap(t.x, t.y);
@@ -4440,8 +4547,10 @@ function frame(now) {
       D = getDifficulty(elapsed);
       updateSpawner(dt);
       updateClockHud();
+      if (gameMode === 'mouse') updateHeist(dt);
     }
     for (const m of mice) if (m.active) m.update(sdt, clock);
+    if (heist.player.active) heist.player.update(sdt, clock);
     if (state === 'ending') { endTimer -= dt; if (endTimer <= 0) showGameOver(); }
   } else if (state === 'cutscene') {
     updateCutscene(dt);
