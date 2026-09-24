@@ -494,7 +494,7 @@ const cordTexH = canvasTex(32, 64, (g, w, h) => {         // same corduroy, ribs
 const lam = (color, extra) => new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {}));
 const basic = (color, extra) => new THREE.MeshBasicMaterial(Object.assign({ color }, extra || {}));
 const box = (w, h, d, mat, x, y, z, parent) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); (parent || scene).add(m); return m; };
-let starMesh = null, mirrorRig = null, gloveRig = null, windowRig = null, tableRig = null, diffuserRig = null, blanketDrape = null, blanketRig = null;
+let starMesh = null, mirrorRig = null, gloveRig = null, windowRig = null, tableRig = null, diffuserRig = null, blanketDrape = null, blanketRig = null, stripedFold = null, blanketRigs = [];
 const steamPuffs = [];
 function breakTable() {
   const t = tableRig; if (!t || t.broken) return;
@@ -579,9 +579,9 @@ function blanketGround(x, z) {
   if (Math.abs(x - CAT_POS.x) < BOX.w / 2 + 0.03 && Math.abs(z - CAT_POS.z) < BOX.d / 2 + 0.03) y = Math.max(y, BOX.h + 0.02);
   return y;
 }
-function restoreHeap() { const b = blanketRig; b.heapGeo.attributes.position.array.set(b.heapBase); b.heapGeo.attributes.position.needsUpdate = true; b.heapGeo.computeVertexNormals(); }
-function drapeHeap() {                                               // lay the landed blanket over the furniture under it
-  const b = blanketRig, h = b.heap, pos = b.heapGeo.attributes.position, base = b.heapBase, c = Math.cos(h.rotation.y), sn = Math.sin(h.rotation.y), P = 0.11;
+function restoreHeap(b = blanketRig) { b.heapGeo.attributes.position.array.set(b.heapBase); b.heapGeo.attributes.position.needsUpdate = true; b.heapGeo.computeVertexNormals(); }
+function drapeHeap(b = blanketRig) {                                  // lay the landed blanket over the furniture under it
+  const h = b.heap, pos = b.heapGeo.attributes.position, base = b.heapBase, c = Math.cos(h.rotation.y), sn = Math.sin(h.rotation.y), P = 0.11;
   h.position.y = 0;
   const floor = new Float32Array(pos.count);
   const objs = props.map(p => p.obj).concat(diffuserRig && diffuserRig.vase.visible ? [diffuserRig.vase] : []);   // (prizes just sit on top of it)
@@ -607,17 +607,18 @@ function drapeHeap() {                                               // lay the 
   for (let i = 0; i < pos.count; i++) pos.setY(i, Y[i]);
   pos.needsUpdate = true; b.heapGeo.computeVertexNormals(); blanketBumps = [];
 }
-function blanketToCat(fromPoint) {
-  const b = blanketRig; if (!b || b.state === 'cat' || b.state === 'flying') return;
-  if (b.state === 'floor') restoreHeap();
+function blanketToCat(fromPoint, b = blanketRig) {
+  if (!b || b.state === 'cat' || b.state === 'flying') return;
+  if (blanketRigs.some(r => r.state === 'cat' || (r.state === 'flying' && r.dest === 'cat'))) return;   // one blanket on the cat at a time
+  if (b.state === 'floor') restoreHeap(b);
   b.from.copy(b.state === 'floor' ? b.heap.position : fromPoint || b.sofaPos);
-  if (blanketDrape) blanketDrape.visible = false;
+  if (b.src) b.src.visible = false;
   b.heap.visible = true; b.state = 'flying'; b.dest = 'cat'; b.t = 0;
   b.to.set(CAT_POS.x, BOX.h * 0.4, CAT_POS.z);
   sfx.whoosh();
 }
-function throwBlanket(point) {
-  const b = blanketRig; if (!b || b.state !== 'cat') return;
+function throwBlanket(point, b = blanketRig) {
+  if (!b || b.state !== 'cat') return;
   b.lump.visible = false; catCard.visible = catTail.visible = true; catFlinch = 0.3;
   b.from.set(CAT_POS.x, 1.2, CAT_POS.z);
   let x = Math.max(-ROOM.halfW + 0.9, Math.min(ROOM.halfW - 0.9, point.x)), z = Math.max(2.6, Math.min(ROOM.depth - 0.8, point.z));
@@ -630,8 +631,8 @@ function throwBlanket(point) {
   if (best) { b.dest = 'mouse'; b.victim = best; b.to.set(best.root.position.x, 0.25, best.root.position.z); }
   sfx.whoosh(); sfx.hiss && sfx.hiss();
 }
-function updateBlanket(dt, time) {
-  const b = blanketRig; if (!b) return;
+function updateBlanket(dt, time) { for (const b of blanketRigs) updateOneBlanket(b, dt, time); }
+function updateOneBlanket(b, dt, time) {
   if (b.state === 'flying') {
     b.t = Math.min(1, b.t + dt / 0.5);
     if (b.dest === 'mouse' && b.victim && b.victim.active) b.to.set(b.victim.root.position.x, 0.25, b.victim.root.position.z);   // homing
@@ -652,7 +653,7 @@ function updateBlanket(dt, time) {
         b.heap.visible = false; b.lump.visible = true; b.lump.position.set(CAT_POS.x, BOX.h - 0.12, CAT_POS.z);
         catCard.visible = catTail.visible = false; b.state = 'cat'; b.rumbleT = 0; sfx.wail(); shake = Math.max(shake, 0.1);
       } else {                                                        // lands crumpled on the floor / sofa
-        b.heap.rotation.set(0, Math.random() * 6, 0); b.heap.scale.setScalar(1); drapeHeap(); b.state = 'floor'; sfx.padThud(0.8);
+        b.heap.rotation.set(0, Math.random() * 6, 0); b.heap.scale.setScalar(1); drapeHeap(b); b.state = 'floor'; sfx.padThud(0.8);
       }
     }
   }
@@ -684,10 +685,12 @@ function updateBlanket(dt, time) {
   }
 }
 function resetBlanket() {
-  const b = blanketRig; if (!b) return;
-  if (b.state === 'floor') restoreHeap();
-  b.heap.visible = false; b.burrito.visible = false; b.dir.set(0, 0, 0); b.victim = null;
-  b.state = 'sofa'; b.lump.visible = b.heap.visible = false; if (blanketDrape) blanketDrape.visible = true; catCard.visible = catTail.visible = true;
+  for (const b of blanketRigs) {
+    if (b.state === 'floor') restoreHeap(b);
+    b.heap.visible = false; b.burrito.visible = false; b.dir.set(0, 0, 0); b.victim = null;
+    b.state = 'sofa'; b.lump.visible = b.heap.visible = false; if (b.src) b.src.visible = true;
+  }
+  catCard.visible = catTail.visible = true;
 }
 function toggleBlinds() { const r = windowRig; if (!r) return; r.target = r.target > 0.4 ? 0.06 : r.base; sfx.rattle(); bonus(5); }
 function updateBlinds(dt) {
@@ -1033,35 +1036,33 @@ function makePistol() {
 const blankX = LEFT_X0 + IN(1.5) + FT(2.45) / 2;                          // pushed to the left end, leaving room for the console
 {
   const fabricTex = canvasTex(64, 64, (g, w, h) => {                  // heathered linen-look fabric
-    g.fillStyle = '#d9d4cc'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 700; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(90,80,70,.10)' : 'rgba(255,255,255,.25)'; g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1); }
+    g.fillStyle = '#fbfaf8'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 700; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(90,80,70,.05)' : 'rgba(255,255,255,.25)'; g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1); }
   }, 3, 2);
   const foldTex = (cols) => canvasTex(64, 64, (g, w, h) => {          // folded blankets seen edge-on: soft stacked bands
     cols.forEach((c, i) => { g.fillStyle = c; g.fillRect(0, i * h / cols.length, w, h / cols.length); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, (i + 1) * h / cols.length - 2, w, 2); });
   }, 1, 1);
-  // frosted, translucent white shells: the folded blankets inside show through softly
-  const frost = new THREE.MeshPhongMaterial({ color: 0xfbfbfa, map: fabricTex, transparent: true, opacity: 0.58, shininess: 30, specular: 0x333333, depthWrite: false });
-  const clear = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, shininess: 120, specular: 0xffffff, depthWrite: false });
-  const trim = lam(0xe2e2e0), strap = lam(0xd2d2cf);
-  const folds = [foldTex(['#f7f6f3', '#ecebe7', '#fbfaf8', '#e8e6e1']), foldTex(['#f3f2ee', '#fbfaf8', '#e9e7e2', '#f6f5f1']), foldTex(['#efe7d6', '#1f7a4a', '#efe7d6', '#c8322b'])];   // plain white blankets; the striped one up top
+  // white fabric organizers (solid: you can't see in), zip line and handles; a folded striped blanket sits on the top one
+  const white = lam(0xffffff, { map: fabricTex }), trim = lam(0xe4e3df), strap = lam(0xd2d2cf);
   const OW = FT(2.45), OD = IN(15), OH = IN(9.5), z = IN(9.5);
   for (let i = 0; i < 3; i++) {
-    const x = blankX + (i % 2 ? IN(0.6) : 0), y0 = CAB_H + i * OH, top = i === 2;
-    const side = lam(0xffffff, { map: folds[i] });                    // the blankets inside (folded edges on the sides, the striped one flat on top)
-    const inner = new THREE.Mesh(new THREE.BoxGeometry(OW - IN(1.4), OH - IN(1.6), OD - IN(1.4)), [side, side, top ? lam(0xffffff, { map: stripeTex }) : side, side, side, side]);
-    inner.position.set(x, y0 + (OH - IN(1.6)) / 2 + IN(0.3), z); scene.add(inner);
-    const shell = new THREE.Mesh(new THREE.BoxGeometry(OW, OH - IN(0.2), OD), [frost, frost, top ? clear : frost, frost, frost, frost]);   // only the top one's lid is clear
-    shell.position.set(x, y0 + OH / 2, z); shell.renderOrder = 1; scene.add(shell);
-    const zy = y0 + OH - IN(0.9);                                      // zip line: a thin band round the outside (not a slab across the middle)
+    const x = blankX + (i % 2 ? IN(0.6) : 0), y0 = CAB_H + i * OH;
+    box(OW, OH - IN(0.2), OD, white, x, y0 + OH / 2, z);
+    const zy = y0 + OH - IN(0.9);                                      // zip line: a thin band round the outside
     for (const [w, d, dx, dz] of [[OW + IN(0.2), IN(0.2), 0, OD / 2 + IN(0.05)], [OW + IN(0.2), IN(0.2), 0, -OD / 2 - IN(0.05)], [IN(0.2), OD + IN(0.2), OW / 2 + IN(0.05), 0], [IN(0.2), OD + IN(0.2), -OW / 2 - IN(0.05), 0]]) box(w, IN(0.3), d, trim, x + dx, zy, z + dz);
     for (const sx of [-1, 1]) box(IN(0.45), IN(1.1), IN(4.5), strap, x + sx * (OW / 2 + IN(0.2)), y0 + OH * 0.62, z);   // carry handles
-    if (top) { const ty = y0 + OH - IN(0.15); for (const [w, d, dx, dz] of [[OW, IN(0.8), 0, OD / 2 - IN(0.4)], [OW, IN(0.8), 0, -OD / 2 + IN(0.4)], [IN(0.8), OD, OW / 2 - IN(0.4), 0], [IN(0.8), OD, -OW / 2 + IN(0.4), 0]]) box(w, IN(0.25), d, trim, x + dx, ty, z + dz); }   // binding round the clear lid
+  }
+  { // the striped blanket, folded in a neat square on top: tap it and it goes over the cat like the black throw
+    const fold = foldTex(['#efe7d6', '#1f7a4a', '#efe7d6', '#c8322b', '#e6bf38', '#efe7d6']);
+    const sq = new THREE.Mesh(new THREE.BoxGeometry(OW * 0.72, IN(3), OD * 0.8), [lam(0xffffff, { map: fold }), lam(0xffffff, { map: fold }), lam(0xffffff, { map: stripeTex }), lam(0xefe7d6), lam(0xffffff, { map: fold }), lam(0xffffff, { map: fold })]);
+    sq.position.set(blankX + IN(0.4), CAB_H + 3 * OH + IN(1.4), z + IN(0.4)); sq.rotation.y = 0.05; scene.add(sq);
+    sq.userData.blanket = true; tapTargets.push(sq); stripedFold = sq;
   }
 }
 // games console in its dock (Switch-style: black dock, neon blue & red controllers either side). Tap it: power light + a click.
 let consoleRig = null;
 {
-  const cx = LEFT_X0 + LEFT_W - IN(9.5), cz = IN(14.2), g = new THREE.Group(); g.position.set(cx, CAB_H, cz); g.rotation.y = 0.12; scene.add(g);
+  const cx = LEFT_X0 + LEFT_W - IN(9.4), cz = IN(9), g = new THREE.Group(); g.position.set(cx, CAB_H, cz); g.rotation.y = 0.12; scene.add(g);
   const black = new THREE.MeshPhongMaterial({ color: 0x1c1c1e, shininess: 40, specular: 0x222222 }), glass = new THREE.MeshPhongMaterial({ color: 0x0b0c0f, shininess: 90, specular: 0x555555 });
   const blue = new THREE.MeshPhongMaterial({ color: 0x0ab9e6, shininess: 50, specular: 0x333333 }), red = new THREE.MeshPhongMaterial({ color: 0xff3c28, shininess: 50, specular: 0x333333 }), nub = lam(0x222226);
   box(IN(6.6), IN(3.1), IN(2.1), glass, 0, IN(1.1) + IN(3.1) / 2 + IN(0.8), -IN(0.2), g);              // the console's screen, sitting in the dock
@@ -1248,7 +1249,7 @@ function updateTV(dt) {
 // pillar candles, 3–4" wide, 6–12" tall (flicker in the main loop)
 const candleMat = lam(0xf1ead6), flames = [], candleGlows = [];
 const TV_L = MAIN_CX - IN(24 * TV_SCALE + 2), TV_R = MAIN_CX + IN(24 * TV_SCALE + 2);                 // keep décor clear of the TV (+2" margin)
-for (const [x, z, r, h] of [[MAIN_X0 + IN(4), IN(9), IN(2), IN(12)], [TV_L - IN(4), IN(8), IN(1.75), IN(7)], [LEFT_X0 + LEFT_W - IN(6), IN(10), IN(1.75), IN(8)],
+for (const [x, z, r, h] of [[MAIN_X0 + IN(4.5), IN(5), IN(2), IN(12)], [MAIN_X0 + IN(11.5), IN(12.5), IN(1.75), IN(7)], [LEFT_X0 + LEFT_W - IN(2.3), IN(8), IN(1.75), IN(8)],   // left of the TV: tall + short candle grouped with the lamp; one at the end of the cabinet
                             [TV_R + IN(3), IN(8), IN(2), IN(9)], [TV_R + IN(8), IN(12), IN(1.75), IN(6)]]) {
   const g = new THREE.Group(); g.position.set(x, CAB_H + h / 2, z); scene.add(g);            // pivot at the candle's centre
   g.add(new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 12), candleMat));
@@ -1295,7 +1296,7 @@ const candleLight = new THREE.PointLight(0xffb45a, 0.32, 6, 2); candleLight.posi
   vase.traverse(o => { if (o.isMesh) { o.userData.diffuser = true; tapTargets.push(o); } });
 }
 { // Himalayan salt lamp: a rough chunk of pink-orange rock salt, lit from inside, on a round wooden base
-  const g = new THREE.Group(); g.position.set(LEFT_X0 + LEFT_W - IN(3.4), CAB_H, IN(4.5)); scene.add(g);   // back corner, behind the candle
+  const g = new THREE.Group(); g.position.set(MAIN_X0 + IN(9.5), CAB_H, IN(7)); scene.add(g);   // between the candles, left of the TV
   const base = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.4), IN(2.6), IN(1.2), 18), lam(0x6b4a2f)); base.position.y = IN(0.6); g.add(base);
   const geo = new THREE.IcosahedronGeometry(IN(2.6), 2), pos = geo.attributes.position, v = new THREE.Vector3();
   for (let i = 0; i < pos.count; i++) {                              // knock it into a craggy, lopsided rock (same jitter for shared corners)
@@ -1756,7 +1757,9 @@ let fireRig = null, mantleMirror = null;
     const light = new THREE.PointLight(0xff7a30, 0, 8, 1.8); light.position.set(IN(12), IN(10), 0); scene.add(light); light.position.add(g.position);
     const ember = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xffb040, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     ember.scale.setScalar(0.4); ember.visible = false; scene.add(ember);
-    fireRig = { g, flames, glow, light, ember, center: g.position.clone(), level: 0, target: 0, blow: 0, crackleT: 0, fly: null };
+    const hot = new THREE.Mesh(new THREE.BoxGeometry(IN(24), IN(16), IN(10)), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));   // invisible tap zone over the firebox
+    hot.position.copy(toWorld(0, RB + IN(8), IN(5))); hot.rotation.y = Math.PI / 2; hot.userData.fireHit = true; scene.add(hot); tapTargets.push(hot);
+    fireRig = { g, flames, glow, light, ember, center: g.position.clone(), level: 0, target: 0, blow: 0, crackleT: 0, fly: null, flare: 0 };
   }
   box(W + IN(4), IN(0.8), IN(12), stone(W, IN(12)), 0, IN(0.4), D + IN(6), fp);                        // flush stone hearth
   const slabTex = canvasTex(256, 64, (g, w, h) => {                   // flat stone mantle: honed grey limestone, softly mottled
@@ -2072,7 +2075,7 @@ const galaxyRig = (() => {
     domes.push({ dome, glow });
   };
   projector(new THREE.Vector3(-ROOM.halfW + IN(6), FIRE.h + IN(3), FIRE.z + FIRE.w * 0.19));   // mantle, by the candles
-  projector(new THREE.Vector3(TV_L - IN(11), CAB_H, IN(10)));                                   // credenza, left of the TV
+  projector(new THREE.Vector3(MAIN_X0 + IN(4), CAB_H, IN(11.5)));                                   // credenza, left of the TV
   // rave lights: three coloured spots that swing round the room and pump with the kick
   const rave = [0xff2fb4, 0x28e0ff, 0x9b4bff].map(c => { const l = new THREE.PointLight(c, 0, 14, 1.6); scene.add(l); return l; });
   return { nebula, stars, nebMat, starMat, planes, domes, rave, level: 0 };
@@ -2167,11 +2170,12 @@ function updateFire(dt) {
     if (f.blow > 1.4) blowOutFire();
   }
   f.level += (f.target - f.level) * Math.min(1, dt * (f.target ? 1.2 : 3));
+  f.flare = Math.max(0, (f.flare || 0) - dt * 1.6);                   // a whoosh of flame when the paw goes in
   f.g.visible = f.level > 0.02;
   const gust = f.target ? Math.min(1, f.blow / 1.4) : 0;              // flames flatten and gutter while the fan is on them
   for (const fl of f.flames) {
     const n = Math.sin(clock * 13 + fl.ph) * 0.5 + Math.sin(clock * 29 + fl.ph * 2) * 0.3;
-    fl.m.scale.set(f.level * (1 - n * 0.1), Math.max(0.01, f.level * fl.s * (1 + n * 0.3) * (1 - gust * 0.6)), f.level * (1 - n * 0.1));
+    fl.m.scale.set(f.level * (1 - n * 0.1) * (1 + f.flare * 0.6), Math.max(0.01, f.level * fl.s * (1 + n * 0.3) * (1 - gust * 0.6) * (1 + f.flare * 1.8)), f.level * (1 - n * 0.1) * (1 + f.flare * 0.6));
     fl.m.rotation.z = gust * 0.5 + Math.sin(clock * 7 + fl.ph) * 0.08;
   }
   f.glow.material.opacity = 0.75 * f.level * (0.9 + Math.sin(clock * 17) * 0.1);
@@ -2223,6 +2227,18 @@ function resetMantleMirror() {
   mm.hits = 0; mm.cracks.visible = false;
   mm.state = 'wall'; mm.mh.position.copy(mm.home); mm.mh.rotation.set(0, 0, 0); mm.mh.visible = true; mm.v.set(0, 0, 0);
   for (const sh of mm.shards) sh.mesh.visible = false;
+}
+// paw in the flames: a burst of fire, a pained yowl, and a life gone
+function burnPaw() {
+  const f = fireRig; if (!f || f.target === 0 || state !== 'playing') return;
+  f.flare = 1;
+  const c = f.center.clone().setY(f.center.y + 0.3);
+  burst(c, 0xff7a1a, 18, 2.6, 3.5, 0.5); burst(c, 0xffd23a, 12, 2, 3, 0.35); burst(c, 0x3a3434, 6, 1.2, 2.5, 0.9);
+  noise(0.4, 0.12, 900); sfx.wail(); sfx.angryMeow && setTimeout(sfx.angryMeow, 250);
+  lives--; combo = 0; catFlinch = 0.8; tailWag = 0; vibrate(80);
+  shake = Math.max(shake, reduceMotion ? 0.06 : 0.35);
+  floatText(c.clone().setY(c.y + 0.8), 'Ouch! −1 life', 'bad');
+  updateHud(); checkEnd();
 }
 function resetFire() { const f = fireRig; if (!f) return; f.level = f.target = f.blow = 0; f.fly = null; f.ember.visible = false; f.g.visible = false; f.light.intensity = 0; }
 function resetRoomFx() { setRoomMode(0); lightF = 1; danceUntil = 0; raveUntil = 0; }
@@ -2343,8 +2359,8 @@ const tailTex = (() => {
 })();
 /* ---------- the blanket gag: tap the throw and it lands ON the cat, who wails and thrashes underneath;
    tap anywhere else and the cat flings it off to land spread out right there, draped over whatever is under it. ---------- */
-{
-  const twoSided = geo => { const gr = new THREE.Group(); gr.add(new THREE.Mesh(geo, lam(0xffffff, { map: blanketBlackTex, side: THREE.FrontSide }))); gr.add(new THREE.Mesh(geo, lam(0xffffff, { map: blanketFuzzTex, side: THREE.BackSide }))); return gr; };
+function makeBlanketRig(FRONT, BACK, src, sofaPos) {
+  const twoSided = geo => { const gr = new THREE.Group(); gr.add(new THREE.Mesh(geo, lam(0xffffff, { map: FRONT, side: THREE.FrontSide }))); gr.add(new THREE.Mesh(geo, lam(0xffffff, { map: BACK, side: THREE.BackSide }))); return gr; };
   // lump: a wrinkled dome over the box with a flared, wavy hem
   const lg = new THREE.SphereGeometry(1, 28, 18, 0, Math.PI * 2, 0, Math.PI * 0.66), lp = lg.attributes.position;
   for (let i = 0; i < lp.count; i++) {
@@ -2370,12 +2386,24 @@ const tailTex = (() => {
   const burrito = new THREE.Group(); burrito.visible = false; scene.add(burrito);
   const roll = new THREE.Group(); roll.position.y = 0.3; burrito.add(roll);
   const bgeo = new THREE.CylinderGeometry(0.3, 0.3, 1.0, 22, 1); bgeo.rotateZ(Math.PI / 2);
-  roll.add(new THREE.Mesh(bgeo, [lam(0xffffff, { map: blanketBlackTex }), lam(0xffffff, { map: blanketFuzzTex }), lam(0xffffff, { map: blanketFuzzTex })]));
-  const seam = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.05, 0.2), lam(0xffffff, { map: blanketFuzzTex })); seam.position.set(0, 0.27, 0.12); seam.rotation.x = 0.5; roll.add(seam);
-  for (const sx of [-1, 1]) { const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8), lam(0xffffff, { map: blanketBlackTex })); tuft.scale.set(0.5, 1, 1); tuft.position.x = sx * 0.55; roll.add(tuft); }   // scrunched ends
-  blanketRig = { state: 'sofa', lump, heap, heapGeo: fg, heapBase: Float32Array.from(fp.array), burrito, roll, victim: null, bt: 0, dir: new THREE.Vector3(), from: new THREE.Vector3(), to: new THREE.Vector3(), t: 0, dest: 'cat', rumbleT: 0, sofaPos: blanketDrape.position.clone().setY(IN(20)) };
-  for (const gr of [lump, heap]) gr.traverse(o => { if (o.isMesh) { o.userData.blanket = true; tapTargets.push(o); } });
+  roll.add(new THREE.Mesh(bgeo, [lam(0xffffff, { map: FRONT }), lam(0xffffff, { map: BACK }), lam(0xffffff, { map: BACK })]));
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.05, 0.2), lam(0xffffff, { map: BACK })); seam.position.set(0, 0.27, 0.12); seam.rotation.x = 0.5; roll.add(seam);
+  for (const sx of [-1, 1]) { const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8), lam(0xffffff, { map: FRONT })); tuft.scale.set(0.5, 1, 1); tuft.position.x = sx * 0.55; roll.add(tuft); }   // scrunched ends
+  const rig = { state: 'sofa', lump, heap, heapGeo: fg, heapBase: Float32Array.from(fp.array), burrito, roll, victim: null, bt: 0, dir: new THREE.Vector3(), from: new THREE.Vector3(), to: new THREE.Vector3(), t: 0, dest: 'cat', rumbleT: 0, sofaPos, src };
+  for (const gr of [lump, heap]) gr.traverse(o => { if (o.isMesh) { o.userData.blanket = true; o.userData.blanketRig = rig; tapTargets.push(o); } });
+  if (src) src.traverse(o => { if (o.isMesh) o.userData.blanketRig = rig; });
+  return rig;
 }
+// the big striped blanket: cream with the four coloured stripes across it, a plain cream fleece underneath
+const stripedBlanketTex = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#efe7d6'; g.fillRect(0, 0, w, h);
+  [['#1f7a4a', 44], ['#c8322b', 56], ['#e6bf38', 68], ['#1b1b1b', 80]].forEach(([c, y]) => { g.fillStyle = c; g.fillRect(0, y, w, 7); });
+  for (let i = 0; i < 900; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(80,60,40,.06)' : 'rgba(255,255,255,.2)'; g.fillRect(Math.random() * w, Math.random() * h, 2, 1); }
+}, 1, 1);
+const creamFleeceTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#ece4d3'; g.fillRect(0, 0, w, h); for (let i = 0; i < 500; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(120,100,70,.08)' : 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(Math.random() * w, Math.random() * h, 1 + Math.random(), 0, 7); g.fill(); } }, 2, 2);
+blanketRig = makeBlanketRig(blanketBlackTex, blanketFuzzTex, blanketDrape, blanketDrape.position.clone().setY(IN(20)));
+const stripedRig = makeBlanketRig(stripedBlanketTex, creamFleeceTex, stripedFold, stripedFold.position.clone());
+blanketRigs = [blanketRig, stripedRig];
 const catTail = new THREE.Group(); catTail.position.set(BOX.w * 0.24, BOX.h * 0.5, -BOX.d * 0.12); catBox.add(catTail);
 const CAT_TAIL_Y = catTail.position.y; let catBounce = 0;
 const TAIL_W = 0.9, TAIL_H = 1.2;
@@ -3233,10 +3261,11 @@ let pawReadyAt = 0;
 function handleTap(clientX, clientY) {
   if (clock < pawReadyAt) return;                                   // paw still recovering from the last swipe
   pawReadyAt = clock + CFG.SWIPE_COOLDOWN;
-  if (blanketRig && blanketRig.state === 'cat') {                     // cat is under the blanket: this tap is where it gets flung
+  const onCat = blanketRigs.find(r => r.state === 'cat');
+  if (onCat) {                                                        // cat is under a blanket: this tap is where it gets flung
     ndc.set(clientX / window.innerWidth * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
-    if (raycaster.ray.intersectPlane(floorPlane, _hit)) throwBlanket(_hit.clone());
+    if (raycaster.ray.intersectPlane(floorPlane, _hit)) throwBlanket(_hit.clone(), onCat);
     return;
   }
   if (gunRig.state === 'cat') { fireGun(); return; }                // armed: every tap is a shot
@@ -3322,7 +3351,8 @@ function interact(o, point, face) {
   if (o.userData.star) { startSwipe(point, true); setTimeout(nudgeStar, 90); tapShake(); return true; }
   if (o.userData.wallpaper) { if (!point) return false; startSwipe(point, true); const n = o.userData.normal; setTimeout(() => hitWallpaper(point, n), 90); tapShake(); return true; }
   if (o.userData.dresserDoor || o.userData.dresser) { startSwipe(point, true); setTimeout(() => toggleDresserDoor(o.userData.dresserDoor ? o.userData.dresserDoor.x : point.x), 90); tapShake(); return true; }
-  if (o.userData.blanket) { if (!blanketRig || blanketRig.state === 'flying' || blanketRig.state === 'gone' || blanketRig.state === 'burrito') return false; startSwipe(point, true); setTimeout(() => blanketToCat(point.clone()), 90); return true; }
+  if (o.userData.blanket) { const br = o.userData.blanketRig || blanketRig; if (!br || br.state === 'flying' || br.state === 'gone' || br.state === 'burrito') return false; startSwipe(point, true); setTimeout(() => blanketToCat(point.clone(), br), 90); return true; }
+  if (o.userData.fireHit) { if (!fireRig || fireRig.target === 0 || fireRig.level < 0.4) return false; startSwipe(point, true); setTimeout(burnPaw, 90); return true; }
   if (o.userData.gameConsole) { startSwipe(point, true); setTimeout(tapConsole, 90); tapShake(); return true; }
   if (o.userData.mantleMirror) {                                     // chaos only: one hit cracks it, the second knocks it off the wall
     const mm = mantleMirror; if (gameMode !== 'chaos' || !mm || mm.state !== 'wall') return false;
@@ -3562,15 +3592,30 @@ function shootMouse(m) {
   floatText(m.center.clone().setY(0.9), saved ? `Dropped! +${pts}` : `Bang! +${pts}`, 'shot');
   updateHud();
 }
+// everything the gun can still wreck in chaos mode (only things not already broken / knocked down)
+function chaosGunTargets() {
+  const L = [], wp = o => o.getWorldPosition(new THREE.Vector3());
+  for (const p of props) if (p.state === 'rest' && p.obj.visible && !p.broken) L.push({ pos: p.obj.position.clone(), hit: () => knockProp(p) });
+  if (!tvBroken) L.push({ pos: wp(screen), hit: breakTV });
+  const m = mirrorRig; if (m && m.glass.visible) L.push({ pos: wp(m.glass), hit: () => { m.hits = 3; m.pending = 0; breakMirror(3); } });
+  const mm = mantleMirror; if (mm && mm.state === 'wall') L.push({ pos: mm.world.clone(), hit: blastMantleMirror });
+  const t = tableRig; if (t && !t.broken) L.push({ pos: new THREE.Vector3(t.center.x, 0.7, t.center.z), hit: breakTable });
+  const d = diffuserRig; if (d && d.state === 'rest') L.push({ pos: wp(d.vase), hit: knockDiffuser });
+  const f = fanRig; if (f && f.state !== 'falling' && f.state !== 'broken') L.push({ pos: wp(f.cap), hit: () => { f.state = 'falling'; f.av = 0.4; } });
+  return L;
+}
 function fireGun() {
   const gr = gunRig; if (gr.state !== 'cat' || gr.ammo <= 0 || state !== 'playing') return;
   gr.ammo--; gr.recoil = 1; gr.flash.visible = true; gr.flashT = 0.07; catFlinch = Math.max(catFlinch, 0.2);
   sfx.gunshot(); shake = Math.max(shake, reduceMotion ? 0.05 : 0.3); vibrate(40);
   const targets = mice.filter(m => m.active && m.hittable && onScreen(m.center));
-  if (targets.length) gr.aim.copy(targets[0].center); else gr.aim.set(CAT_POS.x + (Math.random() - 0.5) * 3, 0.3, CAT_POS.z + 5);
+  let smash = null;                                                   // chaos: no mice about? pick off something that's still in one piece
+  if (!targets.length && gameMode === 'chaos') { const list = chaosGunTargets(); if (list.length) smash = list[(Math.random() * list.length) | 0]; }
+  if (targets.length) gr.aim.copy(targets[0].center); else if (smash) gr.aim.copy(smash.pos); else gr.aim.set(CAT_POS.x + (Math.random() - 0.5) * 3, 0.3, CAT_POS.z + 5);
   gr.held.lookAt(gr.aim); gr.held.updateMatrixWorld(true);
   const muzzle = gr.held.localToWorld(gr.held.userData.muzzle.clone());
   targets.forEach((m, i) => { tracer(muzzle, m.center.clone(), i * 25); setTimeout(() => shootMouse(m), 40 + i * 25); });
+  if (smash) { tracer(muzzle, smash.pos.clone(), 0); setTimeout(() => { burst(smash.pos.clone(), 0xfff0a0, 6, 2, 2, 0.3); sfx.ricochet(); smash.hit(); }, 45); }
   if (gr.ammo === 0) {                                              // last round: pinballs off four surfaces round the room, then into the TV
     const sx = Math.random() < 0.5 ? -1 : 1, W = ROOM.halfW - 0.03;
     const hops = [
@@ -3591,6 +3636,7 @@ function fireGun() {
   showFireBtn();
 }
 function breakTV() {
+  if (tvBroken) return;
   tvBroken = true; setTV(false); tvLight.intensity = 0;
   const p = screen.getWorldPosition(new THREE.Vector3()); p.z += 0.1;
   burst(p, 0xfff2a0, 14, 3, 2, 0.5); burst(p, 0x2a2a2a, 8, 1.6, 2, 0.9); bonus(200, p, 'TV smashed!');
