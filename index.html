@@ -421,6 +421,7 @@ const CFG = {
   // ---- Threat readability ------------------------------------------
   THREAT_RANGE: 5.5,        // mice within this distance of cheese start to grow and glow
   THREAT_SCALE: 0.5,        // extra size at max threat (0.5 = 150%)
+  MOUSE_SIZE: 0.86,         // every mouse drawn a touch smaller, to free up the carpet
   CLUTCH_THREAT: 0.75,      // threat level above which a whack counts as a "clutch save"
   HIT_RADIUS: 0.8,          // tap forgiveness in world units (grows with mouse size)
 
@@ -3480,10 +3481,10 @@ class Cheese {
     this.usePrize();
     this.state = 'home'; this.alive = true; this.claimant = null;
     this.pos.copy(this.home); this.danger = 0; this.shownDanger = 0; this.hitT = 0; this.dropT = 0;
-    this.yaw = Math.random() * Math.PI * 2; this.wob = 0; this.tdir = 0; this.off = new THREE.Vector2(); this.downT = 0; this.lie = 0; this.roll = null;
+    this.yaw = Math.random() * Math.PI * 2; this.wob = 0; this.tdir = 0; this.off = new THREE.Vector2(); this.downT = 0; this.lie = 0; this.roll = null; this.fall = null;
     this.wedge.visible = true; this.wedge.rotation.set(0, this.yaw, 0);
   }
-  get available() { return this.alive && !this.claimant; }
+  get available() { return this.alive && !this.claimant && !this.fall; }   // (not while it's still dropping from the ceiling)
   get grabRadius() { return this.state === 'home' ? CFG.PLATE_GRAB_RADIUS : CFG.FLOOR_GRAB_RADIUS; }
   startCarry(m) { this.state = 'carried'; this.claimant = m; this.hitT = 0.3; }
   drop() {
@@ -3494,13 +3495,26 @@ class Cheese {
     }
     this.claimant = null;
   }
-  nudge() { if (!this.alive || this.state === 'carried') return; this.yaw += (Math.random() < 0.5 ? -1 : 1) * (0.4 + Math.random() * 0.25); this.wob = 1;
-    this.tdir = Math.atan2(this.pos.x - CAT_POS.x, this.pos.z - CAT_POS.z) + (Math.random() - 0.5) * 0.9;   // batted away from the cat
-    this.roll = { t: 0, e: 0, dur: 0.75, dist: 1.0 + Math.random() * 0.6 }; this.downT = 0; sfx.nudge(); }
+  nudge(dir, dist) { if (!this.alive || this.state === 'carried' || this.fall) return; this.yaw += (Math.random() < 0.5 ? -1 : 1) * (0.4 + Math.random() * 0.25); this.wob = 1;
+    this.tdir = dir !== undefined ? dir + (Math.random() - 0.5) * 0.5 : Math.atan2(this.pos.x - CAT_POS.x, this.pos.z - CAT_POS.z) + (Math.random() - 0.5) * 0.9;   // batted away from the cat (or wherever Free-walk Princess hit it from)
+    this.roll = { t: 0, e: 0, dur: dist ? 0.6 + dist * 0.2 : 0.75, dist: dist || 1.0 + Math.random() * 0.6 }; this.downT = 0; sfx.nudge(); }
   lose() { this.state = 'gone'; this.alive = false; this.claimant = null; this.wedge.visible = false; }
   update(dt, time) {
     let y = 0, s = 1;                                    // cheese sits right on the carpet
     if (this._pre) { this.wedge.rotation.copy(this._pre); this._pre = null; }   // undo last frame's tug tilt
+    if (this.fall) {                                                 // ...dropping from the ceiling, spinning end over end; a bounce, then it tumbles away
+      const f = this.fall; f.vy -= 16 * dt; f.y += f.vy * dt; f.rx += f.spin * dt;
+      if (f.y <= 0) {
+        f.y = 0;
+        if (f.vy < -3.5 && f.bounces < 1) { f.vy *= -0.32; f.bounces++; f.spin *= 0.6; sfx.thump(); burst(this.pos.clone().setY(0.1), 0xb08a64, 6, 1.4, 1.2, 0.7); shake = Math.max(shake, reduceMotion ? 0.02 : 0.08); }
+        else { this.fall = null; this.wedge.rotation.set(0, this.yaw, 0); this.tdir = Math.random() * Math.PI * 2; this.roll = { t: 0, e: 0, dur: 0.9, dist: 1.1 + Math.random() * 0.4 }; this.wob = 1; this.downT = 0; sfx.nudge(); }
+      }
+      if (this.fall) {
+        const bs = this.wedge.userData.baseScale || 1;
+        this.wedge.position.set(this.pos.x, f.y, this.pos.z); this.wedge.rotation.set(f.rx, this.yaw, f.rx * 0.35); this.wedge.scale.setScalar(bs);
+        this.danger = 0; return;
+      }
+    }
     if (this.state === 'carried' && this.claimant) {   // gripped by the stem in the mouse's mouth, cap sticking out in front of its nose
       const m = this.claimant; m.model.updateMatrixWorld(true);
       const mouth = m.model.localToWorld(_mouth.set(0, 0.21, 0.6));
@@ -3518,7 +3532,7 @@ class Cheese {
         const r = this.roll; r.t += dt;
         const k = Math.min(1, r.t / r.dur), e = 1 - (1 - k) * (1 - k), step = (e - r.e) * r.dist; r.e = e;   // fast off the paw, slowing down
         const nx = this.pos.x + Math.sin(this.tdir) * step, nz = this.pos.z + Math.cos(this.tdir) * step;
-        if (!rollBlocked(nx, nz) && nz > 1.2 && nz < ROOM.depth - 1) { this.pos.x = nx; this.pos.z = nz; } else r.t = r.dur;   // stops against furniture
+        if (!rollBlocked(nx, nz) && nz > 1.2 && nz < (gameMode === 'walk' ? ROOM.visDepth - 0.8 : ROOM.depth - 1)) { this.pos.x = nx; this.pos.z = nz; } else r.t = r.dur;   // stops against furniture
         spin = e * Math.PI * 2;
         y += 0.24 * (1 - Math.cos(spin)) * (this.wedge.userData.baseScale || 1) + Math.sin(k * Math.PI) * 0.12;   // stays on the carpet as it flips
         this.downT = 0; this.lie = 0;
@@ -3997,9 +4011,13 @@ class Mouse {
         if (!this.target || (!this.target.available && !(this.isBomb && this.target.alive))) this.target = nearestCheese(p);
         if (!this.target) { this.setState('home'); break; }   // nothing left to steal
         const c = this.target.pos, gr = this.isBomb ? 0.9 : this.target.grabRadius, dx = c.x - p.x, dz = c.z - p.z, dist = Math.hypot(dx, dz) || 0.001;
-        const step = Math.min(this.speed * dt, Math.max(0, dist - gr));
-        p.x += dx / dist * step; p.z += dz / dist * step;
-        this.faceToward(c.x, c.z, dt);
+        const aim = this.navAim(c.x, c.z, dt);                           // a sofa in the way? follow a route round it
+        if (aim) { const ax = aim.x - p.x, az = aim.z - p.z, ad = Math.hypot(ax, az) || 0.001, s2 = Math.min(this.speed * dt, ad); p.x += ax / ad * s2; p.z += az / ad * s2; this.faceToward(aim.x, aim.z, dt); }
+        else {
+          const step = Math.min(this.speed * dt, Math.max(0, dist - gr));
+          p.x += dx / dist * step; p.z += dz / dist * step;
+          this.faceToward(c.x, c.z, dt);
+        }
         bob = Math.abs(Math.sin(this.t * 22)) * 0.06;
         if (dist - gr < 0.02) {
           if (this.isBomb) this.setState('loiter');                       // bomb stands guard next to the cheese
@@ -4028,10 +4046,11 @@ class Mouse {
       case 'carry': {  // hauling it back to the hole, slower than running
         const c = this.target;
         if (!c || c.claimant !== this) { this.setState('home'); break; }
-        const h = this.hole.mouthOut, dx = h.x - p.x, dz = h.z - p.z, dist = Math.hypot(dx, dz);
+        const h = this.hole.mouthOut, dist = Math.hypot(h.x - p.x, h.z - p.z);
+        const aim = this.navAim(h.x, h.z, dt), tx = aim ? aim.x : h.x, tz = aim ? aim.z : h.z, dx = tx - p.x, dz = tz - p.z, dd = Math.hypot(dx, dz) || 0.001;
         if (dist > 0.05) {
-          const s = Math.min(dist, this.speed * CFG.CARRY_SPEED * dt); p.x += dx / dist * s; p.z += dz / dist * s;
-          this.faceToward(h.x, h.z, dt); bob = Math.abs(Math.sin(this.t * 16)) * 0.05;
+          const s = Math.min(dd, this.speed * CFG.CARRY_SPEED * dt); p.x += dx / dd * s; p.z += dz / dd * s;
+          this.faceToward(tx, tz, dt); bob = Math.abs(Math.sin(this.t * 16)) * 0.05;
           this.model.rotation.x = -0.05 + Math.sin(this.t * 16) * 0.04; this.model.rotation.z = Math.sin(this.t * 8) * 0.06;   // head up, trotting with its prize
         } else { this.model.rotation.set(0, 0, 0); p.copy(h); onCheeseStolen(this, c); this.setState('retreat'); }
         break;
@@ -4063,8 +4082,9 @@ class Mouse {
         break;
       }
       case 'home': {   // bomb mouse walking back to its hole mouth, then ducking in
-        const h = this.hole.mouthOut, dx = h.x - p.x, dz = h.z - p.z, dist = Math.hypot(dx, dz);
-        if (dist > 0.05) { const s = Math.min(dist, this.speed * 1.3 * dt); p.x += dx / dist * s; p.z += dz / dist * s; this.faceToward(h.x, h.z, dt); bob = Math.abs(Math.sin(this.t * 24)) * 0.06; }
+        const h = this.hole.mouthOut, dist = Math.hypot(h.x - p.x, h.z - p.z);
+        const aim = this.navAim(h.x, h.z, dt), tx = aim ? aim.x : h.x, tz = aim ? aim.z : h.z, dx = tx - p.x, dz = tz - p.z, dd = Math.hypot(dx, dz) || 0.001;
+        if (dist > 0.05) { const s = Math.min(dd, this.speed * 1.3 * dt); p.x += dx / dd * s; p.z += dz / dd * s; this.faceToward(tx, tz, dt); bob = Math.abs(Math.sin(this.t * 24)) * 0.06; }
         else { p.copy(h); this.setState('retreat'); }
         break;
       }
@@ -4127,7 +4147,7 @@ class Mouse {
     } else {
       this.threat = 0;
     }
-    this.visScale = (1 + CFG.THREAT_SCALE * this.threat) * (this.boss ? 2.1 : 1);   // the Rat King is twice the size
+    this.visScale = (1 + CFG.THREAT_SCALE * this.threat) * (this.boss ? 2.1 : 1) * CFG.MOUSE_SIZE;   // the Rat King is twice the size
     const s = Math.max(0.001, this.pop * this.visScale);
     this.model.scale.set(s * this.sqXZ, s * this.sqY, s * this.sqXZ);
     this.model.position.y = bob;
@@ -4232,7 +4252,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 14:09';                                              // stamped when the site is published
+const BUILD = '2026-09-24 15:19';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -4506,7 +4526,7 @@ function handleTap(clientX, clientY) {
   let best = null, bestScore = Infinity;
   for (const m of mice) {
     if (!m.hittable) continue;
-    const r = CFG.HIT_RADIUS * m.visScale;
+    const r = CFG.HIT_RADIUS * m.visScale / CFG.MOUSE_SIZE;           // (smaller mice, same forgiving tap)
     const n = ray.distanceSqToPoint(m.center) / (r * r);
     if (n > 1) continue;
     const sc = n + (m.isBomb ? CFG.BOMB_TAP_PENALTY : 0);
@@ -4572,7 +4592,7 @@ function interactables() {
 function interact(o, point, face) {
   if (o.userData.prize) {                                            // nudge a cheese/mushroom; still counts as a whiff (no camping the prize)
     const c = o.userData.prize; if (!c.alive || c.state === 'carried') return false;
-    startSwipe(point, true); setTimeout(() => c.nudge(), 90); pawReadyAt += CFG.WHIFF_COOLDOWN; return true;
+    startSwipe(point, true); setTimeout(() => gameMode === 'walk' && walk.on ? c.nudge(Math.atan2(c.pos.x - walk.pos.x, c.pos.z - walk.pos.z), 1.8) : c.nudge(), 90); pawReadyAt += CFG.WHIFF_COOLDOWN; return true;
   }
   if (o.userData.couch !== undefined && face) {
     const n = face.normal.clone().transformDirection(o.matrixWorld);
@@ -4683,8 +4703,11 @@ function resetCatCrown() { if (catCrown) { catCrown.visible = false; catCrown.us
 function returnMushroom(at) {
   const c = cheeses.find(x => x.state === 'gone');
   if (!c || gameMode !== 'classic') { bonus(300, at, 'King\'s ransom!'); return; }
-  c.reset(); burst(c.pos.clone().setY(0.5), 0xff6fae, 16, 2.4, 3, 0.7); sfx.sparkle && sfx.sparkle();
-  floatText(c.pos.clone().setY(1.4), 'Mushroom returned!', 'clutch'); showBanner('A mushroom is back!'); updateHud();
+  c.reset(); c.fall = { y: CEIL_H - 0.55, vy: 0, rx: 0, spin: (Math.random() < 0.5 ? -1 : 1) * (7 + Math.random() * 4), bounces: 0 };   // poof! out of the ceiling...
+  const top = new THREE.Vector3(c.pos.x, CEIL_H - 0.35, c.pos.z);
+  burst(top, 0xffffff, 18, 2.4, 0.4, 0.9); burst(top, 0xff6fae, 12, 2, 0.6, 0.7); burst(top, 0xffd23a, 8, 1.6, 0.8, 0.5);
+  sfx.sparkle && sfx.sparkle(); noise(0.25, 0.08, 2400);
+  floatText(c.pos.clone().setY(2.2), 'Mushroom returned!', 'clutch'); showBanner('A mushroom is back!'); updateHud();
 }
 function hurtBoss(m, dmg) {                                         // returns true once he's beaten
   m.hp -= dmg;
@@ -4811,6 +4834,90 @@ function rollBlocked(x, z) {
   if (z < IN(22) + R) return true;
   return false;
 }
+
+/* ---------- mouse pathfinding: a grid of the carpet marked wherever the burrito can't roll (sofas, hearth, table, fan,
+   the box, the credenza). A mouse runs straight when it can see its goal; when something's in the way it follows an
+   A* route round it, pulled tight so it hugs the corners instead of zig-zagging cell to cell. ---------- */
+const NAV = { cell: 0.2, x0: -ROOM.halfW, z0: 0, nx: 0, nz: 0, blocked: null, key: '' };
+function navGrid() {
+  const key = `${tableRig && tableRig.broken ? 1 : 0}${fanRig && fanRig.state === 'broken' ? 1 : 0}`;   // rebuilt when the table smashes or the fan comes down
+  if (NAV.blocked && NAV.key === key) return NAV;
+  NAV.nx = Math.ceil(ROOM.halfW * 2 / NAV.cell); NAV.nz = Math.ceil(ROOM.visDepth / NAV.cell);
+  NAV.blocked = new Uint8Array(NAV.nx * NAV.nz);
+  for (let iz = 0; iz < NAV.nz; iz++) for (let ix = 0; ix < NAV.nx; ix++) NAV.blocked[iz * NAV.nx + ix] = rollBlocked(NAV.x0 + (ix + 0.5) * NAV.cell, NAV.z0 + (iz + 0.5) * NAV.cell) ? 1 : 0;
+  NAV.key = key; return NAV;
+}
+function navBlockedAt(x, z) {
+  const N = navGrid(), ix = Math.floor((x - N.x0) / N.cell), iz = Math.floor((z - N.z0) / N.cell);
+  return ix < 0 || iz < 0 || ix >= N.nx || iz >= N.nz || N.blocked[iz * N.nx + ix] === 1;
+}
+function clearLine(x0, z0, x1, z1, skip0, skip1) {                   // can a mouse run straight from one point to the other? (the ends may sit in a hole's mouth, so they're let off)
+  const d = Math.hypot(x1 - x0, z1 - z0); if (d < 0.05) return true;
+  const n = Math.ceil(d / 0.1);
+  for (let i = 1; i < n; i++) {
+    const t = i / n, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
+    if (t * d < skip0 || (1 - t) * d < skip1) continue;
+    if (navBlockedAt(x, z)) return false;
+  }
+  return true;
+}
+function navPath(sx, sz, gx, gz) {
+  const N = navGrid(), nx = N.nx, nz = N.nz, B = N.blocked;
+  const cellOf = (x, z) => [THREE.MathUtils.clamp(Math.floor((x - N.x0) / N.cell), 0, nx - 1), THREE.MathUtils.clamp(Math.floor((z - N.z0) / N.cell), 0, nz - 1)];
+  const nearestFree = (ix, iz) => {
+    if (!B[iz * nx + ix]) return iz * nx + ix;
+    for (let r = 1; r < 14; r++) { let best = -1, bd = 1e9;
+      for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+        const x = ix + dx, z = iz + dz; if (x < 0 || z < 0 || x >= nx || z >= nz || B[z * nx + x]) continue;
+        const dd = dx * dx + dz * dz; if (dd < bd) { bd = dd; best = z * nx + x; }
+      }
+      if (best >= 0) return best; }
+    return -1;
+  };
+  const s = nearestFree(...cellOf(sx, sz)), g = nearestFree(...cellOf(gx, gz)); if (s < 0 || g < 0) return null;
+  const gs = new Float32Array(nx * nz).fill(Infinity), from = new Int32Array(nx * nz).fill(-1), shut = new Uint8Array(nx * nz);
+  const gxI = g % nx, gzI = (g / nx) | 0, h = i => { const dx = Math.abs(i % nx - gxI), dz = Math.abs(((i / nx) | 0) - gzI); return Math.max(dx, dz) + 0.414 * Math.min(dx, dz); };
+  const heap = [];                                                      // binary heap of [f, cell]
+  const push = (f, i) => { heap.push([f, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = k * 2 + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+  gs[s] = 0; push(h(s), s);
+  while (heap.length) {
+    const [, cur] = pop(); if (cur === g) break; if (shut[cur]) continue; shut[cur] = 1;
+    const cx = cur % nx, cz = (cur / nx) | 0;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dz) continue;
+      const x = cx + dx, z = cz + dz; if (x < 0 || z < 0 || x >= nx || z >= nz) continue;
+      const ni = z * nx + x; if (B[ni] || shut[ni]) continue;
+      if (dx && dz && (B[cz * nx + x] || B[z * nx + cx])) continue;     // no cutting corners
+      const ng = gs[cur] + (dx && dz ? 1.414 : 1);
+      if (ng < gs[ni]) { gs[ni] = ng; from[ni] = cur; push(ng + h(ni), ni); }
+    }
+  }
+  if (from[g] < 0 && g !== s) return null;
+  const pts = [{ x: gx, z: gz }];
+  for (let i = g; i >= 0 && i !== s; i = from[i]) pts.push({ x: N.x0 + (i % nx + 0.5) * N.cell, z: N.z0 + (((i / nx) | 0) + 0.5) * N.cell });
+  pts.push({ x: sx, z: sz }); pts.reverse();
+  const out = []; let i = 0;                                            // pull the string tight: jump to the furthest point still in plain view
+  while (i < pts.length - 1) {
+    let j = pts.length - 1;
+    while (j > i + 1 && !clearLine(pts[i].x, pts[i].z, pts[j].x, pts[j].z, i === 0 ? 0.45 : 0.05, j === pts.length - 1 ? 0.45 : 0.05)) j--;
+    out.push(pts[j]); i = j;
+  }
+  return out;
+}
+Mouse.prototype.navAim = function (gx, gz, dt) {                      // null = run straight at the goal; otherwise the next corner to head for
+  const p = this.root.position;
+  this.routeT = (this.routeT || 0) + dt;
+  if (clearLine(p.x, p.z, gx, gz, 0.45, 0.45)) { this.route = null; return null; }
+  if (!this.route || !this.routeGoal || Math.hypot(this.routeGoal.x - gx, this.routeGoal.z - gz) > 0.35 || this.routeT > 2) {
+    this.route = navPath(p.x, p.z, gx, gz); this.routeGoal = { x: gx, z: gz }; this.routeT = 0;
+  }
+  const r = this.route; if (!r || !r.length) return null;
+  while (r.length > 1 && Math.hypot(r[0].x - p.x, r[0].z - p.z) < 0.15) r.shift();
+  if (r.length > 1 && clearLine(p.x, p.z, r[1].x, r[1].z, 0.2, 0.05)) r.shift();   // the next corner's already in view: cut straight to it
+  return r[0];
+};
 function burritoMouse(m) {                                          // special kill: wrapped up and rolled away
   unlock('burrito');
   if (m.isBomb) { floatText(m.center.clone().setY(1), 'Smothered!', 'clutch'); m.release(); return; }
@@ -6220,6 +6327,11 @@ function updateWalk(dt) {
       let ix = -o.x, iz = ROOM.visDepth / 2 - o.z; const il = Math.hypot(ix, iz) || 1; ix /= il; iz /= il;   // ...and out toward the middle of the room so it falls off its ledge
       pr.v.set(ax * 1.5 + ix * 1.1 + walk.vel.x * 0.3, 1.1, az * 1.5 + iz * 1.1 + walk.vel.z * 0.3); sfx.clink();
     }
+    if (p.y < 0.6) for (const c of cheeses) {                            // the mushrooms are cat toys: walk into one and it goes tumbling
+      if (!c.alive || c.state === 'carried' || c.fall || c.roll) continue;
+      const cx = c.pos.x - p.x, cz = c.pos.z - p.z; if (Math.hypot(cx, cz) > 0.55) continue;
+      c.nudge(Math.atan2(cx, cz), 0.9 + spd * 0.35); c.hitT = 0.3;
+    }
     const dr = diffuserRig;
     if (dr && dr.state === 'rest' && Math.abs(dr.center.y - p.y) < 0.9 && Math.hypot(dr.center.x - bx, dr.center.z - bz) < 0.4) interact(dr.vase.children[0], dr.center);
   }
@@ -6300,6 +6412,10 @@ function walkSwipe() {                                               // swipe at
   walk.swipeReady = clock + 0.3; walk.batT = 0.35; noise(0.12, 0.05, 1800);
   const p = walk.pos, fx = Math.sin(walk.face), fz = Math.cos(walk.face);
   const paw = new THREE.Vector3(p.x + fx * 0.45, p.y + 0.35, p.z + fz * 0.45);
+  if (p.y < 0.6) {                                                   // a mushroom at her paw: swat it clean across the room
+    const c = cheeses.find(c => c.alive && c.state !== 'carried' && !c.fall && Math.hypot(c.pos.x - paw.x, c.pos.z - paw.z) < 0.65);
+    if (c) { c.nudge(walk.face, 2.4); c.hitT = 0.3; showWalkName('Mushroom'); return; }
+  }
   let best = null, bd = Infinity;
   for (const it of interactables()) {
     const d = it.pos.distanceTo(paw), reach = Math.min(it.r, 0.7) + 0.45;
