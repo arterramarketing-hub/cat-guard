@@ -1030,7 +1030,7 @@ function makePistol() {
 }
 // three zip-up fabric blanket organizers stacked on the cabinet, clear vinyl windows showing the blankets inside;
 // the top one has a clear lid, so you can see the striped blanket's four lines of colour from above
-const blankX = LEFT_X0 + IN(3) + FT(2.0) / 2;                          // pushed to the left end, leaving room for the console
+const blankX = LEFT_X0 + IN(1.5) + FT(2.45) / 2;                          // pushed to the left end, leaving room for the console
 {
   const fabricTex = canvasTex(64, 64, (g, w, h) => {                  // heathered linen-look fabric
     g.fillStyle = '#d9d4cc'; g.fillRect(0, 0, w, h);
@@ -1043,8 +1043,8 @@ const blankX = LEFT_X0 + IN(3) + FT(2.0) / 2;                          // pushed
   const frost = new THREE.MeshPhongMaterial({ color: 0xfbfbfa, map: fabricTex, transparent: true, opacity: 0.58, shininess: 30, specular: 0x333333, depthWrite: false });
   const clear = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, shininess: 120, specular: 0xffffff, depthWrite: false });
   const trim = lam(0xe2e2e0), strap = lam(0xd2d2cf);
-  const folds = [foldTex(['#9a9ca0', '#c9c6bf', '#7f8388', '#b5b3ad']), foldTex(['#b9a88f', '#2f6f73', '#c9c6bf', '#8d8f93']), foldTex(['#efe7d6', '#1f7a4a', '#efe7d6', '#c8322b'])];
-  const OW = FT(2.0), OD = IN(15), OH = IN(9.5), z = IN(9.5);
+  const folds = [foldTex(['#f7f6f3', '#ecebe7', '#fbfaf8', '#e8e6e1']), foldTex(['#f3f2ee', '#fbfaf8', '#e9e7e2', '#f6f5f1']), foldTex(['#efe7d6', '#1f7a4a', '#efe7d6', '#c8322b'])];   // plain white blankets; the striped one up top
+  const OW = FT(2.45), OD = IN(15), OH = IN(9.5), z = IN(9.5);
   for (let i = 0; i < 3; i++) {
     const x = blankX + (i % 2 ? IN(0.6) : 0), y0 = CAB_H + i * OH, top = i === 2;
     const side = lam(0xffffff, { map: folds[i] });                    // the blankets inside (folded edges on the sides, the striped one flat on top)
@@ -1061,7 +1061,7 @@ const blankX = LEFT_X0 + IN(3) + FT(2.0) / 2;                          // pushed
 // games console in its dock (Switch-style: black dock, neon blue & red controllers either side). Tap it: power light + a click.
 let consoleRig = null;
 {
-  const cx = LEFT_X0 + LEFT_W - IN(13), cz = IN(8), g = new THREE.Group(); g.position.set(cx, CAB_H, cz); g.rotation.y = 0.12; scene.add(g);
+  const cx = LEFT_X0 + LEFT_W - IN(9.5), cz = IN(14.2), g = new THREE.Group(); g.position.set(cx, CAB_H, cz); g.rotation.y = 0.12; scene.add(g);
   const black = new THREE.MeshPhongMaterial({ color: 0x1c1c1e, shininess: 40, specular: 0x222222 }), glass = new THREE.MeshPhongMaterial({ color: 0x0b0c0f, shininess: 90, specular: 0x555555 });
   const blue = new THREE.MeshPhongMaterial({ color: 0x0ab9e6, shininess: 50, specular: 0x333333 }), red = new THREE.MeshPhongMaterial({ color: 0xff3c28, shininess: 50, specular: 0x333333 }), nub = lam(0x222226);
   box(IN(6.6), IN(3.1), IN(2.1), glass, 0, IN(1.1) + IN(3.1) / 2 + IN(0.8), -IN(0.2), g);              // the console's screen, sitting in the dock
@@ -1294,7 +1294,21 @@ const candleLight = new THREE.PointLight(0xffb45a, 0.32, 6, 2); candleLight.posi
   diffuserRig = { vase, broken, puddle, state: 'rest', v: new THREE.Vector3(), w: new THREE.Vector3(), wet: 0, home: vase.position.clone(), center: new THREE.Vector3(vase.position.x, CAB_H + IN(4.5), vase.position.z) };
   vase.traverse(o => { if (o.isMesh) { o.userData.diffuser = true; tapTargets.push(o); } });
 }
-box(IN(4), IN(4), IN(4), lam(0xf0b8a0), LEFT_X0 + LEFT_W - IN(2.6), CAB_H + IN(2), IN(14));   // pink salt lamp (front corner, clear of the console)
+{ // Himalayan salt lamp: a rough chunk of pink-orange rock salt, lit from inside, on a round wooden base
+  const g = new THREE.Group(); g.position.set(LEFT_X0 + LEFT_W - IN(3.4), CAB_H, IN(4.5)); scene.add(g);   // back corner, behind the candle
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.4), IN(2.6), IN(1.2), 18), lam(0x6b4a2f)); base.position.y = IN(0.6); g.add(base);
+  const geo = new THREE.IcosahedronGeometry(IN(2.6), 2), pos = geo.attributes.position, v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {                              // knock it into a craggy, lopsided rock (same jitter for shared corners)
+    v.fromBufferAttribute(pos, i); const n = Math.sin(v.x * 91 + v.y * 37) * 0.5 + Math.sin(v.z * 73 - v.y * 53) * 0.5;
+    const n2 = Math.sin(v.x * 211 - v.z * 157) * Math.sin(v.y * 173 + v.x * 61);
+    v.multiplyScalar(1 + n * 0.3 + n2 * 0.18); v.x *= 1.12; v.z *= 0.9; v.y *= 1.3; if (v.y > 0) { v.x *= 1 - v.y / IN(11); v.z *= 1 - v.y / IN(11); } pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  const rock = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: 0xe98a68, emissive: 0xb8401e, emissiveIntensity: 0.6, flatShading: true, shininess: 25, specular: 0x552211, transparent: true, opacity: 0.94 }));
+  rock.position.y = IN(1.2) + IN(2.6) * 1.2; rock.rotation.y = 0.7; g.add(rock);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xff6a48, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.3 }));
+  glow.position.y = rock.position.y; glow.scale.setScalar(1.0); g.add(glow);
+}
 // right-corner black shelf (~4' tall, 14" wide) with a plant, and the paper star lamp (2' star on a 5' pole)
 // levelled shelving: black metal frame, five open shelves with odds and ends, plant on top
 const SHELF_H = FT(4), SHELF_D = IN(13), shelfMat = lam(0x1c1c1e), shZ = 0.03 + SHELF_D / 2;
@@ -1766,6 +1780,12 @@ let fireRig = null, mantleMirror = null;
       const m = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts)), i % 3 ? shardMat : shardMat2); m.visible = false; scene.add(m);
       shards.push({ mesh: m, v: new THREE.Vector3(), w: new THREE.Vector3(), down: false, lift: 0.002 * (i % 7) });
     }
+    const frameMat = lam(0x3b3029), frameEnd = lam(0x8a6a4a);
+    for (let i = 0; i < 10; i++) {                                    // splintered lengths of the wooden frame
+      const len = (i % 2 ? MH : MW) * (0.2 + Math.random() * 0.3);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(len, IN(1.5), IN(1)), [frameEnd, frameEnd, frameMat, frameMat, frameMat, frameMat]); m.visible = false; scene.add(m);
+      shards.push({ mesh: m, v: new THREE.Vector3(), w: new THREE.Vector3(), down: false, lift: IN(0.5), wood: true });
+    }
     const crackTex = canvasTex(256, 192, (g2, w, h) => {              // spiderweb crack laid over the glass
       g2.clearRect(0, 0, w, h); const cx = w * 0.58, cy = h * 0.42, rays = [];
       const line = (pts, dark) => { g2.beginPath(); pts.forEach(([x, y], i) => i ? g2.lineTo(x, y) : g2.moveTo(x, y)); g2.strokeStyle = dark ? 'rgba(70,80,88,.85)' : 'rgba(255,255,255,.95)'; g2.lineWidth = dark ? 2 : 1.3; g2.stroke(); };
@@ -2179,8 +2199,8 @@ function updateMantleMirror(dt) {
         sh.v.set(0.4 + Math.random() * 2.2, 1 + Math.random() * 2, (Math.random() - 0.5) * 3); sh.w.set(Math.random() * 12, Math.random() * 12, Math.random() * 12);
       }
       sfx.shatter(); sfx.shatter(); shake = Math.max(shake, reduceMotion ? 0.06 : 0.45);
-      burst(at.clone().setY(0.3), 0xe6f0f4, 16, 2.6, 2.5, 0.4);
-      bonus(200, at, 'Mirror smashed!');
+      burst(at.clone().setY(0.3), 0xe6f0f4, 16, 2.6, 2.5, 0.4); burst(at.clone().setY(0.3), 0x5a4432, 10, 2, 2, 0.5);   // glass and wood splinters
+      sfx.clack(); bonus(200, at, 'Mirror smashed!');
     }
   }
   if (mm.state === 'broken') for (const sh of mm.shards) {
@@ -2189,7 +2209,7 @@ function updateMantleMirror(dt) {
     o.rotation.x += sh.w.x * dt; o.rotation.y += sh.w.y * dt; o.rotation.z += sh.w.z * dt;
     o.position.x = Math.max(o.position.x, -ROOM.halfW + 0.2);
     const gy = groundY(o.position.x, o.position.z) + 0.01 + sh.lift;
-    if (o.position.y <= gy) { o.position.y = gy; if (sh.v.y < -2.5) { sh.v.y *= -0.2; sh.v.x *= 0.4; sh.v.z *= 0.4; sh.w.multiplyScalar(0.3); } else { sh.down = true; o.rotation.set(-Math.PI / 2, 0, Math.random() * 6); } }
+    if (o.position.y <= gy) { o.position.y = gy; if (sh.v.y < -2.5) { sh.v.y *= -0.2; sh.v.x *= 0.4; sh.v.z *= 0.4; sh.w.multiplyScalar(0.3); } else { sh.down = true; if (sh.wood) o.rotation.set(Math.random() < 0.5 ? Math.PI / 2 : 0, Math.random() * 6, 0); else o.rotation.set(-Math.PI / 2, 0, Math.random() * 6); } }   // wood lies flat on a long side
   }
 }
 function hitMantleMirror() {
@@ -3753,7 +3773,7 @@ function startGame(mode) {
   ui.start.hidden = true; ui.over.hidden = true; ui.pause.hidden = true; ui.hud.hidden = false;
   state = 'playing';
   resetChaosCam();
-  if (gameMode === 'chaos') { showBanner('Chaos mode!'); camToast('Two fingers: pinch · twist · drag to explore', 3500); }
+  if (gameMode === 'chaos') showBanner('Chaos mode!');
 }
 function pauseGame() {
   if (state !== 'playing') return;
@@ -4263,7 +4283,7 @@ renderer.domElement.addEventListener('pointerup', endTouch); renderer.domElement
 let last = performance.now(), clock = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = Math.max(now, last);   // never a backwards step (rAF stamps can trail performance.now())
   clock += dt;
 
   if (state === 'playing' || state === 'ending') {
