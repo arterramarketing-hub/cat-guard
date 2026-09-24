@@ -3421,6 +3421,23 @@ class Mouse {
   }
 }
 const mice = Array.from({ length: 14 }, () => new Mouse());
+// mice out on the floor don't pile on top of each other: overlapping pairs get nudged apart (bigger mice push harder),
+// never into furniture. Keeps bombs from hiding right on top of normal mice late in the game.
+const SEP_STATES = new Set(['peek', 'run', 'grab', 'carry', 'loiter', 'taunt', 'home', 'wander']);
+function separateMice() {
+  const list = mice.filter(m => m.active && SEP_STATES.has(m.state) && !m.dancing);
+  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+    const a = list[i], b = list[j], pa = a.root.position, pb = b.root.position;
+    const min = 0.8 * (a.visScale + b.visScale) / 2;
+    let dx = pb.x - pa.x, dz = pb.z - pa.z, d = Math.hypot(dx, dz);
+    if (d >= min) continue;
+    if (d < 1e-4) { const t = Math.random() * 6.28; dx = Math.cos(t); dz = Math.sin(t); d = 1; }
+    const push = (min - d) * 0.5, nx = dx / d, nz = dz / d;
+    const wa = b.visScale / (a.visScale + b.visScale), wb = 1 - wa;          // the smaller mouse gets shoved further
+    const move = (p, s) => { const x = p.x + nx * s, z = p.z + nz * s; if (!rollBlocked(x, z) || rollBlocked(p.x, p.z)) { p.x = x; p.z = z; } };
+    move(pa, -push * 2 * wa); move(pb, push * 2 * wb);
+  }
+}
 
 /* =====================================================================
    MOUSE MODE: you're the mouse. Hold to run toward your finger (or arrows / WASD), grab a mushroom in your
@@ -4821,6 +4838,7 @@ function frame(now) {
       if (gameMode === 'mouse') updateHeist(dt);
     }
     for (const m of mice) if (m.active) m.update(sdt, clock);
+    separateMice(); separateMice();                                  // two relaxation passes: crowds settle in a frame
     if (heist.player.active) heist.player.update(sdt, clock);
     if (state === 'ending') { endTimer -= dt; if (endTimer <= 0) showGameOver(); }
   } else if (state === 'cutscene') {
