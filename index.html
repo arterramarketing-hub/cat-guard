@@ -2036,7 +2036,7 @@ function updateWallpaper(dt) {
 }
 function resetWallpaper() {
   const w = wallRig; if (!w) return;
-  for (const r of w.rips) scene.remove(r.g);
+  for (const r of w.rips) { scene.remove(r.g); r.g.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }   // each rip made its own geometry: free it
   w.rips = [];
 }
 
@@ -3832,8 +3832,8 @@ function resumeGame() {
   state = 'playing'; ui.pause.hidden = true;
 }
 function quitToTitle() {
-  gameMode = 'classic'; resetChaosCam();
-  clearField(); cheeses.forEach(c => c.reset()); resetProps(); clearFluff(); resetGun(); setTV(false); starSpin.target = starSpin.home;
+  gameMode = 'classic';
+  resetGame(); resetChaosCam();                                        // put the whole room back (fire out, mirror up, mess cleared) behind the title
   state = 'menu'; ui.pause.hidden = true; ui.hud.hidden = true; ui.start.hidden = false; showBestOnStart();
 }
 function showGameOver() {
@@ -4328,9 +4328,14 @@ renderer.domElement.addEventListener('pointerup', endTouch); renderer.domElement
 /* =====================================================================
    MAIN LOOP
    ===================================================================== */
-let last = performance.now(), clock = 0;
+let last = performance.now(), clock = 0, reflFrame = 0;
+// each mirror reflection is a whole extra render of the room: the two mirrors take turns refreshing (one per frame),
+// which roughly halves their cost with no visible difference
+{ const refl = []; scene.traverse(o => { if (o.getRenderTarget && o.onBeforeRender) refl.push(o); });
+  refl.forEach((o, i) => { const obr = o.onBeforeRender; o.onBeforeRender = function (...a) { if ((reflFrame + i) % 2) return; obr.apply(this, a); }; }); }
 function frame(now) {
   requestAnimationFrame(frame);
+  reflFrame++;
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = Math.max(now, last);   // never a backwards step (rAF stamps can trail performance.now())
   clock += dt;
 
