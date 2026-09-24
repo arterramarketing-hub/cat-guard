@@ -188,6 +188,7 @@
   .tv-mid{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:960px;order:0}
   .tv-frame{width:100%;aspect-ratio:16/9;background:#000;border:10px solid #121212;border-radius:10px;box-shadow:0 0 0 2px #2a2a2a,0 10px 40px rgba(0,0,0,.6);overflow:hidden}
   .tv-frame canvas{width:100%;height:100%;display:block}
+  .tv-btns{display:flex;gap:10px}
   .tv-exit{appearance:none;border:2px solid #555;background:#222;color:#eee;font:800 14px var(--body);border-radius:999px;padding:8px 18px;cursor:pointer}
   .tv-joy{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 18px;border-radius:28px;min-width:150px}
   .tv-left{background:#0ab9e6;order:1}.tv-right{background:#ff3c28;order:2}
@@ -217,7 +218,7 @@
 <!-- Playing the console: the TV full screen, with a pair of controllers -->
 <section id="tvPlay" hidden>
   <div class="tv-joy tv-left"><div class="dpad"><button data-k="up" aria-label="Up">▲</button><button data-k="left" aria-label="Left">◀</button><button data-k="right" aria-label="Right">▶</button><button data-k="down" aria-label="Down">▼</button></div><span class="joy-lbl">Menu</span></div>
-  <div class="tv-mid"><div class="tv-frame" id="tvScreenHost"></div><button class="tv-exit" id="tvExit">✕ Exit game</button></div>
+  <div class="tv-mid"><div class="tv-frame" id="tvScreenHost"></div><div class="tv-btns"><button class="tv-exit" id="tvSwap">🔄 Other game</button><button class="tv-exit" id="tvExit">✕ Exit game</button></div></div>
   <div class="tv-joy tv-right"><div class="abxy"><button data-k="b" class="kb">B</button><button data-k="a" class="ka">A</button></div><span class="joy-lbl">A: select · B: back</span></div>
 </section>
 <div id="fx"></div>
@@ -1120,7 +1121,7 @@ const blankX = LEFT_X0 + IN(1.5) + FT(2.45) / 2;                          // pus
 // games console in its dock (Switch-style: black dock, neon blue & red controllers either side). Tap it: power light + a click.
 let consoleRig = null;
 {
-  const cx = LEFT_X0 + LEFT_W - IN(9.4), cz = IN(9), g = new THREE.Group(); g.position.set(cx, CAB_H, cz); g.rotation.y = 0.12; scene.add(g);
+  const cx = LEFT_X0 + LEFT_W - IN(9.4), cz = IN(13.5), g = new THREE.Group(); g.position.set(cx, CAB_H, cz); g.rotation.y = 0.05; scene.add(g);
   const black = new THREE.MeshPhongMaterial({ color: 0x1c1c1e, shininess: 40, specular: 0x222222 }), glass = new THREE.MeshPhongMaterial({ color: 0x0b0c0f, shininess: 90, specular: 0x555555 });
   const blue = new THREE.MeshPhongMaterial({ color: 0x0ab9e6, shininess: 50, specular: 0x333333 }), red = new THREE.MeshPhongMaterial({ color: 0xff3c28, shininess: 50, specular: 0x333333 }), nub = lam(0x222226);
   box(IN(6.6), IN(3.1), IN(2.1), glass, 0, IN(1.1) + IN(3.1) / 2 + IN(0.8), -IN(0.2), g);              // the console's screen, sitting in the dock
@@ -1141,7 +1142,7 @@ function tapConsole() {
   c.on = !c.on; c.led.material.color.setHex(c.on ? 0x3cff6a : 0x2a2a2a);
   tone(1200, 1500, 0.05, 'square', 0.03); if (c.on) tone(900, 1800, 0.12, 'sine', 0.04, 0.06);   // the little 'click-click' boot chime
   if (tvBroken) { tvSpark(); return; }
-  if (c.on) { setTVMode(3); setTimeout(gameJingle, 250); } else if (tvMode === 3) setTVMode(0);   // the TV flicks on to the party game
+  if (c.on) { tvGame = tvPlays % 2 === 0 ? 'kart' : 'party'; setTVMode(3); setTimeout(gameJingle, 250); } else if (tvMode === 3) setTVMode(0);   // the TV flicks on to the next game up
   bonus(5);
 }
 // 55" TV (48" x 28"), switched off
@@ -1368,6 +1369,8 @@ function updateGame(dt) {
 }
 function gameInput(k) {
   if (k === 'exit') return exitTvPlay();
+  if (k === 'swap') { tvGame = tvGame === 'kart' ? 'party' : 'kart'; startConsoleGame(); return; }
+  if (tvGame === 'kart') return kartInput(k);
   if (game.over) { if (k === 'a') { resetBoardGame(); gameMsg('New game!'); } return; }
   if (k === 'up' || k === 'left') { game.cursor = (game.cursor + 2) % 3; tone(660, 660, 0.03, 'square', 0.02); }
   if (k === 'down' || k === 'right') { game.cursor = (game.cursor + 1) % 3; tone(660, 660, 0.03, 'square', 0.02); }
@@ -1405,24 +1408,196 @@ function updateTvCine(dt) {
   if (c.t > 1.15) {                                                   // cut to the TV, full screen
     tvCine = null; tvPad.visible = false;
     const host = $('tvScreenHost'); if (!host.contains(gameCanvas)) host.appendChild(gameCanvas);
-    game.player = true; resetBoardGame(); setTVMode(3); gameMsg('Your turn first! Hit the block', 1.8);
+    game.player = true; tvGame = tvPlays++ % 2 === 0 ? 'kart' : 'party'; startConsoleGame();
     $('tvPlay').hidden = false; state = 'tvgame';
     setTimeout(() => $('tvFade').classList.remove('on'), 60);
     gameJingle();
   }
+}
+function startConsoleGame() {
+  for (const k in tvHeld) tvHeld[k] = false;
+  if (tvGame === 'kart') { resetKart(); kart.msg = 'Hold A to drive!'; kart.msgT = 2.4; }
+  else { resetBoardGame(); gameMsg('Your turn first! Hit the block', 1.8); }
+  setTVMode(3); document.querySelectorAll('.joy-lbl')[0].textContent = tvGame === 'kart' ? '◀ ▶ steer' : 'Menu';
+  document.querySelectorAll('.joy-lbl')[1].textContent = tvGame === 'kart' ? 'A: gas · B: item' : 'A: select · B: back';
 }
 function exitTvPlay() {
   if (state !== 'tvgame') return;
   $('tvFade').classList.add('on');
   setTimeout(() => {
     $('tvPlay').hidden = true; ui.hud.hidden = false; state = 'playing'; last = performance.now();
-    if (game.over && !game.rewarded) {                                // a board-game win pays out in the real game
+    if (tvGame === 'party' && game.over && !game.rewarded) {         // a board-game win pays out in the real game
       game.rewarded = true; const place = gameRanking().indexOf(0);
-      const pts = [300, 150, 75, 25][place]; bonus(pts, consoleRig.g.position, place === 0 ? 'Board champ!' : 'Game night');
+      const pts = [300, 150, 75, 25][place]; bonus(pts, consoleRig.g.position, place === 0 ? 'Board champ!' : 'Game night'); if (!place) unlock('boardWin');
     }
-    game.player = false;
+    if (tvGame === 'kart' && kart.over && !kart.rewarded) {            // so does a kart race
+      kart.rewarded = true; const pts = [300, 150, 75, 25][kart.place - 1]; bonus(pts, consoleRig.g.position, kart.place === 1 ? 'Kart champ!' : 'Race day'); if (kart.place === 1) unlock('kartWin');
+    }
+    game.player = false; for (const k in tvHeld) tvHeld[k] = false;
+    tvGame = tvPlays % 2 === 0 ? 'kart' : 'party'; resetKart(); resetBoardGame(); setTVMode(3);   // the TV now shows the next game up
     setTimeout(() => $('tvFade').classList.remove('on'), 60);
   }, 380);
+}
+
+/* ---------- the console's first game: a kart racer (pseudo-3D road, 3 laps vs 3 CPU karts, coins, ? boxes, mushroom boost) ---------- */
+let tvGame = 'kart', tvPlays = 0;                                     // which game the console is showing; plays alternate kart → party
+const tvHeld = {};                                                    // buttons / keys currently held (for steering and gas)
+const KART = { W: 384, H: 216, SEG: 200, ROAD: 2000, CAM_H: 1000, DEPTH: 1 / Math.tan(50 * Math.PI / 180), DRAW: 110, LAPS: 3, MAX: 6200 };
+KART.PZ = KART.CAM_H * KART.DEPTH;                                    // how far ahead of the camera the player's kart sits
+const kSegs = [];
+(() => {
+  const add = (n, curve, deco) => { for (let i = 0; i < n; i++) kSegs.push({ i: kSegs.length, curve, sprites: [], coin: null, boxes: null }); };
+  const bend = (enter, hold, leave, c) => { for (let i = 0; i < enter; i++) add(1, c * (i / enter) ** 2); add(hold, c); for (let i = 0; i < leave; i++) add(1, c * (1 - i / leave) ** 2); };
+  add(45, 0); bend(20, 40, 20, 3); add(30, 0); bend(20, 50, 20, -4); bend(15, 20, 15, 2.5); bend(15, 20, 15, -2.5); add(40, 0); bend(20, 30, 20, 5); add(35, 0);
+  kSegs.forEach((sg, i) => {
+    if (i % 12 === 0 && i > 8) sg.sprites.push({ kind: i % 36 === 0 ? 'pipe' : 'tree', x: (i % 24 === 0 ? -1 : 1) * (1.5 + (i % 5) * 0.2) });   // scenery
+    if (i % 9 === 0 && i > 20) sg.coin = { x: Math.sin(i * 0.37) * 0.55, got: false };
+    if (i % 120 === 60) sg.boxes = [-0.5, 0, 0.5].map(x => ({ x, got: 0 }));
+  });
+})();
+KART.LEN = kSegs.length * KART.SEG;
+const kart = { pos: 0, x: 0, speed: 0, lap: 0, coins: 0, item: null, boost: 0, bump: 0, state: 'count', t: 0, sky: 0, place: 1, over: false, rewarded: false, cars: [], msg: '', msgT: 0 };
+function resetKart() {
+  Object.assign(kart, { pos: 0, x: 0.3, speed: 0, lap: 0, coins: 0, item: null, boost: 0, bump: 0, state: 'count', t: 0, over: false, rewarded: false, msgT: 0, lastBeep: 4 });
+  kart.cars = [{ col: '#3cb44b', cap: '#2b8a3a', skill: 0.9 }, { col: '#f59fc4', cap: '#e56aa0', skill: 0.86 }, { col: '#f2c230', cap: '#b87a14', skill: 0.94 }]
+    .map((c, i) => ({ ...c, pos: KART.SEG * (4 + i * 3), x: [-0.5, 0.45, -0.1][i], lap: 0, speed: 0, wob: Math.random() * 6 }));
+  kSegs.forEach(sg => { if (sg.coin) sg.coin.got = false; if (sg.boxes) sg.boxes.forEach(b => b.got = 0); });
+}
+resetKart();
+const kSeg = z => kSegs[Math.floor(z / KART.SEG) % kSegs.length];
+const kProg = c => c.lap * KART.LEN + c.pos;
+function kartPlace() { const me = kProg(kart); return 1 + kart.cars.filter(c => kProg(c) > me).length; }
+function updateKart(dt) {
+  const K = kart, auto = !game.player; K.msgT = Math.max(0, K.msgT - dt); K.t += dt;
+  if (K.state === 'count') {
+    const n = 3 - Math.floor(K.t); if (n < K.lastBeep && n >= 0) { K.lastBeep = n; tone(n ? 523 : 1047, n ? 523 : 1047, n ? 0.12 : 0.3, 'square', 0.03); }
+    if (K.t >= 3) { K.state = 'race'; K.t = 0; }
+    return;
+  }
+  if (K.state === 'done') { if (auto && K.t > 4) resetKart(); return; }
+  // ---- you (or the autopilot on the room's TV)
+  const seg = kSeg(K.pos), pct = K.speed / KART.MAX;
+  let steer = 0, gas = false, brake = false;
+  if (auto) { gas = true; steer = Math.max(-1, Math.min(1, -K.x * 1.5 + seg.curve * 0.35)); if (K.item && Math.random() < dt) kartUseItem(); }
+  else { steer = (tvHeld.right ? 1 : 0) - (tvHeld.left ? 1 : 0); gas = !!tvHeld.a || !!tvHeld.up; brake = !!tvHeld.down; }
+  K.x += steer * dt * 2.2 * Math.max(0.35, pct);
+  K.x -= dt * 2 * pct * seg.curve * 0.32;                             // centrifugal drift on the bends
+  const top = KART.MAX * (K.boost > 0 ? 1.4 : 1) * (1 + Math.min(10, K.coins) * 0.012);
+  K.speed += (gas ? 2600 : brake ? -6000 : -1600) * dt;
+  if (Math.abs(K.x) > 1 && K.speed > KART.MAX * 0.35) K.speed -= 7000 * dt;   // off the road: grass slows you right down
+  K.speed = Math.max(0, Math.min(top, K.speed)); K.x = Math.max(-2.2, Math.min(2.2, K.x));
+  K.boost = Math.max(0, K.boost - dt); K.bump = Math.max(0, K.bump - dt);
+  const before = K.pos; K.pos += K.speed * dt;
+  if (K.pos >= KART.LEN) { K.pos -= KART.LEN; K.lap++; if (K.lap < KART.LAPS && game.player) { K.msg = K.lap === KART.LAPS - 1 ? 'Final lap!' : `Lap ${K.lap + 1}`; K.msgT = 1.4; tone(880, 1320, 0.15, 'square', 0.03); } }
+  K.sky += dt * pct * seg.curve * 0.004;
+  // coins and ? boxes on the segments you drive through
+  for (let z = before; z <= before + K.speed * dt + 1; z += KART.SEG) {
+    const sg = kSeg((z + KART.PZ) % KART.LEN);
+    if (sg.coin && !sg.coin.got && Math.abs(sg.coin.x - K.x) < 0.3) { sg.coin.got = true; K.coins = Math.min(99, K.coins + 1); tone(1320, 1760, 0.06, 'square', 0.02); }
+    if (sg.boxes) for (const b of sg.boxes) if (!b.got && Math.abs(b.x - K.x) < 0.28) { b.got = 3; if (!K.item) { K.item = 'mushroom'; K.msg = 'Got a Mushroom! (B)'; K.msgT = 1.3; [700, 900, 1100].forEach((f, i) => tone(f, f, 0.05, 'square', 0.02, i * 0.05)); } }
+  }
+  kSegs.forEach(sg => { if (sg.boxes) sg.boxes.forEach(b => { if (b.got) b.got = Math.max(0, b.got - dt); }); });
+  // ---- the CPU karts
+  for (const c of K.cars) {
+    const cs = kSeg(c.pos); c.wob += dt;
+    c.speed += (KART.MAX * c.skill * (1 + 0.04 * Math.sin(c.wob * 0.7)) - c.speed) * dt * 0.8;
+    c.pos += c.speed * dt; if (c.pos >= KART.LEN) { c.pos -= KART.LEN; c.lap++; }
+    c.x += (Math.sin(c.wob * 0.5) * 0.5 - cs.curve * 0.05 - c.x) * dt;
+    // bump: same stretch of road, side by side
+    const dz = (c.pos - K.pos - KART.PZ + KART.LEN * 2) % KART.LEN;
+    if (dz < KART.SEG * 0.8 && Math.abs(c.x - K.x) < 0.35 && !K.bump) { K.bump = 0.6; K.speed *= 0.55; K.x += K.x < c.x ? -0.25 : 0.25; tone(160, 90, 0.12, 'square', 0.04); }
+  }
+  K.place = kartPlace();
+  if (K.lap >= KART.LAPS) { K.state = 'done'; K.t = 0; K.over = game.player; if (game.player) [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.14, 'square', 0.03, i * 0.12)); }
+}
+function kartUseItem() { if (kart.item !== 'mushroom') return; kart.item = null; kart.boost = 1.6; kart.speed = Math.max(kart.speed, KART.MAX * 1.2); [400, 600, 800].forEach((f, i) => tone(f, f * 1.5, 0.08, 'sawtooth', 0.025, i * 0.04)); }
+function kartInput(k) {
+  if (kart.over) { if (k === 'a') { resetKart(); kart.msg = 'Get ready!'; kart.msgT = 1; } return; }
+  if (k === 'b') kartUseItem();
+}
+function drawKartSprite(g, x, y, s, col, cap, tilt) {                // a chunky little kart seen from behind, driver in a cap
+  g.save(); g.translate(x, y); g.rotate(tilt || 0); g.scale(s, s);
+  g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(0, 2, 30, 6, 0, 0, 7); g.fill();
+  g.fillStyle = '#1b1b1b'; g.fillRect(-30, -12, 12, 14); g.fillRect(18, -12, 12, 14);            // back wheels
+  g.fillStyle = col; g.beginPath(); g.moveTo(-24, -6); g.lineTo(24, -6); g.lineTo(20, -22); g.lineTo(-20, -22); g.closePath(); g.fill();
+  g.fillStyle = '#333'; g.fillRect(-16, -8, 32, 4);                                               // bumper
+  g.fillStyle = '#ffe0c2'; g.beginPath(); g.arc(0, -30, 9, 0, 7); g.fill();                       // driver's head
+  g.fillStyle = cap; g.beginPath(); g.arc(0, -33, 9.5, Math.PI, 0); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(0, -36, 3, 0, 7); g.fill();                         // cap badge
+  g.restore();
+}
+function drawKart() {
+  const g = gameCtx, W = KART.W, H = KART.H, K = kart;
+  // sky + rolling hills that slide round the bends
+  const sky = g.createLinearGradient(0, 0, 0, H * 0.55); sky.addColorStop(0, '#4fb3ff'); sky.addColorStop(1, '#cdefff'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#fff'; for (let i = 0; i < 5; i++) { const cx = ((i * 97 - K.sky * 300) % (W + 80) + W + 80) % (W + 80) - 40; g.beginPath(); g.ellipse(cx, 28 + (i % 2) * 14, 22, 8, 0, 0, 7); g.fill(); }
+  for (const [col, amp, sp, base] of [['#7fcf6a', 26, 500, H * 0.5], ['#5db84f', 16, 900, H * 0.52]]) {
+    g.fillStyle = col; g.beginPath(); g.moveTo(0, H);
+    for (let x = 0; x <= W; x += 8) g.lineTo(x, base - Math.abs(Math.sin((x + K.sky * sp) * 0.018)) * amp);
+    g.lineTo(W, H); g.fill();
+  }
+  // the road, back to front
+  const base = kSeg(K.pos), bp = (K.pos % KART.SEG) / KART.SEG, camX = K.x * KART.ROAD;
+  let x = 0, dx = -base.curve * bp, maxy = H;
+  const proj = (wx, wz, cx) => { const tz = wz, sc = KART.DEPTH / tz; return { x: Math.round(W / 2 + sc * (wx - cx) * W / 2), y: Math.round(H / 2 + sc * KART.CAM_H * H / 2), w: Math.round(sc * KART.ROAD * W / 2), s: sc }; };
+  const drawn = [];
+  for (let n = 0; n < KART.DRAW; n++) {
+    const sg = kSegs[(base.i + n) % kSegs.length];
+    const z1 = n * KART.SEG - bp * KART.SEG, z2 = z1 + KART.SEG;
+    if (z1 <= 1) { x += dx; dx += sg.curve; drawn.push(null); continue; }
+    const p1 = proj(0, z1, camX - x), p2 = proj(0, z2, camX - x - dx);
+    x += dx; dx += sg.curve;
+    if (p2.y >= maxy) { drawn.push(null); continue; }
+    const dark = Math.floor(sg.i / 3) % 2;
+    g.fillStyle = dark ? '#36a843' : '#3fb84a'; g.fillRect(0, p2.y, W, p1.y - p2.y + 1);
+    const quad = (c, x1, w1, x2, w2) => { g.fillStyle = c; g.beginPath(); g.moveTo(x1 - w1, p1.y); g.lineTo(x1 + w1, p1.y); g.lineTo(x2 + w2, p2.y); g.lineTo(x2 - w2, p2.y); g.fill(); };
+    quad(dark ? '#e23a32' : '#ffffff', p1.x, p1.w * 1.12, p2.x, p2.w * 1.12);                        // kerbs
+    quad(dark ? '#6b6b73' : '#707078', p1.x, p1.w, p2.x, p2.w);                                      // tarmac
+    if (dark) quad('#f4f4f4', p1.x, p1.w * 0.02, p2.x, p2.w * 0.02);                                 // centre line
+    if (sg.i < 6) quad(Math.floor(sg.i) % 2 ? '#111' : '#fff', p1.x, p1.w, p2.x, p2.w);              // start / finish
+    drawn.push({ sg, p1, clip: maxy });
+    maxy = p2.y;
+  }
+  // scenery, coins, boxes and the other karts, far to near
+  for (let n = drawn.length - 1; n >= 0; n--) {
+    const d = drawn[n]; if (!d) continue;
+    const { sg, p1 } = d, at = (ox) => p1.x + p1.s * ox * KART.ROAD * W / 2, sc = p1.s * W / 2 * 2.2;
+    g.save(); g.beginPath(); g.rect(0, 0, W, d.clip); g.clip();
+    for (const sp of sg.sprites) {
+      const sx = at(sp.x), s = sc * 260;
+      if (sp.kind === 'tree') { g.fillStyle = '#6b4a2b'; g.fillRect(sx - s * 0.08, p1.y - s * 0.5, s * 0.16, s * 0.5); g.fillStyle = '#2f8f3a'; g.beginPath(); g.arc(sx, p1.y - s * 0.62, s * 0.32, 0, 7); g.fill(); }
+      else { g.fillStyle = '#2fb35a'; g.fillRect(sx - s * 0.2, p1.y - s * 0.55, s * 0.4, s * 0.55); g.fillStyle = '#34c865'; g.fillRect(sx - s * 0.26, p1.y - s * 0.62, s * 0.52, s * 0.14); }
+    }
+    if (sg.coin && !sg.coin.got) { const s = sc * 40, sx = at(sg.coin.x); g.fillStyle = '#ffd23a'; g.beginPath(); g.ellipse(sx, p1.y - s * 1.2, s * 0.5 * Math.abs(Math.sin(K.t * 5 + sg.i)) + s * 0.1, s * 0.6, 0, 0, 7); g.fill(); }
+    if (sg.boxes) for (const b of sg.boxes) if (!b.got) { const s = sc * 70, sx = at(b.x); const hue = (K.t * 120 + b.x * 90) % 360; g.fillStyle = `hsla(${hue},90%,60%,.85)`; g.fillRect(sx - s / 2, p1.y - s * 1.25, s, s); g.fillStyle = '#fff'; g.font = `bold ${Math.max(6, s * 0.7) | 0}px sans-serif`; g.textAlign = 'center'; g.fillText('?', sx, p1.y - s * 0.5); }
+    for (const c of K.cars) {
+      const dz = (c.pos - K.pos + KART.LEN * 2) % KART.LEN;
+      if (Math.floor(dz / KART.SEG) === n) drawKartSprite(g, at(c.x), p1.y, sc * 2.7, c.col, c.cap, 0);
+    }
+    g.restore();
+  }
+  // you
+  const bounce = Math.sin(K.t * 30) * (K.speed > 100 ? 1 : 0) + (K.bump ? Math.sin(K.t * 60) * 3 : 0);
+  const tilt = ((tvHeld.right ? 1 : 0) - (tvHeld.left ? 1 : 0)) * 0.08 * (game.player ? 1 : 0);
+  if (K.boost > 0) { g.fillStyle = `rgba(255,${150 + Math.random() * 100 | 0},40,.8)`; g.beginPath(); g.moveTo(W / 2 - 10, H - 18); g.lineTo(W / 2, H - 2 + Math.random() * 6); g.lineTo(W / 2 + 10, H - 18); g.fill(); }
+  drawKartSprite(g, W / 2, H - 14 + bounce, 1.15, '#e23a32', '#e23a32', tilt);
+  // HUD
+  g.font = 'bold 12px sans-serif'; g.textAlign = 'left'; g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(4, 4, 74, 34);
+  g.fillStyle = '#fff'; g.fillText(`LAP ${Math.min(KART.LAPS, K.lap + 1)}/${KART.LAPS}`, 10, 18); g.fillStyle = '#ffd23a'; g.fillText(`● ${K.coins}`, 10, 33);
+  g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(W / 2 - 17, 4, 34, 30); g.strokeStyle = '#fff'; g.lineWidth = 2; g.strokeRect(W / 2 - 17, 4, 34, 30);
+  if (K.item === 'mushroom') { g.fillStyle = '#e23a32'; g.beginPath(); g.arc(W / 2, 17, 10, Math.PI, 0); g.fill(); g.fillStyle = '#fff'; g.fillRect(W / 2 - 5, 17, 10, 10); g.beginPath(); g.arc(W / 2 - 4, 12, 2.5, 0, 7); g.arc(W / 2 + 4, 12, 2.5, 0, 7); g.fill(); }
+  const ord = ['1st', '2nd', '3rd', '4th'][K.place - 1];
+  g.textAlign = 'right'; g.font = 'bold 28px sans-serif'; g.lineWidth = 4; g.strokeStyle = '#000'; g.strokeText(ord, W - 8, 32); g.fillStyle = K.place === 1 ? '#ffd23a' : '#fff'; g.fillText(ord, W - 8, 32);
+  g.textAlign = 'center';
+  if (K.state === 'count') { const n = 3 - Math.floor(K.t); g.font = 'bold 54px sans-serif'; g.lineWidth = 6; g.strokeText(n > 0 ? String(n) : 'GO!', W / 2, H / 2); g.fillStyle = n > 0 ? '#fff' : '#3cff6a'; g.fillText(n > 0 ? String(n) : 'GO!', W / 2, H / 2); }
+  if (K.msgT > 0) { g.font = 'bold 16px sans-serif'; g.lineWidth = 4; g.strokeText(K.msg, W / 2, 62); g.fillStyle = '#ffd23a'; g.fillText(K.msg, W / 2, 62); }
+  if (K.state === 'done') {
+    g.fillStyle = 'rgba(10,15,30,.8)'; g.fillRect(82, 50, 220, 110); g.strokeStyle = '#ffd23a'; g.lineWidth = 2; g.strokeRect(82, 50, 220, 110);
+    g.fillStyle = '#ffd23a'; g.font = 'bold 22px sans-serif'; g.fillText(K.place === 1 ? 'You win! 🏆' : `You finished ${ord}`, W / 2, 84);
+    g.fillStyle = '#fff'; g.font = 'bold 12px sans-serif'; g.fillText(`Coins ● ${K.coins}`, W / 2, 106);
+    if (game.player) { g.fillStyle = '#ffd23a'; g.font = 'bold 11px sans-serif'; g.fillText('A: race again · Exit: back to the room', W / 2, 142); }
+  }
+  gameTex.needsUpdate = true;
 }
 function gameJingle() { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, f, 0.1, 'square', 0.025, i * 0.09)); }
 const tvAudio = { node: null, gain: null, nextLine: 0 };
@@ -1459,7 +1634,7 @@ function setTVMode(m) {
   tvMode = m; tvOn = m > 0;
   screen.material = tvBroken ? tvBrokenMat : m === 1 ? tvStaticMat : m === 2 ? tvShowMat : m === 3 ? tvGameMat : tvOffMat;
   tvLight.color.setHex(m === 3 ? 0x9fd6ff : 0xd6e4ff);
-  if (m === 3) { game.rollT = 1.2; drawGame(clock); }
+  if (m === 3) { game.rollT = 1.2; if (tvGame === 'kart') drawKart(); else drawGame(clock); }
   tvHiss(m === 1);
   tvAudio.nextLine = 0; showCast.forEach(c => { c.talk = 0; c.arm = 0; });
 }
@@ -1468,9 +1643,9 @@ function updateTV(dt) {
   if (tvBroken) { tvLight.intensity = 0; if (Math.random() < dt * 0.5) tvSpark(true); return; }   // broken: the odd little spark
   if (!tvOn) { tvLight.intensity = 0; return; }
   if (tvAudio.gain) tvAudio.gain.gain.value = state === 'playing' || state === 'debug' ? 0.03 : 0;   // hush while paused
-  if (tvMode === 3) {                                                     // the console game: tokens hop round the board
-    updateGame(dt);
-    if (game.player || (staticTick = (staticTick + 1) % 3) === 0) drawGame(clock);
+  if (tvMode === 3) {                                                     // the console game (kart racer or party board)
+    if (tvGame === 'kart') { updateKart(dt); if (game.player || (staticTick = (staticTick + 1) % 2) === 0) drawKart(); }
+    else { updateGame(dt); if (game.player || (staticTick = (staticTick + 1) % 3) === 0) drawGame(clock); }
     tvLight.intensity = 0.4 + Math.sin(clock * 3) * 0.05;
     return;
   }
@@ -1496,7 +1671,7 @@ function updateTV(dt) {
 // pillar candles, 3–4" wide, 6–12" tall (flicker in the main loop)
 const candleMat = lam(0xf1ead6), flames = [], candleGlows = [];
 const TV_L = MAIN_CX - IN(24 * TV_SCALE + 2), TV_R = MAIN_CX + IN(24 * TV_SCALE + 2);                 // keep décor clear of the TV (+2" margin)
-for (const [x, z, r, h] of [[MAIN_X0 + IN(4.5), IN(5), IN(2), IN(12)], [MAIN_X0 + IN(11.5), IN(12.5), IN(1.75), IN(7)], [LEFT_X0 + LEFT_W - IN(2.3), IN(8), IN(1.75), IN(8)],   // left of the TV: tall + short candle grouped with the lamp; one at the end of the cabinet
+for (const [x, z, r, h] of [[MAIN_X0 + IN(4.5), IN(5), IN(2), IN(12)], [MAIN_X0 + IN(11.5), IN(12.5), IN(1.75), IN(7)], [LEFT_X0 + LEFT_W - IN(2.6), IN(4), IN(1.75), IN(8)],   // left of the TV: tall + short candle grouped with the lamp; one at the end of the cabinet
                             [TV_R + IN(3), IN(8), IN(2), IN(9)], [TV_R + IN(8), IN(12), IN(1.75), IN(6)]]) {
   const g = new THREE.Group(); g.position.set(x, CAB_H + h / 2, z); scene.add(g);            // pivot at the candle's centre
   g.add(new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 12), candleMat));
@@ -4308,12 +4483,21 @@ $('startBtn').addEventListener('click', () => startGame('classic'));
 $('chaosBtn').addEventListener('click', () => startGame('chaos'));
 $('mouseBtn').addEventListener('click', () => startGame('mouse'));
 $('againBtn').addEventListener('click', () => startGame(gameMode));
-document.querySelectorAll('#tvPlay [data-k]').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); gameInput(b.dataset.k); }));
+document.querySelectorAll('#tvPlay [data-k]').forEach(b => {
+  b.addEventListener('pointerdown', e => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (err) {} tvHeld[b.dataset.k] = true; gameInput(b.dataset.k); });
+  const up = () => { tvHeld[b.dataset.k] = false; };
+  b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
+});
+$('tvSwap').addEventListener('click', () => gameInput('swap'));
 $('tvExit').addEventListener('click', () => gameInput('exit'));
 window.addEventListener('keydown', e => {
   if (state !== 'tvgame') return;
   const k = { arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right', enter: 'a', ' ': 'a', a: 'a', z: 'a', b: 'b', x: 'b', backspace: 'b', escape: 'exit' }[e.key.toLowerCase()];
-  if (k) { e.preventDefault(); gameInput(k); }
+  if (k) { e.preventDefault(); if (!e.repeat) { tvHeld[k] = true; gameInput(k); } }
+});
+window.addEventListener('keyup', e => {
+  const k = { arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right', enter: 'a', ' ': 'a', a: 'a', z: 'a', b: 'b', x: 'b' }[e.key.toLowerCase()];
+  if (k) tvHeld[k] = false;
 });
 $('overTitleBtn').addEventListener('click', () => { ui.over.hidden = true; quitToTitle(); });
 $('pauseBtn').addEventListener('click', pauseGame);
