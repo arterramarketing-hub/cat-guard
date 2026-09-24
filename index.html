@@ -1164,7 +1164,7 @@ function tapConsole() {
   c.on = !c.on; c.led.material.color.setHex(c.on ? 0x3cff6a : 0x2a2a2a);
   tone(1200, 1500, 0.05, 'square', 0.03); if (c.on) tone(900, 1800, 0.12, 'sine', 0.04, 0.06);   // the little 'click-click' boot chime
   if (tvBroken) { tvSpark(); return; }
-  if (c.on) { tvGame = tvPlays % 2 === 0 ? 'kart' : 'party'; setTVMode(3); setTimeout(gameJingle, 250); } else if (tvMode === 3) setTVMode(0);   // the TV flicks on to the next game up
+  if (c.on) { tvGame = tvNextGame(); setTVMode(3); setTimeout(gameJingle, 250); } else if (tvMode === 3) setTVMode(0);   // the TV flicks on to the next game up
   bonus(5);
 }
 // 55" TV (48" x 28"), switched off
@@ -1391,7 +1391,10 @@ function updateGame(dt) {
 }
 function gameInput(k) {
   if (k === 'exit') return exitTvPlay();
-  if (k === 'swap') { tvGame = tvGame === 'kart' ? 'party' : 'kart'; startConsoleGame(); return; }
+  if (k === 'swap') { hush(); const i = TV_GAMES.indexOf(tvGame); tvGame = TV_GAMES[(i + 1) % TV_GAMES.length]; startConsoleGame(); return; }
+  if (tvGame === 'story') { if (k === 'a' || k === 'b') { hush(); startRetro(); } return; }
+  if (tvGame === 'retro') { if (k === 'a') retroSwipe(); return; }
+  if (tvGame === 'flappy') { flappyFlap(); return; }
   if (tvGame === 'kart') return kartInput(k);
   if (game.over) { if (k === 'a') { resetBoardGame(); gameMsg('New game!'); } return; }
   if (k === 'up' || k === 'left') { game.cursor = (game.cursor + 2) % 3; tone(660, 660, 0.03, 'square', 0.02); }
@@ -1430,7 +1433,7 @@ function updateTvCine(dt) {
   if (c.t > 1.15) {                                                   // cut to the TV, full screen
     tvCine = null; tvPad.visible = false;
     const host = $('tvScreenHost'); if (!host.contains(gameCanvas)) host.appendChild(gameCanvas);
-    game.player = true; tvGame = tvPlays++ % 2 === 0 ? 'kart' : 'party'; startConsoleGame();
+    game.player = true; tvGame = tvNextGame(); tvPlays++; startConsoleGame();
     $('tvPlay').hidden = false; state = 'tvgame';
     setTimeout(() => $('tvFade').classList.remove('on'), 60);
     gameJingle();
@@ -1439,9 +1442,9 @@ function updateTvCine(dt) {
 function startConsoleGame() {
   for (const k in tvHeld) tvHeld[k] = false;
   if (tvGame === 'kart') { resetKart(); kart.msg = 'Hold A to drive!'; kart.msgT = 2.4; }
+  else if (tvGame === 'flappy') { resetFlappy(); flappy.won = false; flappy.rewarded = false; flappy.sessionBest = 0; }
   else { resetBoardGame(); gameMsg('Your turn first! Hit the block', 1.8); }
-  setTVMode(3); document.querySelectorAll('.joy-lbl')[0].textContent = tvGame === 'kart' ? '◀ ▶ steer' : 'Menu';
-  document.querySelectorAll('.joy-lbl')[1].textContent = tvGame === 'kart' ? 'A: gas · B: item' : 'A: select · B: back';
+  setTVMode(3); setJoyLabels();
 }
 const CONSOLE_PRIZES = [1000, 400, 200, 100];                            // winning a console game is a big score boost in the real game
 function consoleWin(title, pts) {                                     // a proper celebration when you come back to the room as champion
@@ -1456,15 +1459,21 @@ function exitTvPlay() {
   $('tvFade').classList.add('on');
   setTimeout(() => {
     $('tvPlay').hidden = true; ui.hud.hidden = false; state = 'playing'; last = performance.now();
-    if (tvGame === 'party' && game.over && !game.rewarded) {         // a board-game win pays out in the real game
+    hush();
+    if (game.over && !game.rewarded) {         // a board-game win pays out in the real game
       game.rewarded = true; const place = gameRanking().indexOf(0);
       const pts = CONSOLE_PRIZES[place]; bonus(pts, consoleRig.g.position, place === 0 ? 'Board champ!' : 'Game night'); if (!place) { unlock('boardWin'); consoleWin('Board game champion!', pts); }
     }
-    if (tvGame === 'kart' && kart.over && !kart.rewarded) {            // so does a kart race
+    if (kart.over && !kart.rewarded) {            // so does a kart race
       kart.rewarded = true; const pts = CONSOLE_PRIZES[kart.place - 1]; bonus(pts, consoleRig.g.position, kart.place === 1 ? 'Kart champ!' : 'Race day'); if (kart.place === 1) { unlock('kartWin'); consoleWin('Kart race champion!', pts); }
     }
+    if (retro.won && !retro.rewarded) {                               // beat the game inside the game inside the game
+      retro.rewarded = true; bonus(1500, consoleRig.g.position, 'Game-ception!'); unlock('inception'); consoleWin('Game-ception complete!', 1500);
+    }
+    if (flappy.won && !flappy.rewarded) { flappy.rewarded = true; bonus(1000, consoleRig.g.position, 'Flappy champ!'); unlock('flappy'); consoleWin('Flappy Kitty champion!', 1000); }
+    else if (flappy.sessionBest > 0 && !flappy.rewarded) { flappy.rewarded = true; bonus(flappy.sessionBest * 20, consoleRig.g.position, 'Flappy'); }
     game.player = false; for (const k in tvHeld) tvHeld[k] = false;
-    tvGame = tvPlays % 2 === 0 ? 'kart' : 'party'; resetKart(); resetBoardGame(); setTVMode(3);   // the TV now shows the next game up
+    tvGame = tvNextGame(); resetKart(); resetBoardGame(); resetFlappy(); retro.won = false; setTVMode(3);   // the TV now shows the next game up
     setTimeout(() => $('tvFade').classList.remove('on'), 60);
   }, 380);
 }
@@ -1542,7 +1551,7 @@ function updateKart(dt) {
 }
 function kartUseItem() { if (kart.item !== 'mushroom') return; kart.item = null; kart.boost = 1.6; kart.speed = Math.max(kart.speed, KART.MAX * 1.2); [400, 600, 800].forEach((f, i) => tone(f, f * 1.5, 0.08, 'sawtooth', 0.025, i * 0.04)); }
 function kartInput(k) {
-  if (kart.over) { if (k === 'a') { resetKart(); kart.msg = 'Get ready!'; kart.msgT = 1; } return; }
+  if (kart.over) { if (k === 'a') { if (kart.place === 1 && kart.t > 1) { startStory(); return; } resetKart(); kart.msg = 'Get ready!'; kart.msgT = 1; } return; }
   if (k === 'b') kartUseItem();
 }
 function drawKartSprite(g, x, y, s, col, cap, tilt) {                // a chunky little kart seen from behind, driver in a cap
@@ -1625,9 +1634,277 @@ function drawKart() {
     g.fillStyle = 'rgba(10,15,30,.8)'; g.fillRect(82, 50, 220, 110); g.strokeStyle = '#ffd23a'; g.lineWidth = 2; g.strokeRect(82, 50, 220, 110);
     g.fillStyle = '#ffd23a'; g.font = 'bold 22px sans-serif'; g.fillText(K.place === 1 ? 'You win! 🏆' : `You finished ${ord}`, W / 2, 84);
     g.fillStyle = '#fff'; g.font = 'bold 12px sans-serif'; g.fillText(`Coins ● ${K.coins}`, W / 2, 106);
-    if (game.player) { g.fillStyle = '#ffd23a'; g.font = 'bold 11px sans-serif'; g.fillText('A: race again · Exit: back to the room', W / 2, 142); }
+    if (game.player) { g.fillStyle = '#ffd23a'; g.font = 'bold 11px sans-serif'; g.fillText(K.place === 1 ? 'A: see what happens next… ▶' : 'A: race again · Exit: back to the room', W / 2, 142); }
   }
   gameTex.needsUpdate = true;
+}
+
+/* =====================================================================
+   GAMES INSIDE GAMES. Win the kart race → a narrated cutscene of the driver going home and playing their own
+   Switch → Retro Kitty Defender (this game, in pixels) → whose little TV shows a tinier kart race.
+   Plus the console's third game: Flappy Kitty.
+   ===================================================================== */
+const TV_GAMES = ['kart', 'party', 'flappy'];
+const tvNextGame = () => TV_GAMES[tvPlays % TV_GAMES.length];
+function speak(line) {                                                // narration: spoken aloud (where the device can) + subtitles on screen
+  try { if (!window.speechSynthesis) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(line); u.rate = 0.95; u.pitch = 1.05; u.volume = 0.9; speechSynthesis.speak(u); } catch (e) {}
+}
+function hush() { try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {} }
+
+// ---------- the cutscene: sunset drive → the sofa → over the shoulder into their Switch
+const STORY = [
+  { t: 0, line: 'After a long day at the races…' },
+  { t: 4.6, line: '…our champion heads home and kicks back on the sofa…' },
+  { t: 9.4, line: '…and fires up their favourite game.' },
+];
+const STORY_END = 14.6;
+const story = { t: 0, said: -1 };
+function startStory() { tvGame = 'story'; story.t = 0; story.said = -1; for (const k in tvHeld) tvHeld[k] = false; setJoyLabels(); }
+function updateStory(dt) {
+  story.t += dt;
+  const i = STORY.findLastIndex ? STORY.findLastIndex(s => story.t >= s.t) : STORY.map(s => story.t >= s.t).lastIndexOf(true);
+  if (i > story.said) { story.said = i; speak(STORY[i].line); }
+  if (story.t >= STORY_END) { hush(); startRetro(); }
+}
+function drawStory() {
+  const g = gameCtx, W = 384, H = 216, t = story.t;
+  g.save();
+  if (t < 4.6) {                                                       // 1) the drive home at sunset
+    const k = t / 4.6;
+    const sky = g.createLinearGradient(0, 0, 0, 150); sky.addColorStop(0, '#2b1b55'); sky.addColorStop(0.55, '#c9557a'); sky.addColorStop(1, '#ffc36b'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    const sunY = 112 + k * 16, glow = g.createRadialGradient(300, sunY, 4, 300, sunY, 70); glow.addColorStop(0, 'rgba(255,230,160,.95)'); glow.addColorStop(1, 'rgba(255,190,120,0)');
+    g.fillStyle = glow; g.fillRect(200, sunY - 70, 200, 140); g.fillStyle = '#ffe3a0'; g.beginPath(); g.arc(300, sunY, 22, 0, 7); g.fill();
+    for (let i = 0; i < 30; i++) { g.fillStyle = `rgba(255,255,255,${0.2 + 0.5 * ((i * 37) % 10) / 10})`; g.fillRect((i * 71) % W, (i * 23) % 60, 1.5, 1.5); }
+    g.fillStyle = '#5a2d5c'; g.beginPath(); g.moveTo(0, 140); for (let x = 0; x <= W; x += 16) g.lineTo(x, 118 + Math.sin(x * 0.02 + 1) * 12); g.lineTo(W, 150); g.lineTo(0, 150); g.fill();
+    g.fillStyle = '#3a1f44'; g.fillRect(0, 140, W, H - 140);
+    // the house, windows glowing
+    g.fillStyle = '#241634'; g.fillRect(262, 112, 86, 58); g.beginPath(); g.moveTo(254, 114); g.lineTo(305, 82); g.lineTo(356, 114); g.fill();
+    g.fillStyle = '#ffd98a'; g.shadowColor = '#ffcf70'; g.shadowBlur = 14; g.fillRect(274, 126, 18, 14); g.fillRect(318, 126, 18, 14); g.fillRect(298, 140, 12, 30); g.shadowBlur = 0;
+    // road + the red kart pulling in
+    g.fillStyle = '#231a2a'; g.fillRect(0, 170, W, 24); g.fillStyle = '#f2d27a'; for (let x = -((t * 120) % 40); x < W; x += 40) g.fillRect(x, 181, 18, 2);
+    const kx = 30 + Math.min(1, k * 1.15) * 190, bob = Math.sin(t * 30) * 0.8;
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(kx + 22, 191, 26, 4, 0, 0, 7); g.fill();
+    g.fillStyle = '#e23a32'; g.beginPath(); g.moveTo(kx, 186 + bob); g.lineTo(kx + 46, 186 + bob); g.lineTo(kx + 40, 176 + bob); g.lineTo(kx + 8, 176 + bob); g.fill();
+    g.fillStyle = '#1b1b1b'; g.beginPath(); g.arc(kx + 10, 188, 5, 0, 7); g.arc(kx + 36, 188, 5, 0, 7); g.fill();
+    g.fillStyle = '#ffe0c2'; g.beginPath(); g.arc(kx + 24, 170 + bob, 5, 0, 7); g.fill(); g.fillStyle = '#e23a32'; g.beginPath(); g.arc(kx + 24, 168 + bob, 5.5, Math.PI, 0); g.fill(); g.fillRect(kx + 24, 167 + bob, 7, 2);
+  } else if (t < 9.4) {                                                // 2) home, on the sofa
+    const k = (t - 4.6) / 4.8;
+    const wall = g.createLinearGradient(0, 0, 0, H); wall.addColorStop(0, '#4a2d4d'); wall.addColorStop(1, '#6d4459'); g.fillStyle = wall; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#0f1030'; g.fillRect(40, 30, 70, 60); g.fillStyle = '#fff'; for (let i = 0; i < 14; i++) g.fillRect(44 + (i * 29) % 62, 34 + (i * 17) % 52, 1.2, 1.2);   // window, stars
+    g.strokeStyle = '#2a1830'; g.lineWidth = 4; g.strokeRect(40, 30, 70, 60); g.beginPath(); g.moveTo(75, 30); g.lineTo(75, 90); g.stroke();
+    const lamp = g.createRadialGradient(320, 70, 5, 320, 70, 140); lamp.addColorStop(0, 'rgba(255,214,140,.55)'); lamp.addColorStop(1, 'rgba(255,190,120,0)'); g.fillStyle = lamp; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#e8c27a'; g.beginPath(); g.moveTo(306, 60); g.lineTo(334, 60); g.lineTo(328, 44); g.lineTo(312, 44); g.fill(); g.fillStyle = '#2a1830'; g.fillRect(318, 60, 4, 60);
+    g.fillStyle = '#2e1a2a'; g.fillRect(0, 170, W, H - 170);
+    // sofa
+    g.fillStyle = '#8e3b4c'; g.beginPath(); g.roundRect ? g.roundRect(110, 112, 180, 60, 14) : g.rect(110, 112, 180, 60); g.fill();
+    g.fillStyle = '#a4485b'; g.beginPath(); g.roundRect ? g.roundRect(120, 140, 160, 30, 8) : g.rect(120, 140, 160, 30); g.fill();
+    // the driver sinking into the sofa, Switch in hand
+    const sink = Math.min(1, k * 1.6) * 6, cx = 200;
+    g.fillStyle = '#e23a32'; g.beginPath(); g.roundRect ? g.roundRect(cx - 18, 118 + sink, 36, 34, 10) : g.rect(cx - 18, 118 + sink, 36, 34); g.fill();
+    g.fillStyle = '#ffe0c2'; g.beginPath(); g.arc(cx, 106 + sink, 13, 0, 7); g.fill();
+    g.fillStyle = '#e23a32'; g.beginPath(); g.arc(cx, 100 + sink, 13.5, Math.PI, 0); g.fill(); g.fillRect(cx - 2, 98 + sink, 18, 4);
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(cx, 94 + sink, 4, 0, 7); g.fill();
+    g.fillStyle = '#222'; g.fillRect(cx - 5, 107 + sink, 2, 3); g.fillRect(cx + 4, 107 + sink, 2, 3);
+    if (k > 0.45) { g.fillStyle = '#1c1c1e'; g.fillRect(cx - 14, 138 + sink, 28, 12); g.fillStyle = '#0ab9e6'; g.fillRect(cx - 20, 138 + sink, 6, 12); g.fillStyle = '#ff3c28'; g.fillRect(cx + 14, 138 + sink, 6, 12); g.fillStyle = '#7fd4ff'; g.fillRect(cx - 12, 140 + sink, 24, 8); }
+  } else {                                                             // 3) over the shoulder, then into the screen
+    const k = Math.min(1, (t - 9.4) / 5.2), zoom = k < 0.55 ? 1 + k * 0.4 : 1.22 + Math.pow((k - 0.55) / 0.45, 2.2) * 9;
+    const sx = 222, sy = 104;                                          // the Switch screen's centre
+    g.translate(sx, sy); g.scale(zoom, zoom); g.translate(-sx, -sy);
+    const wall = g.createLinearGradient(0, 0, 0, H); wall.addColorStop(0, '#3a2440'); wall.addColorStop(1, '#5b3a52'); g.fillStyle = wall; g.fillRect(-40, -40, W + 80, H + 80);
+    // the Switch in their hands
+    g.fillStyle = '#1c1c1e'; g.fillRect(160, 72, 124, 66); g.fillStyle = '#0ab9e6'; g.beginPath(); g.roundRect ? g.roundRect(142, 72, 20, 66, 8) : g.rect(142, 72, 20, 66); g.fill();
+    g.fillStyle = '#ff3c28'; g.beginPath(); g.roundRect ? g.roundRect(282, 72, 20, 66, 8) : g.rect(282, 72, 20, 66); g.fill();
+    g.fillStyle = '#111'; g.beginPath(); g.arc(152, 88, 4, 0, 7); g.arc(292, 118, 4, 0, 7); g.fill();
+    drawRetroFrame(); g.imageSmoothingEnabled = false; g.drawImage(retroCanvas, 166, 76, 112, 58); g.imageSmoothingEnabled = true;   // their screen: the retro game's title
+    g.fillStyle = '#ffe0c2'; g.beginPath(); g.ellipse(150, 146, 12, 9, 0.4, 0, 7); g.ellipse(292, 146, 12, 9, -0.4, 0, 7); g.fill();   // thumbs
+    // their head and shoulder, in the foreground
+    g.fillStyle = '#c3342d'; g.beginPath(); g.ellipse(70, 230, 120, 70, 0, 0, 7); g.fill();
+    g.fillStyle = '#2a1a14'; g.beginPath(); g.arc(78, 132, 44, 0, 7); g.fill();
+    g.fillStyle = '#e23a32'; g.beginPath(); g.arc(78, 120, 46, Math.PI * 1.02, Math.PI * 1.98); g.fill(); g.fillRect(40, 112, 76, 12);
+    if (k > 0.9) { g.fillStyle = `rgba(255,255,255,${(k - 0.9) * 10})`; g.fillRect(-40, -40, W + 80, H + 80); }
+  }
+  g.restore();
+  // subtitles
+  const line = STORY[Math.max(0, story.said)].line;
+  g.font = 'italic bold 13px sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText(line, W / 2, 206); g.fillStyle = '#fff'; g.fillText(line, W / 2, 206);
+  g.font = 'bold 9px sans-serif'; g.fillStyle = 'rgba(255,255,255,.6)'; g.textAlign = 'right'; g.fillText('A: skip', W - 6, 12);
+  gameTex.needsUpdate = true;
+}
+
+// ---------- Retro Kitty Defender: this very game, in 8-bit, on the driver's Switch
+const RW = 192, RH = 108, retroCanvas = document.createElement('canvas'); retroCanvas.width = RW; retroCanvas.height = RH;
+const rctx = retroCanvas.getContext('2d');
+const R_HOLES = [[5, 44], [5, 84], [187, 44], [187, 84], [70, 104], [122, 104]];
+const R_SHROOMS = [[74, 58], [118, 58], [96, 80]];
+const R_GOAL = 12;
+const retro = { state: 'title', t: 0, mice: [], shrooms: [], whacked: 0, spawnT: 1, cx: 96, cy: 64, swipe: 0, poofs: [], zoomT: 0, won: false, rewarded: false };
+function resetRetro() {
+  Object.assign(retro, { state: 'title', t: 0, mice: [], whacked: 0, spawnT: 1.2, cx: 96, cy: 66, swipe: 0, poofs: [], zoomT: 0, won: false, rewarded: false });
+  retro.shrooms = R_SHROOMS.map(([x, y]) => ({ x, y, hx: x, hy: y, alive: true, by: null }));
+}
+function startRetro() { tvGame = 'retro'; resetRetro(); setJoyLabels(); [262, 330, 392, 523].forEach((f, i) => tone(f, f, 0.1, 'square', 0.03, i * 0.1)); }
+function retroSwipe(x, y) {
+  if (retro.state !== 'play') { if (retro.state === 'lost') resetRetro(); return; }
+  if (x != null) { retro.cx = x; retro.cy = y; }
+  retro.swipe = 0.16; tone(700, 300, 0.05, 'square', 0.025);
+  let best = null, bd = 11;
+  for (const m of retro.mice) { const d = Math.hypot(m.x - retro.cx, m.y - retro.cy); if (d < bd) { bd = d; best = m; } }
+  if (!best) return;
+  if (best.carry) { best.carry.by = null; best.carry.x = best.x; best.carry.y = best.y; }   // it drops the mushroom where it was
+  retro.mice.splice(retro.mice.indexOf(best), 1); retro.whacked++;
+  retro.poofs.push({ x: best.x, y: best.y, t: 0.35 }); tone(1047, 1568, 0.08, 'square', 0.03);
+  if (retro.whacked >= R_GOAL) { retro.state = 'won'; retro.t = 0; [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, f, 0.12, 'square', 0.03, i * 0.09)); }
+}
+function updateRetro(dt) {
+  const R = retro; R.t += dt; R.swipe = Math.max(0, R.swipe - dt); R.poofs.forEach(p => p.t -= dt); R.poofs = R.poofs.filter(p => p.t > 0);
+  if (R.state === 'title') { if (R.t > 2.4) { R.state = 'play'; R.t = 0; } return; }
+  if (R.state === 'won') { if (R.t > 1.3) { R.state = 'zoom'; R.zoomT = 0; speak('And on that little TV… an even tinier kart race.'); } return; }
+  if (R.state === 'zoom') { R.zoomT += dt; if (R.zoomT > 3.4) { R.won = true; hush(); exitTvPlay(); } return; }
+  if (R.state !== 'play') return;
+  const sp = 90 * dt;                                                 // D-pad moves the paw
+  if (tvHeld.left) R.cx -= sp; if (tvHeld.right) R.cx += sp; if (tvHeld.up) R.cy -= sp; if (tvHeld.down) R.cy += sp;
+  R.cx = Math.max(8, Math.min(RW - 8, R.cx)); R.cy = Math.max(30, Math.min(RH - 6, R.cy));
+  R.spawnT -= dt;
+  if (R.spawnT <= 0 && R.mice.length < 5) { R.spawnT = Math.max(0.55, 1.4 - R.whacked * 0.07); const [x, y] = R_HOLES[Math.random() * R_HOLES.length | 0]; R.mice.push({ x, y, hx: x, hy: y, st: 'go', t: 0, carry: null }); }
+  const speed = 15 + R.whacked * 1.1;
+  for (const m of R.mice) {
+    if (m.st === 'go') {
+      let tgt = null, bd = 1e9; for (const s of R.shrooms) if (s.alive && !s.by) { const d = Math.hypot(s.x - m.x, s.y - m.y); if (d < bd) { bd = d; tgt = s; } }
+      if (!tgt) { m.st = 'home'; continue; }
+      const d = Math.hypot(tgt.x - m.x, tgt.y - m.y);
+      if (d < 4) { m.st = 'grab'; m.t = 0.7; m.tgt = tgt; tgt.by = m; } else { m.x += (tgt.x - m.x) / d * speed * dt; m.y += (tgt.y - m.y) / d * speed * dt; }
+    } else if (m.st === 'grab') { m.t -= dt; if (m.t <= 0) { m.st = 'home'; m.carry = m.tgt; } }
+    else if (m.st === 'home') {
+      const d = Math.hypot(m.hx - m.x, m.hy - m.y);
+      if (d < 2) { if (m.carry) { m.carry.alive = false; tone(200, 100, 0.2, 'square', 0.03); } m.gone = true; }
+      else { m.x += (m.hx - m.x) / d * speed * 0.8 * dt; m.y += (m.hy - m.y) / d * speed * 0.8 * dt; if (m.carry) { m.carry.x = m.x; m.carry.y = m.y - 3; } }
+    }
+  }
+  R.mice = R.mice.filter(m => !m.gone);
+  if (!R.shrooms.some(s => s.alive)) { R.state = 'lost'; R.t = 0; tone(300, 80, 0.5, 'square', 0.04); }
+}
+function drawRetroFrame() {                                           // the pixel room (also shown on the Switch in the cutscene)
+  const g = rctx, R = retro, t = clock;
+  g.fillStyle = '#e8cfa4'; g.fillRect(0, 0, RW, RH);                                   // carpet
+  g.fillStyle = '#c9a9d6'; g.fillRect(0, 0, RW, 26); g.fillStyle = '#b392c4'; for (let x = 0; x < RW; x += 6) g.fillRect(x, 0, 2, 26);   // striped wallpaper
+  g.fillStyle = '#5a3a26'; g.fillRect(40, 20, 112, 10);                                 // the credenza
+  g.fillStyle = '#e6dcc8'; g.fillRect(4, 36, 18, 58); g.fillRect(170, 36, 18, 58);      // the sofas
+  g.fillStyle = '#111'; g.fillRect(83, 4, 26, 14);                                      // the TV… with a tiny kart race on it
+  drawMiniKart(g, 84, 5, 24, 12, t);
+  g.fillStyle = '#c98e4a'; g.fillRect(89, 28, 14, 8); g.fillStyle = '#8a8f98'; g.fillRect(92, 22, 8, 8); g.fillStyle = '#6b6f78'; g.fillRect(92, 20, 2, 3); g.fillRect(98, 20, 2, 3);   // cat in her box
+  g.fillStyle = '#111'; g.fillRect(94, 25, 1, 1); g.fillRect(97, 25, 1, 1);
+  for (const [x, y] of R_HOLES) { g.fillStyle = '#1a1310'; g.beginPath(); g.arc(x, y, 3.5, 0, 7); g.fill(); }
+  for (const s of R.shrooms) if (s.alive) { g.fillStyle = '#f4efe2'; g.fillRect(s.x - 1, s.y, 3, 3); g.fillStyle = '#e03a3a'; g.fillRect(s.x - 4, s.y - 3, 9, 4); g.fillStyle = '#fff'; g.fillRect(s.x - 2, s.y - 3, 1, 1); g.fillRect(s.x + 2, s.y - 2, 1, 1); }
+  for (const m of R.mice) {
+    const dir = m.st === 'home' ? Math.sign(m.hx - m.x) || 1 : Math.sign((m.tgt || R.shrooms[0]).x - m.x) || 1, wig = Math.sin(t * 20) > 0 ? 1 : 0;
+    g.fillStyle = '#9a9a9a'; g.fillRect(m.x - 3, m.y - 2 + wig * 0, 7, 4); g.fillRect(m.x + dir * 3, m.y - 2, 2, 3);
+    g.fillStyle = '#f0a0b0'; g.fillRect(m.x + dir * 3, m.y - 3, 1, 1); g.fillRect(m.x - dir * 5, m.y, 3, 1);
+  }
+  for (const p of R.poofs) { g.fillStyle = `rgba(255,255,255,${p.t * 2.5})`; const r = (0.35 - p.t) * 20; g.fillRect(p.x - r, p.y - 1, r * 2, 2); g.fillRect(p.x - 1, p.y - r, 2, r * 2); }
+  if (R.state === 'play') {                                           // the paw cursor
+    const x = Math.round(R.cx), y = Math.round(R.cy), big = R.swipe > 0 ? 1 : 0;    // a little pixel paw: pad + four toes
+    g.fillStyle = '#3a1434'; g.fillRect(x - 4 - big, y - 1, 9 + big * 2, 6 + big);
+    g.fillStyle = '#ffffff'; g.fillRect(x - 3 - big, y, 7 + big * 2, 4 + big);
+    g.fillStyle = '#ff8fb8'; g.fillRect(x - 2, y + 1, 5, 2);
+    for (const dx of [-4, -1.5, 1.5, 4]) { g.fillStyle = '#3a1434'; g.fillRect(x + dx - 1.5, y - 5 - big, 3, 3); g.fillStyle = '#ffffff'; g.fillRect(x + dx - 0.5, y - 4 - big, 1.5, 1.5); }
+  }
+  g.font = 'bold 8px monospace'; g.textAlign = 'left'; g.fillStyle = '#3a1434'; g.fillText(`WHACKED ${R.whacked}/${R_GOAL}`, 26, 104 - 1);
+  g.textAlign = 'center';
+  if (R.state === 'title') { g.fillStyle = 'rgba(40,10,40,.8)'; g.fillRect(20, 36, 152, 42); g.fillStyle = '#ffd23a'; g.fillText('PRINCESS KITTY', 96, 52); g.fillStyle = '#ff8fb8'; g.fillText('DEFENDER', 96, 62); g.fillStyle = '#fff'; g.fillText(`WHACK ${R_GOAL} MICE!`, 96, 73); }
+  if (R.state === 'lost') { g.fillStyle = 'rgba(40,10,40,.85)'; g.fillRect(24, 40, 144, 32); g.fillStyle = '#ff6b6b'; g.fillText('GAME OVER', 96, 54); g.fillStyle = '#fff'; g.fillText('A: TRY AGAIN', 96, 66); }
+  if (R.state === 'won') { g.fillStyle = 'rgba(40,10,40,.8)'; g.fillRect(24, 40, 144, 26); g.fillStyle = '#ffd23a'; g.fillText('YOU WIN!', 96, 56); }
+}
+function drawMiniKart(g, x, y, w, h, t) {                             // the tiniest kart race: a road rushing to the horizon, a red kart
+  g.fillStyle = '#7ec8ff'; g.fillRect(x, y, w, h / 2); g.fillStyle = '#3fb84a'; g.fillRect(x, y + h / 2, w, h / 2);
+  g.fillStyle = '#6b6b73'; g.beginPath(); g.moveTo(x + w / 2 - 1, y + h / 2); g.lineTo(x + w / 2 + 1, y + h / 2); g.lineTo(x + w * 0.85, y + h); g.lineTo(x + w * 0.15, y + h); g.fill();
+  g.fillStyle = '#fff'; const ph = (t * 3) % 1; g.fillRect(x + w / 2 - 0.5, y + h / 2 + ph * h / 2, 1, 1.5);
+  g.fillStyle = '#e23a32'; g.fillRect(x + w / 2 - 2 + Math.sin(t * 2) * 2, y + h - 3, 4, 2);
+}
+function drawRetro() {
+  const g = gameCtx, W = 384, H = 216, R = retro;
+  drawRetroFrame();
+  g.imageSmoothingEnabled = false;
+  if (R.state === 'zoom') {                                           // into the little TV… where the kart race goes on
+    const k = Math.min(1, R.zoomT / 2.6), z = 1 + Math.pow(k, 2.4) * 15, tx = 96 * 2, ty = 11 * 2;
+    g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+    g.save(); g.translate(W / 2, H / 2); g.scale(z, z); g.translate(-tx, -ty); g.drawImage(retroCanvas, 0, 0, W, H); g.restore();
+    if (R.zoomT > 2.2) { g.fillStyle = `rgba(255,255,255,${Math.min(1, (R.zoomT - 2.2) * 1.5)})`; g.fillRect(0, 0, W, H); }
+    g.imageSmoothingEnabled = true; g.font = 'italic bold 13px sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.8)';
+    const line = 'And on that little TV… an even tinier kart race.'; g.strokeText(line, W / 2, 206); g.fillStyle = '#fff'; g.fillText(line, W / 2, 206);
+  } else g.drawImage(retroCanvas, 0, 0, W, H);
+  g.imageSmoothingEnabled = true;
+  gameTex.needsUpdate = true;
+}
+
+// ---------- Flappy Kitty: tap to flap through the scratching posts
+const flappy = { y: 100, vy: 0, posts: [], score: 0, best: 0, state: 'ready', t: 0, spawn: 0, won: false, rewarded: false, sessionBest: 0 };
+try { flappy.best = +(localStorage.getItem('catguard.flappy') || 0); } catch (e) {}
+function resetFlappy() { Object.assign(flappy, { y: 100, vy: 0, posts: [], score: 0, state: 'ready', t: 0, spawn: 0.4 }); }
+function flappyFlap() {
+  const F = flappy;
+  if (F.state === 'dead') { if (F.t > 0.6) resetFlappy(); return; }
+  if (F.state === 'ready') F.state = 'play';
+  F.vy = -175; tone(620, 900, 0.06, 'square', 0.02);
+}
+function updateFlappy(dt) {
+  const F = flappy; F.t += dt;
+  const auto = !game.player;
+  if (F.state === 'ready') { F.y = 100 + Math.sin(F.t * 4) * 6; if (auto && F.t > 1) F.state = 'play'; return; }
+  if (F.state === 'dead') { F.vy += 600 * dt; F.y = Math.min(196, F.y + F.vy * dt); if (auto && F.t > 1.5) resetFlappy(); return; }
+  if (auto) { const p = F.posts.find(p => p.x + 34 > 70); const gap = p ? p.gap : 100; if (F.y > gap + 8 && F.vy > -20) F.vy = -175; }
+  F.vy += 540 * dt; F.y += F.vy * dt;
+  F.spawn -= dt; if (F.spawn <= 0) { F.spawn = 1.45; F.posts.push({ x: 400, gap: 60 + Math.random() * 90, scored: false }); }
+  for (const p of F.posts) {
+    p.x -= 115 * dt;
+    if (!p.scored && p.x + 34 < 80) { p.scored = true; F.score++; tone(1047, 1319, 0.06, 'square', 0.02);
+      if (game.player) { F.sessionBest = Math.max(F.sessionBest, F.score); if (F.score > F.best) { F.best = F.score; try { localStorage.setItem('catguard.flappy', F.best); } catch (e) {} } }
+      if (F.score === 10 && game.player) { F.won = true; [784, 988, 1175, 1568].forEach((f, i) => tone(f, f, 0.1, 'square', 0.03, i * 0.08)); } }
+    const hitX = 90 + 11 > p.x && 90 - 11 < p.x + 34, hitY = F.y - 10 < p.gap - 38 || F.y + 10 > p.gap + 38;
+    if (hitX && hitY) die();
+  }
+  F.posts = F.posts.filter(p => p.x > -40);
+  if (F.y > 196 || F.y < -10) die();
+  function die() { if (F.state !== 'play') return; F.state = 'dead'; F.t = 0; F.vy = -120; tone(300, 90, 0.3, 'square', 0.035);
+    if (game.player) { F.sessionBest = Math.max(F.sessionBest, F.score); if (F.score > F.best) { F.best = F.score; try { localStorage.setItem('catguard.flappy', F.best); } catch (e) {} } } }
+}
+function drawFlappyKitty(g, x, y, vy, t) {
+  g.save(); g.translate(x, y); g.scale(1.3, 1.3); g.rotate(Math.max(-0.45, Math.min(0.7, vy / 450)));
+  const flap = Math.sin(t * 30) > 0 ? -1 : 1;
+  g.fillStyle = '#ffb3d1'; g.beginPath(); g.ellipse(-4, flap * 4, 7, 4, flap * 0.5, 0, 7); g.fill();                      // a little wing
+  g.fillStyle = '#d9d4d0'; g.beginPath(); g.arc(0, 0, 11, 0, 7); g.fill();                                                   // round kitty
+  g.beginPath(); g.moveTo(-9, -6); g.lineTo(-6, -15); g.lineTo(-2, -9); g.fill(); g.beginPath(); g.moveTo(9, -6); g.lineTo(6, -15); g.lineTo(2, -9); g.fill();
+  g.fillStyle = '#8a7a72'; g.beginPath(); g.moveTo(-9, -6); g.lineTo(-7, -13); g.lineTo(-4, -8); g.fill(); g.beginPath(); g.moveTo(9, -6); g.lineTo(7, -13); g.lineTo(4, -8); g.fill();   // darker ear tips
+  g.fillStyle = '#a8968c'; g.beginPath(); g.ellipse(0, 5, 4.5, 3.2, 0, 0, 7); g.fill();                                     // soft darker muzzle (like her)
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(-4.2, -1.5, 3, 0, 7); g.arc(4.2, -1.5, 3, 0, 7); g.fill();
+  g.fillStyle = '#2a7fd4'; g.beginPath(); g.arc(-3.8, -1.3, 2, 0, 7); g.arc(4.6, -1.3, 2, 0, 7); g.fill();                  // big blue eyes
+  g.fillStyle = '#111'; g.beginPath(); g.arc(-3.6, -1.2, 0.9, 0, 7); g.arc(4.8, -1.2, 0.9, 0, 7); g.fill();
+  g.fillStyle = '#ff8fb8'; g.beginPath(); g.moveTo(-1.2, 3.4); g.lineTo(1.2, 3.4); g.lineTo(0, 4.8); g.fill();                 // pink nose
+  g.fillStyle = '#ffd23a'; g.beginPath(); g.moveTo(-7, -13); g.lineTo(-7, -19); g.lineTo(-3.5, -16); g.lineTo(0, -21); g.lineTo(3.5, -16); g.lineTo(7, -19); g.lineTo(7, -13); g.fill();   // her crown
+  g.restore();
+}
+function drawFlappy() {
+  const g = gameCtx, W = 384, H = 216, F = flappy;
+  const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#9fd8ff'); sky.addColorStop(1, '#ffd6ea'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 5; i++) { const cx = ((i * 110 - clock * 18) % (W + 80) + W + 80) % (W + 80) - 40; g.beginPath(); g.ellipse(cx, 30 + (i % 3) * 22, 26, 9, 0, 0, 7); g.fill(); }
+  for (const p of F.posts) {                                           // scratching posts: sisal rope with a carpet cap
+    for (const [y0, y1] of [[0, p.gap - 38], [p.gap + 38, 200]]) {
+      g.fillStyle = '#d8b98a'; g.fillRect(p.x, y0, 34, y1 - y0);
+      g.fillStyle = '#b8955f'; for (let y = y0 + 2; y < y1; y += 5) g.fillRect(p.x, y, 34, 2);
+      g.fillStyle = '#b24a7a'; g.fillRect(p.x - 4, y0 === 0 ? y1 - 8 : y0, 42, 8);
+    }
+  }
+  g.fillStyle = '#5db84f'; g.fillRect(0, 200, W, 16); g.fillStyle = '#4a9c3e'; for (let x = -((clock * 115) % 16); x < W; x += 16) g.fillRect(x, 200, 8, 3);
+  drawFlappyKitty(g, 90, F.y, F.vy, clock);
+  g.textAlign = 'center'; g.font = 'bold 30px sans-serif'; g.lineWidth = 5; g.strokeStyle = '#3a1434'; g.strokeText(String(F.score), W / 2, 40); g.fillStyle = '#fff'; g.fillText(String(F.score), W / 2, 40);
+  g.font = 'bold 10px sans-serif'; g.textAlign = 'left'; g.fillStyle = '#3a1434'; g.fillText(`BEST ${F.best}`, 8, 14); g.textAlign = 'right'; g.fillText('10 = champion', W - 8, 14);
+  g.textAlign = 'center';
+  if (F.state === 'ready') { g.font = 'bold 18px sans-serif'; g.lineWidth = 4; g.strokeText('Flappy Kitty', W / 2, 90); g.fillStyle = '#ffd23a'; g.fillText('Flappy Kitty', W / 2, 90); g.font = 'bold 11px sans-serif'; g.fillStyle = '#3a1434'; g.fillText('Tap or press any button to flap', W / 2, 150); }
+  if (F.state === 'dead') { g.fillStyle = 'rgba(40,10,40,.75)'; g.fillRect(112, 70, 160, 70); g.fillStyle = '#ffd23a'; g.font = 'bold 18px sans-serif'; g.fillText(F.score >= 10 ? 'Champion! 🏆' : 'Bonk!', W / 2, 96); g.fillStyle = '#fff'; g.font = 'bold 11px sans-serif'; g.fillText(`Score ${F.score} · Best ${F.best}`, W / 2, 114); g.fillText('Tap to try again', W / 2, 130); }
+  gameTex.needsUpdate = true;
+}
+function setJoyLabels() {
+  const L = { kart: ['◀ ▶ steer', 'A: gas · B: item'], party: ['Menu', 'A: select · B: back'], flappy: ['Any button: flap', 'Any button: flap'], story: ['', 'A: skip'], retro: ['Move the paw', 'A: whack'] }[tvGame] || ['', ''];
+  const el = document.querySelectorAll('.joy-lbl'); if (el[0]) { el[0].textContent = L[0]; el[1].textContent = L[1]; }
 }
 function gameJingle() { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, f, 0.1, 'square', 0.025, i * 0.09)); }
 const tvAudio = { node: null, gain: null, nextLine: 0 };
@@ -1664,7 +1941,7 @@ function setTVMode(m) {
   tvMode = m; tvOn = m > 0;
   screen.material = tvBroken ? tvBrokenMat : m === 1 ? tvStaticMat : m === 2 ? tvShowMat : m === 3 ? tvGameMat : tvOffMat;
   tvLight.color.setHex(m === 3 ? 0x9fd6ff : 0xd6e4ff);
-  if (m === 3) { game.rollT = 1.2; if (tvGame === 'kart') drawKart(); else drawGame(clock); }
+  if (m === 3) { game.rollT = 1.2; if (tvGame === 'kart') drawKart(); else if (tvGame === 'flappy') drawFlappy(); else drawGame(clock); }
   tvHiss(m === 1);
   tvAudio.nextLine = 0; showCast.forEach(c => { c.talk = 0; c.arm = 0; });
 }
@@ -1674,8 +1951,12 @@ function updateTV(dt) {
   if (!tvOn) { tvLight.intensity = 0; return; }
   if (tvAudio.gain) tvAudio.gain.gain.value = state === 'playing' || state === 'debug' ? 0.03 : 0;   // hush while paused
   if (tvMode === 3) {                                                     // the console game (kart racer or party board)
-    if (tvGame === 'kart') { updateKart(dt); if (game.player || (staticTick = (staticTick + 1) % 2) === 0) drawKart(); }
-    else { updateGame(dt); if (game.player || (staticTick = (staticTick + 1) % 3) === 0) drawGame(clock); }
+    const every = game.player || (staticTick = (staticTick + 1) % 2) === 0;
+    if (tvGame === 'kart') { updateKart(dt); if (every) drawKart(); }
+    else if (tvGame === 'flappy') { updateFlappy(dt); if (every) drawFlappy(); }
+    else if (tvGame === 'story') { updateStory(dt); drawStory(); }
+    else if (tvGame === 'retro') { updateRetro(dt); drawRetro(); }
+    else { updateGame(dt); if (every) drawGame(clock); }
     tvLight.intensity = 0.4 + Math.sin(clock * 3) * 0.05;
     return;
   }
@@ -3718,6 +3999,8 @@ const ACHIEVEMENTS = [
     ['console', '🎮', 'Player one', 'Tap the Switch twice to play it'],
     ['kartWin', '🏁', 'Kart champ', 'Win the kart race'],
     ['boardWin', '🎲', 'Board champ', 'Win the party board game'],
+    ['flappy', '🐦', 'Flappy champ', 'Score 10 in Flappy Kitty'],
+    ['inception', '🪆', 'Game-ception', 'Win the kart race, then beat the game on the driver\'s Switch'],
   ]],
   ['Other modes', [
     ['chaos', '🌪️', 'Chaos complete', 'Finish a Chaos mode round'],
@@ -3728,7 +4011,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 09:08';                                              // stamped when the site is published
+const BUILD = '2026-09-24 09:30';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -4669,6 +4952,13 @@ document.querySelectorAll('#tvPlay [data-k]').forEach(b => {
   b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
 });
 $('tvSwap').addEventListener('click', () => gameInput('swap'));
+gameCanvas.addEventListener('pointerdown', e => {
+  if (state !== 'tvgame') return; e.preventDefault();
+  const r = gameCanvas.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  if (tvGame === 'flappy') flappyFlap();
+  else if (tvGame === 'retro') retroSwipe(x * RW, y * RH);
+  else if (tvGame === 'story') { hush(); startRetro(); }
+});
 $('tvExit').addEventListener('click', () => gameInput('exit'));
 window.addEventListener('keydown', e => {
   if (state !== 'tvgame') return;
