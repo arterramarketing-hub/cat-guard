@@ -537,9 +537,9 @@ const CEIL_H = ROOM.wallH;                                          // ceiling s
 /* ACCESS POINTS — where mice come in and go home.
    kind 'couch': out from under a sofa · 'wall': a mouse hole · 'door': through the doorway from the hall.
    x/z is the point on the edge, n is the direction the mouse walks out. */
-const FIRE_END = 13.3 + (58 + 4) / 15.6 / 2;                              // front edge of the fireplace hearth (see FIRE below)
-const COUCH_DEPTH = 2.1, COUCH_LEFT_Z0 = 3.47, COUCH_RIGHT_Z0 = FIRE_END - 2.85 * 3 / 1.3 - 7 / 15.6;   // its far arm lines up with the hearth   // left sofa + fireplace sit further down their wall; right sofa pushed down to make room for the acrylic table
-const FIRE = { z: 13.3, w: 58 / 15.6, d: 7 / 15.6, h: 46 / 15.6 };   // built in: only 7" proud of the wall   // stone fireplace on the left wall (58" wide, 15" deep, 44" to the mantle)
+const FIRE_END = 13.3 + (70 + 4) / 15.6 / 2;                              // front edge of the fireplace hearth (see FIRE below)
+const COUCH_DEPTH = 2.1, COUCH_LEFT_Z0 = 3.47, COUCH_RIGHT_Z0 = 13.3 + (58 + 4) / 15.6 / 2 - 2.85 * 3 / 1.3 - 7 / 15.6;   // its far arm lines up with the hearth   // left sofa + fireplace sit further down their wall; right sofa pushed down to make room for the acrylic table
+const FIRE = { z: 13.3, w: 70 / 15.6, d: 7 / 15.6, h: 46 / 15.6 };   // built in: only 7" proud of the wall   // stone fireplace on the left wall (58" wide, 15" deep, 44" to the mantle)
 const ARMCHAIR = { x: 3.62, z: ROOM.visDepth - 1.5, half: 1.2 };   // the armchair tucked in the back corner (only seen from inside the room)...
 const WTABLE = { x: -ROOM.halfW + 14.5 / 15.6, z: (FIRE_END + ROOM.visDepth - 24 / 15.6) / 2, len: 66 / 15.6, dep: 28 / 15.6, h: 30 / 15.6 };   // plank table on hairpin legs against the wall past the fireplace (two white chairs tucked in)
 ARMCHAIR.rot = Math.atan2(0 - ARMCHAIR.x, ROOM.visDepth / 2 - ARMCHAIR.z);   // ...turned to face the middle of the room
@@ -2397,7 +2397,7 @@ SECT = 'Wall';
 const WIN_W = IN(66), WIN_H = IN(30), WIN_SILL = FT(4), CASING = IN(3), WALL_T = IN(5);
 const DOOR_W = IN(32), DOOR_H = IN(80), DOOR_Z = FT(5.4);
 const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // opening edges along the wall
-const DOOR2_Z = ROOM.visDepth - 1.5 - FT(2), DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DOOR2_Z1 = DOOR2_Z + DOOR_W / 2;   // a second doorway in the far corner of the same wall, into another room
+const DOOR2_Z = ROOM.visDepth - 1.5 - FT(4), DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DOOR2_Z1 = DOOR2_Z + DOOR_W / 2;   // a second doorway in the far corner of the same wall, into another room
 (() => {
   /* ---- right wall with the door opening notched out ---- */
   const L = ROOM.visDepth, Hh = ROOM.wallH, ox = L / 2, oy = Hh / 2;   // shape coords are centred like a plane
@@ -3322,7 +3322,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     }
     const named = (g, name) => { g.userData.name = name; povEndWall.add(g); return g; };
     const BX = (g, w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
-    const TREE_X = -hw + IN(28.5), TREE_Z = VD - IN(13.5);
+    const TREE_X = DX - DW / 4 - IN(4), TREE_Z = VD - IN(13.5);             // in front of the slider panel nearest the litter box
     SLIDER = { DX, DW, DH, VD };                                                        // the cat tree: in front of the sliding panel, beside the litter box
     { // a little disco ball hanging off the top of the slider on a thread, in the middle of the doors (leap onto it from the cat tree!)
       const g = named(new THREE.Group(), 'Disco ball'); g.position.set(DX, DH + IN(1.2), VD - IN(9));   // right in the middle of the doors (hop to it off the cat tree)
@@ -3345,34 +3345,36 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     { // daylight through the slider lights up the far end of the room (dims with the room lights, like the others)
       const day = new THREE.PointLight(0xfff3dc, 0.4, 13, 1.6); day.position.set(DX, FT(5), VD - FT(2)); scene.add(day); roomLights.push({ l: day, base: 0.4 });
     }
-    { // the armchair in the corner (back-left, seen from her box), facing the room: an overstuffed dark brown leather recliner
-      // (from the photo) with a tall pillow-top back of padded rolls, big rolled arms and a skirt to the floor, in creased,
-      // softly grained leather; a little white patterned cushion and a stack of folded laundry on the seat
+    { // the armchair in the corner (back-left, seen from her box), facing the room: a big brown leather recliner (from the photo).
+      // A tall back of three stitched pillows (the headrest roll the biggest), overstuffed arms that curl over and flare at the front,
+      // a seat that runs into a padded chaise front, flat stitched side panels down to the floor. The folded laundry sits on the seat.
       const g = named(new THREE.Group(), 'Armchair'); g.position.set(ARMCHAIR.x, 0, ARMCHAIR.z); g.rotation.y = ARMCHAIR.rot;
-      const hideTex = canvasTex(128, 128, (c, w, h) => {                                                            // leather: fine grain, a few soft creases
-        c.fillStyle = '#bdbdbd'; c.fillRect(0, 0, w, h);
-        for (let i = 0; i < 2600; i++) { const v = 150 + Math.random() * 90 | 0; c.fillStyle = `rgba(${v},${v},${v},.35)`; c.fillRect(Math.random() * w, Math.random() * h, 1, 1); }
-        for (let i = 0; i < 14; i++) { const x = Math.random() * w, y = Math.random() * h, l = 12 + Math.random() * 30, a = Math.random() * Math.PI, cx = Math.cos(a) * l, cy = Math.sin(a) * l;
-          c.lineWidth = 2.2; c.strokeStyle = 'rgba(40,40,40,.35)'; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + cx * 0.5 + cy * 0.2, y + cy * 0.5 - cx * 0.2, x + cx, y + cy); c.stroke();
-          c.lineWidth = 1.2; c.strokeStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.moveTo(x + 1.5, y + 1.5); c.quadraticCurveTo(x + cx * 0.5 + cy * 0.2 + 1.5, y + cy * 0.5 - cx * 0.2 + 1.5, x + cx + 1.5, y + cy + 1.5); c.stroke(); }
-      }, 2, 2);
-      const leather = new THREE.MeshPhongMaterial({ color: 0x4a2c20, map: hideTex, shininess: 32, specular: 0x3a2a24 }), deep = new THREE.MeshPhongMaterial({ color: 0x35201a, map: hideTex, shininess: 24, specular: 0x2a1c16 });
-      const CW = IN(38), CD = IN(36), AW = IN(8);
-      const E = (rx, ry, rz, m, x, y, z) => { const o = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), m); o.scale.set(rx, ry, rz); o.position.set(x, y, z); g.add(o); return o; };   // a padded, pillowy lump
-      BX(g, CW - IN(2), IN(13), CD - IN(3), deep, 0, IN(6.5), 0);                                                   // the base, skirted right down to the floor
-      E(CW / 2 - IN(1), IN(4), IN(3.5), leather, 0, IN(10), CD / 2 - IN(3));                                         // rounded front of the footrest panel
-      BX(g, CW - AW * 2 + IN(1), IN(5), CD - IN(10), leather, 0, IN(15.5), IN(1));                                 // the seat cushion, filling the space between the arms
-      const nose = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.6), IN(2.6), CW - AW * 2 + IN(1), 16), leather); nose.rotation.z = Math.PI / 2; nose.position.set(0, IN(15.5), CD / 2 - IN(4)); g.add(nose);   // its rounded front edge
-      E(CW / 2 - IN(2.5), IN(16), IN(5), deep, 0, IN(28), -CD / 2 + IN(5));                                         // the rounded back behind the rolls
-      for (const [y, ry, rz] of [[IN(23), IN(5.2), IN(5.2)], [IN(31.5), IN(5.8), IN(5.6)], [IN(40), IN(6.5), IN(6.5)]]) E(CW / 2 - AW + IN(1), ry, rz, leather, 0, y, -CD / 2 + IN(9.5));   // three stacked padded rolls, the headrest biggest
-      for (const sx of [-1, 1]) {                                                                                    // big rolled arms
-        BX(g, AW, IN(20), CD - IN(4), deep, sx * (CW / 2 - AW / 2), IN(10), IN(0.5));
-        E(AW / 2 + IN(1.2), IN(5.5), CD / 2 - IN(2), leather, sx * (CW / 2 - AW / 2 + IN(0.6)), IN(22), IN(0.5));      // the roll along the top, bulging out
-        E(AW / 2 + IN(0.5), IN(9), IN(3), leather, sx * (CW / 2 - AW / 2), IN(15), CD / 2 - IN(3));                     // padded front of the arm
+      const hideTex = canvasTex(128, 128, (c, w, h) => {                                                            // leather: fine grain, soft creases, a double row of stitching
+        c.fillStyle = '#c2c2c2'; c.fillRect(0, 0, w, h);
+        for (let i = 0; i < 2600; i++) { const v = 150 + Math.random() * 90 | 0; c.fillStyle = `rgba(${v},${v},${v},.3)`; c.fillRect(Math.random() * w, Math.random() * h, 1, 1); }
+        for (let i = 0; i < 10; i++) { const x = Math.random() * w, y = Math.random() * h, l = 14 + Math.random() * 26, a = Math.random() * Math.PI;
+          c.lineWidth = 2; c.strokeStyle = 'rgba(40,40,40,.28)'; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke();
+          c.lineWidth = 1; c.strokeStyle = 'rgba(255,255,255,.3)'; c.beginPath(); c.moveTo(x + 1.5, y + 1.5); c.lineTo(x + Math.cos(a) * l + 1.5, y + Math.sin(a) * l + 1.5); c.stroke(); }
+        c.strokeStyle = 'rgba(30,30,30,.45)'; c.lineWidth = 1; c.setLineDash([3, 2]);
+        for (const x of [w * 0.33, w * 0.36, w * 0.64, w * 0.67]) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke(); }   // the stitched seams
+      }, 1, 1);
+      const leather = new THREE.MeshPhongMaterial({ color: 0x4a2420, map: hideTex, shininess: 45, specular: 0x4a302c }), deep = new THREE.MeshPhongMaterial({ color: 0x381a17, map: hideTex, shininess: 35, specular: 0x3a2420 });
+      const CW = IN(37), CD = IN(36), AW = IN(8), SEAT = IN(19);
+      const E = (rx, ry, rz, m, x, y, z) => { const o = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 18), m); o.scale.set(rx, ry, rz); o.position.set(x, y, z); g.add(o); return o; };   // a padded, pillowy lump
+      for (const sx of [-1, 1]) BX(g, AW, IN(21), CD - IN(3), deep, sx * (CW / 2 - AW / 2), IN(10.5), -IN(0.5));  // flat side panels right down to the floor
+      BX(g, CW - AW * 2 + IN(0.5), IN(12), CD - IN(8), deep, 0, IN(6), -IN(2));                                   // the base between them
+      BX(g, CW - AW * 2 + IN(0.5), IN(5), CD - IN(12), leather, 0, SEAT - IN(2.5), -IN(1));                        // the seat cushion...
+      E(CW / 2 - AW + IN(0.4), IN(4.6), IN(6.5), leather, 0, SEAT - IN(4), CD / 2 - IN(7));                          // ...running into a padded chaise front
+      BX(g, CW - AW * 2, IN(10), IN(4), deep, 0, IN(6.5), CD / 2 - IN(8));                                        // the recessed front panel under it
+      E(CW / 2 - IN(1.5), IN(19), IN(5.5), deep, 0, IN(27), -CD / 2 + IN(5.5));                                   // the back shell
+      E(CW / 2 - IN(2.5), IN(7), IN(6.5), leather, 0, IN(40), -CD / 2 + IN(9));                                   // the big headrest pillow
+      E(CW / 2 - AW + IN(1), IN(6), IN(5.5), leather, 0, IN(31), -CD / 2 + IN(10.5));                             // middle back pillow
+      E(CW / 2 - AW + IN(0.5), IN(4.5), IN(5), leather, 0, IN(23.5), -CD / 2 + IN(11.5));                         // lumbar pillow
+      for (const sx of [-1, 1]) {                                                                                  // overstuffed arms curling over the side panels, flaring at the front
+        E(AW / 2 + IN(2), IN(5.2), CD / 2 - IN(3), leather, sx * (CW / 2 - AW / 2 + IN(0.8)), IN(23), -IN(1));
+        E(AW / 2 + IN(2.4), IN(6.5), IN(4.5), leather, sx * (CW / 2 - AW / 2 + IN(1)), IN(20), CD / 2 - IN(5));    // the rolled front of the arm
       }
-      const swirlTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#e9e7e2'; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(120,120,125,.7)'; c.lineWidth = 1.3; for (let i = 0; i < 14; i++) { const x = Math.random() * w, y = Math.random() * h, r = 3 + Math.random() * 4; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 1.6); c.stroke(); c.beginPath(); c.arc(x + r * 0.4, y, r * 0.45, 0, Math.PI * 1.5); c.stroke(); } }, 2, 2);   // grey paisley swirls
-      const cush = E(IN(7), IN(1.4), IN(6.5), lam(0xffffff, { map: swirlTex }), IN(6), IN(18.6), IN(6)); cush.rotation.y = 0.3; cush.userData.name = 'Patterned cushion';
-      const st = new THREE.Group(); st.userData.name = 'Folded laundry'; st.position.set(-IN(4), IN(18), IN(5)); st.rotation.y = 0.1; g.add(st);   // the folded laundry (swipe it and it goes everywhere)
+      const st = new THREE.Group(); st.userData.name = 'Folded laundry'; st.position.set(-IN(2), SEAT, IN(3)); st.rotation.y = 0.1; g.add(st);   // the folded laundry (swipe it and it goes everywhere)
       const specs = [[0x2f3e5c, 1.9], [0x9b9892, 1.5], [0xece7dc, 1.3], [0x5b7fa6, 1.8], [0xb5475a, 1.4]];            // jeans, a grey tee, a white tee, a denim shirt, a red sweater
       let fy = 0;
       specs.forEach(([c, t], i) => {
@@ -4986,7 +4988,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 23:53';                                              // stamped when the site is published
+const BUILD = '2026-09-25 11:28';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -7443,7 +7445,7 @@ function walkBlocked(nx, nz, ox, oz) {
 }
 function startWalk() {
   if (!walk.rig) walk.rig = makeWalker();
-  const skip = new Set([walk.rig.g, cat, heist.player.root, heistGoal.g, heist.ring, ...mice.map(m => m.root), ...(MW.dk ? [MW.dk.rig.g] : [])]);
+  const skip = new Set([walk.rig.g, cat, heist.player.root, heistGoal.g, heist.ring, gunRig.held, ...blanketRigs.map(b => b.lump), ...mice.map(m => m.root), ...(MW.dk ? [MW.dk.rig.g] : [])]);
   walk.meshes = [];
   scene.traverse(o => {
     if (!o.isMesh) return;
@@ -7994,6 +7996,7 @@ function updateRaccoon(dt) {
   coon.t += dt;
   if (coon.state === 'hidden') {
     if (coon.dead) return;                                             // (it's not coming back)
+    if (walk.pos.z > SLIDER.VD - 3.2 && Math.abs(walk.pos.x - SLIDER.DX) < 3.5 && clock > (coon.cool || 0)) coon.next = Math.min(coon.next, 1.2);   // she's come up to the slider: out it pops
     coon.next -= dt; if (coon.next > 0) return;
     coon.from.set(home.x + 5.5, home.y, home.z + 2.4); coon.to.copy(home); pos.copy(coon.from); g.visible = true; coon.swipes = 0; coonSet('arrive'); chitter(3);
   }
@@ -8017,7 +8020,7 @@ function updateRaccoon(dt) {
       if (walkTo(2.6)) { g.rotation.y = Math.PI; coonSet('taunt'); coon.stay = 26 + Math.random() * 12; coon.taunt = Math.random() * COON_TAUNTS.length | 0; coon.tauntT = 0; coonSay('Heh heh heh...'); chitter(6); }
       break;
     case 'leave': case 'flee':
-      if (walkTo(coon.state === 'flee' ? 1.1 : 2.4, coon.state === 'flee')) { g.visible = false; coon.state = 'hidden'; coon.next = 35 + Math.random() * 25; }
+      if (walkTo(coon.state === 'flee' ? 1.1 : 2.4, coon.state === 'flee')) { const fled = coon.state === 'flee'; g.visible = false; coon.state = 'hidden'; coon.next = 35 + Math.random() * 25; coon.cool = clock + (fled ? 20 : 10); }
       break;
     case 'taunt': {
       g.rotation.y = Math.PI; coon.stay -= dt; coon.tauntT += dt;
