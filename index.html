@@ -3274,7 +3274,7 @@ function updateRoomFx(dt) {
 SECT = 'Dome light';
 /* ---------- 8 ft ceiling with three frosted dome lights (the near end of the room is left open, dollhouse style). Both face into
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
-let povEndWall = null, sliderDisco = null, catCondo = null;
+let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null;
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
   const VD = ROOM.visDepth, WH = ROOM.wallH;
@@ -3305,10 +3305,11 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     }
     const named = (g, name) => { g.userData.name = name; povEndWall.add(g); return g; };
     const BX = (g, w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
-    const TREE_X = -hw + IN(28.5), TREE_Z = VD - IN(13.5);                                                        // the cat tree: in front of the sliding panel, beside the litter box
-    { // a little disco ball hanging off the top of the slider on a thread, over the cat tree's top perch (jump on it from there!)
-      const g = named(new THREE.Group(), 'Disco ball'); g.position.set(TREE_X - IN(2), DH + IN(1.2), TREE_Z);
-      const BL = VD - IN(0.8) - TREE_Z, br = BX(g, IN(0.6), IN(0.6), BL, bronze, 0, 0, BL / 2); br.userData.noWalk = true;   // a little bracket off the casing
+    const TREE_X = -hw + IN(28.5), TREE_Z = VD - IN(13.5);
+    SLIDER = { DX, DW, DH, VD };                                                        // the cat tree: in front of the sliding panel, beside the litter box
+    { // a little disco ball hanging off the top of the slider on a thread, in the middle of the doors (leap onto it from the cat tree!)
+      const g = named(new THREE.Group(), 'Disco ball'); g.position.set(DX, DH + IN(1.2), VD - IN(9));   // right in the middle of the doors (hop to it off the cat tree)
+      const BL = IN(8.2), br = BX(g, IN(0.6), IN(0.6), BL, bronze, 0, 0, BL / 2); br.userData.noWalk = true;   // a little bracket off the casing
       const R = IN(3.5), TH = IN(10);
       const thread = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.08), IN(0.08), TH, 4), lam(0xdddddd)); thread.position.y = -TH / 2; thread.userData.noWalk = true; g.add(thread);
       const tiles = canvasTex(64, 32, (c, w, h) => { c.fillStyle = '#3a3c40'; c.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 4) for (let x = 0; x < w; x += 4) { const v = 175 + Math.random() * 80 | 0; c.fillStyle = `rgb(${v},${v},${Math.min(255, v + 10)})`; c.fillRect(x, y, 3.4, 3.4); } }, 1, 1);
@@ -3440,16 +3441,16 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const yard = named(new THREE.Group(), 'Covered patio'); yard.userData.noWalk = true;
       const OB = c => new THREE.MeshBasicMaterial({ color: c, fog: false });
       const soffitTex = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#e3dac2'; c.fillRect(0, 0, w, h); for (let i = 0; i < 26; i++) { const x = Math.random() * w, y = Math.random() * h, r = 6 + Math.random() * 22, gr = c.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(150,135,100,.22)'); gr.addColorStop(1, 'rgba(150,135,100,0)'); c.fillStyle = gr; c.fillRect(x - r, y - r, r * 2, r * 2); } }, 2, 2);   // water stains
-      const SW = FT(18), SD = FT(10), SY = FT(8.6), ST2 = IN(10), SX = DX + FT(1);
+      const SW = FT(7), SD = FT(6.2), SY = FT(7.3), ST2 = IN(8), SX = DX;   // just big enough to cover the concrete pads
       const slab = new THREE.Mesh(new THREE.BoxGeometry(SW, ST2, SD), [OB(0xd9d0b9), OB(0xd9d0b9), OB(0xe6dfcb), new THREE.MeshBasicMaterial({ map: soffitTex, color: 0xf2eee4, fog: false }), OB(0xe9e2cf), OB(0xcfc6ae)]);
-      slab.position.set(SX, SY + ST2 / 2, VD + SD / 2); slab.userData.name = 'Balcony above'; yard.add(slab);
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(SW, IN(11), IN(9)), [OB(0xd3cab3), OB(0xd3cab3), OB(0xe6dfcb), OB(0xc9c0a8), OB(0xeee8d8), OB(0xe2dac6)]);
-      beam.position.set(SX, SY - IN(5.5), VD + SD - IN(4.5)); beam.userData.name = 'Balcony beam'; yard.add(beam);
-      for (const px of [SX - SW / 2 + FT(1.2), SX + SW / 2 - FT(1.2)]) {
-        const ph = SY - IN(11), col = new THREE.Mesh(new THREE.BoxGeometry(IN(11), ph, IN(11)), [OB(0xdcd8d0), OB(0xe4e0d8), OB(0xf4f1ec), OB(0xf4f1ec), OB(0xe8e4dc), OB(0xf3f0ea)]);
-        col.position.set(px, ph / 2, VD + SD - IN(4.5)); col.userData.name = 'Patio post'; yard.add(col);
+      slab.position.set(SX, SY + ST2 / 2, VD + 0.08 + SD / 2);   // (just clear of the house wall, so the two don't flicker through each other) slab.userData.name = 'Balcony above'; yard.add(slab);
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(SW, IN(6), IN(7)), [OB(0xd3cab3), OB(0xd3cab3), OB(0xe6dfcb), OB(0xc9c0a8), OB(0xeee8d8), OB(0xe2dac6)]);
+      beam.position.set(SX, SY - IN(3), VD + SD - IN(3.5)); beam.userData.name = 'Balcony beam'; yard.add(beam);
+      for (const px of [SX - SW / 2 + IN(5), SX + SW / 2 - IN(5)]) {
+        const ph = SY - IN(6), col = new THREE.Mesh(new THREE.BoxGeometry(IN(8), ph, IN(8)), [OB(0xdcd8d0), OB(0xe4e0d8), OB(0xf4f1ec), OB(0xf4f1ec), OB(0xe8e4dc), OB(0xf3f0ea)]);
+        col.position.set(px, ph / 2, VD + SD - IN(3.5)); col.userData.name = 'Patio post'; yard.add(col);
       }
-      for (const [lx, lz] of [[DX - FT(1.5), VD + FT(4.5)], [DX + FT(4), VD + FT(6.5)]]) {                          // jelly-jar porch lights
+      for (const [lx, lz] of [[DX, VD + SD * 0.5]]) {                                                              // a jelly-jar porch light
         const f = new THREE.Group(); f.position.set(lx, SY, lz); f.userData.name = 'Porch light'; yard.add(f);
         const base = new THREE.Mesh(new THREE.CylinderGeometry(IN(3), IN(3.4), IN(1), 16), OB(0x8d877b)); base.position.y = -IN(0.5); f.add(base);
         const jar = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.3), IN(2.3), IN(5), 16), new THREE.MeshBasicMaterial({ color: 0xf8f3e6, fog: false, transparent: true, opacity: 0.8 })); jar.position.y = -IN(3.5); f.add(jar);
@@ -4745,6 +4746,7 @@ const ACHIEVEMENTS = [
     ['karen', '💇‍♀️', 'Complaint dismissed', 'Vanquish the Karen mouse (rare: she turns up around 3,000 points)'],
     ['discoFever', '🕺', 'Disco fever', 'In Free walk, leap onto the little disco ball hanging on the slider'],
     ['catNap', '😴', 'Cat nap', 'In Free walk, curl up for a nap in the cat tree condo'],
+    ['raccoon', '🦝', 'Trash panda, begone', 'In Free walk, swipe at the raccoon taunting you through the slider until it runs off'],
     ['darkKitty', '😈', 'Through the looking glass', 'Beat the evil dark kitty in the mirror world (9 hits)'],
     ['inception', '🪆', 'Game-ception', 'Win the kart race, then beat the game on the driver\'s Switch'],
   ]],
@@ -4757,7 +4759,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 20:25';                                              // stamped when the site is published
+const BUILD = '2026-09-24 22:45';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5118,7 +5120,7 @@ function interactables() {
   }
   screen.getWorldPosition(_ip); list.push({ obj: screen, pos: _ip.clone(), r: 1.4 });
   if (starMesh) list.push({ obj: starMesh, pos: starMesh.position.clone(), r: 1.0 });
-  const nipOpen = catnip.door && catnip.door.angle < -0.6 && catnipReady();
+  const nipOpen = catnip.door && !!catnip.door.target;              // (cupboard open or opening: the jar is the target, not the door)
   for (const d of dresserDoors) if (!(d === pistolDoor && gunReady()) && !(d === catnip.door && nipOpen)) list.push({ obj: d.hinge.children[0], pos: d.center, r: 0.55 });   // (that door's bubble goes to the gun instead)
   if (nipOpen) { catnip.jar.getWorldPosition(_ip); list.push({ obj: catnip.targets[0], pos: _ip.clone(), r: 0.7 }); }   // the open catnip cupboard: a big target on the jar
   if (diffuserRig && diffuserRig.state === 'rest') list.push({ obj: diffuserRig.vase.children[0], pos: diffuserRig.center, r: 0.45 });
@@ -5149,7 +5151,11 @@ function interact(o, point, face) {
   if (gunReady() && ((o.userData.dresserDoor === pistolDoor) || (o.userData.dresser && point && Math.abs(point.x - pistolDoor.x) < pistolDoor.hinge.children[0].geometry.parameters.width * 0.8))) {
     startSwipe(point || pistolDoor.center, true); setTimeout(takeGun, 90); return true;   // anywhere on the open gun cupboard (its door too) grabs the gun
   }
-  if (o.userData.catnip) { if (!catnip.door || catnip.door.angle > -0.6 || !catnipReady()) return false; startSwipe(point, true); setTimeout(startCatnip, 90); tapShake(); return true; }   // the second hit: into the catnip
+  if (o.userData.catnip) {                                            // the second hit: into the catnip
+    if (!catnip.door || !catnip.door.target) return false;
+    if (!catnipReady()) { if (!catnip.active && point) floatText(point.clone().setY(point.y + 0.5), `Refilling... ${Math.ceil(catnip.readyAt - clock)}s`, 'warn'); return true; }
+    startSwipe(point, true); setTimeout(startCatnip, 90); tapShake(); return true;
+  }
   if (o.userData.dresserDoor || o.userData.dresser) { startSwipe(point, true); setTimeout(() => toggleDresserDoor(o.userData.dresserDoor ? o.userData.dresserDoor.x : point.x), 90); tapShake(); return true; }
   if (o.userData.blanket) { const br = o.userData.blanketRig || blanketRig; if (!br || br.state === 'flying' || br.state === 'gone' || br.state === 'burrito') return false; startSwipe(point, true); setTimeout(() => blanketToCat(point.clone(), br), 90); return true; }
   if (o.userData.fireHit) { if (!fireRig || fireRig.target === 0 || fireRig.level < 0.4) return false; startSwipe(point, true); setTimeout(burnPaw, 90); return true; }
@@ -5250,9 +5256,9 @@ function updateCatCrown(dt) {
   }
 }
 function resetCatCrown() { if (catCrown) { catCrown.visible = false; catCrown.userData.claimed = false; } crownFlight = null; }
-function returnMushroom(at) {
+function returnMushroom(at, label) {
   const c = cheeses.find(x => x.state === 'gone');
-  if (!c || gameMode !== 'classic') { bonus(300, at, 'King\'s ransom!'); return; }
+  if (!c || gameMode !== 'classic') { bonus(300, at, label || 'King\'s ransom!'); return; }
   c.reset(); c.fall = { y: CEIL_H - 0.55, vy: 0, rx: 0, spin: (Math.random() < 0.5 ? -1 : 1) * (7 + Math.random() * 4), bounces: 0 };   // poof! out of the ceiling...
   const top = new THREE.Vector3(c.pos.x, CEIL_H - 0.35, c.pos.z);
   burst(top, 0xffffff, 18, 2.4, 0.4, 0.9); burst(top, 0xff6fae, 12, 2, 0.6, 0.7); burst(top, 0xffd23a, 8, 1.6, 0.8, 0.5);
@@ -6047,7 +6053,7 @@ function resetCatnip() {
    (asymmetric blonde bob, pearls), jumps down and lectures the cat to stop hitting the mice. Hit her and she
    demands to speak to the manager; two more hits and she's gone. Leave her be and she storms off.
    ===================================================================== */
-const KAREN_CHANCE = 0.2;
+const KAREN_CHANCE = 1 / 3;
 const KAREN_LECTURE = ['Stop hitting the mice this instant!', "I don't appreciate you whacking my mouse friends!", 'Do you know who I am?', "I'm writing all of this down.", 'Absolutely unacceptable behaviour!'];
 const KAREN_RANT = ['LET ME SPEAK TO A MANAGER!', 'I WANT YOUR MANAGER! NOW!', 'Where is your SUPERVISOR?!'];
 const karenState = { rolled: false, pending: false };
@@ -6112,6 +6118,7 @@ function hurtKaren(m) {                                              // true onc
     return false;
   }
   hush(); unlock('karen'); score += 300; showBanner('Complaint dismissed!'); floatText(m.center.clone().setY(1.5), 'Karen vanquished! +300', 'clutch');
+  { const at = m.center.clone(); setTimeout(() => returnMushroom(at, 'Karen\'s refund!'), 700); }   // she drops a mushroom on her way out (a refund if you've lost none)
   m.karenLine = ''; burst(m.center.clone().setY(0.6), 0xfdfaf2, 14, 3, 3.5, 0.6);
   return true;
 }
@@ -7182,7 +7189,7 @@ function startWalk() {
   showBanner('Free walk!'); camToast('Stick to walk · Jump to leap · drag to look · tap anything', 4200);
 }
 function endWalk() {
-  stopDisco(); walk.napT = 0;
+  stopDisco(); walk.napT = 0; coonHide();
   walk.on = false; walkPtr = null; walk.stick.x = walk.stick.y = 0;
   if (walk.poops) { walk.poops.forEach(o => scene.remove(o)); walk.poops = []; }
   if (mirrorWorld || MW.trans) exitMirror(null, true);
@@ -7533,7 +7540,8 @@ function updateMirrorWorld(dt) {
   const p = walk.pos, spd = Math.hypot(walk.vel.x, walk.vel.z);
   if (MW.portalCD <= 0 && (spd > 0.4 || !walk.grounded)) {           // walking or jumping into a mirror: through you go
     const ahead = new THREE.Vector3(p.x + Math.sin(walk.face) * 0.45, p.y + 0.4, p.z + Math.cos(walk.face) * 0.45);
-    if (!MW.trans && mirrorPortals().some(b => b.containsPoint(ahead))) { startMirrorTrans(mirrorWorld ? 'out' : 'in', MW.done ? null : 'You escaped the mirror world'); }
+    const push = spd > 0.4 ? new THREE.Vector3(p.x + walk.vel.x / spd * 0.45, p.y + 0.4, p.z + walk.vel.z / spd * 0.45) : ahead;
+    if (!MW.trans && mirrorPortals().some(b => b.containsPoint(ahead) || b.containsPoint(push))) { startMirrorTrans(mirrorWorld ? 'out' : 'in', MW.done ? null : 'You escaped the mirror world'); }
   }
   if (MW.trans) updateMirrorTrans(dt);
   if (!mirrorWorld) return;
@@ -7557,6 +7565,7 @@ function walkSwipe() {                                               // swipe at
   walk.swipeReady = clock + 0.3; walk.batT = 0.35; noise(0.12, 0.05, 1800);
   const p = walk.pos, fx = Math.sin(walk.face), fz = Math.cos(walk.face);
   const paw = new THREE.Vector3(p.x + fx * 0.45, p.y + 0.35, p.z + fz * 0.45);
+  if (coonSwipe(paw)) return;                                        // the raccoon at the slider: whack the glass right in front of it
   if (mirrorWorld && MW.dk && MW.dk.state !== 'dead') {                // the dark kitty within reach: that's who gets it
     const q = MW.dk.pos; if (Math.hypot(q.x - paw.x, q.z - paw.z) < 1.0 && Math.abs(q.y + 0.4 - paw.y) < 0.9) { hitDark(); return; }
   }
@@ -7623,12 +7632,168 @@ function dropPoop() {
   floatText(g.position.clone().setY(g.position.y + 0.55), '💩 Plop!', 'name'); showWalkName('💩 Plop! Business done');
   unlock('poop');
 }
+/* ---------- the raccoon: in Free walk a raccoon waddles up to the slider now and then and taunts her through the glass
+   (squishes its face on it, sticks its tongue out, wiggles its bum, eats one of HER mushrooms, does a little jig).
+   Meow at it and it cups an ear, meows back and cracks up; a big angry yowl makes it jump out of its fur. Swipe at the
+   glass in front of it and it falls on its bum, then shakes a fist (three swipes and it bolts); swipe from across the
+   room and it points and laughs. ---------- */
+const coon = { rig: null, state: 'hidden', t: 0, next: 12, taunt: 0, tauntT: 0, stay: 0, swipes: 0, from: new THREE.Vector3(), to: new THREE.Vector3(), said: 0 };
+const COON_TAUNTS = [['squish', '*squish*'], ['nyah', 'Nyah nyah nyah!'], ['wiggle', "Can't catch meee!"], ['snack', 'Mmm... YOUR mushroom!'], ['dance', '♪ Trash panda! ♪']];
+function makeRaccoon() {
+  const g = new THREE.Group(); g.userData.name = 'Raccoon'; g.userData.noWalk = true; g.visible = false; povEndWall.add(g);
+  const fur = lam(0x86817b, { map: furTex }), pale = lam(0xe2ddd3, { map: furTex }), dark = lam(0x2a2623), black = basic(0x0d0c0b), white = basic(0xffffff), pink = lam(0xe58a9a);
+  const M = (geo, mat, x, y, z, par) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); par.add(m); return m; };
+  const body = new THREE.Group(); g.add(body);
+  M(new THREE.SphereGeometry(0.3, 18, 14), fur, 0, 0.52, 0, body).scale.set(1, 1.3, 0.85);
+  M(new THREE.SphereGeometry(0.22, 14, 10), pale, 0, 0.5, 0.11, body).scale.set(1, 1.3, 0.62);                         // pale tummy
+  const head = new THREE.Group(); head.position.set(0, 1.0, 0.04); body.add(head);
+  M(new THREE.SphereGeometry(0.2, 18, 14), fur, 0, 0, 0, head).scale.set(1.14, 0.95, 1);
+  M(new THREE.SphereGeometry(0.13, 14, 10), pale, 0, -0.06, 0.12, head).scale.set(1.3, 0.8, 1);                       // white cheeks and muzzle
+  M(new THREE.ConeGeometry(0.075, 0.17, 12), pale, 0, -0.06, 0.24, head).rotation.x = Math.PI / 2;                     // pointy snout
+  M(new THREE.SphereGeometry(0.032, 10, 8), black, 0, -0.058, 0.33, head);                                              // nose
+  M(new THREE.SphereGeometry(0.204, 18, 6, 0.25, Math.PI - 0.5, Math.PI * 0.27, Math.PI * 0.1), pale, 0, 0.004, 0, head).scale.set(1.14, 0.95, 1.02);   // white brows
+  M(new THREE.SphereGeometry(0.206, 18, 6, 0, Math.PI, Math.PI * 0.38, Math.PI * 0.16), dark, 0, 0, 0, head).scale.set(1.15, 0.96, 1.03);    // the bandit mask
+  const eyes = [];
+  for (const sx of [-1, 1]) {
+    const e = M(new THREE.SphereGeometry(0.04, 12, 10), white, sx * 0.078, 0.012, 0.175, head); eyes.push(e);
+    M(new THREE.SphereGeometry(0.024, 10, 8), black, 0, 0, 0.028, e); M(new THREE.SphereGeometry(0.008, 6, 5), white, sx * 0.006 - 0.004, 0.012, 0.048, e);
+    const ear = M(new THREE.ConeGeometry(0.075, 0.13, 10), fur, sx * 0.14, 0.17, -0.03, head); ear.rotation.z = -sx * 0.35;
+    M(new THREE.ConeGeometry(0.045, 0.08, 10), pale, 0, -0.01, 0.03, ear);
+  }
+  const tongue = M(new THREE.SphereGeometry(0.04, 10, 8), pink, 0, -0.14, 0.26, head); tongue.scale.set(1, 0.35, 1.3); tongue.visible = false;
+  const arms = [];
+  for (const sx of [-1, 1]) {
+    const sh = new THREE.Group(); sh.position.set(sx * 0.21, 0.8, 0.07); body.add(sh);
+    M(new THREE.CylinderGeometry(0.055, 0.045, 0.34, 10), fur, 0, -0.17, 0, sh);
+    const paw = M(new THREE.SphereGeometry(0.058, 10, 8), dark, 0, -0.36, 0, sh); paw.scale.set(1, 0.8, 1.2);
+    for (let f = 0; f < 3; f++) M(new THREE.SphereGeometry(0.018, 6, 5), dark, (f - 1) * 0.028, -0.045, 0.04, paw);   // little fingers
+    arms.push(sh);
+  }
+  const legs = [];
+  for (const sx of [-1, 1]) { const hip = new THREE.Group(); hip.position.set(sx * 0.14, 0.26, 0); body.add(hip); M(new THREE.CylinderGeometry(0.075, 0.065, 0.24, 10), fur, 0, -0.12, 0, hip); M(new THREE.SphereGeometry(0.07, 10, 8), dark, 0, -0.25, 0.05, hip).scale.set(1, 0.55, 1.5); legs.push(hip); }
+  const tail = []; let par = body;
+  for (let i = 0; i < 8; i++) {                                                                                          // a big bushy ringed tail
+    const seg = new THREE.Group(); if (i === 0) seg.position.set(0, 0.3, -0.24); else seg.position.set(0, 0, -0.09); par.add(seg);
+    M(new THREE.SphereGeometry(0.095 - i * 0.004, 12, 10), i % 2 ? dark : fur, 0, 0, -0.045, seg).scale.set(1, 1, 1.25);
+    tail.push(seg); par = seg;
+  }
+  const snack = new THREE.Group(); snack.visible = false; arms[1].add(snack); snack.position.set(0, -0.42, 0.06);   // one of HER mushrooms
+  M(new THREE.CylinderGeometry(0.025, 0.03, 0.07, 10), lam(0xf4efe4), 0, 0, 0, snack);
+  M(new THREE.SphereGeometry(0.06, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), lam(0xd8342c), 0, 0.03, 0, snack);
+  return { g, body, head, eyes, tongue, arms, legs, tail, snack };
+}
+function coonHome() { const S = SLIDER; return new THREE.Vector3(S.DX + S.DW / 4, IN(1.2), S.VD + 0.38); }   // outside the fixed glass panel, standing on the pads
+function coonSay(text, cls) { const R = coon.rig; floatText(R.g.position.clone().setY(R.g.position.y + 1.55), text, cls || 'name'); }
+function chitter(n, hi) { for (let i = 0; i < (n || 5); i++) tone((hi || 1700) + Math.random() * 500, 1300 + Math.random() * 400, 0.05, 'square', 0.022, i * 0.07); }
+function coonHide() { if (coon.rig) coon.rig.g.visible = false; coon.state = 'hidden'; coon.next = Math.max(coon.next, 8); }
+function coonSet(st) { coon.state = st; coon.t = 0; coon.said = 0; }
+function coonActive() { return coon.rig && coon.rig.g.visible && ['taunt', 'mock', 'laugh', 'startle'].includes(coon.state); }
+function coonReact(kind) {                                            // she meowed
+  if (!coonActive() || !walk.on || walk.pos.distanceTo(coon.rig.g.position) > 14) return;
+  coonSet(kind === 'angry' ? 'startle' : 'mock');
+}
+function coonSwipe(paw) {                                             // she swiped: at the glass right in front of it, or from way over there
+  if (!coonActive()) return false;
+  const h = coonHome(), near = Math.hypot(paw.x - h.x, paw.z - (h.z - 0.45)) < 1.0 && paw.y < 1.8;
+  if (near) {
+    noise(0.15, 0.2, 700); tone(160, 90, 0.12, 'sine', 0.08); shake = Math.max(shake, reduceMotion ? 0.03 : 0.15);   // THUD on the glass
+    coon.swipes++; coonSet('flinch'); showWalkName('🦝 Raccoon'); return true;
+  }
+  if (coon.state === 'taunt' && walk.pos.distanceTo(coon.rig.g.position) < 9) coonSet('laugh');
+  return false;
+}
+function updateRaccoon(dt) {
+  if (gameMode !== 'walk' || !walk.on || !SLIDER) { if (coon.rig && coon.rig.g.visible) coonHide(); return; }
+  if (state !== 'playing') return;                                   // (paused: it just freezes where it is)
+  if (!coon.rig) coon.rig = makeRaccoon();
+  const R = coon.rig, g = R.g, pos = g.position, home = coonHome();
+  coon.t += dt;
+  if (coon.state === 'hidden') {
+    coon.next -= dt; if (coon.next > 0) return;
+    coon.from.set(home.x + 5.5, home.y, home.z + 2.4); coon.to.copy(home); pos.copy(coon.from); g.visible = true; coon.swipes = 0; coonSet('arrive'); chitter(3);
+  }
+  // reset the pose, then each state strikes its own
+  const b = R.body; b.position.set(0, 0, 0); b.rotation.set(0, 0, 0); b.scale.setScalar(1);
+  R.head.rotation.set(0, 0, 0); R.head.scale.set(1, 1, 1); R.head.position.set(0, 1.0, 0.04); R.tongue.visible = false; R.snack.visible = false;
+  R.arms.forEach(a => a.rotation.set(-1.3, 0, 0)); R.legs.forEach(l => l.rotation.set(0, 0, 0));
+  R.tail.forEach((sg, i) => { sg.rotation.set(i ? -0.18 : 0.9, Math.sin(clock * 3 - i * 0.6) * 0.12, 0); });
+  R.eyes.forEach(e => e.scale.setScalar(1));
+  const t = coon.t, look = walk.pos.clone().sub(pos), lookYaw = THREE.MathUtils.clamp(Math.atan2(-look.x, -look.z), -0.7, 0.7);   // (it faces the house: -z)
+  const walkTo = (dur, fast) => {                                      // waddling (or scampering) from one spot to the next
+    const k = Math.min(1, t / dur); pos.lerpVectors(coon.from, coon.to, k);
+    const d = coon.to.clone().sub(coon.from); g.rotation.y = Math.atan2(d.x, d.z);
+    const w = Math.sin(t * (fast ? 22 : 12)); b.rotation.z = w * 0.12; b.position.y = Math.abs(w) * 0.05;
+    R.legs[0].rotation.x = w * 0.6; R.legs[1].rotation.x = -w * 0.6; R.arms.forEach((a, i) => a.rotation.set((i ? -w : w) * 0.5 - (fast ? 0.9 : 0.2), 0, 0));
+    if (fast) { b.rotation.x = 0.9; b.position.y += -0.25; }           // down on all fours and GONE
+    return k >= 1;
+  };
+  switch (coon.state) {
+    case 'arrive':
+      if (walkTo(2.6)) { g.rotation.y = Math.PI; coonSet('taunt'); coon.stay = 26 + Math.random() * 12; coon.taunt = Math.random() * COON_TAUNTS.length | 0; coon.tauntT = 0; coonSay('Heh heh heh...'); chitter(6); }
+      break;
+    case 'leave': case 'flee':
+      if (walkTo(coon.state === 'flee' ? 1.1 : 2.4, coon.state === 'flee')) { g.visible = false; coon.state = 'hidden'; coon.next = 35 + Math.random() * 25; }
+      break;
+    case 'taunt': {
+      g.rotation.y = Math.PI; coon.stay -= dt; coon.tauntT += dt;
+      if (coon.tauntT > 2.9) { coon.tauntT = 0; coon.taunt = (coon.taunt + 1 + (Math.random() * (COON_TAUNTS.length - 1) | 0)) % COON_TAUNTS.length; coon.said = 0; }
+      if (coon.stay <= 0) { coonSay('Later, loser!'); chitter(4); coon.from.copy(pos); coon.to.set(home.x - 6, home.y, home.z + 2.2); coonSet('leave'); break; }
+      const [kind, line] = COON_TAUNTS[coon.taunt], k = coon.tauntT;
+      if (!coon.said) { coon.said = 1; coonSay(line); chitter(kind === 'dance' ? 8 : 4); }
+      R.head.rotation.y = lookYaw * 0.8;
+      if (kind === 'squish') {                                           // face mashed flat on the glass, paws either side
+        const sq = Math.min(1, k / 0.4); R.head.position.z = 0.04 + sq * 0.13; R.head.scale.set(1 + sq * 0.22, 1 + sq * 0.08, 1 - sq * 0.35); R.head.rotation.y = 0;
+        R.arms.forEach((a, i) => a.rotation.set(-1.55, 0, (i ? -1 : 1) * 0.35));
+      } else if (kind === 'nyah') {                                      // thumbs in its ears, fingers waggling, tongue out
+        R.tongue.visible = true; R.arms.forEach((a, i) => a.rotation.set(-2.55, 0, (i ? -1 : 1) * (0.55 + Math.sin(clock * 18) * 0.12)));
+        R.head.rotation.z = Math.sin(clock * 9) * 0.18;
+      } else if (kind === 'wiggle') {                                    // turns round and shakes its bum at her, looking back over its shoulder
+        g.rotation.y = 0; b.rotation.z = Math.sin(clock * 14) * 0.22; R.head.rotation.y = Math.PI * 0.75; R.arms.forEach(a => a.rotation.set(-0.3, 0, 0));
+        R.tail.forEach((sg, i) => { sg.rotation.y = Math.sin(clock * 14 - i * 0.5) * 0.45; });
+      } else if (kind === 'snack') {                                     // noms one of HER mushrooms, right in front of her
+        R.snack.visible = true; R.arms.forEach(a => a.rotation.set(-2.2, 0, 0)); R.arms[0].rotation.z = -0.4; R.arms[1].rotation.z = 0.4;
+        R.head.rotation.x = 0.2 + Math.abs(Math.sin(clock * 12)) * 0.12; R.snack.scale.setScalar(Math.max(0.3, 1 - k * 0.25));
+        if (Math.sin(clock * 12) > 0.95) tone(300, 200, 0.04, 'triangle', 0.02);
+      } else {                                                           // a little jig
+        const j = Math.sin(clock * 10); b.position.x = j * 0.08; b.rotation.z = -j * 0.15; b.position.y = Math.abs(j) * 0.06;
+        R.arms.forEach((a, i) => a.rotation.set(-2.3 + (i ? j : -j) * 0.5, 0, (i ? -1 : 1) * 0.3)); R.legs[0].rotation.x = j * 0.4; R.legs[1].rotation.x = -j * 0.4;
+      }
+      break;
+    }
+    case 'mock':                                                         // cups an ear... "Meow? MEOW?"... and cracks up laughing
+      g.rotation.y = Math.PI;
+      if (t < 1.1) { R.arms[1].rotation.set(-2.6, 0, -0.9); R.head.rotation.z = 0.35; R.head.rotation.y = lookYaw; if (!coon.said) { coon.said = 1; coonSay('Hm? Whazzat?'); } }
+      else if (t < 2.0) { R.head.rotation.x = -0.3; R.arms.forEach(a => a.rotation.set(-2.7, 0, 0)); if (coon.said < 2) { coon.said = 2; coonSay('Meeeow? MEEEOW? 😹'); speak('Meow meow meeeow!', { pitch: 2, rate: 1.35 }); [900, 1300, 750].forEach((f, i) => tone(f, f * 1.3, 0.14, 'triangle', 0.035, i * 0.16)); } }
+      else if (t < 3.6) { b.rotation.x = -0.25; b.position.y = Math.abs(Math.sin(t * 20)) * 0.04; R.head.rotation.x = -0.4; R.arms.forEach(a => a.rotation.set(-0.4, 0, 0)); R.tongue.visible = true; if (coon.said < 3) { coon.said = 3; coonSay('HAHAHAHA!'); chitter(10, 2200); } }   // holding its belly
+      else coonSet('taunt');
+      break;
+    case 'startle':                                                      // that yowl: it jumps clean out of its fur
+      g.rotation.y = Math.PI; b.position.y = Math.max(0, Math.sin(Math.min(1, t / 0.45) * Math.PI)) * 0.35; b.scale.setScalar(1 + Math.max(0, 0.25 - t * 0.15));
+      R.arms.forEach((a, i) => a.rotation.set(-2.9, 0, (i ? -1 : 1) * 0.5)); R.eyes.forEach(e => e.scale.setScalar(1.5));
+      if (!coon.said) { coon.said = 1; coonSay('EEP!!', 'bad'); tone(1400, 2400, 0.18, 'square', 0.04); }
+      if (t > 1.5) { coonSay('...pfft. Not scared.'); coonSet('taunt'); coon.tauntT = 0; coon.said = 1; }
+      break;
+    case 'flinch':                                                       // WHAM on the glass: falls on its bum... then shakes a fist
+      g.rotation.y = Math.PI;
+      if (t < 0.9) { const k = Math.min(1, t / 0.35); b.position.z = -0.3 * k; b.position.y = -0.18 * k; b.rotation.x = -0.6 * k; R.legs.forEach(l => l.rotation.x = -1.2 * k); R.arms.forEach((a, i) => a.rotation.set(-0.3, 0, (i ? -1 : 1) * 1.2 * k)); R.eyes.forEach(e => e.scale.setScalar(1.4)); if (!coon.said) { coon.said = 1; coonSay('HEY!!', 'bad'); tone(900, 500, 0.2, 'square', 0.04); } }
+      else if (coon.swipes >= 3) { coonSay('Nope nope NOPE!', 'bad'); chitter(8, 2000); unlock('raccoon'); showWalkName('🦝 The raccoon ran off!'); coon.from.copy(pos); coon.to.set(home.x + 7, home.y, home.z + 2.5); coonSet('flee'); }
+      else if (t < 2.1) { R.arms[1].rotation.set(-2.7 + Math.sin(clock * 22) * 0.25, 0, -0.2); R.head.rotation.y = lookYaw; if (coon.said < 2) { coon.said = 2; coonSay(coon.swipes === 2 ? 'One more and I\'m OUTTA here!' : 'Hmph! Missed me anyway!'); chitter(5, 1200); } }   // shaking its fist
+      else coonSet('taunt');
+      break;
+    case 'laugh':                                                        // she swiped from across the room: it points and laughs
+      g.rotation.y = Math.PI; R.arms[1].rotation.set(-1.6, 0, -0.1 + lookYaw * 0.5); b.position.y = Math.abs(Math.sin(t * 18)) * 0.03; R.head.rotation.y = lookYaw;
+      if (!coon.said) { coon.said = 1; coonSay('Ha! Missed me! Hehehe'); chitter(8, 2100); }
+      if (t > 1.8) coonSet('taunt');
+      break;
+  }
+}
 function walkMeow() {
   if (!walk.on || state !== 'playing') return;
   initAudio();
   walk.meowRun = clock - walk.lastMeow < 1.8 ? walk.meowRun + 1 : 1; walk.lastMeow = clock;
   const head = walk.pos.clone().setY(walk.pos.y + 1.05);
   if (walkInLitter() && clock > (walk.poopReady || 0)) { walk.poopReady = clock + 2; setTimeout(dropPoop, 450); }   // a meow in the litter box... and then a little present
+  coonReact(walk.meowRun >= 10 ? 'angry' : 'meow');                  // the raccoon at the slider has opinions about her meows
   if (walk.meowRun >= 10) {                                          // the tenth in a row: a furious, LOUD yowl
     walk.meowRun = 0; walk.meowT = 1.1; walk.puff = 1;
     sfx.meow(true); vibrate(120); shake = Math.max(shake, reduceMotion ? 0.06 : 0.45);
@@ -7766,7 +7931,8 @@ function frame(now) {
   const lit = flames.filter(f => f.visible).length;
   candleLight.intensity = (0.32 + flick / flames.length * 0.1) * lit / flames.length;
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
-  if (sliderDisco) updateSliderDisco(dt);                              // the slider's little disco ball turns (and runs the disco)
+  if (sliderDisco) updateSliderDisco(dt);
+  updateRaccoon(dt);                              // the slider's little disco ball turns (and runs the disco)
 
   if (povEndWall) povEndWall.visible = camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02;   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
