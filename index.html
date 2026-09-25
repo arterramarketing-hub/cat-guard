@@ -540,7 +540,8 @@ const CEIL_H = ROOM.wallH;                                          // ceiling s
 const FIRE_END = 13.3 + (58 + 4) / 15.6 / 2;                              // front edge of the fireplace hearth (see FIRE below)
 const COUCH_DEPTH = 2.1, COUCH_LEFT_Z0 = 3.47, COUCH_RIGHT_Z0 = FIRE_END - 2.85 * 3 / 1.3 - 7 / 15.6;   // its far arm lines up with the hearth   // left sofa + fireplace sit further down their wall; right sofa pushed down to make room for the acrylic table
 const FIRE = { z: 13.3, w: 58 / 15.6, d: 7 / 15.6, h: 46 / 15.6 };   // built in: only 7" proud of the wall   // stone fireplace on the left wall (58" wide, 15" deep, 44" to the mantle)
-const ARMCHAIR = { x: 2.15, z: ROOM.visDepth - 1.45, half: 1.2 };   // the armchair at the back (only seen from inside the room)...
+const ARMCHAIR = { x: 3.62, z: ROOM.visDepth - 1.5, half: 1.2 };   // the armchair tucked in the back corner (only seen from inside the room)...
+const WTABLE = { x: -ROOM.halfW + 8.5 / 15.6, z: (FIRE_END + ROOM.visDepth - 24 / 15.6) / 2, len: 48 / 15.6, dep: 16 / 15.6, h: 30 / 15.6 };   // wooden console table against the wall past the fireplace
 ARMCHAIR.rot = Math.atan2(0 - ARMCHAIR.x, ROOM.visDepth / 2 - ARMCHAIR.z);   // ...turned to face the middle of the room
 const HOLES = [
   { kind: 'couch', x: -ROOM.halfW + COUCH_DEPTH, z: COUCH_LEFT_Z0 + 1.6, n: [1, 0] },   // under the left sofa
@@ -1352,7 +1353,7 @@ const TV_SCALE = 65 / 55;                                                  // 65
 const tv = new THREE.Group(); tv.position.set(MAIN_CX, CAB_H, IN(9)); tv.scale.setScalar(TV_SCALE); scene.add(tv);
 box(IN(12), IN(1), IN(8), lam(0x222222), 0, IN(0.5), 0, tv);
 box(IN(2), IN(3), IN(1.5), lam(0x222222), 0, IN(2.5), 0, tv);
-box(IN(48.5), IN(28.5), IN(1.2), lam(0x121212), 0, IN(4) + IN(14.25), 0, tv);
+const tvPanel = box(IN(48.5), IN(28.5), IN(1.2), lam(0x121212), 0, IN(4) + IN(14.25), 0, tv);
 const screen = new THREE.Mesh(new THREE.PlaneGeometry(IN(47), IN(26.5)), lam(0xffffff, { map: tvOffTex }));
 screen.position.set(0, IN(4) + IN(14.25), IN(0.65)); tv.add(screen);
 box(IN(36), IN(2.5), IN(4), lam(0x2a2a2a), 0, IN(1.25), IN(6), tv);                            // soundbar
@@ -2381,7 +2382,7 @@ SECT = 'Wall';
 const WIN_W = IN(66), WIN_H = IN(30), WIN_SILL = FT(4), CASING = IN(3), WALL_T = IN(5);
 const DOOR_W = IN(32), DOOR_H = IN(80), DOOR_Z = FT(5.4);
 const DOOR_Z0 = DOOR_Z - DOOR_W / 2, DOOR_Z1 = DOOR_Z + DOOR_W / 2;     // opening edges along the wall
-const DOOR2_Z = ROOM.visDepth - 1.5, DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DOOR2_Z1 = DOOR2_Z + DOOR_W / 2;   // a second doorway in the far corner of the same wall, into another room
+const DOOR2_Z = ROOM.visDepth - 1.5 - FT(2), DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DOOR2_Z1 = DOOR2_Z + DOOR_W / 2;   // a second doorway in the far corner of the same wall, into another room
 (() => {
   /* ---- right wall with the door opening notched out ---- */
   const L = ROOM.visDepth, Hh = ROOM.wallH, ox = L / 2, oy = Hh / 2;   // shape coords are centred like a plane
@@ -3172,6 +3173,70 @@ const galaxyRig = (() => {
 })();
 let raveKick = -1, remoteLed = null, danceUntil = 0, raveUntil = 0;
 const RAVE_SECS = 40;                                                  // the party shuts itself off after this long
+// disco fever: land on the little disco ball on the slider and the room turns into a 70s dance floor. The lights drop, the
+// ball spins up and throws a hundred spots of light round the walls, floor and ceiling, coloured spots sweep, the mice dance,
+// she spins round on top of the ball, and a disco track plays
+const disco = { on: false, t: 0, until: 0, prev: 0, spin: 0, specks: null, halo: null }, DISCO_SECS = 26;
+const _dB = new THREE.Vector3(), _dN = new THREE.Vector3(), _speckGeo = new THREE.PlaneGeometry(1, 1);
+function discoFever() {
+  if (disco.on || !sliderDisco) return;
+  if (!disco.specks) {
+    const cols = [0xffffff, 0xffffff, 0xfff2c0, 0xff7ad0, 0x6fe3ff, 0xffd36f, 0xb48cff];
+    disco.specks = [];
+    for (let i = 0; i < 120; i++) {
+      const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = Math.sqrt(1 - u * u);
+      const dir = new THREE.Vector3(Math.cos(a) * r, u * 0.85 - 0.15, Math.sin(a) * r).normalize();   // (a few more aimed down at the floor)
+      const sp = new THREE.Mesh(_speckGeo, new THREE.MeshBasicMaterial({ map: candleGlowTex, color: cols[i % cols.length], blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0, fog: false }));   // a flat spot lying on the wall / floor / ceiling
+      sp.material.color.multiplyScalar(2);
+      sp.visible = false; scene.add(sp); disco.specks.push({ sp, dir, ph: Math.random() * 6.28 });
+    }
+    disco.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xfff6e0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); disco.halo.visible = false; scene.add(disco.halo);
+  }
+  Object.assign(disco, { on: true, t: 0, until: clock + DISCO_SECS, prev: roomMode });
+  if (roomMode !== 1) setRoomMode(1); else { musicNext = 0; musicStep = 0; }
+  danceUntil = Math.max(danceUntil, clock + DISCO_SECS);
+  unlock('discoFever'); showBanner('Disco fever!'); showWalkName('🪩 Disco fever! Everybody on the dance floor!');
+  sfx.bassDrop(); vibrate(60);
+  const B = sliderDisco.ball.getWorldPosition(new THREE.Vector3());
+  for (const c of [0xff5fa2, 0x6fe3ff, 0xffd36f, 0xb48cff]) burst(B, c, 10, 2.6, 2.4, 0.7);
+}
+function stopDisco() {
+  if (!disco.on) return;
+  disco.on = false;
+  if (disco.specks) for (const k of disco.specks) k.sp.visible = false;
+  if (disco.halo) disco.halo.visible = false;
+  if (roomMode === 1) setRoomMode(disco.prev === 2 ? 0 : disco.prev);
+  musicNext = 0; musicStep = 0; danceUntil = Math.min(danceUntil, clock);
+}
+function discoCatch(ny) {                                            // coming down right by the slider's disco ball: she lands on top of it
+  const D = sliderDisco; if (!D || !walk.on) return false;
+  const B = D.ball.getWorldPosition(_dB), top = B.y + D.R, p = walk.pos;
+  if (Math.hypot(p.x - B.x, p.z - B.z) > 0.45 || p.y < top - 0.05 || ny > top + 0.02) return false;
+  p.set(B.x, top, B.z); walk.vy = 0; walk.grounded = true; walk.squash = 1; walk.vel.set(0, 0, 0); sfx.padThud(0.35); discoFever(); return true;
+}
+function updateSliderDisco(dt) {
+  const D = sliderDisco;
+  if (disco.on) { disco.t += dt; if (clock > disco.until || !walk.on) stopDisco(); }
+  if (!povEndWall.visible && !disco.on) return;
+  disco.spin += dt * (disco.on ? 2.2 : 0.5);
+  D.ball.rotation.y = disco.spin; D.g.rotation.z = Math.sin(clock * 0.7) * 0.025;
+  const beat = disco.on && actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 7) : 0;
+  for (const d of D.glints) d.gl.material.opacity = disco.on ? Math.max(0, Math.sin(clock * d.speed * 4 + d.phase)) * (0.7 + beat) : Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.7) * 3;
+  D.ball.material.emissive.setScalar(disco.on ? 0.3 + 0.45 * beat : 0.29);
+  if (!disco.on) return;
+  const B = D.ball.getWorldPosition(_dB), env = Math.min(1, disco.t / 0.8) * Math.min(1, (disco.until - clock) / 1.2), hw = ROOM.halfW - 0.03, cs = Math.cos(disco.spin), sn = Math.sin(disco.spin);
+  for (const k of disco.specks) {                                    // each mirror tile throws a spot of light; they sweep round the room as the ball turns
+    const d0 = k.dir, dx = d0.x * cs + d0.z * sn, dz = -d0.x * sn + d0.z * cs, dy = d0.y;
+    const tx = dx ? ((dx > 0 ? hw : -hw) - B.x) / dx : 99, ty = dy ? ((dy > 0 ? CEIL_H - 0.03 : 0.02) - B.y) / dy : 99, tz = dz ? ((dz > 0 ? ROOM.visDepth - 0.03 : 0.03) - B.z) / dz : 99;
+    const t = Math.min(tx, ty, tz);
+    if (t === tx) _dN.set(-Math.sign(dx), 0, 0); else if (t === ty) _dN.set(0, -Math.sign(dy), 0); else _dN.set(0, 0, -Math.sign(dz));   // the surface it lands on faces back into the room
+    k.sp.position.set(B.x + dx * t, B.y + dy * t, B.z + dz * t); k.sp.lookAt(_dN.add(k.sp.position)); k.sp.scale.setScalar(0.3 + t * 0.034);
+    k.sp.material.opacity = env * (0.6 + 0.4 * Math.sin(clock * 7 + k.ph)) * (0.9 + beat * 0.5); k.sp.visible = true;
+  }
+  disco.halo.visible = true; disco.halo.position.copy(B); disco.halo.scale.setScalar(1.1 + beat * 0.5); disco.halo.material.opacity = env * (0.45 + 0.4 * beat);
+  const p = walk.pos;
+  if (walk.on && walk.grounded && Math.hypot(p.x - B.x, p.z - B.z) < 0.25 && Math.abs(p.y - B.y - D.R) < 0.1) walk.face += dt * 2.2;   // she spins round on top of the ball
+}
 function setRoomMode(m) {
   roomMode = m;
   lightTarget = m === 0 ? 1 : m === 1 ? 0.16 : 0.1;
@@ -3202,14 +3267,14 @@ function updateRoomFx(dt) {
   const beat = actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 7) : 0;
   g.rave.forEach((l, i) => {
     const a = clock * (0.7 + i * 0.25) + i * 2.1;
-    l.position.set(Math.sin(a) * 3.8, 3.2 + Math.sin(clock * 1.3 + i) * 0.8, 7 + Math.cos(a * 0.8) * 5.5);
-    l.intensity = roomMode === 2 ? 0.9 + 1.6 * beat : Math.max(0, l.intensity - dt * 4);
+    l.position.set(Math.sin(a) * 3.8, 3.2 + Math.sin(clock * 1.3 + i) * 0.8, disco.on ? ROOM.visDepth - 5.5 + Math.cos(a * 0.8) * 4 : 7 + Math.cos(a * 0.8) * 5.5);   // (disco: sweeping round the dance floor by the slider)
+    l.intensity = roomMode === 2 || disco.on ? 0.9 + 1.6 * beat : Math.max(0, l.intensity - dt * 4);
   });
 }
 SECT = 'Dome light';
 /* ---------- 8 ft ceiling with three frosted dome lights (the near end of the room is left open, dollhouse style). Both face into
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
-let povEndWall = null, sliderDisco = null;
+let povEndWall = null, sliderDisco = null, catCondo = null;
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
   const VD = ROOM.visDepth, WH = ROOM.wallH;
@@ -3240,15 +3305,16 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     }
     const named = (g, name) => { g.userData.name = name; povEndWall.add(g); return g; };
     const BX = (g, w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); g.add(b); return b; };
-    { // a little disco ball hanging off the top of the slider on a thread, slowly turning and catching the light
-      const g = named(new THREE.Group(), 'Disco ball'); g.position.set(DX + IN(5), DH + IN(1.2), VD - IN(9));
-      BX(g, IN(0.6), IN(0.6), IN(9), bronze, 0, 0, IN(4.5));                                                     // a little bracket off the casing
+    const TREE_X = -hw + IN(28.5), TREE_Z = VD - IN(13.5);                                                        // the cat tree: in front of the sliding panel, beside the litter box
+    { // a little disco ball hanging off the top of the slider on a thread, over the cat tree's top perch (jump on it from there!)
+      const g = named(new THREE.Group(), 'Disco ball'); g.position.set(TREE_X - IN(2), DH + IN(1.2), TREE_Z);
+      const BL = VD - IN(0.8) - TREE_Z, br = BX(g, IN(0.6), IN(0.6), BL, bronze, 0, 0, BL / 2); br.userData.noWalk = true;   // a little bracket off the casing
       const R = IN(3.5), TH = IN(10);
-      const thread = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.08), IN(0.08), TH, 4), lam(0xdddddd)); thread.position.y = -TH / 2; g.add(thread);
+      const thread = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.08), IN(0.08), TH, 4), lam(0xdddddd)); thread.position.y = -TH / 2; thread.userData.noWalk = true; g.add(thread);
       const tiles = canvasTex(64, 32, (c, w, h) => { c.fillStyle = '#3a3c40'; c.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 4) for (let x = 0; x < w; x += 4) { const v = 175 + Math.random() * 80 | 0; c.fillStyle = `rgb(${v},${v},${Math.min(255, v + 10)})`; c.fillRect(x, y, 3.4, 3.4); } }, 1, 1);
       const ball = new THREE.Mesh(new THREE.SphereGeometry(R, 20, 12), new THREE.MeshPhongMaterial({ map: tiles, color: 0xffffff, emissive: 0x4a4c52, specular: 0xffffff, shininess: 140, flatShading: true }));
       ball.position.y = -TH - R; g.add(ball);
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.5), IN(0.7), IN(0.6), 8), bronze); cap.position.y = -TH - IN(0.2); g.add(cap);
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.5), IN(0.7), IN(0.6), 8), bronze); cap.position.y = -TH - IN(0.2); cap.userData.noWalk = true; g.add(cap);
       const glints = [];
       for (let i = 0; i < 4; i++) {                                                                               // sparkles that wink on its face
         const gl2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xffffff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
@@ -3256,7 +3322,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         gl2.position.set(Math.cos(a) * R * 1.02, -TH - R + Math.sin(e) * R, -Math.abs(Math.sin(a)) * R * 1.02); gl2.scale.setScalar(IN(3)); g.add(gl2);
         glints.push({ gl: gl2, phase: i * 2.3, speed: 1.3 + i * 0.6 });
       }
-      sliderDisco = { g, ball, glints };
+      sliderDisco = { g, ball, glints, R };
     }
     { // daylight through the slider lights up the far end of the room (dims with the room lights, like the others)
       const day = new THREE.PointLight(0xfff3dc, 0.4, 13, 1.6); day.position.set(DX, FT(5), VD - FT(2)); scene.add(day); roomLights.push({ l: day, base: 0.4 });
@@ -3291,6 +3357,26 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         fy += h * 0.96;
       });
     }
+    { // a wooden console table against the wall past the fireplace: an oak plank top, two drawers with brass knobs, square legs, a shelf below
+      const g = named(new THREE.Group(), 'Wooden table'); g.position.set(WTABLE.x, 0, WTABLE.z); g.rotation.y = Math.PI / 2;   // (its front faces into the room)
+      const L = WTABLE.len, D = WTABLE.dep, H = WTABLE.h, LG = IN(2.5), INS = IN(1.2);
+      const plankTex = canvasTex(256, 64, (c, w, h) => {
+        c.fillStyle = '#a8743f'; c.fillRect(0, 0, w, h);
+        for (let i = 0; i < 90; i++) { c.strokeStyle = `rgba(${Math.random() < 0.5 ? '90,55,25' : '205,155,100'},${0.12 + Math.random() * 0.15})`; c.lineWidth = 0.6 + Math.random(); const y = Math.random() * h; c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(w * 0.3, y + (Math.random() - 0.5) * 6, w * 0.7, y + (Math.random() - 0.5) * 6, w, y + (Math.random() - 0.5) * 4); c.stroke(); }
+        c.fillStyle = 'rgba(60,35,15,.55)'; for (const y of [21, 43]) c.fillRect(0, y, w, 1.2);   // three planks, the grain running their length
+      }, 1, 1);
+      const oak = lam(0x9a6a3a), dark = lam(0x7a5230), brass = new THREE.MeshPhongMaterial({ color: 0xc9a44a, shininess: 90, specular: 0xffffff });
+      BX(g, L, IN(1.5), D, lam(0xffffff, { map: plankTex }), 0, H - IN(0.75), 0).userData.name = 'Wooden table';
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) BX(g, LG, H - IN(1.5), LG, oak, sx * (L / 2 - INS - LG / 2), (H - IN(1.5)) / 2, sz * (D / 2 - INS - LG / 2));
+      const AW = L - INS * 2 - LG, AD = D - INS * 2 - LG;
+      BX(g, AW, IN(5), IN(0.8), oak, 0, H - IN(4), D / 2 - INS - IN(0.4)); BX(g, AW, IN(5), IN(0.8), oak, 0, H - IN(4), -D / 2 + INS + IN(0.4));   // aprons
+      for (const sx of [-1, 1]) BX(g, IN(0.8), IN(5), AD, oak, sx * (L / 2 - INS - IN(0.4)), H - IN(4), 0);
+      for (const dx of [-AW / 4, AW / 4]) {                                                                       // two drawers
+        BX(g, AW / 2 - IN(3), IN(3.6), IN(0.4), dark, dx, H - IN(4), D / 2 - INS + IN(0.2));
+        const kb = new THREE.Mesh(new THREE.SphereGeometry(IN(0.6), 10, 8), brass); kb.position.set(dx, H - IN(4), D / 2 - INS + IN(0.8)); g.add(kb);
+      }
+      BX(g, L - INS * 2 - LG * 0.5, IN(1), D - INS * 2 - LG * 0.5, oak, 0, IN(7), 0);                            // the shelf below
+    }
     { // litter box in the corner past the fireplace, by the slider: a grey tray of litter with a scoop
       const g = named(new THREE.Group(), 'Litter box'); g.position.set(-hw + IN(9.5), 0, VD - IN(12.5)); g.rotation.y = Math.PI / 2;
       const plastic = new THREE.MeshPhongMaterial({ color: 0x9fb2bd, shininess: 50, specular: 0x444444 }), L = IN(22), Wd = IN(16), H = IN(6), T = IN(0.5);
@@ -3301,16 +3387,21 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const scoop = new THREE.Group(); scoop.position.set(L / 2 + IN(4), IN(0.4), Wd / 2 - IN(3)); scoop.rotation.y = 0.5; g.add(scoop);
       const green = lam(0x5fbf6a); BX(scoop, IN(5), IN(0.4), IN(4.5), green, 0, 0, 0); BX(scoop, IN(6), IN(0.5), IN(1.2), green, -IN(5), 0, 0);
     }
-    { // cat tree right in front of the slider glass (the fixed panel, under the little disco ball): a dark cube condo with a round doorway, two orange sisal posts, a side step,
+    { // cat tree in front of the sliding panel, beside the litter box (the little disco ball hangs over it): a dark cube condo with a round doorway, two orange sisal posts, a side step,
       // a middle shelf and an oval top perch in beige carpet (with a pom-pom dangling off the top)
       const g = named(new THREE.Group(), 'Cat tree'), CW = IN(18), CDp = IN(16), CH = IN(20);
-      g.position.set(DX + IN(10), 0, VD - CDp / 2 - IN(5.5));
+      g.position.set(TREE_X, 0, TREE_Z);
       const condo = lam(0x3a332e), carpet = lam(0xd6c9b2), carpet2 = lam(0xc7b99f);
       const sisalTex = canvasTex(32, 64, (c, w, h) => { c.fillStyle = '#d9974c'; c.fillRect(0, 0, w, h); c.fillStyle = '#a86a2e'; for (let y = 0; y < h; y += 4) c.fillRect(0, y, w, 1.5); c.fillStyle = 'rgba(255,230,180,.25)'; for (let y = 2; y < h; y += 4) c.fillRect(0, y, w, 1); }, 1, 6);
       const sisal = lam(0xffffff, { map: sisalTex });
-      const cube = BX(g, CW, CH, CDp, condo, 0, CH / 2, 0); cube.userData.name = 'Cat condo';
+      const t = IN(0.75), DR = IN(5), DY0 = IN(1), DY1 = IN(10);                                            // wall thickness; an arched doorway she fits through
+      const front = new THREE.Shape(); front.moveTo(-CW / 2, 0); front.lineTo(CW / 2, 0); front.lineTo(CW / 2, CH); front.lineTo(-CW / 2, CH); front.lineTo(-CW / 2, 0);
+      const arch = new THREE.Path(); arch.moveTo(-DR, DY0); arch.lineTo(DR, DY0); arch.lineTo(DR, DY1); arch.absarc(0, DY1, DR, 0, Math.PI, false); arch.lineTo(-DR, DY0); front.holes.push(arch);
+      const fm = new THREE.Mesh(new THREE.ExtrudeGeometry(front, { depth: t, bevelEnabled: false, curveSegments: 18 }), condo); fm.position.z = -CDp / 2; fm.userData.name = 'Cat condo'; g.add(fm);
+      for (const [w, h, d, x, y, z] of [[CW, CH, t, 0, CH / 2, CDp / 2 - t / 2], [t, CH, CDp, -CW / 2 + t / 2, CH / 2, 0], [t, CH, CDp, CW / 2 - t / 2, CH / 2, 0], [CW, t, CDp, 0, CH - t / 2, 0], [CW, t, CDp, 0, t / 2, 0]]) BX(g, w, h, d, condo, x, y, z).userData.name = 'Cat condo';
+      const pad = new THREE.Mesh(new THREE.CylinderGeometry(IN(7), IN(7), IN(1), 20), lam(0xe9e1d3)); pad.scale.z = 0.8; pad.position.set(0, t + IN(0.5), IN(1)); pad.userData.name = 'Nap cushion'; g.add(pad);
+      catCondo = { box: new THREE.Box3(new THREE.Vector3(TREE_X - CW / 2 + t, -0.1, TREE_Z - CDp / 2 + t), new THREE.Vector3(TREE_X + CW / 2 - t, CH - t, TREE_Z + CDp / 2 - t)), door: new THREE.Vector3(TREE_X, 0, TREE_Z - CDp / 2) };
       BX(g, CW + IN(0.4), IN(0.8), CDp + IN(0.4), carpet2, 0, CH + IN(0.4), 0);                                   // carpet on the roof
-      const door = new THREE.Mesh(new THREE.CircleGeometry(IN(4.2), 22), basic(0x120e0b)); door.rotation.y = Math.PI; door.position.set(0, CH * 0.42, -CDp / 2 - 0.004); g.add(door);   // doorway, facing the room
       const T = CH + IN(0.8);                                                                                     // top of the condo
       const post = (x, z, y0, y1) => { const p = new THREE.Mesh(new THREE.CylinderGeometry(IN(2), IN(2), y1 - y0, 16), sisal); p.position.set(x, (y0 + y1) / 2, z); p.userData.name = 'Sisal post'; g.add(p); return p; };
       const step = BX(g, IN(12), IN(1.5), IN(13), carpet, CW / 2 + IN(6), T - IN(0.75), -IN(0.5)); step.userData.name = 'Cat tree step';   // a step off the side of the condo
@@ -3551,7 +3642,7 @@ function burnPaw() {
   updateHud(); checkEnd();
 }
 function resetFire() { const f = fireRig; if (!f) return; f.level = f.target = f.blow = 0; f.fly = null; f.ember.visible = false; f.g.visible = false; f.light.intensity = 0; }
-function resetRoomFx() { setRoomMode(0); lightF = 1; danceUntil = 0; raveUntil = 0; }
+function resetRoomFx() { stopDisco(); setRoomMode(0); lightF = 1; danceUntil = 0; raveUntil = 0; }
 SECT = 'TV remote';
 { // the TV remote, lying on the right sofa's seat
   const rm = new THREE.Group(); rm.position.set(ROOM.halfW - COUCH_DEPTH + IN(9), IN(18.3), COUCH_RIGHT_Z0 + FT(2.85) * 1.5); rm.rotation.y = 0.5; rm.scale.setScalar(1.7); scene.add(rm);   // middle cushion, near the front
@@ -4291,7 +4382,8 @@ class Mouse {
     if (this.pointer) this.pointer.visible = this.kind === 'laser';
     if (this.kind === 'laser') this.willRetreat = false;               // it never just ducks back in: it comes out to play
     if (this.kind === 'karen' && !this.karenHair) this.karenHair = makeKarenHair(this.model);
-    if (this.karenHair) this.karenHair.visible = this.kind === 'karen';                          // the paint jar smashed: every mouse comes out a different colour
+    if (this.karenHair) this.karenHair.visible = this.kind === 'karen';
+    for (const e of this.ears) e.parent.scale.setScalar(this.kind === 'karen' ? 0.55 : 1);   // (Karen's ears tucked under that hair)
     this.ring.visible = false;     // coloured threat rings removed; threat reads through size, shadows stay
     this.ringMat.opacity = 0;
     this.setState('emerge');
@@ -4357,7 +4449,7 @@ class Mouse {
         const T = karenTV(); this.pop = 1;
         p.set(T.x, T.top - 0.55 + Math.min(1, this.t / 0.7) * 0.55, T.z); this.root.rotation.y = Math.sin(this.t * 2) * 0.4;
         if (this.t > 0.7 && !this.saidHi) { this.saidHi = true; karenSay(this, 'Excuse me. EXCUSE me!'); }
-        if (this.t > 2.2) { this.jFrom = p.clone(); this.jTo = new THREE.Vector3(CAT_POS.x + 0.95, 0, CAT_POS.z + 1.35); this.setState('kJump'); tone(500, 900, 0.2, 'triangle', 0.04); }
+        if (this.t > 2.2 && !cine) { this.jFrom = p.clone(); this.jTo = new THREE.Vector3(CAT_POS.x + 0.95, 0, CAT_POS.z + 1.35); this.setState('kJump'); tone(500, 900, 0.2, 'triangle', 0.04); }
         break;
       }
       case 'kJump': {                                                  // ...and jumps down to march up to the cat
@@ -4651,6 +4743,8 @@ const ACHIEVEMENTS = [
     ['fishCatch', '🐟', 'Gone fishing', 'Catch 5 hallucinated fish in one trip'],
     ['mirrorEnter', '🪞', 'Mirror, mirror', 'In Free walk, jump into a mirror'],
     ['karen', '💇‍♀️', 'Complaint dismissed', 'Vanquish the Karen mouse (rare: she turns up around 3,000 points)'],
+    ['discoFever', '🕺', 'Disco fever', 'In Free walk, leap onto the little disco ball hanging on the slider'],
+    ['catNap', '😴', 'Cat nap', 'In Free walk, curl up for a nap in the cat tree condo'],
     ['darkKitty', '😈', 'Through the looking glass', 'Beat the evil dark kitty in the mirror world (9 hits)'],
     ['inception', '🪆', 'Game-ception', 'Win the kart race, then beat the game on the driver\'s Switch'],
   ]],
@@ -4663,7 +4757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 19:37';                                              // stamped when the site is published
+const BUILD = '2026-09-24 20:25';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5091,14 +5185,23 @@ let cine = null;
 function startCutscene(m) {
   cine = { m, t: 0, fromPos: camBase.clone(), fromLook: camTarget.clone(), look: new THREE.Vector3(), pos: new THREE.Vector3(), roared: false };
   state = 'cutscene'; camera.clearViewOffset(); ui.hud.hidden = true;
-  const bars = document.createElement('div'); bars.className = 'cine'; bars.id = 'cineBars'; bars.innerHTML = '<i></i><i></i><b>' + (m.bossLevel ? 'The Rat King returns!' : 'The Rat King') + '</b>'; document.body.appendChild(bars);
-  sfx.bossHorn();
+  const bars = document.createElement('div'); bars.className = 'cine'; bars.id = 'cineBars'; bars.innerHTML = '<i></i><i></i><b>' + (m.kind === 'karen' ? 'Uh oh... it\'s Karen' : m.bossLevel ? 'The Rat King returns!' : 'The Rat King') + '</b>'; document.body.appendChild(bars);
+  if (m.kind === 'karen') { noise(0.25, 0.18, 2600); tone(900, 110, 0.32, 'sawtooth', 0.05); hush(); } else sfx.bossHorn();   // (Karen: a record scratch)
 }
 function updateCutscene(dt) {
   const c = cine; if (!c) return;
   c.t += dt;
-  const m = c.m, p = m.root.position, T = 3.6;
+  const m = c.m, p = m.root.position, karen = m.kind === 'karen', T = karen ? 5.4 : 3.6;
   m.update(dt * 0.9, clock);                                          // he climbs out of his hole while we watch...
+  if (karen) {                                                        // Karen rises up behind the TV, the camera pushes in on her face, and she has her say
+    if (!c.dir) { const f = new THREE.Vector3(0, 0, 1), toCam = c.fromPos.clone().sub(p).setY(0).normalize(); c.dir = f.multiplyScalar(0.7).addScaledVector(toCam, 0.3).normalize(); }
+    const close = p.clone().addScaledVector(c.dir, 1.9).setY(p.y + 0.75), eye = p.clone().setY(p.y + 0.42);
+    const k = c.t < 0.9 ? easeInOut(c.t / 0.9) : c.t < T - 0.8 ? 1 : easeInOut(Math.max(0, (T - c.t) / 0.8));
+    camBase.lerpVectors(c.fromPos, close, k); c.look.lerpVectors(c.fromLook, eye, k);
+    if (!c.said && c.t > 2.4) { c.said = true; karenSay(m, "I don't appreciate you whacking my mouse friends!"); }
+    if (c.t >= T) endCutscene();
+    return;
+  }
   if (m.state !== 'emerge' && m.state !== 'peek') { if (!c.hold) c.hold = m.root.position.clone(); m.root.position.copy(c.hold); }   // ...but gets no head start
   const toCam = c.fromPos.clone().sub(p).setY(0).normalize(), face = new THREE.Vector3(Math.sin(m.root.rotation.y), 0, Math.cos(m.root.rotation.y));
   const dir = face.multiplyScalar(0.75).addScaledVector(toCam, 0.25).normalize();   // stand in front of his face
@@ -5283,6 +5386,7 @@ function rollBlocked(x, z) {
   if (Math.abs(x - CAT_POS.x) < BOX.w / 2 + R && Math.abs(z - CAT_POS.z) < BOX.d / 2 + R) return true;
   if (z < IN(22) + R) return true;
   if (Math.abs(x - ARMCHAIR.x) < ARMCHAIR.half + R && Math.abs(z - ARMCHAIR.z) < ARMCHAIR.half + R) return true;   // the armchair in the back corner
+  if (x < WTABLE.x + WTABLE.dep / 2 + R && Math.abs(z - WTABLE.z) < WTABLE.len / 2 + R) return true;               // the wooden table past the fireplace
   return false;
 }
 
@@ -5944,19 +6048,44 @@ function resetCatnip() {
    demands to speak to the manager; two more hits and she's gone. Leave her be and she storms off.
    ===================================================================== */
 const KAREN_CHANCE = 0.2;
-const KAREN_LECTURE = ['Stop hitting the mice this instant!', 'This is a mouse-friendly household!', 'Do you know who I am?', "I'm writing all of this down.", 'Absolutely unacceptable behaviour!'];
+const KAREN_LECTURE = ['Stop hitting the mice this instant!', "I don't appreciate you whacking my mouse friends!", 'Do you know who I am?', "I'm writing all of this down.", 'Absolutely unacceptable behaviour!'];
 const KAREN_RANT = ['LET ME SPEAK TO A MANAGER!', 'I WANT YOUR MANAGER! NOW!', 'Where is your SUPERVISOR?!'];
 const karenState = { rolled: false, pending: false };
-function makeKarenHair(model) {                                       // the haircut: a sleek angled bob, one side longer, spiky stacked back, highlights, and pearls
+function makeKarenHair(model) {                                       // THE haircut: an asymmetric A-line bob (long at the front, short at the back) with a
+  // stacked spiky back, chunky platinum / honey / brown foils over a dark underlayer, a heavy side-swept fringe, big dark sunglasses and spiral earrings
   const g = new THREE.Group(); model.add(g);
-  const blonde = new THREE.MeshPhongMaterial({ color: 0xe6c46a, shininess: 60, specular: 0x665522 }), low = lam(0xa88838), hi = lam(0xfff0b8);
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.23, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), blonde); cap.position.set(0, 0.4, 0.32); cap.scale.set(1.12, 0.95, 1.18); g.add(cap);
-  const longSide = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), blonde); longSide.scale.set(0.55, 1.35, 1.2); longSide.position.set(-0.2, 0.3, 0.38); longSide.rotation.z = 0.25; g.add(longSide);
-  const shortSide = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), blonde); shortSide.scale.set(0.55, 0.9, 1.05); shortSide.position.set(0.19, 0.37, 0.35); g.add(shortSide);
-  const sweep = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), blonde); sweep.scale.set(1.5, 0.45, 0.8); sweep.position.set(-0.06, 0.52, 0.47); sweep.rotation.z = 0.35; g.add(sweep);   // the side-swept fringe
-  for (let i = 0; i < 6; i++) { const sp = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.16, 6), i % 2 ? low : blonde); const a = (i - 2.5) * 0.28; sp.position.set(Math.sin(a) * 0.12, 0.52 + Math.cos(i) * 0.02, 0.14); sp.rotation.set(-1.9, 0, -a * 0.8); g.add(sp); }   // spiky stacked back
-  for (let i = 0; i < 4; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.012, 0.22), hi); st.position.set(-0.1 + i * 0.065, 0.61 - Math.abs(i - 1.5) * 0.015, 0.32); g.add(st); }   // highlights
-  for (let i = 0; i < 9; i++) { const a = (i / 8 - 0.5) * 2.2, pl = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), new THREE.MeshPhongMaterial({ color: 0xfdfaf2, shininess: 120, specular: 0xffffff })); pl.position.set(Math.sin(a) * 0.17, 0.2 - Math.cos(a) * 0.03, 0.42 + Math.cos(a) * 0.08); g.add(pl); }   // pearls
+  const streakTex = canvasTex(256, 64, (c, w, h) => {
+    const pal = ['#f6ecd2', '#fbf5e4', '#e2c98f', '#cfa968', '#f0dfb4', '#8a6442', '#fff8ea', '#d9bb7a', '#b98d58'];
+    let x = 0; while (x < w) { const bw = 5 + Math.random() * 14; c.fillStyle = pal[Math.random() * pal.length | 0]; c.fillRect(x, 0, bw + 1, h); x += bw; }   // chunky foils
+    for (let i = 0; i < 260; i++) { c.strokeStyle = Math.random() < 0.5 ? 'rgba(255,255,255,.25)' : 'rgba(90,60,30,.2)'; c.lineWidth = 0.7; const sx = Math.random() * w; c.beginPath(); c.moveTo(sx, 0); c.lineTo(sx + (Math.random() - 0.5) * 6, h); c.stroke(); }   // fine strands
+  }, 1, 1);
+  const hair = new THREE.MeshPhongMaterial({ map: streakTex, shininess: 45, specular: 0x554433, side: THREE.DoubleSide });
+  const cream = lam(0xf6ecd2), honey = lam(0xd9b36a), brown = lam(0x8a6442), under = lam(0x3e2a1c);
+  const M = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
+  const bob = new THREE.Group(); bob.position.set(0, 0.37, 0.32); bob.rotation.x = 0.62; g.add(bob);   // tipped forward: the front drops to the jaw, the back rides up short
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.235, 32, 18, Math.PI * 0.72, Math.PI * 1.56, 0, Math.PI * 0.74), hair); shell.scale.set(1.2, 1.1, 1.22); bob.add(shell);   // open at the face
+  const nape = M(new THREE.SphereGeometry(0.212, 20, 10, Math.PI * 1.08, Math.PI * 0.84, Math.PI * 0.42, Math.PI * 0.36), under, 0, 0.36, 0.3); nape.scale.set(1.12, 1.05, 1.16);   // dark underneath
+  M(new THREE.SphereGeometry(0.17, 16, 12), hair, 0, 0.6, 0.22).scale.set(1.25, 0.8, 1.1);                                      // volume stacked at the crown
+  for (let row = 0; row < 2; row++) for (let i = 0; i < 9; i++) {                                                                // choppy spiky layers flicking out at the back
+    const a = (i / 8 - 0.5) * 2.3, sp = M(new THREE.ConeGeometry(0.042, 0.19, 5), [cream, honey, brown, cream, honey][(i + row) % 5], Math.sin(a) * (0.16 - row * 0.03), 0.6 - row * 0.09 - Math.abs(a) * 0.04, 0.13 - row * 0.03 - Math.cos(a) * 0.05);
+    sp.rotation.set(-1.25 - row * 0.2 - Math.random() * 0.2, 0, -a * 0.5);
+  }
+  const fringe = M(new THREE.SphereGeometry(0.13, 16, 12), hair, -0.03, 0.53, 0.53); fringe.scale.set(1.7, 0.52, 0.72); fringe.rotation.set(0.35, 0, 0.3);   // heavy side-swept fringe...
+  const swoop = M(new THREE.SphereGeometry(0.075, 12, 10), hair, -0.16, 0.47, 0.57); swoop.scale.set(0.95, 1.15, 0.55); swoop.rotation.z = 0.45;             // ...swooping down over one lens
+  const frameM = new THREE.MeshPhongMaterial({ color: 0x8a5a78, shininess: 80, specular: 0xffffff }), lensM = new THREE.MeshPhongMaterial({ color: 0x140e12, shininess: 150, specular: 0xbb99bb });
+  const silver = new THREE.MeshPhongMaterial({ color: 0xe6e8ec, shininess: 120, specular: 0xffffff });
+  for (const sx of [-1, 1]) {                                                                                                    // oversized dark sunglasses, thin mauve frames
+    const lg = new THREE.Group(); lg.position.set(sx * 0.105, 0.44, 0.6); lg.rotation.set(-0.1, sx * 0.5, 0); g.add(lg);
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.078, 28), lensM); lens.scale.set(1.2, 0.92, 1); lg.add(lens);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.008, 6, 28), frameM); rim.scale.set(1.2, 0.92, 1); lg.add(rim);
+    const arm = M(new THREE.BoxGeometry(0.012, 0.016, 0.28), frameM, sx * 0.19, 0.455, 0.44); arm.rotation.y = sx * 0.25;
+    const pts = []; for (let i = 0; i <= 40; i++) { const a = i / 40 * Math.PI * 6; pts.push(new THREE.Vector3(Math.cos(a) * 0.012, -i / 40 * 0.075, Math.sin(a) * 0.012)); }   // spiral earrings
+    const coil = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, 0.0035, 5), silver); coil.position.set(sx * 0.225, 0.2, 0.33); g.add(coil);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.014, 0.0045, 6, 16), silver); ring.position.set(sx * 0.225, 0.115, 0.33); ring.rotation.y = Math.PI / 2; g.add(ring);
+  }
+  const bridge = M(new THREE.CylinderGeometry(0.007, 0.007, 0.05, 6), frameM, 0, 0.455, 0.64); bridge.rotation.z = Math.PI / 2;
+  const pearl = new THREE.MeshPhongMaterial({ color: 0xfdfaf2, shininess: 120, specular: 0xffffff });
+  for (let i = 0; i < 9; i++) { const a = (i / 8 - 0.5) * 2.2; M(new THREE.SphereGeometry(0.022, 8, 6), pearl, Math.sin(a) * 0.17, 0.2 - Math.cos(a) * 0.03, 0.42 + Math.cos(a) * 0.08); }   // pearls
   return g;
 }
 function karenTV() { const b = new THREE.Box3().setFromObject(screen); return { x: (b.min.x + b.max.x) / 2 + 0.25, top: b.max.y, z: (b.min.z + b.max.z) / 2 - 0.05 }; }
@@ -5971,8 +6100,9 @@ function checkKaren() {
   if (!karenState.pending || mice.some(x => x.active && (x.boss || x.kind === 'karen'))) return;
   const m = spawnMouse({ safe: true, kind: 'karen' }); if (!m) return;
   karenState.pending = false;
-  Object.assign(m, { hp: 3, karenMad: false, karenLine: '', lineI: 0, lineT: 0, saidHi: false, willRetreat: false });
+  Object.assign(m, { hp: 2, karenMad: false, karenLine: '', lineI: 0, lineT: 0, saidHi: false, willRetreat: false });
   const T = karenTV(); m.root.position.set(T.x, T.top - 0.55, T.z); m.root.rotation.y = 0; m.setState('kRise');
+  startCutscene(m);                                                   // everything stops: close-up on Karen
 }
 function hurtKaren(m) {                                              // true once she's vanquished
   m.hp--; m.hitT = 0.3; m.sqY = 0.7; m.sqXZ = 1.2; burst(m.center.clone().setY(0.7), 0xe6c46a, 8, 2.4, 3, 0.5); sfx.squeak(3);
@@ -5988,7 +6118,7 @@ function hurtKaren(m) {                                              // true onc
 function updateKarenBubble() {
   const el = document.getElementById('karenBubble'); if (!el) return;
   const m = mice.find(x => x.active && x.kind === 'karen' && x.state !== 'whacked' && x.state !== 'retreat' && x.karenLine);
-  if (!m || (state !== 'playing' && state !== 'ending')) { if (!el.hidden) el.hidden = true; return; }
+  if (!m || (state !== 'playing' && state !== 'ending' && state !== 'cutscene')) { if (!el.hidden) el.hidden = true; return; }
   const v = m.root.position.clone().setY(m.root.position.y + 1.25 * Math.max(0.6, m.visScale)).project(camera);
   if (v.z > 1) { el.hidden = true; return; }
   el.hidden = false; if (el.textContent !== m.karenLine) el.textContent = m.karenLine; el.classList.toggle('mad', m.state === 'kRant' || /[A-Z]{5}/.test(m.karenLine));
@@ -6558,9 +6688,25 @@ function scheduleRave() {
     musicNext += six; musicStep++;
   }
 }
+function scheduleDisco() {                                            // 118 bpm disco: four on the floor, open hats on the off-beat, an octave-bouncing bass, funky stabs, a string swell
+  const six = 60 / 118 / 4;
+  if (musicNext < actx.currentTime) musicNext = actx.currentTime + 0.05;
+  while (musicNext < actx.currentTime + 0.25) {
+    const t = musicNext, st = musicStep % 16, bar = Math.floor(musicStep / 16) % 4, root = [45, 45, 50, 52][bar];
+    if (st % 4 === 0) rKick(t);
+    if (st === 4 || st === 12) rNoise(t, 0.18, 0.28, 'bandpass', 1600, 0.8);                                   // clap
+    if (st % 4 === 2) rNoise(t, 0.16, 0.11, 'highpass', 7000); else if (st % 2 === 1) rNoise(t, 0.03, 0.03, 'highpass', 9000);
+    if (st % 2 === 0) rSynth(root - 12 + (st % 4 === 2 ? 12 : 0), t, six * 1.7, 'sawtooth', 0.2, 420, 3);    // octave bass
+    if (st % 4 === 2) { const ch = [[57, 60, 64], [57, 60, 64], [57, 62, 65], [56, 59, 64]][bar]; for (const n of ch) rSynth(n + 12, t, 0.14, 'square', 0.02, 2400, 2); }   // funky stabs
+    if (st === 0 && bar % 2 === 0) for (const n of [69, 72, 76]) cPad(n, t, six * 30, 0.018);                  // string swell
+    if (st === 14 && bar === 3) cGlide(600, 1500, t, 0.35, 0.04);                                              // whoop!
+    musicNext += six; musicStep++;
+  }
+}
 function scheduleMusic() {
   if (!actx || !soundOn || (state !== 'playing' && state !== 'ending')) { musicNext = 0; return; }
   if (!musicBus) { musicBus = actx.createGain(); musicBus.gain.value = MUSIC.VOL; musicBus.connect(actx.destination); }
+  if (disco.on) { scheduleDisco(); return; }                          // disco fever brings its own record
   if (catnip.active) { scheduleCatnipMusic(); return; }               // each catnip effect has its own soundtrack (played even with the music off: it's part of the trip)
   if (!musicOn) { musicNext = 0; return; }
   if (roomMode === 2) { scheduleRave(); return; }
@@ -6924,12 +7070,14 @@ function makeWalker(dark) {                                          // dark = t
   add(new THREE.SphereGeometry(0.16, 18, 14), fur, 0, 0, 0, head).scale.set(1.08, 0.95, 0.98);
   add(new THREE.SphereGeometry(0.08, 14, 10), point, 0, -0.058, 0.128, head).scale.set(1.15, 0.8, 0.9);   // her darker muzzle
   add(new THREE.SphereGeometry(0.018, 8, 6), pink, 0, -0.022, 0.198, head);                           // nose
+  const peepers = [], lids = [];                                       // (her eyes, and the closed ones she shows when she naps)
   for (const sx of [-1, 1]) {
     const ear = add(new THREE.ConeGeometry(0.066, 0.15, 4), point, sx * 0.095, 0.14, -0.01, head); ear.rotation.set(-0.08, Math.PI / 4, -sx * 0.32);
     const inner = add(new THREE.ConeGeometry(0.038, 0.09, 4), pink, sx * 0.092, 0.126, 0.016, head); inner.rotation.copy(ear.rotation);
-    add(new THREE.SphereGeometry(0.036, 12, 10), eyeM, sx * 0.07, 0.018, 0.132, head).scale.z = 0.75;   // blue eyes
-    add(new THREE.SphereGeometry(0.021, 8, 8), pupil, sx * 0.071, 0.018, 0.155, head).scale.set(0.42, 1, 0.4);
-    add(new THREE.SphereGeometry(0.007, 6, 5), basic(0xffffff), sx * 0.062, 0.03, 0.162, head);   // catchlight
+    const ey = add(new THREE.SphereGeometry(0.036, 12, 10), eyeM, sx * 0.07, 0.018, 0.132, head); ey.scale.z = 0.75; peepers.push(ey);   // blue eyes
+    const pu = add(new THREE.SphereGeometry(0.021, 8, 8), pupil, sx * 0.071, 0.018, 0.155, head); pu.scale.set(0.42, 1, 0.4); peepers.push(pu);
+    peepers.push(add(new THREE.SphereGeometry(0.007, 6, 5), basic(0xffffff), sx * 0.062, 0.03, 0.162, head));   // catchlight
+    const lid = add(new THREE.TorusGeometry(0.03, 0.0065, 4, 12, Math.PI), point, sx * 0.07, 0.012, 0.15, head); lid.rotation.z = Math.PI; lid.visible = false; lids.push(lid);   // closed eyes (for naps)
   }
   const crown = new THREE.Group(); crown.position.set(0, 0.15, -0.015); crown.rotation.x = -0.14; head.add(crown);   // she is a princess
   add(new THREE.CylinderGeometry(0.058, 0.062, 0.03, 16, 1, true), gold, 0, 0, 0, crown);
@@ -6956,7 +7104,7 @@ function makeWalker(dark) {                                          // dark = t
     const e = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0x19e6d0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     e.position.set(sx * 0.07, 0.02, 0.15); e.scale.setScalar(0.14); head.add(e); eyes.push(e);
   }
-  return { g, body, head, legs, tail, shadow, eyes };
+  return { g, body, head, legs, tail, shadow, eyes, peepers, lids };
 }
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY + 0.5;
@@ -6991,9 +7139,17 @@ function sideBlocked(x, z, y, mx, mz, scale) {
   }
   return false;
 }
+const _tvB = new THREE.Box3(), _nap = new THREE.Vector3();
+function tvHits(x, z, face, y) {                                      // the TV is a thin panel: count how much of her (nose, middle, rump) is inside its solid box
+  _tvB.setFromObject(tvPanel); if (y + WALK.height < _tvB.min.y || y + 0.05 > _tvB.max.y) return 0;
+  const fx = Math.sin(face), fz = Math.cos(face), M = 0.15; let n = 0;
+  for (const k of [-0.3, 0, 0.3]) { const px = x + fx * k, pz = z + fz * k; if (px > _tvB.min.x - M && px < _tvB.max.x + M && pz > _tvB.min.z - M && pz < _tvB.max.z + M) n++; }
+  return n;
+}
 function walkBlocked(nx, nz, ox, oz) {
   const p = walk.pos, lim = p.y + (walk.grounded ? WALK.step : 0.05), top = p.y + WALK.height;
   const mx = nx - ox, mz = nz - oz, face = mx || mz ? Math.atan2(mx, mz) : walk.face;   // (she turns to face where she's going)
+  if (tvHits(nx, nz, face, p.y) > tvHits(ox, oz, walk.face, p.y)) return true;
   if (sideBlocked(ox, oz, p.y, mx, mz)) return true;
   const now = walk.nowHits != null ? walk.nowHits : bodyHits(ox, oz, walk.face, lim, top);
   const next = Math.max(bodyHits(nx, nz, face, lim, top), bodyHits(nx, nz, walk.face, lim, top));   // both the way she's heading and the way she's still facing mid-turn
@@ -7026,6 +7182,7 @@ function startWalk() {
   showBanner('Free walk!'); camToast('Stick to walk · Jump to leap · drag to look · tap anything', 4200);
 }
 function endWalk() {
+  stopDisco(); walk.napT = 0;
   walk.on = false; walkPtr = null; walk.stick.x = walk.stick.y = 0;
   if (walk.poops) { walk.poops.forEach(o => scene.remove(o)); walk.poops = []; }
   if (mirrorWorld || MW.trans) exitMirror(null, true);
@@ -7076,7 +7233,8 @@ function updateWalk(dt) {
     walk.vy -= WALK.grav * nipK().grav * dt;                          // (slow-mo catnip: moon gravity)
     const cap = CEIL_H - WALK.height - 0.05;
     let ny = p.y + walk.vy * dt; if (ny > cap) { ny = cap; walk.vy = Math.min(walk.vy, 0); }
-    if (walk.vy <= 0) {
+    if (walk.vy <= 0 && discoCatch(ny)) walk.vy = 0;
+    else if (walk.vy <= 0) {
       const g = surfaceTop(p.x, p.z, p.y + 0.02);
       if (ny <= g) { p.y = g; walk.vy = 0; walk.grounded = true; walk.squash = 1; sfx.padThud(0.35); walkLanded(); } else p.y = ny;
     } else p.y = ny;
@@ -7104,6 +7262,14 @@ function updateWalk(dt) {
   const inBox = walk.grounded && p.y < BOX.h * 0.5 && Math.abs(p.x - CAT_POS.x) < BOX.w / 2 - 0.1 && Math.abs(p.z - CAT_POS.z) < BOX.d / 2 - 0.1;
   if (inBox && !walk.inBox) { unlock('boxJump'); showWalkName('Home sweet box!'); tailWag = 2; }
   walk.inBox = inBox;
+  // a nap in the cat tree's condo: curl up on the cushion in there and she dozes off (any move wakes her)
+  const cc = catCondo, snug = cc && walk.grounded && cc.box.containsPoint(_nap.set(p.x, p.y + 0.1, p.z));
+  if (snug && Math.hypot(sx, sy) < 0.3 && walk.jumpQ < 0 && spd < 0.4) {
+    walk.napT = (walk.napT || 0) + dt;
+    if (walk.napT >= 1 && walk.napT - dt < 1) { showWalkName('💤 Nap time in the cat condo...'); walk.face = Math.PI; fc.yaw = Math.PI; walk.zzzT = 0; }   // she turns round to face out, and we peek in through the doorway
+    if (walk.napT >= 1) { walk.zzzT -= dt; if (walk.zzzT <= 0) { walk.zzzT = 1.7; floatText(cc.door.clone().setY(0.95), 'Zzz', 'name'); tone(70, 62, 1.1, 'sine', 0.025); } }
+    if (walk.napT > 5) unlock('catNap');
+  } else if (walk.napT) { if (walk.napT >= 1) showWalkName('*streeetch* ...what a lovely nap'); walk.napT = 0; }
   // bumping into things: anything loose she walks or jumps into gets knocked flying (off the mantle, the credenza, the sofa...)
   if (spd > 0.6 || !walk.grounded) {
     const fx0 = Math.sin(walk.face), fz0 = Math.cos(walk.face), bx = p.x + fx0 * 0.2, bz = p.z + fz0 * 0.2;
@@ -7152,6 +7318,14 @@ function updateWalk(dt) {
   catTail.visible = false;
   W.head.rotation.y = walk.look && spd < 0.25 ? THREE.MathUtils.clamp(Math.atan2(walk.look.x - p.x, walk.look.z - p.z) - walk.face, -0.6, 0.6) * 0.5 : 0;
   W.tail.forEach((sg, i) => { sg.rotation.x = (i ? 0.2 : 0.75) + (walk.grounded ? 0 : 0.15); sg.rotation.y = Math.sin(clock * (spd > 0.3 ? 5 : 2.2) - i * 0.55) * (0.1 + i * 0.03); });
+  if (walk.napT > 1) {                                                // asleep: tucked into a loaf, chin down, tail wrapped round, eyes shut, slow breaths
+    const k = Math.min(1, (walk.napT - 1) / 0.8);
+    W.body.position.y -= 0.24 * k; W.body.rotation.x = 0; W.body.scale.y *= 1 + Math.sin(clock * 1.8) * 0.03 * k;
+    W.legs[0].rotation.x = W.legs[1].rotation.x = -1.35 * k; W.legs[2].rotation.x = W.legs[3].rotation.x = 1.35 * k;
+    W.head.rotation.x = 0.5 * k;
+    W.tail.forEach((sg, i) => { sg.rotation.x = (i ? 0.05 : 1.2) * k + sg.rotation.x * (1 - k); sg.rotation.y = 0.45 * k; });
+    W.peepers.forEach(e => { e.visible = k < 0.5; }); W.lids.forEach(l => { l.visible = k >= 0.5; });
+  } else if (W.lids[0].visible) { W.peepers.forEach(e => { e.visible = true; }); W.lids.forEach(l => { l.visible = false; }); }
   const gy = surfaceTop(p.x, p.z, p.y + 0.05), hgt = p.y - gy;
   W.shadow.position.set(p.x, gy + 0.012, p.z); W.shadow.rotation.z = -walk.face; W.shadow.scale.set(1, 1.5, 1).multiplyScalar(1 / (1 + hgt * 0.4)); W.shadow.material.opacity = 0.25 / (1 + hgt);
   W.shadow.visible = !walk.fp;
@@ -7197,7 +7371,7 @@ function walkName(h) {                                               // what did
    mirror any time to escape.
    ===================================================================== */
 let mirrorWorld = false;
-const MW = { dk: null, hp: 9, you: 5, portalCD: 0, hurtT: 0, done: false };
+const MW = { dk: null, hp: 9, you: 5, portalCD: 0, hurtT: 0, done: false, perch: new THREE.Vector3(CAT_POS.x, BOX.h - 0.16, CAT_POS.z + BOX.d / 2 - 0.1) };   // perch: sitting on the front edge of the box
 function mirrorPortals() {                                            // only the mirror over the fireplace is a way through
   const mm = mantleMirror; if (!mm) return [];
   if (mm.state === 'wall') { MW.homeBox = new THREE.Box3().setFromObject(mm.mh).expandByScalar(0.15); return [MW.homeBox]; }
@@ -7211,21 +7385,21 @@ function mirrorHud() {
 }
 function mirrorFlash(kind) { const el = document.getElementById('mirrorFlash'); el.className = ''; void el.offsetWidth; el.className = kind; }
 function shimmer() { [1568, 1319, 1047, 784, 1175, 1568, 2093].forEach((f, i) => tone(f, f * 1.02, 0.35, 'sine', 0.035, i * 0.05)); noise(0.5, 0.05, 5000); }
-function throughMirror() {                                           // step through: she comes out facing back into the room
+function throughMirror() {                                           // step through: she comes out on the mantle on the other side, facing back into the room
   MW.portalCD = 1.6;
-  const fx = Math.sin(walk.face), fz = Math.cos(walk.face), p = walk.pos;
-  p.x = THREE.MathUtils.clamp(p.x - fx * 0.8, -ROOM.halfW + 0.3, ROOM.halfW - 0.3); p.z = THREE.MathUtils.clamp(p.z - fz * 0.8, 0.3, ROOM.visDepth - 0.45);
-  p.y = surfaceTop(p.x, p.z, p.y + WALK.step); walk.grounded = true; walk.vy = 0; walk.vel.set(0, 0, 0);
-  walk.face += Math.PI; fc.yaw += Math.PI; fc.s.yaw = fc.yaw;
+  const p = walk.pos;
+  p.set(-ROOM.halfW + (FIRE.d + IN(3.5)) / 2 + 0.02, FIRE.h + IN(3), FIRE.z - 0.32);   // always the same spot: on the mantle shelf, in the gap between the candle and the paint jar
+  walk.grounded = true; walk.vy = 0; walk.vel.set(0, 0, 0);
+  walk.face = Math.PI / 2; fc.yaw = walk.face - 0.75; fc.s.yaw = fc.yaw;   // (camera out in the room at three-quarters, looking back at her with the mirror behind)
 }
 function enterMirror() {
   throughMirror();
   mirrorWorld = true; document.body.classList.add('mirror-world'); unlock('mirrorEnter');
   MW.hp = 9; MW.you = 5; MW.done = false; MW.hurtT = 0; MW.battle = false;
   if (!MW.dk) { MW.dk = { rig: makeWalker(true), pos: new THREE.Vector3(), vel: new THREE.Vector3(), vy: 0, grounded: true, face: 0, state: 'lurk', t: 0, cd: 0, phase: 0 }; MW.dk.rig.g.userData.name = 'Evil dark kitty'; }
-  const d = MW.dk; d.pos.set(CAT_POS.x, surfaceTop(CAT_POS.x, CAT_POS.z, 0.5), CAT_POS.z); d.vel.set(0, 0, 0); d.vy = 0; d.grounded = true; d.state = 'lurk'; d.t = 0; d.cd = 0;
+  const d = MW.dk; d.pos.copy(MW.perch); d.perched = true; d.vel.set(0, 0, 0); d.vy = 0; d.grounded = true; d.state = 'lurk'; d.t = 0; d.cd = 0;
   d.face = Math.atan2(walk.pos.x - d.pos.x, walk.pos.z - d.pos.z); d.rig.g.scale.setScalar(1); d.rig.g.visible = true; d.rig.shadow.visible = true;
-  mirrorHud(); showWalkName('The mirror world... something is waiting in your box');
+  mirrorHud(); showWalkName('The mirror world... something is waiting on your box');
 }
 function exitMirror(msg, quiet) {
   if (!quiet) throughMirror();
@@ -7279,6 +7453,7 @@ function hitDark() {
 function darkBlocked(q, grounded, nx, nz) {
   const lim = q.y + (grounded ? WALK.step : 0.05), top = q.y + WALK.height;
   if (sideBlocked(q.x, q.z, q.y, nx - q.x, nz - q.z, 1)) return true;   // (same feelers as Princess: no running through sofas)
+  const mf = Math.atan2(nx - q.x, nz - q.z); if (tvHits(nx, nz, mf, q.y) > tvHits(q.x, q.z, mf, q.y)) return true;
   if (surfaceTop(q.x, q.z, top) > lim) return false;
   const mx = nx - q.x, mz = nz - q.z, ml = Math.hypot(mx, mz) || 1;
   return surfaceTop(nx, nz, top) > lim || surfaceTop(nx + mx / ml * WALK.reach, nz + mz / ml * WALK.reach, top) > lim;
@@ -7288,14 +7463,15 @@ function updateDarkKitty(dt) {
   const p = walk.pos, q = d.pos, R = d.rig, dx = p.x - q.x, dz = p.z - q.z, dist = Math.hypot(dx, dz) || 0.001, dy = p.y - q.y;
   d.t += dt; d.cd = Math.max(0, d.cd - dt);
   let speed = 0, face = Math.atan2(dx, dz);
+  if (d.perched) face = THREE.MathUtils.clamp(face, -1.1, 1.1);       // perched on the box it only turns its head so far
   switch (d.state) {
-    case 'lurk':                                                     // crouched in the box, eyes on you, until you come close
-      if (dist < 2.8 && !MW.done) { d.state = 'taunt'; d.t = 0; d.said = 0; }
+    case 'lurk':                                                     // resting on the edge of the box, eyes on you, until you come and stand in front of it
+      if (!MW.done && ((dist < 3.0 && dz > 0.35) || dist < 1.3)) { d.state = 'taunt'; d.t = 0; d.said = 0; }
       break;
     case 'taunt':                                                    // rises up in the box and speaks, two lines, then pounces
       if (d.said === 0) { d.said = 1; const l = "I've been waiting for you..."; speak(l, { pitch: 0.45, rate: 0.8 }); showWalkName('😈 ' + l); floatText(q.clone().setY(q.y + 1.5), l, 'name'); tone(110, 80, 1.2, 'sawtooth', 0.04); }
       if (d.said === 1 && d.t > 2.2) { d.said = 2; const l = 'Time to take your place!'; speak(l, { pitch: 0.45, rate: 0.85 }); showWalkName('😈 ' + l); floatText(q.clone().setY(q.y + 1.5), l, 'bad'); }
-      if (d.t > 4.2) { d.state = 'leap'; d.t = 0; d.vy = 9.5; d.grounded = false; d.vel.set(dx / dist * 3.2, 0, dz / dist * 3.2); sfx.meow(true); MW.battle = true; mirrorHud(); }
+      if (d.t > 4.2) { d.state = 'leap'; d.perched = false; d.t = 0; d.vy = 9.5; d.grounded = false; d.vel.set(dx / dist * 3.2, 0, dz / dist * 3.2); sfx.meow(true); MW.battle = true; mirrorHud(); }
       break;
     case 'leap': if (d.grounded && d.t > 0.2) { d.state = 'hunt'; d.t = 0; } break;
     case 'hunt':
@@ -7315,6 +7491,7 @@ function updateDarkKitty(dt) {
   }
   if (d.state === 'dead') return;
   // move (its own little version of her physics: stands on whatever is under it, hops over what blocks it)
+  if (d.perched) q.copy(MW.perch); else {
   const want = _wv.set(dx / dist * speed, 0, dz / dist * speed);
   if (d.state === 'hunt') d.vel.lerp(want, 1 - Math.exp(-dt * 8)); else if (d.grounded) d.vel.multiplyScalar(Math.exp(-dt * 6));
   const mx = d.vel.x * dt, mz = d.vel.z * dt;
@@ -7328,13 +7505,17 @@ function updateDarkKitty(dt) {
     d.vy -= WALK.grav * dt; const ny = Math.min(q.y + d.vy * dt, CEIL_H - WALK.height - 0.05);
     if (d.vy <= 0) { const g = surfaceTop(q.x, q.z, q.y + 0.02); if (ny <= g) { q.y = g; d.vy = 0; d.grounded = true; } else q.y = ny; } else q.y = ny;
   }
+  }
   // look + animate
   let df = face - d.face; df = Math.atan2(Math.sin(df), Math.cos(df)); d.face += df * Math.min(1, dt * (d.state === 'windup' ? 14 : 8));
   const spd = Math.hypot(d.vel.x, d.vel.z), a = Math.min(1, spd / 2); d.phase += dt * (5 + spd * 3.4); const sw = Math.sin(d.phase);
   R.g.position.copy(q); R.g.rotation.y = d.face;
   R.body.rotation.x = 0; R.body.position.y = 0;
   if (d.state === 'taunt') { R.body.position.y = -0.04 + Math.min(1, d.t / 1.5) * 0.04; R.body.rotation.x = -0.35; R.legs[2].rotation.x = R.legs[3].rotation.x = -1.1; R.legs[0].rotation.x = R.legs[1].rotation.x = 0; }   // sitting up tall in the box
-  else if (d.state === 'lurk') {                                          // crouched low in the box, peeking over the rim
+  else if (d.state === 'lurk' && d.perched) {                            // sitting on the front edge of the box, front paws dangling over, breathing slow
+    R.body.position.y = Math.sin(clock * 1.6) * 0.006; R.body.rotation.x = -0.3;
+    R.legs[0].rotation.x = R.legs[1].rotation.x = 0.3; R.legs[2].rotation.x = R.legs[3].rotation.x = -1.25;
+  } else if (d.state === 'lurk') {                                        // crouched low, watching
     R.body.position.y = -0.12; R.body.rotation.x = -0.25;
     R.legs[0].rotation.x = R.legs[1].rotation.x = 0.2; R.legs[2].rotation.x = R.legs[3].rotation.x = -1.1;
   } else if (!d.grounded) { R.legs[0].rotation.x = R.legs[1].rotation.x = -0.9; R.legs[2].rotation.x = R.legs[3].rotation.x = 0.9; R.body.rotation.x = -0.2; }
@@ -7585,7 +7766,7 @@ function frame(now) {
   const lit = flames.filter(f => f.visible).length;
   candleLight.intensity = (0.32 + flick / flames.length * 0.1) * lit / flames.length;
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
-  if (sliderDisco && povEndWall.visible) { sliderDisco.ball.rotation.y = clock * 0.5; sliderDisco.g.rotation.z = Math.sin(clock * 0.7) * 0.025; for (const d of sliderDisco.glints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.7) * 3; }   // the slider's little disco ball turns
+  if (sliderDisco) updateSliderDisco(dt);                              // the slider's little disco ball turns (and runs the disco)
 
   if (povEndWall) povEndWall.visible = camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02;   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
