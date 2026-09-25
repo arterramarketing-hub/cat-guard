@@ -541,7 +541,7 @@ const FIRE_END = 13.3 + (58 + 4) / 15.6 / 2;                              // fro
 const COUCH_DEPTH = 2.1, COUCH_LEFT_Z0 = 3.47, COUCH_RIGHT_Z0 = FIRE_END - 2.85 * 3 / 1.3 - 7 / 15.6;   // its far arm lines up with the hearth   // left sofa + fireplace sit further down their wall; right sofa pushed down to make room for the acrylic table
 const FIRE = { z: 13.3, w: 58 / 15.6, d: 7 / 15.6, h: 46 / 15.6 };   // built in: only 7" proud of the wall   // stone fireplace on the left wall (58" wide, 15" deep, 44" to the mantle)
 const ARMCHAIR = { x: 3.62, z: ROOM.visDepth - 1.5, half: 1.2 };   // the armchair tucked in the back corner (only seen from inside the room)...
-const WTABLE = { x: -ROOM.halfW + 8.5 / 15.6, z: (FIRE_END + ROOM.visDepth - 24 / 15.6) / 2, len: 48 / 15.6, dep: 16 / 15.6, h: 30 / 15.6 };   // wooden console table against the wall past the fireplace
+const WTABLE = { x: -ROOM.halfW + 14.5 / 15.6, z: (FIRE_END + ROOM.visDepth - 24 / 15.6) / 2, len: 66 / 15.6, dep: 28 / 15.6, h: 30 / 15.6 };   // plank table on hairpin legs against the wall past the fireplace (two white chairs tucked in)
 ARMCHAIR.rot = Math.atan2(0 - ARMCHAIR.x, ROOM.visDepth / 2 - ARMCHAIR.z);   // ...turned to face the middle of the room
 const HOLES = [
   { kind: 'couch', x: -ROOM.halfW + COUCH_DEPTH, z: COUCH_LEFT_Z0 + 1.6, n: [1, 0] },   // under the left sofa
@@ -3328,55 +3328,75 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     { // daylight through the slider lights up the far end of the room (dims with the room lights, like the others)
       const day = new THREE.PointLight(0xfff3dc, 0.4, 13, 1.6); day.position.set(DX, FT(5), VD - FT(2)); scene.add(day); roomLights.push({ l: day, base: 0.4 });
     }
-    { // a single armchair in the corner (back-left, seen from her box), facing the room: a thick, low club chair in dark brown
-      // velvet on stubby legs, with a tall rounded back, fat rolled arms, a mustard cushion and a stack of folded laundry on the seat
+    { // the armchair in the corner (back-left, seen from her box), facing the room: an overstuffed dark brown leather recliner
+      // (from the photo) with a tall pillow-top back of stacked padded rolls, big rolled arms, a skirt to the floor, a large
+      // chocolate throw pillow leaning on the back and a little white patterned cushion on the seat
       const g = named(new THREE.Group(), 'Armchair'); g.position.set(ARMCHAIR.x, 0, ARMCHAIR.z); g.rotation.y = ARMCHAIR.rot;
-      const velvet = new THREE.MeshPhongMaterial({ color: 0x5a3a26, shininess: 16, specular: 0x2a1a10 }), deep = new THREE.MeshPhongMaterial({ color: 0x472d1d, shininess: 12, specular: 0x1e130b }), wood = lam(0x2b1d14);
-      const CW = IN(36), CD = IN(34), AW = IN(7.5), LEG = IN(3), BASE = IN(10), SEAT = LEG + BASE + IN(6);   // SEAT: top of the seat cushion
-      for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(IN(1.2), IN(0.8), LEG, 8), wood); l.position.set(lx * (CW / 2 - IN(2.5)), LEG / 2, lz * (CD / 2 - IN(2.5))); g.add(l); }
-      BX(g, CW, BASE, CD, velvet, 0, LEG + BASE / 2, 0);                                                    // deep base
-      const seat = new THREE.Mesh(new THREE.BoxGeometry(CW - AW * 2, IN(6), CD - IN(9)), velvet); seat.position.set(0, SEAT - IN(3), IN(4)); g.add(seat);
-      const arch = (w, h1, h2, depth, bev) => {                                                             // a slab with a rounded top
-        const sh = new THREE.Shape(); sh.moveTo(-w / 2, 0); sh.lineTo(w / 2, 0); sh.lineTo(w / 2, h1); sh.absellipse(0, h1, w / 2, h2, 0, Math.PI, false); sh.lineTo(-w / 2, 0);
-        const geo = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelSize: bev, bevelThickness: bev, bevelSegments: 3, curveSegments: 24 }); geo.translate(0, 0, -depth / 2); return geo;
-      };
-      const back = new THREE.Mesh(arch(CW - IN(2), IN(19), IN(9), IN(6), IN(1.5)), deep); back.position.set(0, LEG + BASE, -CD / 2 + IN(4.5)); g.add(back);   // tall rounded back, ~40" to the top
-      const bc = new THREE.Mesh(arch(CW - AW * 2 - IN(1), IN(12), IN(7), IN(3.5), IN(1.8)), velvet); bc.position.set(0, SEAT, -CD / 2 + IN(10)); bc.rotation.x = -0.1; g.add(bc);   // plump back cushion, leaning back a little
-      for (const sx of [-1, 1]) {
-        BX(g, AW, IN(9), CD - IN(2), deep, sx * (CW / 2 - AW / 2), LEG + BASE + IN(4.5), IN(1));             // fat arms
-        const roll = new THREE.Mesh(new THREE.CylinderGeometry(AW * 0.62, AW * 0.62, CD - IN(2), 16), velvet); roll.rotation.x = Math.PI / 2; roll.position.set(sx * (CW / 2 - AW / 2), LEG + BASE + IN(9), IN(1)); g.add(roll);
-        const cap = new THREE.Mesh(new THREE.CircleGeometry(AW * 0.62, 16), deep); cap.position.set(sx * (CW / 2 - AW / 2), LEG + BASE + IN(9), CD / 2 + 0.002); g.add(cap);   // the scroll at the front of each arm
+      const leather = new THREE.MeshPhongMaterial({ color: 0x3a2119, shininess: 75, specular: 0x6a4a3e }), deep = new THREE.MeshPhongMaterial({ color: 0x28160f, shininess: 55, specular: 0x4a3028 });
+      const CW = IN(38), CD = IN(36), AW = IN(8);
+      const E = (rx, ry, rz, m, x, y, z) => { const o = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), m); o.scale.set(rx, ry, rz); o.position.set(x, y, z); g.add(o); return o; };   // a padded, pillowy lump
+      BX(g, CW - IN(2), IN(13), CD - IN(3), deep, 0, IN(6.5), 0);                                                   // the base, skirted right down to the floor
+      E(CW / 2 - IN(1), IN(4), IN(3.5), leather, 0, IN(10), CD / 2 - IN(3));                                         // rounded front of the footrest panel
+      BX(g, CW - AW * 2 + IN(1), IN(5), CD - IN(10), leather, 0, IN(15.5), IN(1));                                 // the seat cushion, filling the space between the arms
+      const nose = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.6), IN(2.6), CW - AW * 2 + IN(1), 16), leather); nose.rotation.z = Math.PI / 2; nose.position.set(0, IN(15.5), CD / 2 - IN(4)); g.add(nose);   // its rounded front edge
+      E(CW / 2 - IN(2.5), IN(16), IN(5), deep, 0, IN(28), -CD / 2 + IN(5));                                         // the rounded back behind the rolls
+      for (const [y, ry, rz] of [[IN(31.5), IN(6), IN(5.8)], [IN(40), IN(6.5), IN(6.5)]]) E(CW / 2 - AW + IN(1), ry, rz, leather, 0, y, -CD / 2 + IN(9.5));   // stacked padded rolls, the headrest biggest (the pillow covers the bottom one)
+      for (const sx of [-1, 1]) {                                                                                    // big rolled arms
+        BX(g, AW, IN(20), CD - IN(4), deep, sx * (CW / 2 - AW / 2), IN(10), IN(0.5));
+        E(AW / 2 + IN(1.2), IN(5.5), CD / 2 - IN(2), leather, sx * (CW / 2 - AW / 2 + IN(0.6)), IN(22), IN(0.5));      // the roll along the top, bulging out
+        E(AW / 2 + IN(0.5), IN(9), IN(3), leather, sx * (CW / 2 - AW / 2), IN(15), CD / 2 - IN(3));                     // padded front of the arm
       }
-      const pil = new THREE.Mesh(new THREE.SphereGeometry(IN(7), 14, 10), lam(0xe0b040)); pil.scale.set(1, 0.85, 0.35); pil.position.set(IN(6.5), SEAT + IN(7), -CD / 2 + IN(13.5)); pil.rotation.set(-0.15, 0, 0.25); g.add(pil);
-      const st = new THREE.Group(); st.userData.name = 'Folded laundry'; st.position.set(-IN(3), SEAT, IN(6)); st.rotation.y = 0.1; g.add(st);
-      let fy = 0;
-      [[0x2f3e5c, 1.9], [0x9b9892, 1.5], [0xece7dc, 1.3], [0x5b7fa6, 1.8], [0xb5475a, 1.4]].forEach(([c, t], i) => {   // jeans, a grey tee, a white tee, a denim shirt, a red sweater
-        const h = IN(t), w = IN(12.5 - i * 0.5), d = IN(10 - (i % 2) * 0.8), m = lam(c), f = new THREE.Group();
-        f.position.set((i % 2 ? 1 : -1) * IN(0.5), fy, (i % 3 - 1) * IN(0.4)); f.rotation.y = (i % 2 ? -1 : 1) * 0.05 * i; st.add(f);
-        BX(f, w, h, d - h, m, 0, h / 2, -h / 2);
-        const fold = new THREE.Mesh(new THREE.CylinderGeometry(h / 2, h / 2, w, 10), m); fold.rotation.z = Math.PI / 2; fold.position.set(0, h / 2, d / 2 - h); f.add(fold);   // the rounded folded edge
-        fy += h * 0.96;
-      });
+      const choc = lam(0x3c2519);
+      const ps = new THREE.Shape(), pw = IN(14), ph = IN(9), pr = IN(4);                                              // big chocolate throw pillow leaning on the back
+      ps.moveTo(-pw + pr, -ph); ps.lineTo(pw - pr, -ph); ps.quadraticCurveTo(pw, -ph, pw, -ph + pr); ps.lineTo(pw, ph - pr); ps.quadraticCurveTo(pw, ph, pw - pr, ph);
+      ps.lineTo(-pw + pr, ph); ps.quadraticCurveTo(-pw, ph, -pw, ph - pr); ps.lineTo(-pw, -ph + pr); ps.quadraticCurveTo(-pw, -ph, -pw + pr, -ph);
+      const pgeo = new THREE.ExtrudeGeometry(ps, { depth: IN(2), bevelEnabled: true, bevelThickness: IN(2.2), bevelSize: IN(2), bevelSegments: 5, curveSegments: 8 }); pgeo.translate(0, 0, -IN(1));
+      const pil = new THREE.Mesh(pgeo, choc); pil.position.set(IN(0.5), IN(28.5), -CD / 2 + IN(19.5)); pil.rotation.set(-0.28, 0, -0.06); pil.userData.name = 'Throw pillow'; g.add(pil);
+      const swirlTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#e9e7e2'; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(120,120,125,.7)'; c.lineWidth = 1.3; for (let i = 0; i < 14; i++) { const x = Math.random() * w, y = Math.random() * h, r = 3 + Math.random() * 4; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 1.6); c.stroke(); c.beginPath(); c.arc(x + r * 0.4, y, r * 0.45, 0, Math.PI * 1.5); c.stroke(); } }, 2, 2);   // grey paisley swirls
+      const cush = E(IN(9), IN(1.4), IN(7), lam(0xffffff, { map: swirlTex }), IN(2), IN(18.6), IN(6)); cush.rotation.y = 0.15; cush.userData.name = 'Patterned cushion';
     }
-    { // a wooden console table against the wall past the fireplace: an oak plank top, two drawers with brass knobs, square legs, a shelf below
+    { // a rustic plank table against the wall past the fireplace (from the photo): three honey-stained pine boards on black
+      // hairpin legs, with two white moulded chairs on wooden dowel legs with black wire cross-bracing, tucked in along the front
       const g = named(new THREE.Group(), 'Wooden table'); g.position.set(WTABLE.x, 0, WTABLE.z); g.rotation.y = Math.PI / 2;   // (its front faces into the room)
-      const L = WTABLE.len, D = WTABLE.dep, H = WTABLE.h, LG = IN(2.5), INS = IN(1.2);
-      const plankTex = canvasTex(256, 64, (c, w, h) => {
-        c.fillStyle = '#a8743f'; c.fillRect(0, 0, w, h);
-        for (let i = 0; i < 90; i++) { c.strokeStyle = `rgba(${Math.random() < 0.5 ? '90,55,25' : '205,155,100'},${0.12 + Math.random() * 0.15})`; c.lineWidth = 0.6 + Math.random(); const y = Math.random() * h; c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(w * 0.3, y + (Math.random() - 0.5) * 6, w * 0.7, y + (Math.random() - 0.5) * 6, w, y + (Math.random() - 0.5) * 4); c.stroke(); }
-        c.fillStyle = 'rgba(60,35,15,.55)'; for (const y of [21, 43]) c.fillRect(0, y, w, 1.2);   // three planks, the grain running their length
+      const L = WTABLE.len, D = WTABLE.dep, H = WTABLE.h, T = IN(1.5);
+      const rod = (par, a, b, r, m) => { const d = b.clone().sub(a), o = new THREE.Mesh(new THREE.CylinderGeometry(r, r, d.length(), 8), m); o.position.copy(a).add(b).multiplyScalar(0.5); o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); par.add(o); return o; };
+      const pineTex = canvasTex(256, 48, (c, w, h) => {
+        c.fillStyle = '#a57d4e'; c.fillRect(0, 0, w, h);
+        for (let i = 0; i < 70; i++) { c.strokeStyle = `rgba(${Math.random() < 0.55 ? '110,70,32' : '222,176,118'},${0.12 + Math.random() * 0.18})`; c.lineWidth = 0.5 + Math.random() * 1.2; const y = Math.random() * h; c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(w * 0.33, y + (Math.random() - 0.5) * 8, w * 0.66, y + (Math.random() - 0.5) * 8, w, y + (Math.random() - 0.5) * 5); c.stroke(); }   // long pine grain
+        for (let k = 0; k < 3; k++) { const x = 20 + Math.random() * (w - 40), y = 8 + Math.random() * (h - 16); c.fillStyle = 'rgba(95,55,22,.55)'; c.beginPath(); c.ellipse(x, y, 3 + Math.random() * 3, 2 + Math.random() * 1.5, 0, 0, 7); c.fill(); c.strokeStyle = 'rgba(95,55,22,.3)'; c.beginPath(); c.ellipse(x, y, 7 + Math.random() * 4, 4, 0, 0, 7); c.stroke(); }   // knots
       }, 1, 1);
-      const oak = lam(0x9a6a3a), dark = lam(0x7a5230), brass = new THREE.MeshPhongMaterial({ color: 0xc9a44a, shininess: 90, specular: 0xffffff });
-      BX(g, L, IN(1.5), D, lam(0xffffff, { map: plankTex }), 0, H - IN(0.75), 0).userData.name = 'Wooden table';
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) BX(g, LG, H - IN(1.5), LG, oak, sx * (L / 2 - INS - LG / 2), (H - IN(1.5)) / 2, sz * (D / 2 - INS - LG / 2));
-      const AW = L - INS * 2 - LG, AD = D - INS * 2 - LG;
-      BX(g, AW, IN(5), IN(0.8), oak, 0, H - IN(4), D / 2 - INS - IN(0.4)); BX(g, AW, IN(5), IN(0.8), oak, 0, H - IN(4), -D / 2 + INS + IN(0.4));   // aprons
-      for (const sx of [-1, 1]) BX(g, IN(0.8), IN(5), AD, oak, sx * (L / 2 - INS - IN(0.4)), H - IN(4), 0);
-      for (const dx of [-AW / 4, AW / 4]) {                                                                       // two drawers
-        BX(g, AW / 2 - IN(3), IN(3.6), IN(0.4), dark, dx, H - IN(4), D / 2 - INS + IN(0.2));
-        const kb = new THREE.Mesh(new THREE.SphereGeometry(IN(0.6), 10, 8), brass); kb.position.set(dx, H - IN(4), D / 2 - INS + IN(0.8)); g.add(kb);
+      const PW = (D - IN(0.4)) / 3;
+      for (let i = 0; i < 3; i++) {                                                                               // three boards, a hairline gap between each
+        const t = pineTex.clone(); t.needsUpdate = true; t.offset.set(Math.random(), 0); t.wrapS = THREE.RepeatWrapping;
+        const m = lam(0xffffff, { map: t }); m.color.setScalar(0.9 + i * 0.06);
+        BX(g, L, T, PW, m, 0, H - T / 2, -D / 2 + PW / 2 + i * (PW + IN(0.2))).userData.name = 'Wooden table';
       }
-      BX(g, L - INS * 2 - LG * 0.5, IN(1), D - INS * 2 - LG * 0.5, oak, 0, IN(7), 0);                            // the shelf below
+      const metal = new THREE.MeshPhongMaterial({ color: 0x151515, shininess: 60, specular: 0x555555 });
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {                                                       // hairpin legs: two thin rods splaying out to a little foot
+        const tx = sx * (L / 2 - IN(3.5)), tz = sz * (D / 2 - IN(2.5)), top = H - T, foot = new THREE.Vector3(tx + sx * IN(2.5), IN(0.6), tz + sz * IN(1.5));
+        for (const o of [-1, 1]) rod(g, new THREE.Vector3(tx + o * IN(3.2), top, tz), foot.clone().add(new THREE.Vector3(o * IN(0.5), 0, 0)), IN(0.3), metal);
+        const f = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.9), IN(0.9), IN(0.5), 10), lam(0x9a9a9a)); f.position.set(foot.x, IN(0.25), foot.z); g.add(f);
+        BX(g, IN(8), IN(0.3), IN(2.5), metal, tx, top - IN(0.15), tz);                                           // mounting plate
+      }
+      const plastic = new THREE.MeshPhongMaterial({ color: 0xf6f5f1, shininess: 45, specular: 0x3a3a3a, side: THREE.DoubleSide }), beech = lam(0xd8ae72);
+      const SH = IN(17.5), SR = IN(11);
+      for (const cz of [-IN(12), IN(12)]) {                                                                      // two white moulded chairs
+        const c = new THREE.Group(); c.userData.name = 'Chair'; c.position.set(cz, 0, D / 2 + IN(3)); c.rotation.y = Math.PI + (Math.random() - 0.5) * 0.12; g.add(c);
+        const seat = new THREE.Mesh(new THREE.SphereGeometry(SR, 26, 10, 0, Math.PI * 2, Math.PI * 0.62, Math.PI * 0.38), plastic); seat.scale.set(1, 0.45, 0.92); seat.position.y = SH + SR * 0.37 * 0.45; c.add(seat);   // a shallow scooped seat
+        const back = new THREE.Mesh(new THREE.CylinderGeometry(IN(10.5), IN(9.2), IN(12), 26, 1, true, Math.PI - 0.95, 1.9), plastic); back.position.set(0, SH + IN(6.5), IN(1.5)); back.rotation.x = -0.13; c.add(back);   // the curved shell back
+        const lipG = new THREE.Group(); lipG.position.set(0, SH + IN(12.45), IN(0.72)); lipG.rotation.x = Math.PI / 2 - 0.13; c.add(lipG);   // its rolled top edge
+        const lip = new THREE.Mesh(new THREE.TorusGeometry(IN(10.5), IN(0.5), 6, 26, 1.9), plastic); lip.rotation.z = -Math.PI / 2 - 0.95; lipG.add(lip);
+        BX(c, IN(7), IN(0.6), IN(7), metal, 0, SH - IN(2.6), 0);                                                 // the mount under the seat
+        const legTops = [], legFeet = [];
+        for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          const a = new THREE.Vector3(lx * IN(3.2), SH - IN(2.8), lz * IN(3.2)), b = new THREE.Vector3(lx * IN(9), 0, lz * IN(9));
+          rod(c, a, b, IN(0.55), beech); legTops.push(a); legFeet.push(b);
+          const cap = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.5), IN(0.5), IN(0.5), 8), metal); cap.position.copy(b).setY(IN(0.25)); c.add(cap);
+        }
+        const mid = (i, k) => legTops[i].clone().lerp(legFeet[i], k);
+        rod(c, mid(0, 0.55), mid(3, 0.55), IN(0.15), metal); rod(c, mid(1, 0.55), mid(2, 0.55), IN(0.15), metal);   // the black wire X between the legs
+        for (const [i, j] of [[0, 1], [2, 3], [0, 2], [1, 3]]) rod(c, mid(i, 0.02), mid(j, 0.55), IN(0.12), metal); // ...and the struts up to the seat
+      }
     }
     { // litter box in the corner past the fireplace, by the slider: a grey tray of litter with a scoop
       const g = named(new THREE.Group(), 'Litter box'); g.position.set(-hw + IN(9.5), 0, VD - IN(12.5)); g.rotation.y = Math.PI / 2;
@@ -4759,7 +4779,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 22:45';                                              // stamped when the site is published
+const BUILD = '2026-09-24 22:54';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5392,7 +5412,7 @@ function rollBlocked(x, z) {
   if (Math.abs(x - CAT_POS.x) < BOX.w / 2 + R && Math.abs(z - CAT_POS.z) < BOX.d / 2 + R) return true;
   if (z < IN(22) + R) return true;
   if (Math.abs(x - ARMCHAIR.x) < ARMCHAIR.half + R && Math.abs(z - ARMCHAIR.z) < ARMCHAIR.half + R) return true;   // the armchair in the back corner
-  if (x < WTABLE.x + WTABLE.dep / 2 + R && Math.abs(z - WTABLE.z) < WTABLE.len / 2 + R) return true;               // the wooden table past the fireplace
+  if (x < WTABLE.x + WTABLE.dep / 2 + 13 / 15.6 + R && Math.abs(z - WTABLE.z) < WTABLE.len / 2 + R) return true;   // the plank table past the fireplace, and its chairs
   return false;
 }
 
