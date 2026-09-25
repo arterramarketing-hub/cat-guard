@@ -795,7 +795,16 @@ function blanketToCat(fromPoint, b = blanketRig) {
   if (b.src) b.src.visible = false;
   b.heap.visible = true; b.state = 'flying'; b.dest = 'cat'; b.t = 0;
   b.to.set(CAT_POS.x, BOX.h * 0.4, CAT_POS.z);
+  if (walk.on) b.to.set(walk.pos.x, walk.pos.y + 0.35, walk.pos.z);   // Free walk: it's coming for her, wherever she is
   sfx.whoosh();
+}
+function shrugBlanket() {                                            // Free walk: a big swipe and the blanket goes flying off her
+  const b = blanketRigs.find(r => r.state === 'cat'); if (!b) return;
+  const p = walk.pos, fx = Math.sin(walk.face), fz = Math.cos(walk.face);
+  b.lump.visible = false; b.from.set(p.x, p.y + 0.9, p.z);
+  const x = THREE.MathUtils.clamp(p.x + fx * 1.6, -ROOM.halfW + 0.9, ROOM.halfW - 0.9), z = THREE.MathUtils.clamp(p.z + fz * 1.6, 1.8, ROOM.visDepth - 0.9);
+  b.to.set(x, blanketGround(x, z), z); b.heap.visible = true; b.state = 'flying'; b.dest = 'floor'; b.t = 0; b.victim = null;
+  sfx.whoosh(); showWalkName('Free!'); walk.puff = 0.6;
 }
 function throwBlanket(point, b = blanketRig) {
   if (!b || b.state !== 'cat') return;
@@ -816,6 +825,7 @@ function updateOneBlanket(b, dt, time) {
   if (b.state === 'flying') {
     b.t = Math.min(1, b.t + dt / 0.5);
     if (b.dest === 'mouse' && b.victim && b.victim.active) b.to.set(b.victim.root.position.x, 0.25, b.victim.root.position.z);   // homing
+    if (b.dest === 'cat' && walk.on) b.to.set(walk.pos.x, walk.pos.y + 0.35, walk.pos.z);                     // (Free walk: homing on her)
     if (b.dest !== 'cat' && b.t > 0.12)                                         // swallows the first mouse it passes over on the way
       for (const m of mice) if (m.active && m.hittable && !m.boss && m.kind !== 'karen' && Math.hypot(m.root.position.x - b.heap.position.x, m.root.position.z - b.heap.position.z) < 0.8) { b.dest = 'mouse'; b.victim = m; b.to.set(m.root.position.x, 0.25, m.root.position.z); b.t = 1; break; }
     const k = b.t, e = k * k * (3 - 2 * k);
@@ -830,7 +840,7 @@ function updateOneBlanket(b, dt, time) {
         if (b.victim && b.victim.active) burritoMouse(b.victim);
         b.state = 'burrito'; b.bt = 0.7; sfx.padThud(0.9); sfx.squeak(3);   // (skips the wriggle: rolls away at once)
       } else if (b.dest === 'cat') {                                         // lands on the cat
-        b.heap.visible = false; b.lump.visible = true; b.lump.position.set(CAT_POS.x, BOX.h - 0.12, CAT_POS.z);
+        b.heap.visible = false; b.lump.visible = true; b.lump.position.set(CAT_POS.x, BOX.h - 0.12, CAT_POS.z); if (walk.on) showWalkName('Hey! Who turned out the lights? (swipe to get it off)');
         catCard.visible = catTail.visible = false; b.state = 'cat'; b.rumbleT = 0; sfx.wail(); shake = Math.max(shake, 0.1);
       } else {                                                        // lands crumpled on the floor / sofa
         b.heap.rotation.set(0, Math.random() * 6, 0); b.heap.scale.setScalar(1); drapeHeap(b); b.state = 'floor'; sfx.padThud(0.8);
@@ -854,7 +864,12 @@ function updateOneBlanket(b, dt, time) {
       if (b.bt > 1.2 && (!onScreen(b.burrito.position) || b.burrito.position.z > ROOM.visDepth - 1)) { b.burrito.visible = false; b.dir.set(0, 0, 0); b.state = 'gone'; sfx.burritoCrash(); shake = Math.max(shake, reduceMotion ? 0.08 : 0.55); vibrate(60); }   // gone for the rest of this game, with a crash offscreen
     }
   }
-  if (b.state === 'cat') {                                            // the cat thrashing about underneath
+  if (b.state === 'cat' && walk.on) {                                 // Free walk: a blanket ghost wandering the room, wriggling as she goes
+    const p = walk.pos, w = Math.sin(time * 9) * 0.05;
+    b.lump.position.set(p.x, p.y + 0.3, p.z); b.lump.rotation.set(Math.sin(time * 6) * 0.08, walk.face, Math.cos(time * 5) * 0.08);
+    b.lump.scale.set(0.36 * (1 + w), 0.74 * (1 - w), 0.56);
+    b.rumbleT -= dt; if (b.rumbleT <= 0) { b.rumbleT = 0.8 + Math.random() * 0.8; sfx.rumble(); }
+  } else if (b.state === 'cat') {                                     // the cat thrashing about underneath
     b.rumbleT -= dt;
     const thrash = Math.sin(time * 13) * 0.5 + Math.sin(time * 7.3) * 0.5;
     b.lump.position.x = CAT_POS.x + Math.sin(time * 5.1) * 0.03 + thrash * 0.015;           // stays within the box walls
@@ -3217,6 +3232,7 @@ function discoCatch(ny) {                                            // coming d
 function updateSliderDisco(dt) {
   const D = sliderDisco;
   if (disco.on) { disco.t += dt; if (clock > disco.until || !walk.on) stopDisco(); }
+  for (const d of mosaicGlints) d.sp.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.8) * 4;   // the mosaic art sparkles
   if (!povEndWall.visible && !disco.on) return;
   disco.spin += dt * (disco.on ? 2.2 : 0.5);
   D.ball.rotation.y = disco.spin; D.g.rotation.z = Math.sin(clock * 0.7) * 0.025;
@@ -3274,7 +3290,7 @@ function updateRoomFx(dt) {
 SECT = 'Dome light';
 /* ---------- 8 ft ceiling with three frosted dome lights (the near end of the room is left open, dollhouse style). Both face into
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
-let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null;
+let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null, laundry = null, mosaicGlints = [];
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
   const VD = ROOM.visDepth, WH = ROOM.wallH;
@@ -3329,10 +3345,17 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const day = new THREE.PointLight(0xfff3dc, 0.4, 13, 1.6); day.position.set(DX, FT(5), VD - FT(2)); scene.add(day); roomLights.push({ l: day, base: 0.4 });
     }
     { // the armchair in the corner (back-left, seen from her box), facing the room: an overstuffed dark brown leather recliner
-      // (from the photo) with a tall pillow-top back of stacked padded rolls, big rolled arms, a skirt to the floor, a large
-      // chocolate throw pillow leaning on the back and a little white patterned cushion on the seat
+      // (from the photo) with a tall pillow-top back of padded rolls, big rolled arms and a skirt to the floor, in creased,
+      // softly grained leather; a little white patterned cushion and a stack of folded laundry on the seat
       const g = named(new THREE.Group(), 'Armchair'); g.position.set(ARMCHAIR.x, 0, ARMCHAIR.z); g.rotation.y = ARMCHAIR.rot;
-      const leather = new THREE.MeshPhongMaterial({ color: 0x3a2119, shininess: 75, specular: 0x6a4a3e }), deep = new THREE.MeshPhongMaterial({ color: 0x28160f, shininess: 55, specular: 0x4a3028 });
+      const hideTex = canvasTex(128, 128, (c, w, h) => {                                                            // leather: fine grain, a few soft creases
+        c.fillStyle = '#bdbdbd'; c.fillRect(0, 0, w, h);
+        for (let i = 0; i < 2600; i++) { const v = 150 + Math.random() * 90 | 0; c.fillStyle = `rgba(${v},${v},${v},.35)`; c.fillRect(Math.random() * w, Math.random() * h, 1, 1); }
+        for (let i = 0; i < 14; i++) { const x = Math.random() * w, y = Math.random() * h, l = 12 + Math.random() * 30, a = Math.random() * Math.PI, cx = Math.cos(a) * l, cy = Math.sin(a) * l;
+          c.lineWidth = 2.2; c.strokeStyle = 'rgba(40,40,40,.35)'; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + cx * 0.5 + cy * 0.2, y + cy * 0.5 - cx * 0.2, x + cx, y + cy); c.stroke();
+          c.lineWidth = 1.2; c.strokeStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.moveTo(x + 1.5, y + 1.5); c.quadraticCurveTo(x + cx * 0.5 + cy * 0.2 + 1.5, y + cy * 0.5 - cx * 0.2 + 1.5, x + cx + 1.5, y + cy + 1.5); c.stroke(); }
+      }, 2, 2);
+      const leather = new THREE.MeshPhongMaterial({ color: 0x4a2c20, map: hideTex, shininess: 32, specular: 0x3a2a24 }), deep = new THREE.MeshPhongMaterial({ color: 0x35201a, map: hideTex, shininess: 24, specular: 0x2a1c16 });
       const CW = IN(38), CD = IN(36), AW = IN(8);
       const E = (rx, ry, rz, m, x, y, z) => { const o = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), m); o.scale.set(rx, ry, rz); o.position.set(x, y, z); g.add(o); return o; };   // a padded, pillowy lump
       BX(g, CW - IN(2), IN(13), CD - IN(3), deep, 0, IN(6.5), 0);                                                   // the base, skirted right down to the floor
@@ -3340,20 +3363,44 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       BX(g, CW - AW * 2 + IN(1), IN(5), CD - IN(10), leather, 0, IN(15.5), IN(1));                                 // the seat cushion, filling the space between the arms
       const nose = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.6), IN(2.6), CW - AW * 2 + IN(1), 16), leather); nose.rotation.z = Math.PI / 2; nose.position.set(0, IN(15.5), CD / 2 - IN(4)); g.add(nose);   // its rounded front edge
       E(CW / 2 - IN(2.5), IN(16), IN(5), deep, 0, IN(28), -CD / 2 + IN(5));                                         // the rounded back behind the rolls
-      for (const [y, ry, rz] of [[IN(31.5), IN(6), IN(5.8)], [IN(40), IN(6.5), IN(6.5)]]) E(CW / 2 - AW + IN(1), ry, rz, leather, 0, y, -CD / 2 + IN(9.5));   // stacked padded rolls, the headrest biggest (the pillow covers the bottom one)
+      for (const [y, ry, rz] of [[IN(23), IN(5.2), IN(5.2)], [IN(31.5), IN(5.8), IN(5.6)], [IN(40), IN(6.5), IN(6.5)]]) E(CW / 2 - AW + IN(1), ry, rz, leather, 0, y, -CD / 2 + IN(9.5));   // three stacked padded rolls, the headrest biggest
       for (const sx of [-1, 1]) {                                                                                    // big rolled arms
         BX(g, AW, IN(20), CD - IN(4), deep, sx * (CW / 2 - AW / 2), IN(10), IN(0.5));
         E(AW / 2 + IN(1.2), IN(5.5), CD / 2 - IN(2), leather, sx * (CW / 2 - AW / 2 + IN(0.6)), IN(22), IN(0.5));      // the roll along the top, bulging out
         E(AW / 2 + IN(0.5), IN(9), IN(3), leather, sx * (CW / 2 - AW / 2), IN(15), CD / 2 - IN(3));                     // padded front of the arm
       }
-      const choc = lam(0x3c2519);
-      const ps = new THREE.Shape(), pw = IN(14), ph = IN(9), pr = IN(4);                                              // big chocolate throw pillow leaning on the back
-      ps.moveTo(-pw + pr, -ph); ps.lineTo(pw - pr, -ph); ps.quadraticCurveTo(pw, -ph, pw, -ph + pr); ps.lineTo(pw, ph - pr); ps.quadraticCurveTo(pw, ph, pw - pr, ph);
-      ps.lineTo(-pw + pr, ph); ps.quadraticCurveTo(-pw, ph, -pw, ph - pr); ps.lineTo(-pw, -ph + pr); ps.quadraticCurveTo(-pw, -ph, -pw + pr, -ph);
-      const pgeo = new THREE.ExtrudeGeometry(ps, { depth: IN(2), bevelEnabled: true, bevelThickness: IN(2.2), bevelSize: IN(2), bevelSegments: 5, curveSegments: 8 }); pgeo.translate(0, 0, -IN(1));
-      const pil = new THREE.Mesh(pgeo, choc); pil.position.set(IN(0.5), IN(28.5), -CD / 2 + IN(19.5)); pil.rotation.set(-0.28, 0, -0.06); pil.userData.name = 'Throw pillow'; g.add(pil);
       const swirlTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#e9e7e2'; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(120,120,125,.7)'; c.lineWidth = 1.3; for (let i = 0; i < 14; i++) { const x = Math.random() * w, y = Math.random() * h, r = 3 + Math.random() * 4; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 1.6); c.stroke(); c.beginPath(); c.arc(x + r * 0.4, y, r * 0.45, 0, Math.PI * 1.5); c.stroke(); } }, 2, 2);   // grey paisley swirls
-      const cush = E(IN(9), IN(1.4), IN(7), lam(0xffffff, { map: swirlTex }), IN(2), IN(18.6), IN(6)); cush.rotation.y = 0.15; cush.userData.name = 'Patterned cushion';
+      const cush = E(IN(7), IN(1.4), IN(6.5), lam(0xffffff, { map: swirlTex }), IN(6), IN(18.6), IN(6)); cush.rotation.y = 0.3; cush.userData.name = 'Patterned cushion';
+      const st = new THREE.Group(); st.userData.name = 'Folded laundry'; st.position.set(-IN(4), IN(18), IN(5)); st.rotation.y = 0.1; g.add(st);   // the folded laundry (swipe it and it goes everywhere)
+      const specs = [[0x2f3e5c, 1.9], [0x9b9892, 1.5], [0xece7dc, 1.3], [0x5b7fa6, 1.8], [0xb5475a, 1.4]];            // jeans, a grey tee, a white tee, a denim shirt, a red sweater
+      let fy = 0;
+      specs.forEach(([c, t], i) => {
+        const h = IN(t), w = IN(12.5 - i * 0.5), d = IN(10 - (i % 2) * 0.8), m = lam(c), f = new THREE.Group();
+        f.position.set((i % 2 ? 1 : -1) * IN(0.5), fy, (i % 3 - 1) * IN(0.4)); f.rotation.y = (i % 2 ? -1 : 1) * 0.05 * i; st.add(f);
+        BX(f, w, h, d - h, m, 0, h / 2, -h / 2);
+        const fold = new THREE.Mesh(new THREE.CylinderGeometry(h / 2, h / 2, w, 10), m); fold.rotation.z = Math.PI / 2; fold.position.set(0, h / 2, d / 2 - h); f.add(fold);   // the rounded folded edge
+        fy += h * 0.96;
+      });
+      laundry = { stack: st, chair: g, specs, state: 'folded', bits: [] };
+    }
+    function chairShell(mat, SH) {                                     // an Eames-style moulded chair shell: a scooped seat that sweeps up into a tall curved back, its edges rolled up
+      const PROF = [[-0.9, 9.6], [-0.1, 8.6], [0, 6], [-0.5, 1], [-0.5, -3.5], [0.6, -7.2], [3.5, -9.6], [8, -10.6], [12, -10.9]];   // (height above the seat, front-to-back) in inches
+      const WF = [9.2, 9.4, 9.4, 9.2, 8.7, 8.0, 8.4, 9.2, 9.6], CU = [0.3, 0.7, 1.5, 1.9, 1.9, 1.5, 2.4, 2.8, 2.6];                      // half-width, how far the edges curl up
+      const curve = new THREE.CatmullRomCurve3(PROF.map(([y, z]) => new THREE.Vector3(0, SH + IN(y), IN(z))));
+      const NU = 18, NV = 40, pos = [], idx = [], grid = [];
+      for (let j = 0; j <= NV; j++) {
+        const v = j / NV, P = curve.getPointAt(v), T = curve.getTangentAt(v), N = new THREE.Vector3(0, -T.z, T.y).normalize();
+        const f = v * (PROF.length - 1), i0 = Math.min(PROF.length - 2, Math.floor(f)), k = f - i0;
+        const w = IN(WF[i0] + (WF[i0 + 1] - WF[i0]) * k), cu = IN(CU[i0] + (CU[i0 + 1] - CU[i0]) * k), row = [];
+        for (let i = 0; i <= NU; i++) { const u = i / NU * 2 - 1, q = P.clone().add(new THREE.Vector3(u * w, 0, 0)).addScaledVector(N, cu * Math.pow(Math.abs(u), 3)); pos.push(q.x, q.y, q.z); row.push(q); }
+        grid.push(row);
+      }
+      for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) { const a = j * (NU + 1) + i, b = a + NU + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+      const out = new THREE.Group(); out.add(new THREE.Mesh(geo, mat));
+      const edge = [...grid[0], ...grid.slice(1).map(r => r[NU]), ...grid[NV].slice(0, NU).reverse(), ...grid.slice(1, NV).reverse().map(r => r[0])];   // round the rim
+      out.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(edge, true), 200, IN(0.35), 6, true), mat));   // the rolled edge all the way round
+      return out;
     }
     { // a rustic plank table against the wall past the fireplace (from the photo): three honey-stained pine boards on black
       // hairpin legs, with two white moulded chairs on wooden dowel legs with black wire cross-bracing, tucked in along the front
@@ -3379,23 +3426,52 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         BX(g, IN(8), IN(0.3), IN(2.5), metal, tx, top - IN(0.15), tz);                                           // mounting plate
       }
       const plastic = new THREE.MeshPhongMaterial({ color: 0xf6f5f1, shininess: 45, specular: 0x3a3a3a, side: THREE.DoubleSide }), beech = lam(0xd8ae72);
-      const SH = IN(17.5), SR = IN(11);
+      const SH = IN(17.5);
       for (const cz of [-IN(12), IN(12)]) {                                                                      // two white moulded chairs
         const c = new THREE.Group(); c.userData.name = 'Chair'; c.position.set(cz, 0, D / 2 + IN(3)); c.rotation.y = Math.PI + (Math.random() - 0.5) * 0.12; g.add(c);
-        const seat = new THREE.Mesh(new THREE.SphereGeometry(SR, 26, 10, 0, Math.PI * 2, Math.PI * 0.62, Math.PI * 0.38), plastic); seat.scale.set(1, 0.45, 0.92); seat.position.y = SH + SR * 0.37 * 0.45; c.add(seat);   // a shallow scooped seat
-        const back = new THREE.Mesh(new THREE.CylinderGeometry(IN(10.5), IN(9.2), IN(12), 26, 1, true, Math.PI - 0.95, 1.9), plastic); back.position.set(0, SH + IN(6.5), IN(1.5)); back.rotation.x = -0.13; c.add(back);   // the curved shell back
-        const lipG = new THREE.Group(); lipG.position.set(0, SH + IN(12.45), IN(0.72)); lipG.rotation.x = Math.PI / 2 - 0.13; c.add(lipG);   // its rolled top edge
-        const lip = new THREE.Mesh(new THREE.TorusGeometry(IN(10.5), IN(0.5), 6, 26, 1.9), plastic); lip.rotation.z = -Math.PI / 2 - 0.95; lipG.add(lip);
-        BX(c, IN(7), IN(0.6), IN(7), metal, 0, SH - IN(2.6), 0);                                                 // the mount under the seat
+        c.add(chairShell(plastic, SH));                                                                          // one moulded shell, seat sweeping up into the back
         const legTops = [], legFeet = [];
         for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-          const a = new THREE.Vector3(lx * IN(3.2), SH - IN(2.8), lz * IN(3.2)), b = new THREE.Vector3(lx * IN(9), 0, lz * IN(9));
+          const a = new THREE.Vector3(lx * IN(3.4), SH - IN(1), lz * IN(3.4)), b = new THREE.Vector3(lx * IN(9), 0, lz * IN(9));
           rod(c, a, b, IN(0.55), beech); legTops.push(a); legFeet.push(b);
-          const cap = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.5), IN(0.5), IN(0.5), 8), metal); cap.position.copy(b).setY(IN(0.25)); c.add(cap);
         }
         const mid = (i, k) => legTops[i].clone().lerp(legFeet[i], k);
         rod(c, mid(0, 0.55), mid(3, 0.55), IN(0.15), metal); rod(c, mid(1, 0.55), mid(2, 0.55), IN(0.15), metal);   // the black wire X between the legs
         for (const [i, j] of [[0, 1], [2, 3], [0, 2], [1, 3]]) rod(c, mid(i, 0.02), mid(j, 0.55), IN(0.12), metal); // ...and the struts up to the seat
+      }
+    }
+    { // wall art above the litter box (from the photo): a tall panel of tiny mirror tiles laid in a damask pattern on champagne gold
+      const AW2 = IN(22), AH = IN(46), g = named(new THREE.Group(), 'Mosaic mirror art'); g.position.set(-hw + IN(0.55), IN(21) + AH / 2, VD - IN(13)); g.rotation.y = Math.PI / 2;
+      const TW = 176, TH = 368, mask = document.createElement('canvas'); mask.width = TW; mask.height = TH; const mc = mask.getContext('2d');
+      mc.strokeStyle = '#fff'; mc.fillStyle = '#fff'; mc.lineCap = 'round'; mc.lineWidth = 9;
+      const half = (oy) => {                                           // one half of a damask motif (mirrored to make it whole)
+        const q = (a, b, c, d, e, f, g2, h) => { mc.beginPath(); mc.moveTo(a, b); mc.bezierCurveTo(c, d, e, f, g2, h); mc.stroke(); };
+        q(88, oy + 8, 58, oy + 10, 40, oy + 40, 58, oy + 62); q(58, oy + 62, 74, oy + 80, 56, oy + 100, 36, oy + 90);       // top scroll curling out
+        q(88, oy + 40, 66, oy + 60, 70, oy + 92, 88, oy + 104);                                                                // the onion dome
+        q(88, oy + 104, 60, oy + 112, 30, oy + 118, 14, oy + 96); q(14, oy + 96, 6, oy + 80, 22, oy + 66, 32, oy + 76);          // side leaf, curled
+        q(88, oy + 128, 56, oy + 128, 50, oy + 158, 70, oy + 172); q(70, oy + 172, 84, oy + 180, 88, oy + 178, 88, oy + 178);    // teardrop below
+        q(40, oy + 130, 20, oy + 142, 18, oy + 168, 40, oy + 176);                                                             // lower flourish
+        mc.beginPath(); mc.ellipse(88, oy + 150, 9, 16, 0, 0, 7); mc.fill();                                                   // jewel in the teardrop
+      };
+      for (const oy of [0, 184]) { half(oy); mc.save(); mc.translate(TW, 0); mc.scale(-1, 1); half(oy); mc.restore(); }
+      const md = mc.getImageData(0, 0, TW, TH).data;
+      const artTex = canvasTex(TW, TH, (c, w, h) => {
+        c.fillStyle = '#8a7650'; c.fillRect(0, 0, w, h);                                                                        // champagne gold ground
+        for (let i = 0; i < 900; i++) { c.fillStyle = `rgba(${Math.random() < 0.5 ? '255,245,215' : '90,75,45'},.08)`; c.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+        const C = ['#f2f0ea', '#dcdcd8', '#c9c9c4', '#e6d6a6', '#d4bc7c', '#fbf7ec', '#b8b8b4'], S = 4;
+        for (let y = 2; y < h - 2; y += S) for (let x = 2; x < w - 2; x += S) {
+          const on = md[((y + 1) * w + (x + 1)) * 4] > 100;
+          if (!on && Math.random() > 0.035) continue;                                                                            // (a few stray tiles scattered on the ground too)
+          c.fillStyle = Math.random() < 0.035 ? ['#8ea2c8', '#b89ac0', '#9c8a6a'][Math.random() * 3 | 0] : C[Math.random() * C.length | 0];   // the odd one catching a colour
+          c.fillRect(x + Math.random() * 0.6, y + Math.random() * 0.6, S - 1 - Math.random() * 0.6, S - 1 - Math.random() * 0.6);
+        }
+      }, 1, 1);
+      const edge = lam(0x9a875e), front = new THREE.MeshPhongMaterial({ map: artTex, color: 0xd8d4cc, shininess: 60, specular: 0x777777, emissive: 0x100e0a });
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(AW2, AH, IN(1)), [edge, edge, edge, edge, front, edge]); panel.userData.name = 'Mosaic mirror art'; g.add(panel);
+      for (let i = 0; i < 7; i++) {                                                                                             // glints winking off the mirror tiles
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xffffff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
+        sp.position.set((Math.random() - 0.5) * AW2 * 0.8, (Math.random() - 0.5) * AH * 0.85, IN(0.6)); sp.scale.setScalar(IN(2.6)); g.add(sp);
+        mosaicGlints.push({ sp, phase: Math.random() * 10, speed: 1.1 + Math.random() * 1.6 });
       }
     }
     { // litter box in the corner past the fireplace, by the slider: a grey tray of litter with a scoop
@@ -4779,7 +4855,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 22:54';                                              // stamped when the site is published
+const BUILD = '2026-09-24 23:25';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5099,6 +5175,12 @@ function handleTap(clientX, clientY) {
   if (hits.length && hits[0].object.userData.wallpaper) {           // the wall is behind everything: a near miss on something in front wins
     for (const it of interactables()) if (ray.distanceSqToPoint(it.pos) < it.r * it.r * 0.6) { interact(it.obj, it.pos); return; }
   }
+  const fr = fanRig;                                                  // the fan stands right by the sofa: a tap anywhere near its column is for the fan, not the cushion behind it
+  if (fr && fr.state !== 'falling' && fr.state !== 'broken' && (!hits.length || hits[0].object.userData.couch !== undefined || hits[0].object.userData.wallpaper)) {
+    fr.tip.children[0].getWorldPosition(_fa); fr.cap.getWorldPosition(_fb); let near = Infinity;
+    for (let k = 0; k <= 4; k++) near = Math.min(near, ray.distanceSqToPoint(_fc2.lerpVectors(_fa, _fb, k / 4)));
+    if (near < 0.5 * 0.5) { let fm = null; fr.tip.traverse(o => { if (!fm && o.isMesh) fm = o; }); if (interact(fm, _fb.clone())) return; }
+  }
   if (hits.length && interact(hits[0].object, hits[0].point, hits[0].face)) return;
   // 2) a near miss: the closest interactive thing whose "reach bubble" the tap ray passes through
   let near = null, nearN = 1;
@@ -5125,7 +5207,7 @@ function handleTap(clientX, clientY) {
   }
 }
 // everything the cat can bat, with a generous reach radius so near-misses still count
-const _ip = new THREE.Vector3();
+const _ip = new THREE.Vector3(), _fa = new THREE.Vector3(), _fb = new THREE.Vector3(), _fc2 = new THREE.Vector3();
 const gunReady = () => gunRig && gunRig.state === 'cupboard' && pistolDoor && pistolDoor.inside.visible && pistolDoor.angle < -0.6;   // open cupboard, pistol inside
 function interactables() {
   const list = [];
@@ -5144,6 +5226,7 @@ function interactables() {
   for (const d of dresserDoors) if (!(d === pistolDoor && gunReady()) && !(d === catnip.door && nipOpen)) list.push({ obj: d.hinge.children[0], pos: d.center, r: 0.55 });   // (that door's bubble goes to the gun instead)
   if (nipOpen) { catnip.jar.getWorldPosition(_ip); list.push({ obj: catnip.targets[0], pos: _ip.clone(), r: 0.7 }); }   // the open catnip cupboard: a big target on the jar
   if (diffuserRig && diffuserRig.state === 'rest') list.push({ obj: diffuserRig.vase.children[0], pos: diffuserRig.center, r: 0.45 });
+  if (fanRig && fanRig.state !== 'falling' && fanRig.state !== 'broken') { fanRig.cap.getWorldPosition(_ip); let fm = null; fanRig.tip.traverse(o => { if (!fm && o.isMesh) fm = o; }); list.push({ obj: fm, pos: _ip.clone().setY(_ip.y * 0.6), r: 0.75 }); }   // the fan: a big bubble round its column
   if (tableRig && !tableRig.broken) list.push({ obj: tableRig.pieces[0].mesh, pos: tableRig.center, r: 0.9 });
   if (laser.state === 'floor') list.push({ obj: laser.pickupMesh, pos: laser.pickup.position.clone(), r: 0.9 });   // a big, forgiving target on the dropped laser pointer
   if (windowRig) { windowRig.bl.getWorldPosition(_ip); list.push({ obj: windowRig.bl, pos: _ip.clone(), r: 1.2 }); }
@@ -5208,6 +5291,19 @@ function checkBoss() {                                             // 1000 point
 /* Rat King cutscene: play freezes, letterbox bars slide in, the camera swoops down to his hole as he climbs out,
    he roars, his name slams onto the screen, then the camera pulls back and play resumes. */
 let cine = null;
+let karenCam = null;
+const _kcL = new THREE.Vector3(), _kcP = new THREE.Vector3(), _kcD = new THREE.Vector3(-0.8, 0.62, 0.75).normalize();   // (a three-quarter view from her front: her face and the cat both in shot)
+function updateKarenCam(dt) {                                         // follows Karen (and keeps the cat in shot) until she's dealt with
+  const kc = karenCam; if (!kc) return;
+  const m = kc.m, done = !m.active || m.kind !== 'karen' || m.state === 'whacked' || m.state === 'retreat' || m.state === 'home' || (state !== 'playing' && state !== 'ending' && state !== 'paused');
+  if (done || gameMode !== 'classic' || CAM_VIEWS[camView].pov) { karenCam = null; if (state === 'playing' || state === 'ending') fitCamera(); return; }
+  if (state === 'paused') return;
+  const p = m.root.position, onTV = p.y > 0.5;
+  _kcL.set(p.x * 0.72 + CAT_POS.x * 0.28, onTV ? p.y + 0.3 : 0.55, p.z * 0.72 + CAT_POS.z * 0.28);
+  _kcP.copy(_kcL).addScaledVector(_kcD, onTV ? 2.6 : 3.3);
+  const k = 1 - Math.exp(-dt * 2.5); camBase.lerp(_kcP, k); kc.look.lerp(_kcL, k);
+  camera.clearViewOffset();
+}
 function startCutscene(m) {
   cine = { m, t: 0, fromPos: camBase.clone(), fromLook: camTarget.clone(), look: new THREE.Vector3(), pos: new THREE.Vector3(), roared: false };
   state = 'cutscene'; camera.clearViewOffset(); ui.hud.hidden = true;
@@ -5222,10 +5318,13 @@ function updateCutscene(dt) {
   if (karen) {                                                        // Karen rises up behind the TV, the camera pushes in on her face, and she has her say
     if (!c.dir) { const f = new THREE.Vector3(0, 0, 1), toCam = c.fromPos.clone().sub(p).setY(0).normalize(); c.dir = f.multiplyScalar(0.7).addScaledVector(toCam, 0.3).normalize(); }
     const close = p.clone().addScaledVector(c.dir, 1.9).setY(p.y + 0.75), eye = p.clone().setY(p.y + 0.42);
-    const k = c.t < 0.9 ? easeInOut(c.t / 0.9) : c.t < T - 0.8 ? 1 : easeInOut(Math.max(0, (T - c.t) / 0.8));
+    const k = c.t < 0.9 ? easeInOut(c.t / 0.9) : 1;
     camBase.lerpVectors(c.fromPos, close, k); c.look.lerpVectors(c.fromLook, eye, k);
     if (!c.said && c.t > 2.4) { c.said = true; karenSay(m, "I don't appreciate you whacking my mouse friends!"); }
-    if (c.t >= T) endCutscene();
+    if (c.t >= T) {                                                   // no cut back: the camera follows her down to the cat
+      const bars = document.getElementById('cineBars'); if (bars) { bars.classList.add('out'); setTimeout(() => bars.remove(), 450); }
+      karenCam = { m, look: c.look.clone(), from: c.fromPos.clone() }; cine = null; ui.hud.hidden = false; state = 'playing';
+    }
     return;
   }
   if (m.state !== 'emerge' && m.state !== 'peek') { if (!c.hold) c.hold = m.root.position.clone(); m.root.position.copy(c.hold); }   // ...but gets no head start
@@ -5391,7 +5490,7 @@ function takeGun() {
   const gr = gunRig; if (gr.state !== 'cupboard' || state !== 'playing') return;
   unlock('gun');
   gr.state = 'cat'; gr.ammo = GUN_ROUNDS; cupboardPistol.visible = false; gr.held.visible = true; gr.held.position.copy(gr.hand); gr.held.rotation.set(0, 0, 0);
-  sfx.cock(); sfx.gasp(); tailWag = 1.4; showBanner('Kitty’s got a gun!'); floatText(gr.hand.clone().setY(BOX.h + 1.3), 'Tap to shoot', 'clutch');
+  sfx.cock(); sfx.gasp(); tailWag = 1.4; showBanner('Kitty’s got a gun!'); if (walk.on) showWalkName('🔫 Swipe to shoot'); else floatText(gr.hand.clone().setY(BOX.h + 1.3), 'Tap to shoot', 'clutch');
   if (pistolDoor.target) { pistolDoor.target = 0; sfx.creak(); }    // cupboard swings shut behind her
   showFireBtn();
 }
@@ -5660,7 +5759,10 @@ function fireGun() {
   const targets = mice.filter(m => m.active && m.hittable && onScreen(m.center));
   let smash = null;                                                   // chaos: no mice about? pick off something that's still in one piece
   if (!targets.length && gameMode === 'chaos') { const list = chaosGunTargets(); if (list.length) smash = list[(Math.random() * list.length) | 0]; }
-  if (targets.length) gr.aim.copy(targets[0].center); else if (smash) gr.aim.copy(smash.pos); else gr.aim.set(CAT_POS.x + (Math.random() - 0.5) * 3, 0.3, CAT_POS.z + 5);
+  if (walk.on && walk.rig) { targets.length = 0; const h = gunHand(), fx = Math.sin(walk.face), fz = Math.cos(walk.face);   // Free walk: whatever's in front of her
+    const inFront = mice.filter(m => m.active && m.hittable && (m.center.x - h.x) * fx + (m.center.z - h.z) * fz > 0 && Math.abs((m.center.x - h.x) * fz - (m.center.z - h.z) * fx) < 1.2);
+    inFront.sort((a, b) => a.center.distanceTo(h) - b.center.distanceTo(h)); if (inFront.length) targets.push(inFront[0]); }
+  if (targets.length) gr.aim.copy(targets[0].center); else if (smash) gr.aim.copy(smash.pos); else if (walk.on && walk.rig) gr.aim.copy(gunHand()).add(_gF.set(Math.sin(walk.face) * 6, 0, Math.cos(walk.face) * 6)); else gr.aim.set(CAT_POS.x + (Math.random() - 0.5) * 3, 0.3, CAT_POS.z + 5);
   gr.held.lookAt(gr.aim); gr.held.updateMatrixWorld(true);
   const muzzle = gr.held.localToWorld(gr.held.userData.muzzle.clone());
   targets.forEach((m, i) => { tracer(muzzle, m.center.clone(), i * 25); setTimeout(() => shootMouse(m), 40 + i * 25); });
@@ -5705,6 +5807,11 @@ function tossGun() {                                                 // empty: s
   gr.state = 'tossed'; sfx.dryFire(); gr.v.set((Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random()), 2.4, 1.6); gr.w.set(6, 9, 4);
   showFireBtn();
 }
+const _gH = new THREE.Vector3(), _gAim = new THREE.Vector3(), _gF = new THREE.Vector3();
+function gunHand() {                                                  // where the pistol is held: by the cat in her box, or (Free walk) gripped in her mouth
+  if (!walk.on || !walk.rig) return gunRig.hand;
+  walk.rig.head.getWorldPosition(_gH); return _gH.add(_gF.set(Math.sin(walk.face) * 0.2, -0.1, Math.cos(walk.face) * 0.2));
+}
 function updateGun(dt) {
   const gr = gunRig;
   const reveal = gr.state === 'cupboard' && pistolDoor && pistolDoor.angle < -0.9 && cupboardPistol.visible;   // the pistol glints when its cupboard opens
@@ -5720,11 +5827,13 @@ function updateGun(dt) {
   if (gr.flashT > 0) { gr.flashT -= dt; if (gr.flashT <= 0) gr.flash.visible = false; }
   if (gr.state === 'cat') {
     gr.recoil = Math.max(0, gr.recoil - dt * 6);
+    const hand = gunHand();
     const idle = mice.find(m => m.active && m.hittable && onScreen(m.center));   // keeps a bead on the nearest threat
-    if (idle && gr.recoil <= 0) gr.aim.lerp(idle.center, Math.min(1, dt * 6));
-    gr.held.position.copy(gr.hand); gr.held.lookAt(gr.aim);
+    if (walk.on && walk.rig) { if (gr.recoil <= 0) gr.aim.lerp(_gAim.copy(hand).add(_gF.set(Math.sin(walk.face) * 4, 0, Math.cos(walk.face) * 4)), Math.min(1, dt * 10)); }   // Free walk: pointing where she's facing
+    else if (idle && gr.recoil <= 0) gr.aim.lerp(idle.center, Math.min(1, dt * 6));
+    gr.held.position.copy(hand); gr.held.lookAt(gr.aim);
     ammoPop = Math.max(0, ammoPop - dt * 4);
-    ammoTag.position.set(gr.hand.x + 0.75, gr.hand.y + 0.55 + Math.sin(clock * 3) * 0.05, gr.hand.z + 0.1); ammoTag.scale.setScalar(0.85 * (1 + ammoPop * 0.35));
+    ammoTag.position.set(hand.x + 0.75, hand.y + 0.55 + Math.sin(clock * 3) * 0.05, hand.z + 0.1); ammoTag.scale.setScalar(0.85 * (1 + ammoPop * 0.35));
     gr.held.rotateX(-gr.recoil * 0.5); gr.held.translateZ(-gr.recoil * 0.12);
   } else if (gr.state === 'tossed') {
     const o = gr.held; gr.v.y -= 9.8 * dt; o.position.addScaledVector(gr.v, dt);
@@ -7135,12 +7244,16 @@ function makeWalker(dark) {                                          // dark = t
 }
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY + 0.5;
+  let top = 0; walk.hitObj = null;
   for (const h of _wRay.intersectObjects(walk.meshes, false)) {
     let shown = true; for (let q = h.object; q; q = q.parent) if (!q.visible) { shown = false; break; }
-    if (shown) { walk.hitObj = h.object; return h.point.y; }
+    if (shown) { walk.hitObj = h.object; top = h.point.y; break; }
   }
-  walk.hitObj = null; return 0;
+  if (!_tvTop) { _tvTop = new THREE.Box3().setFromObject(tvPanel); }   // the TV's top edge is only an inch deep: give her a proper ledge along it to stand on
+  if (fromY >= _tvTop.max.y - 0.001 && _tvTop.max.y > top && x > _tvTop.min.x && x < _tvTop.max.x && Math.abs(z - (_tvTop.min.z + _tvTop.max.z) / 2) < 0.26) { walk.hitObj = tvPanel; top = _tvTop.max.y; }
+  return top;
 }
+let _tvTop = null;
 // her body as a set of points: nose, both shoulders, both hips, tail end and middle (so her sides and back end
 // can't slide into a sofa or the box, not just her nose)
 const BODY_PTS = [[0.36, 0], [0.18, 0.17], [0.18, -0.17], [-0.14, 0.17], [-0.14, -0.17], [-0.32, 0], [0, 0]];
@@ -7173,10 +7286,17 @@ function tvHits(x, z, face, y) {                                      // the TV 
   for (const k of [-0.3, 0, 0.3]) { const px = x + fx * k, pz = z + fz * k; if (px > _tvB.min.x - M && px < _tvB.max.x + M && pz > _tvB.min.z - M && pz < _tvB.max.z + M) n++; }
   return n;
 }
+function cabHits(x, z, face, y) {                                    // how much of her is inside the credenza (the cupboards behind their doors): nose, middle, rump
+  if (y > CAB_H - 0.15) return 0;
+  const fx = Math.sin(face), fz = Math.cos(face), x1 = MAIN_X0 + MAIN_W; let n = 0;
+  for (const k of [-0.3, 0, 0.3]) { const px = x + fx * k, pz = z + fz * k; if (pz < DEPTH + 0.02 && px > LEFT_X0 && px < x1) n++; }
+  return n;
+}
 function walkBlocked(nx, nz, ox, oz) {
   const p = walk.pos, lim = p.y + (walk.grounded ? WALK.step : 0.05), top = p.y + WALK.height;
   const mx = nx - ox, mz = nz - oz, face = mx || mz ? Math.atan2(mx, mz) : walk.face;   // (she turns to face where she's going)
   if (tvHits(nx, nz, face, p.y) > tvHits(ox, oz, walk.face, p.y)) return true;
+  if (cabHits(nx, nz, face, p.y) > cabHits(ox, oz, walk.face, p.y)) return true;   // (an open cupboard is still not a way in)
   if (sideBlocked(ox, oz, p.y, mx, mz)) return true;
   const now = walk.nowHits != null ? walk.nowHits : bodyHits(ox, oz, walk.face, lim, top);
   const next = Math.max(bodyHits(nx, nz, face, lim, top), bodyHits(nx, nz, walk.face, lim, top));   // both the way she's heading and the way she's still facing mid-turn
@@ -7200,6 +7320,7 @@ function startWalk() {
   Object.assign(walk, { on: true, vy: 0, grounded: true, face: Math.PI, phase: 0, batT: 0, squash: 0, fp: false, jumpQ: -1, burnCD: 0, look: null, tableHops: 0, meowRun: 0, lastMeow: -9, meowT: 0, puff: 0, inBox: false });
   catTail.visible = false;
   walk.vel.set(0, 0, 0); walk.stick.x = walk.stick.y = 0;
+  resetLaundry();
   walk.pos.set(0.9, 0, 4.4); walk.pos.y = surfaceTop(walk.pos.x, walk.pos.z, 0.9);
   walk.rig.g.visible = true; walk.rig.shadow.visible = true; cat.visible = false;
   fcStart(); Object.assign(fc, { dist0: 3.3, el0: 20, zoom: 1, tilt: 0, yaw: 0 });
@@ -7320,7 +7441,7 @@ function updateWalk(dt) {
   // animate: trot, tuck in the air, bat with a front paw, tail sways
   walk.phase += dt * (5 + spd * 3.4); walk.batT = Math.max(0, walk.batT - dt); walk.squash = Math.max(0, walk.squash - dt * 5);
   const a = Math.min(1, spd / 2), sw = Math.sin(walk.phase);
-  W.g.position.copy(p); W.g.rotation.y = walk.face; W.g.visible = !walk.fp;
+  W.g.position.copy(p); W.g.rotation.y = walk.face; W.g.visible = !walk.fp && !blanketRigs.some(r => r.state === 'cat');   // (under a blanket: she's the lump)
   const nk = catnip.active ? catnip.kind : '';
   walk.gScale = (walk.gScale || 1) + ((nk === 'giant' ? 1.8 : 1) - (walk.gScale || 1)) * Math.min(1, dt * 4); W.g.scale.setScalar(walk.gScale);   // giant catnip: a huge Princess
   if (nk === 'zen') W.g.position.y += 0.28 + Math.sin(clock * 2) * 0.06;   // zen catnip: she levitates in bliss
@@ -7586,6 +7707,9 @@ function walkSwipe() {                                               // swipe at
   const p = walk.pos, fx = Math.sin(walk.face), fz = Math.cos(walk.face);
   const paw = new THREE.Vector3(p.x + fx * 0.45, p.y + 0.35, p.z + fz * 0.45);
   if (coonSwipe(paw)) return;                                        // the raccoon at the slider: whack the glass right in front of it
+  if (blanketRigs.some(r => r.state === 'cat')) { shrugBlanket(); return; }   // under a blanket: the swipe flings it off
+  if (gunRig.state === 'cat') { fireGun(); return; }                 // armed: the swipe pulls the trigger
+  if (laundrySwipe(paw)) return;                                     // the folded laundry on the armchair: all over the floor
   if (mirrorWorld && MW.dk && MW.dk.state !== 'dead') {                // the dark kitty within reach: that's who gets it
     const q = MW.dk.pos; if (Math.hypot(q.x - paw.x, q.z - paw.z) < 1.0 && Math.abs(q.y + 0.4 - paw.y) < 0.9) { hitDark(); return; }
   }
@@ -7765,31 +7889,31 @@ function updateRaccoon(dt) {
         const sq = Math.min(1, k / 0.4); R.head.position.z = 0.04 + sq * 0.13; R.head.scale.set(1 + sq * 0.22, 1 + sq * 0.08, 1 - sq * 0.35); R.head.rotation.y = 0;
         R.arms.forEach((a, i) => a.rotation.set(-1.55, 0, (i ? -1 : 1) * 0.35));
       } else if (kind === 'nyah') {                                      // thumbs in its ears, fingers waggling, tongue out
-        R.tongue.visible = true; R.arms.forEach((a, i) => a.rotation.set(-2.55, 0, (i ? -1 : 1) * (0.55 + Math.sin(clock * 18) * 0.12)));
+        R.tongue.visible = true; R.arms.forEach((a, i) => a.rotation.set(0.15, 0, (i ? 1 : -1) * (Math.PI - 0.38 + Math.sin(clock * 18) * 0.08)));   // paws up beside its ears (clear of its head), waggling
         R.head.rotation.z = Math.sin(clock * 9) * 0.18;
       } else if (kind === 'wiggle') {                                    // turns round and shakes its bum at her, looking back over its shoulder
         g.rotation.y = 0; b.rotation.z = Math.sin(clock * 14) * 0.22; R.head.rotation.y = Math.PI * 0.75; R.arms.forEach(a => a.rotation.set(-0.3, 0, 0));
         R.tail.forEach((sg, i) => { sg.rotation.y = Math.sin(clock * 14 - i * 0.5) * 0.45; });
       } else if (kind === 'snack') {                                     // noms one of HER mushrooms, right in front of her
-        R.snack.visible = true; R.arms.forEach(a => a.rotation.set(-2.2, 0, 0)); R.arms[0].rotation.z = -0.4; R.arms[1].rotation.z = 0.4;
+        R.snack.visible = true; R.arms.forEach(a => a.rotation.set(-1.75, 0, 0)); R.arms[0].rotation.z = -0.3; R.arms[1].rotation.z = 0.3;   // (paws up at its mouth, in front of its face)
         R.head.rotation.x = 0.2 + Math.abs(Math.sin(clock * 12)) * 0.12; R.snack.scale.setScalar(Math.max(0.3, 1 - k * 0.25));
         if (Math.sin(clock * 12) > 0.95) tone(300, 200, 0.04, 'triangle', 0.02);
       } else {                                                           // a little jig
         const j = Math.sin(clock * 10); b.position.x = j * 0.08; b.rotation.z = -j * 0.15; b.position.y = Math.abs(j) * 0.06;
-        R.arms.forEach((a, i) => a.rotation.set(-2.3 + (i ? j : -j) * 0.5, 0, (i ? -1 : 1) * 0.3)); R.legs[0].rotation.x = j * 0.4; R.legs[1].rotation.x = -j * 0.4;
+        R.arms.forEach((a, i) => a.rotation.set(0.1, 0, (i ? 1 : -1) * (2.25 + (i ? j : -j) * 0.45))); R.legs[0].rotation.x = j * 0.4; R.legs[1].rotation.x = -j * 0.4;   // arms up and out, swinging
       }
       break;
     }
     case 'mock':                                                         // cups an ear... "Meow? MEOW?"... and cracks up laughing
       g.rotation.y = Math.PI;
-      if (t < 1.1) { R.arms[1].rotation.set(-2.6, 0, -0.9); R.head.rotation.z = 0.35; R.head.rotation.y = lookYaw; if (!coon.said) { coon.said = 1; coonSay('Hm? Whazzat?'); } }
-      else if (t < 2.0) { R.head.rotation.x = -0.3; R.arms.forEach(a => a.rotation.set(-2.7, 0, 0)); if (coon.said < 2) { coon.said = 2; coonSay('Meeeow? MEEEOW? 😹'); speak('Meow meow meeeow!', { pitch: 2, rate: 1.35 }); [900, 1300, 750].forEach((f, i) => tone(f, f * 1.3, 0.14, 'triangle', 0.035, i * 0.16)); } }
+      if (t < 1.1) { R.arms[1].rotation.set(0.2, 0, Math.PI - 0.5); R.head.rotation.z = -0.3; R.head.rotation.y = lookYaw; if (!coon.said) { coon.said = 1; coonSay('Hm? Whazzat?'); } }
+      else if (t < 2.0) { R.head.rotation.x = -0.3; R.arms.forEach((a, i) => a.rotation.set(0.1, 0, (i ? 1 : -1) * (Math.PI - 0.55))); if (coon.said < 2) { coon.said = 2; coonSay('Meeeow? MEEEOW? 😹'); speak('Meow meow meeeow!', { pitch: 2, rate: 1.35 }); [900, 1300, 750].forEach((f, i) => tone(f, f * 1.3, 0.14, 'triangle', 0.035, i * 0.16)); } }
       else if (t < 3.6) { b.rotation.x = -0.25; b.position.y = Math.abs(Math.sin(t * 20)) * 0.04; R.head.rotation.x = -0.4; R.arms.forEach(a => a.rotation.set(-0.4, 0, 0)); R.tongue.visible = true; if (coon.said < 3) { coon.said = 3; coonSay('HAHAHAHA!'); chitter(10, 2200); } }   // holding its belly
       else coonSet('taunt');
       break;
     case 'startle':                                                      // that yowl: it jumps clean out of its fur
       g.rotation.y = Math.PI; b.position.y = Math.max(0, Math.sin(Math.min(1, t / 0.45) * Math.PI)) * 0.35; b.scale.setScalar(1 + Math.max(0, 0.25 - t * 0.15));
-      R.arms.forEach((a, i) => a.rotation.set(-2.9, 0, (i ? -1 : 1) * 0.5)); R.eyes.forEach(e => e.scale.setScalar(1.5));
+      R.arms.forEach((a, i) => a.rotation.set(0.1, 0, (i ? 1 : -1) * (Math.PI - 0.6))); R.eyes.forEach(e => e.scale.setScalar(1.5));
       if (!coon.said) { coon.said = 1; coonSay('EEP!!', 'bad'); tone(1400, 2400, 0.18, 'square', 0.04); }
       if (t > 1.5) { coonSay('...pfft. Not scared.'); coonSet('taunt'); coon.tauntT = 0; coon.said = 1; }
       break;
@@ -7797,7 +7921,7 @@ function updateRaccoon(dt) {
       g.rotation.y = Math.PI;
       if (t < 0.9) { const k = Math.min(1, t / 0.35); b.position.z = -0.3 * k; b.position.y = -0.18 * k; b.rotation.x = -0.6 * k; R.legs.forEach(l => l.rotation.x = -1.2 * k); R.arms.forEach((a, i) => a.rotation.set(-0.3, 0, (i ? -1 : 1) * 1.2 * k)); R.eyes.forEach(e => e.scale.setScalar(1.4)); if (!coon.said) { coon.said = 1; coonSay('HEY!!', 'bad'); tone(900, 500, 0.2, 'square', 0.04); } }
       else if (coon.swipes >= 3) { coonSay('Nope nope NOPE!', 'bad'); chitter(8, 2000); unlock('raccoon'); showWalkName('🦝 The raccoon ran off!'); coon.from.copy(pos); coon.to.set(home.x + 7, home.y, home.z + 2.5); coonSet('flee'); }
-      else if (t < 2.1) { R.arms[1].rotation.set(-2.7 + Math.sin(clock * 22) * 0.25, 0, -0.2); R.head.rotation.y = lookYaw; if (coon.said < 2) { coon.said = 2; coonSay(coon.swipes === 2 ? 'One more and I\'m OUTTA here!' : 'Hmph! Missed me anyway!'); chitter(5, 1200); } }   // shaking its fist
+      else if (t < 2.1) { R.arms[1].rotation.set(-0.3, 0, Math.PI - 0.75 + Math.sin(clock * 22) * 0.2); R.head.rotation.y = lookYaw; if (coon.said < 2) { coon.said = 2; coonSay(coon.swipes === 2 ? 'One more and I\'m OUTTA here!' : 'Hmph! Missed me anyway!'); chitter(5, 1200); } }   // shaking its fist
       else coonSet('taunt');
       break;
     case 'laugh':                                                        // she swiped from across the room: it points and laughs
@@ -7806,6 +7930,36 @@ function updateRaccoon(dt) {
       if (t > 1.8) coonSet('taunt');
       break;
   }
+}
+const _lw = new THREE.Vector3();
+function laundrySwipe(paw) {
+  const L = laundry; if (!L || L.state !== 'folded') return false;
+  L.stack.getWorldPosition(_lw); if (Math.hypot(_lw.x - paw.x, _lw.z - paw.z) > 0.75 || Math.abs(_lw.y + 0.15 - paw.y) > 0.8) return false;
+  L.state = 'messy'; L.stack.visible = false; showWalkName('Folded laundry... not anymore!'); sfx.rustle && sfx.rustle(); noise(0.3, 0.08, 1500);
+  const rot = ARMCHAIR.rot, fx = Math.sin(rot), fz = Math.cos(rot), rx = Math.cos(rot), rz = -Math.sin(rot);
+  L.specs.forEach(([c, t], i) => {                                    // each garment unfolds as it flies, and lands crumpled on the carpet
+    const w = IN(12.5 - i * 0.5) * 1.7, d = IN(10) * 1.9, geo = new THREE.PlaneGeometry(w, d, 8, 8), pp = geo.attributes.position;
+    for (let k = 0; k < pp.count; k++) pp.setZ(k, (Math.random() - 0.5) * IN(1.6) + Math.sin(pp.getX(k) * 9 + i) * IN(0.8));   // rumpled
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, lam(c, { side: THREE.DoubleSide })); m.userData.name = 'Laundry'; m.userData.noWalk = true; povEndWall.add(m);
+    const along = 0.7 + Math.random() * 1.2, side = (Math.random() - 0.5) * 1.8;
+    const to = new THREE.Vector3(_lw.x + fx * along + rx * side, 0.012 + i * 0.004, _lw.z + fz * along + rz * side);
+    L.bits.push({ m, from: _lw.clone().add(new THREE.Vector3(0, i * 0.03, 0)), to, t: -i * 0.05, spin: (Math.random() - 0.5) * 8, yaw: Math.random() * 6 });
+  });
+  return true;
+}
+function updateLaundry(dt) {
+  const L = laundry; if (!L || !L.bits.length) return;
+  for (const b of L.bits) {
+    if (b.t >= 1) continue;
+    b.t = Math.min(1, b.t + dt / 0.6); const k = Math.max(0, b.t), e = k * k * (3 - 2 * k);
+    b.m.position.lerpVectors(b.from, b.to, e); b.m.position.y += Math.sin(k * Math.PI) * 0.5;
+    b.m.rotation.set(-Math.PI / 2 + (1 - k) * b.spin * 0.3, b.yaw * k, (1 - k) * b.spin);
+  }
+}
+function resetLaundry() {
+  const L = laundry; if (!L) return;
+  for (const b of L.bits) povEndWall.remove(b.m); L.bits = []; L.stack.visible = true; L.state = 'folded';
 }
 function walkMeow() {
   if (!walk.on || state !== 'playing') return;
@@ -7931,10 +8085,11 @@ function frame(now) {
   updateBombFx(dt);
 
   shake = Math.max(0, shake - dt * 1.4);
+  updateKarenCam(dt);
   if (fc.on && !cine) updateFreeCam(dt);
   updateEdgeArrows();
   camera.position.copy(camBase);
-  if (cine) camera.lookAt(cine.look);
+  if (cine) camera.lookAt(cine.look); else if (karenCam) camera.lookAt(karenCam.look);
   if (catnip.active && !cine) { const sw = nipK().sway; camera.position.x += Math.sin(clock * 1.3) * 0.06 * sw; camera.position.y += Math.cos(clock * 1.7) * 0.04 * sw; }   // catnip: the whole room drifts dreamily
   if (shake > 0) camera.position.add(new THREE.Vector3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0));
   lamp.intensity = (0.5 + Math.sin(clock * 1.3) * 0.03) * lightF;
@@ -7952,7 +8107,7 @@ function frame(now) {
   candleLight.intensity = (0.32 + flick / flames.length * 0.1) * lit / flames.length;
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
   if (sliderDisco) updateSliderDisco(dt);
-  updateRaccoon(dt);                              // the slider's little disco ball turns (and runs the disco)
+  updateRaccoon(dt); updateLaundry(dt);                              // the slider's little disco ball turns (and runs the disco)
 
   if (povEndWall) povEndWall.visible = camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02;   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
