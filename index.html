@@ -3299,7 +3299,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
   // a two-panel sliding glass door looking out onto the backyard lawn. From the usual camera outside it's not drawn.
   povEndWall = new THREE.Group(); povEndWall.visible = false; povEndWall.userData.name = 'Sliding glass door';
   {
-    const hw = ROOM.halfW, DW = FT(6), DH = FT(6.67), DX = -1.6, L0 = -(DX + DW / 2), L1 = -(DX - DW / 2);   // (the wall faces back into the room, so its local x runs the other way)
+    const hw = ROOM.halfW, DW = FT(6), DH = FT(6.67), DX = -1.6 + FT(1), L0 = -(DX + DW / 2), L1 = -(DX - DW / 2);   // (the wall faces back into the room, so its local x runs the other way)
     const sh = new THREE.Shape(); sh.moveTo(-hw, 0); sh.lineTo(L0, 0); sh.lineTo(L0, DH); sh.lineTo(L1, DH); sh.lineTo(L1, 0); sh.lineTo(hw, 0); sh.lineTo(hw, WH); sh.lineTo(-hw, WH); sh.closePath();
     const wg = new THREE.ShapeGeometry(sh), uv = wg.attributes.uv, ps = wg.attributes.position;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (ps.getX(i) + hw) / (2 * hw), ps.getY(i) / WH);   // same paneling as the other walls
@@ -3441,8 +3441,116 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         for (const [i, j] of [[0, 1], [2, 3], [0, 2], [1, 3]]) rod(c, mid(i, 0.02), mid(j, 0.55), IN(0.12), metal); // ...and the struts up to the seat
       }
     }
-    { // wall art above the litter box (from the photo): a tall panel of tiny mirror tiles laid in a damask pattern on champagne gold
-      const AW2 = IN(22), AH = IN(46), g = named(new THREE.Group(), 'Mosaic mirror art'); g.position.set(-hw + IN(0.55), IN(21) + AH / 2, VD - IN(13)); g.rotation.y = Math.PI / 2;
+    { // a big cork board above the plank table (from the photo): gold cork in a pale wood frame, covered in pinned polaroids,
+      // photo-booth strips, notes, a holy card, stickers, a Blue Jays pennant and a Kings banner
+      const BW = IN(72), BH = IN(47), g = named(new THREE.Group(), 'Cork board'); g.position.set(-hw + IN(0.6), IN(34) + BH / 2, WTABLE.z); g.rotation.y = Math.PI / 2;
+      const W = 1000, H = 650;
+      let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+      const tex = canvasTex(1024, 666, (c) => {
+        c.scale(1024 / W, 666 / H);
+        c.fillStyle = '#c9a35a'; c.fillRect(0, 0, W, H);                                                           // gold cork
+        for (let i = 0; i < 9000; i++) { const v = rnd(); c.fillStyle = v < 0.5 ? 'rgba(120,85,30,.18)' : 'rgba(255,230,160,.16)'; c.fillRect(rnd() * W, rnd() * H, 1.6, 1.6); }
+        for (let i = 0; i < 40; i++) { const x = rnd() * W, y = rnd() * H, r = 30 + rnd() * 90, gr = c.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(${rnd() < 0.5 ? '110,80,30' : '230,200,130'},.1)`); gr.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = gr; c.fillRect(x - r, y - r, r * 2, r * 2); }
+        const skin = ['#e9c4a6', '#d9a882', '#f1d3bd', '#c98f6c'], hair = ['#2a1d16', '#4a3222', '#1a1411', '#6b4a2e', '#b58a55'], bgs = ['#3c3a3e', '#6b5f58', '#8a8f96', '#a89684', '#2d3440', '#5a6a5a', '#c9c3bb', '#7d6a70'];
+        const pin = (x, y) => { c.fillStyle = ['#e03b3b', '#f2c230', '#3a7be0', '#ffffff', '#3cb46e'][rnd() * 5 | 0]; c.beginPath(); c.arc(x, y, 3.4, 0, 7); c.fill(); c.fillStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.arc(x - 1, y - 1, 1.1, 0, 7); c.fill(); };
+        const snap = (x, y, w, h) => {                                                                          // a little photo: a background and one to three people
+          c.fillStyle = bgs[rnd() * bgs.length | 0]; c.fillRect(x, y, w, h);
+          if (rnd() < 0.3) { c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(x, y, w, h * 0.45); }
+          const n = 1 + (rnd() * 2.6 | 0);
+          for (let k = 0; k < n; k++) {
+            const cx = x + w * (n === 1 ? 0.5 : 0.25 + 0.5 * k / (n - 1)) + (rnd() - 0.5) * w * 0.1, r = Math.min(w, h) * (n === 1 ? 0.2 : 0.15), cy = y + h * 0.45;
+            c.fillStyle = hair[rnd() * hair.length | 0]; c.beginPath(); c.ellipse(cx, cy + r * 0.3, r * 1.25, r * 1.7, 0, 0, 7); c.fill();   // hair
+            c.fillStyle = skin[rnd() * skin.length | 0]; c.beginPath(); c.ellipse(cx, cy, r * 0.8, r, 0, 0, 7); c.fill();                    // face
+            c.fillStyle = ['#222', '#e8e2da', '#7a2a2a', '#2f4f7a', '#4a4a4a'][rnd() * 5 | 0]; c.fillRect(cx - r * 1.3, cy + r * 1.1, r * 2.6, h);   // shoulders
+          }
+          c.fillStyle = 'rgba(0,0,0,.08)'; c.fillRect(x, y, w, h);
+        };
+        const clip = (x, y, w, h, fn) => { c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip(); fn(); c.restore(); };
+        const shadow = (fn) => { c.save(); c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 5; c.shadowOffsetX = 2; c.shadowOffsetY = 3; fn(); c.restore(); };
+        const polaroid = (cx, cy, w, h, rot, land) => {                                                            // white border, thicker at the bottom
+          c.save(); c.translate(cx, cy); c.rotate(rot || 0);
+          shadow(() => { c.fillStyle = '#f7f5f0'; c.fillRect(-w / 2, -h / 2, w, h); });
+          const m = w * 0.08, iw = w - m * 2, ih = land ? h * 0.72 : h * 0.72;
+          clip(-w / 2 + m, -h / 2 + m, iw, ih, () => snap(-w / 2 + m, -h / 2 + m, iw, ih));
+          c.restore(); pin(cx, cy - h / 2 + 4);
+        };
+        const strip = (cx, y0, w, h, frames) => {                                                               // a photo-booth strip
+          shadow(() => { c.fillStyle = '#f7f5f0'; c.fillRect(cx - w / 2, y0, w, h); });
+          const fh = (h - 6) / frames;
+          for (let k = 0; k < frames; k++) clip(cx - w / 2 + 3, y0 + 3 + k * fh, w - 6, fh - 3, () => snap(cx - w / 2 + 3, y0 + 3 + k * fh, w - 6, fh - 3));
+          pin(cx, y0 + 4);
+        };
+        const note = (cx, cy, w, h, rot, ink) => {                                                                // a handwritten card
+          c.save(); c.translate(cx, cy); c.rotate(rot);
+          shadow(() => { c.fillStyle = '#f3efe6'; c.fillRect(-w / 2, -h / 2, w, h); });
+          c.strokeStyle = ink || '#2b3a66'; c.lineWidth = 1.2;
+          for (let l = 0; l < 5; l++) { c.beginPath(); let x = -w / 2 + 6; const y = -h / 2 + 10 + l * (h - 16) / 5; c.moveTo(x, y); while (x < w / 2 - 8 - rnd() * 14) { x += 3 + rnd() * 4; c.lineTo(x, y + (rnd() - 0.5) * 4); } c.stroke(); }
+          c.restore(); pin(cx, cy - h / 2 + 4);
+        };
+        // photos (positions traced from the photo of the real board)
+        for (const [x, y, w, h, r, land] of [
+          [40, 172, 54, 44, 0, 1], [153, 190, 36, 54, 0], [188, 280, 32, 44, 0], [283, 275, 36, 46, 0], [333, 274, 34, 44, 0.08],
+          [167, 336, 58, 42, -0.2, 1], [452, 86, 30, 44, 0], [446, 133, 32, 40, -0.35], [452, 172, 30, 44, 0], [398, 180, 30, 44, 0],
+          [510, 180, 30, 44, 0], [427, 222, 30, 42, 0], [455, 240, 30, 42, 0], [482, 222, 30, 42, 0], [401, 273, 30, 42, 0], [458, 276, 30, 42, 0],
+          [497, 273, 34, 42, -0.25], [533, 280, 32, 42, 0.1], [566, 280, 30, 42, 0], [571, 210, 30, 44, 0], [665, 255, 56, 46, 0, 1],
+          [633, 342, 30, 40, 0], [633, 382, 30, 40, 0], [705, 318, 30, 36, -0.3], [740, 320, 44, 40, 0.15, 1], [522, 348, 30, 38, 0.1],
+          [860, 200, 40, 34, 0, 1], [978, 88, 26, 40, 0], [970, 214, 28, 40, 0], [965, 340, 28, 40, 0], [956, 452, 28, 38, 0], [956, 494, 28, 38, 0],
+          [118, 638, 40, 22, 0, 1]
+        ]) polaroid(x - 15 + w / 2, y - 18 + h / 2, w, h, r, land);
+        strip(47 - 15, 215 - 18, 26, 88, 4); strip(74 - 15, 310 - 18, 28, 108, 5); strip(626 - 15, 240 - 18, 28, 104, 4); strip(540 - 15, 345 - 18, 26, 70, 3); strip(890 - 15, 234 - 18, 30, 86, 4);
+        // the holy card: Our Lady in blue and red on gold
+        { const x = 695 - 15, y = 198 - 18, w = 36, h = 58; shadow(() => { c.fillStyle = '#e8d9a8'; c.fillRect(x, y, w, h); });
+          c.fillStyle = '#c8a24a'; c.fillRect(x + 3, y + 3, w - 6, h - 6); c.fillStyle = '#f4dc7a'; c.beginPath(); c.arc(x + w / 2, y + 17, 11, 0, 7); c.fill();
+          c.fillStyle = '#e9c4a6'; c.beginPath(); c.ellipse(x + w / 2, y + 18, 5, 6.5, 0, 0, 7); c.fill();
+          c.fillStyle = '#2f5aa8'; c.beginPath(); c.moveTo(x + w / 2, y + 11); c.lineTo(x + 5, y + h - 4); c.lineTo(x + w - 5, y + h - 4); c.closePath(); c.fill();
+          c.fillStyle = '#b8342c'; c.beginPath(); c.moveTo(x + w / 2, y + 25); c.lineTo(x + w / 2 - 6, y + h - 4); c.lineTo(x + w / 2 + 6, y + h - 4); c.closePath(); c.fill(); pin(x + w / 2, y + 3); }
+        note(162 - 15, 467 - 18, 86, 44, 0.18, '#2b3a66');                                                     // a handwritten note, tilted
+        note(862 - 15, 478 - 18, 58, 70, 0.02, '#355c3a');                                                     // a card with a little drawing
+        c.fillStyle = '#7a8f4a'; c.beginPath(); c.ellipse(862 - 15, 462 - 18, 8, 10, 0, 0, 7); c.fill(); c.fillStyle = '#8a5a3a'; c.fillRect(860 - 15, 468 - 18, 4, 10);
+        { const x = 490 - 15, y = 408 - 18; shadow(() => { c.fillStyle = '#f2c9cf'; c.fillRect(x, y, 50, 74); }); pin(x + 25, y + 4); }   // a pink paper
+        // stickers
+        { const x = 220 - 15, y = 242 - 18; shadow(() => { c.fillStyle = '#1b1b1b'; c.fillRect(x, y, 54, 56); });            // black slogan sticker
+          c.fillStyle = '#f2efe8'; c.font = 'bold 10px Arial'; c.textAlign = 'center'; c.fillText('SAVE', x + 27, y + 17); c.fillText('THE', x + 27, y + 29); c.fillText('PLANET', x + 27, y + 41); }
+        c.save(); c.translate(346 - 15, 250 - 18); c.rotate(-0.05); shadow(() => { c.fillStyle = '#e8506a'; c.fillRect(-20, -14, 40, 28); }); c.fillStyle = '#fff'; for (let l = 0; l < 3; l++) c.fillRect(-15, -8 + l * 7, 30 - l * 6, 3); c.restore();
+        c.save(); c.translate(378 - 15, 262 - 18); c.rotate(0.35); shadow(() => { c.fillStyle = '#e8506a'; c.fillRect(-16, -18, 32, 36); }); c.fillStyle = '#fff'; for (let l = 0; l < 4; l++) c.fillRect(-11, -12 + l * 7, 22, 3); c.restore();
+        c.save(); c.translate(288 - 15, 350 - 18); shadow(() => { c.fillStyle = '#1a1a1a'; c.beginPath(); c.ellipse(0, 0, 24, 18, 0, 0, 7); c.fill(); });   // the burger-joint oval
+        c.strokeStyle = '#f2c230'; c.lineWidth = 2; c.beginPath(); c.ellipse(0, 0, 21, 15, 0, 0, 7); c.stroke(); c.fillStyle = '#d8342c'; c.beginPath(); c.moveTo(-14, -3); c.lineTo(8, -3); c.lineTo(8, -9); c.lineTo(17, 1); c.lineTo(8, 10); c.lineTo(8, 4); c.lineTo(-14, 4); c.closePath(); c.fill(); c.restore();
+        c.fillStyle = '#e8c83a'; c.fillRect(322 - 15, 182 - 18, 12, 14);                                             // little yellow square
+        c.fillStyle = '#6fa8d8'; c.beginPath(); c.roundRect ? c.roundRect(643 - 15, 178 - 18, 30, 12, 4) : c.rect(643 - 15, 178 - 18, 30, 12); c.fill(); c.fillStyle = '#333'; c.beginPath(); c.arc(650 - 15, 190 - 18, 3, 0, 7); c.arc(666 - 15, 190 - 18, 3, 0, 7); c.fill();   // car sticker
+        c.fillStyle = '#3aa37a'; c.beginPath(); c.ellipse(855 - 15, 198 - 18, 12, 16, 0.5, 0, 7); c.fill();          // green sticker
+        c.fillStyle = '#a0643a'; c.beginPath(); c.ellipse(840 - 15, 408 - 18, 8, 13, 0, 0, 7); c.fill(); c.fillStyle = '#6a3e22'; c.beginPath(); c.arc(840 - 15, 398 - 18, 2, 0, 7); c.fill();   // wooden tag
+        // the Blue Jays pennant: royal blue felt, a white-and-blue jay's head, a maple leaf
+        { const x = 237 - 15, y = 383 - 18, w = 229, h = 157;
+          shadow(() => { c.fillStyle = '#1d3f9e'; c.fillRect(x, y, w, h); });
+          for (let i = 0; i < 1400; i++) { c.fillStyle = rnd() < 0.5 ? 'rgba(0,0,40,.12)' : 'rgba(120,150,255,.08)'; c.fillRect(x + rnd() * w, y + rnd() * h, 1.5, 1.5); }
+          const L = (cx, cy, s) => { const pts = [[0, -1], [0.18, -0.62], [0.42, -0.72], [0.36, -0.32], [0.82, -0.44], [0.62, -0.12], [0.9, 0.02], [0.5, 0.2], [0.58, 0.44], [0.12, 0.3], [0.08, 0.72], [-0.08, 0.72], [-0.12, 0.3], [-0.58, 0.44], [-0.5, 0.2], [-0.9, 0.02], [-0.62, -0.12], [-0.82, -0.44], [-0.36, -0.32], [-0.42, -0.72], [-0.18, -0.62]];
+            c.beginPath(); pts.forEach(([a, b2], i) => i ? c.lineTo(cx + a * s, cy + b2 * s) : c.moveTo(cx + a * s, cy + b2 * s)); c.closePath(); };
+          L(x + 146, y + 68, 40); c.fillStyle = '#2d5bd0'; c.fill(); c.strokeStyle = '#ffffff'; c.lineWidth = 3; c.stroke();   // the maple leaf
+          c.fillStyle = '#ffffff'; c.beginPath(); c.moveTo(x + 50, y + 70); c.quadraticCurveTo(x + 70, y + 38, x + 118, y + 44); c.lineTo(x + 150, y + 26); c.lineTo(x + 136, y + 52); c.lineTo(x + 162, y + 46); c.lineTo(x + 140, y + 70); c.quadraticCurveTo(x + 150, y + 104, x + 120, y + 122); c.quadraticCurveTo(x + 96, y + 100, x + 88, y + 88); c.quadraticCurveTo(x + 66, y + 86, x + 50, y + 70); c.fill();   // the jay's head
+          c.fillStyle = '#9fb8e8'; c.beginPath(); c.moveTo(x + 58, y + 72); c.quadraticCurveTo(x + 80, y + 78, x + 90, y + 88); c.quadraticCurveTo(x + 70, y + 88, x + 58, y + 72); c.fill();   // beak shading
+          c.fillStyle = '#15327e'; c.beginPath(); c.moveTo(x + 92, y + 58); c.quadraticCurveTo(x + 104, y + 50, x + 116, y + 58); c.quadraticCurveTo(x + 104, y + 66, x + 92, y + 58); c.fill();   // eye stripe
+          c.fillStyle = '#fff'; c.beginPath(); c.arc(x + 106, y + 57, 3, 0, 7); c.fill();
+          pin(x + 6, y + 6); pin(x + w - 6, y + 6); }
+        // the Kings playoffs banner
+        { const x = 540 - 15, y = 425 - 18, w = 212, h = 180;
+          shadow(() => { c.fillStyle = '#f4f3ef'; c.fillRect(x, y, w, h); });
+          c.fillStyle = '#16161a'; c.beginPath(); c.moveTo(x, y); c.lineTo(x + w * 0.62, y); c.lineTo(x + w * 0.3, y + h * 0.42); c.lineTo(x, y + h * 0.42); c.closePath(); c.fill();
+          c.save(); c.translate(x + 15, y + 70); c.rotate(-Math.PI / 2); c.fillStyle = '#f4f3ef'; c.font = 'bold 10px Arial'; c.textAlign = 'left'; c.fillText('PLAYOFFS', 0, 0); c.restore();
+          c.fillStyle = '#16161a'; c.font = 'bold 13px Arial'; c.textAlign = 'center'; c.fillText('KINGS', x + 76, y + 90);
+          c.font = '900 25px Arial Black, Arial'; c.textAlign = 'left'; c.fillText('BUILT', x + 104, y + 92); c.fillText('FOR THIS', x + 50, y + 126);
+          pin(x + 6, y + 6); pin(x + w - 6, y + 6); }
+        // a few empty pushpins in the cork
+        for (const [x, y] of [[118, 300], [125, 316], [102, 338], [74, 424], [196, 502], [330, 186]]) pin(x - 15, y - 18);
+      }, 1, 1);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(BW, BH), lam(0xffffff, { map: tex })); face.position.z = IN(0.8); face.userData.name = 'Cork board'; g.add(face);
+      BX(g, BW, BH, IN(0.7), lam(0xa98a55), 0, 0, IN(0.35));                                                        // the backing
+      const pine = lam(0xd9b877);
+      BX(g, BW + IN(2), IN(1.2), IN(1.3), pine, 0, BH / 2 + IN(0.6), IN(0.65)); BX(g, BW + IN(2), IN(1.2), IN(1.3), pine, 0, -BH / 2 - IN(0.6), IN(0.65));   // the frame
+      BX(g, IN(1.2), BH, IN(1.3), pine, BW / 2 + IN(0.6), 0, IN(0.65)); BX(g, IN(1.2), BH, IN(1.3), pine, -BW / 2 - IN(0.6), 0, IN(0.65));
+      g.traverse(o => { if (o.isMesh) o.userData.noWalk = true; });
+    }
+    { // wall art on the back wall above the litter box, beside the slider (from the photo): a tall panel of tiny mirror tiles laid in a damask pattern on champagne gold
+      const AW2 = IN(22), AH = IN(46), g = named(new THREE.Group(), 'Mosaic mirror art'); g.position.set(-hw + IN(14.5), IN(21) + AH / 2, VD - IN(0.55)); g.rotation.y = Math.PI;   // on the back wall over the litter box, beside the slider
       const TW = 176, TH = 368, mask = document.createElement('canvas'); mask.width = TW; mask.height = TH; const mc = mask.getContext('2d');
       mc.strokeStyle = '#fff'; mc.fillStyle = '#fff'; mc.lineCap = 'round'; mc.lineWidth = 9;
       const half = (oy) => {                                           // one half of a damask motif (mirrored to make it whole)
@@ -4862,7 +4970,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 23:34';                                              // stamped when the site is published
+const BUILD = '2026-09-24 23:51';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -7722,9 +7830,9 @@ function walkSwipe() {                                               // swipe at
   walk.swipeReady = clock + 0.3; walk.batT = 0.35; noise(0.12, 0.05, 1800);
   const p = walk.pos, fx = Math.sin(walk.face), fz = Math.cos(walk.face);
   const paw = new THREE.Vector3(p.x + fx * 0.45, p.y + 0.35, p.z + fz * 0.45);
-  if (coonSwipe(paw)) return;                                        // the raccoon at the slider: whack the glass right in front of it
   if (blanketRigs.some(r => r.state === 'cat')) { shrugBlanket(); return; }   // under a blanket: the swipe flings it off
   if (gunRig.state === 'cat') { fireGun(); return; }                 // armed: the swipe pulls the trigger
+  if (coonSwipe(paw)) return;                                        // the raccoon at the slider: whack the glass right in front of it
   if (laundrySwipe(paw)) return;                                     // the folded laundry on the armchair: all over the floor
   if (mirrorWorld && MW.dk && MW.dk.state !== 'dead') {                // the dark kitty within reach: that's who gets it
     const q = MW.dk.pos; if (Math.hypot(q.x - paw.x, q.z - paw.z) < 1.0 && Math.abs(q.y + 0.4 - paw.y) < 0.9) { hitDark(); return; }
