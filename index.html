@@ -804,7 +804,7 @@ function shrugBlanket() {                                            // Free wal
   b.lump.visible = false; b.from.set(p.x, p.y + 0.9, p.z);
   const x = THREE.MathUtils.clamp(p.x + fx * 1.6, -ROOM.halfW + 0.9, ROOM.halfW - 0.9), z = THREE.MathUtils.clamp(p.z + fz * 1.6, 1.8, ROOM.visDepth - 0.9);
   b.to.set(x, blanketGround(x, z), z); b.heap.visible = true; b.state = 'flying'; b.dest = 'floor'; b.t = 0; b.victim = null;
-  sfx.whoosh(); showWalkName('Free!'); walk.puff = 0.6;
+  sfx.whoosh(); showWalkName('Free!'); walk.puff = 0.6; unlock('blanketGhost');
 }
 function throwBlanket(point, b = blanketRig) {
   if (!b || b.state !== 'cat') return;
@@ -3291,6 +3291,7 @@ SECT = 'Dome light';
 /* ---------- 8 ft ceiling with three frosted dome lights (the near end of the room is left open, dollhouse style). Both face into
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
 let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null, laundry = null, mosaicGlints = [];
+const sliderGlass = [];
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
   const VD = ROOM.visDepth, WH = ROOM.wallH;
@@ -3316,7 +3317,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     for (const [px, pz, slide] of [[DX + DW / 4 - IN(0.5), VD - IN(1.3), false], [DX - DW / 4 + IN(0.5), VD - IN(3.1), true]]) {   // fixed panel outside, sliding panel inside
       B(ST, PH, IN(1.4), bronze, px - PW / 2 + ST / 2, P0 + PH / 2, pz); B(ST, PH, IN(1.4), bronze, px + PW / 2 - ST / 2, P0 + PH / 2, pz);
       B(PW, ST, IN(1.4), bronze, px, P0 + ST / 2, pz); B(PW, ST, IN(1.4), bronze, px, P0 + PH - ST / 2, pz);
-      const glass = new THREE.Mesh(new THREE.PlaneGeometry(PW - ST * 2, PH - ST * 2), gl); glass.position.set(px, P0 + PH / 2, pz); povEndWall.add(glass);
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(PW - ST * 2, PH - ST * 2), gl); glass.position.set(px, P0 + PH / 2, pz); povEndWall.add(glass); sliderGlass.push(glass);   // (it can be shot out)
       if (slide) B(IN(0.9), IN(11), IN(1), bronze, px + PW / 2 - ST - IN(1.4), IN(38), pz - IN(1.3));                         // pull handle
     }
     const named = (g, name) => { g.userData.name = name; povEndWall.add(g); return g; };
@@ -4842,6 +4843,12 @@ const ACHIEVEMENTS = [
     ['karen', '💇‍♀️', 'Complaint dismissed', 'Vanquish the Karen mouse (rare: she turns up around 3,000 points)'],
     ['discoFever', '🕺', 'Disco fever', 'In Free walk, leap onto the little disco ball hanging on the slider'],
     ['catNap', '😴', 'Cat nap', 'In Free walk, curl up for a nap in the cat tree condo'],
+    ['coonShot', '🎯', 'Trash panda down', 'In Free walk, shoot the raccoon taunting you at the slider'],
+    ['glassBreak', '💥', 'Slider smasher', 'Shatter the sliding glass door'],
+    ['copsCalled', '🚨', 'Someone called the cops', 'Stick around until the sirens show up after the raccoon incident'],
+    ['laundryMess', '🧺', 'Laundry day', 'In Free walk, swipe the folded laundry off the armchair'],
+    ['tvTop', '📺', 'King of the TV', 'In Free walk, stand on top of the TV'],
+    ['blanketGhost', '👻', 'Blanket ghost', 'In Free walk, get caught under a blanket, then swipe it off'],
     ['raccoon', '🦝', 'Trash panda, begone', 'In Free walk, swipe at the raccoon taunting you through the slider until it runs off'],
     ['darkKitty', '😈', 'Through the looking glass', 'Beat the evil dark kitty in the mirror world (9 hits)'],
     ['inception', '🪆', 'Game-ception', 'Win the kart race, then beat the game on the driver\'s Switch'],
@@ -4855,7 +4862,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-24 23:25';                                              // stamped when the site is published
+const BUILD = '2026-09-24 23:34';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5756,6 +5763,14 @@ function fireGun() {
   const gr = gunRig; if (gr.state !== 'cat' || gr.ammo <= 0 || state !== 'playing') return;
   gr.ammo--; gr.recoil = 1; gr.flash.visible = true; gr.flashT = 0.07; catFlinch = Math.max(catFlinch, 0.2);
   sfx.gunshot(); shake = Math.max(shake, reduceMotion ? 0.05 : 0.3); vibrate(40);
+  if (walk.on && walk.rig && coonInSights()) {                        // Free walk, and the raccoon's right there in her sights: through the glass it goes
+    const c = coon.rig.g.position.clone().setY(coon.rig.g.position.y + 0.9);
+    gr.aim.copy(c); gr.held.lookAt(c); gr.held.updateMatrixWorld(true);
+    tracer(gr.held.localToWorld(gr.held.userData.muzzle.clone()), c, 0);
+    setTimeout(() => { shatterSlider(c); coonShot(); }, 40);
+    if (gr.ammo === 0) setTimeout(tossGun, 900);
+    showFireBtn(); return;
+  }
   const targets = mice.filter(m => m.active && m.hittable && onScreen(m.center));
   let smash = null;                                                   // chaos: no mice about? pick off something that's still in one piece
   if (!targets.length && gameMode === 'chaos') { const list = chaosGunTargets(); if (list.length) smash = list[(Math.random() * list.length) | 0]; }
@@ -7320,7 +7335,7 @@ function startWalk() {
   Object.assign(walk, { on: true, vy: 0, grounded: true, face: Math.PI, phase: 0, batT: 0, squash: 0, fp: false, jumpQ: -1, burnCD: 0, look: null, tableHops: 0, meowRun: 0, lastMeow: -9, meowT: 0, puff: 0, inBox: false });
   catTail.visible = false;
   walk.vel.set(0, 0, 0); walk.stick.x = walk.stick.y = 0;
-  resetLaundry();
+  resetLaundry(); resetSliderScene();
   walk.pos.set(0.9, 0, 4.4); walk.pos.y = surfaceTop(walk.pos.x, walk.pos.z, 0.9);
   walk.rig.g.visible = true; walk.rig.shadow.visible = true; cat.visible = false;
   fcStart(); Object.assign(fc, { dist0: 3.3, el0: 20, zoom: 1, tilt: 0, yaw: 0 });
@@ -7410,6 +7425,7 @@ function updateWalk(dt) {
   const inBox = walk.grounded && p.y < BOX.h * 0.5 && Math.abs(p.x - CAT_POS.x) < BOX.w / 2 - 0.1 && Math.abs(p.z - CAT_POS.z) < BOX.d / 2 - 0.1;
   if (inBox && !walk.inBox) { unlock('boxJump'); showWalkName('Home sweet box!'); tailWag = 2; }
   walk.inBox = inBox;
+  if (walk.grounded && _tvTop && Math.abs(p.y - _tvTop.max.y) < 0.02 && p.x > _tvTop.min.x && p.x < _tvTop.max.x) unlock('tvTop');   // up on the TV
   // a nap in the cat tree's condo: curl up on the cushion in there and she dozes off (any move wakes her)
   const cc = catCondo, snug = cc && walk.grounded && cc.box.containsPoint(_nap.set(p.x, p.y + 0.1, p.z));
   if (snug && Math.hypot(sx, sy) < 0.3 && walk.jumpQ < 0 && spd < 0.4) {
@@ -7829,7 +7845,7 @@ function makeRaccoon() {
 function coonHome() { const S = SLIDER; return new THREE.Vector3(S.DX + S.DW / 4, IN(1.2), S.VD + 0.38); }   // outside the fixed glass panel, standing on the pads
 function coonSay(text, cls) { const R = coon.rig; floatText(R.g.position.clone().setY(R.g.position.y + 1.55), text, cls || 'name'); }
 function chitter(n, hi) { for (let i = 0; i < (n || 5); i++) tone((hi || 1700) + Math.random() * 500, 1300 + Math.random() * 400, 0.05, 'square', 0.022, i * 0.07); }
-function coonHide() { if (coon.rig) coon.rig.g.visible = false; coon.state = 'hidden'; coon.next = Math.max(coon.next, 8); }
+function coonHide() { if (coon.rig) coon.rig.g.visible = false; coon.state = 'hidden'; coon.dead = false; coon.next = Math.max(coon.next, 8); }
 function coonSet(st) { coon.state = st; coon.t = 0; coon.said = 0; }
 function coonActive() { return coon.rig && coon.rig.g.visible && ['taunt', 'mock', 'laugh', 'startle'].includes(coon.state); }
 function coonReact(kind) {                                            // she meowed
@@ -7853,6 +7869,7 @@ function updateRaccoon(dt) {
   const R = coon.rig, g = R.g, pos = g.position, home = coonHome();
   coon.t += dt;
   if (coon.state === 'hidden') {
+    if (coon.dead) return;                                             // (it's not coming back)
     coon.next -= dt; if (coon.next > 0) return;
     coon.from.set(home.x + 5.5, home.y, home.z + 2.4); coon.to.copy(home); pos.copy(coon.from); g.visible = true; coon.swipes = 0; coonSet('arrive'); chitter(3);
   }
@@ -7924,6 +7941,7 @@ function updateRaccoon(dt) {
       else if (t < 2.1) { R.arms[1].rotation.set(-0.3, 0, Math.PI - 0.75 + Math.sin(clock * 22) * 0.2); R.head.rotation.y = lookYaw; if (coon.said < 2) { coon.said = 2; coonSay(coon.swipes === 2 ? 'One more and I\'m OUTTA here!' : 'Hmph! Missed me anyway!'); chitter(5, 1200); } }   // shaking its fist
       else coonSet('taunt');
       break;
+    case 'dying': coonDying(R, t, b); break;
     case 'laugh':                                                        // she swiped from across the room: it points and laughs
       g.rotation.y = Math.PI; R.arms[1].rotation.set(-1.6, 0, -0.1 + lookYaw * 0.5); b.position.y = Math.abs(Math.sin(t * 18)) * 0.03; R.head.rotation.y = lookYaw;
       if (!coon.said) { coon.said = 1; coonSay('Ha! Missed me! Hehehe'); chitter(8, 2100); }
@@ -7935,7 +7953,7 @@ const _lw = new THREE.Vector3();
 function laundrySwipe(paw) {
   const L = laundry; if (!L || L.state !== 'folded') return false;
   L.stack.getWorldPosition(_lw); if (Math.hypot(_lw.x - paw.x, _lw.z - paw.z) > 0.75 || Math.abs(_lw.y + 0.15 - paw.y) > 0.8) return false;
-  L.state = 'messy'; L.stack.visible = false; showWalkName('Folded laundry... not anymore!'); sfx.rustle && sfx.rustle(); noise(0.3, 0.08, 1500);
+  L.state = 'messy'; L.stack.visible = false; unlock('laundryMess'); showWalkName('Folded laundry... not anymore!'); sfx.rustle && sfx.rustle(); noise(0.3, 0.08, 1500);
   const rot = ARMCHAIR.rot, fx = Math.sin(rot), fz = Math.cos(rot), rx = Math.cos(rot), rz = -Math.sin(rot);
   L.specs.forEach(([c, t], i) => {                                    // each garment unfolds as it flies, and lands crumpled on the carpet
     const w = IN(12.5 - i * 0.5) * 1.7, d = IN(10) * 1.9, geo = new THREE.PlaneGeometry(w, d, 8, 8), pp = geo.attributes.position;
@@ -7960,6 +7978,97 @@ function updateLaundry(dt) {
 function resetLaundry() {
   const L = laundry; if (!L) return;
   for (const b of L.bits) povEndWall.remove(b.m); L.bits = []; L.stack.visible = true; L.state = 'folded';
+}
+/* ---------- shooting the raccoon: the slider shatters, the raccoon dies a long, dramatic, theatrical death on the patio, and
+   ten seconds later the police lights come flashing up beyond the back fence (with a siren, far off) ---------- */
+const shards = [], cops = { at: 0, t: -1, rig: null, next: 0 };
+function coonInSights() {
+  const R = coon.rig; if (!R || !R.g.visible || coon.dead || !['arrive', 'taunt', 'mock', 'laugh', 'startle', 'flinch', 'leave'].includes(coon.state)) return false;
+  const h = gunHand(), dx = R.g.position.x - h.x, dz = R.g.position.z - h.z, d = Math.hypot(dx, dz);
+  return d < 16 && (dx * Math.sin(walk.face) + dz * Math.cos(walk.face)) / d > 0.72;
+}
+function shatterSlider(at) {
+  if (!sliderGlass.some(g => g.visible)) return;
+  unlock('glassBreak'); noise(0.6, 0.3, 5200); noise(0.25, 0.2, 2500);
+  for (let i = 0; i < 12; i++) tone(2400 + Math.random() * 3200, 1800 + Math.random() * 2000, 0.08 + Math.random() * 0.2, 'triangle', 0.03, 0.02 + i * 0.035 + Math.random() * 0.05);   // tinkle tinkle
+  shake = Math.max(shake, reduceMotion ? 0.05 : 0.35); showWalkName('💥 The slider shattered!');
+  const mat = new THREE.MeshPhongMaterial({ color: 0xd6ebf5, transparent: true, opacity: 0.45, shininess: 140, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
+  for (const g of sliderGlass) {
+    if (!g.visible) continue; g.visible = false;
+    const w = g.geometry.parameters.width, h = g.geometry.parameters.height;
+    for (let i = 0; i < 26; i++) {
+      const sz = 0.08 + Math.random() * 0.22, geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, sz * (0.6 + Math.random()), sz * (Math.random() - 0.3), 0, sz * (Math.random() - 0.5), sz * (0.6 + Math.random()), 0], 3)); geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, mat); m.userData.noWalk = true; povEndWall.add(m);
+      m.position.set(g.position.x + (Math.random() - 0.5) * w, g.position.y + (Math.random() - 0.5) * h, g.position.z);
+      const out = Math.random() < 0.6 ? 1 : -1;                          // most of it blown out onto the patio, some back into the room
+      shards.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 2.5, Math.random() * 2, out * (1 + Math.random() * 2.5)), w: new THREE.Vector3(Math.random() * 12, Math.random() * 12, Math.random() * 12), rest: false });
+    }
+  }
+  burst(at.clone().setZ(SLIDER.VD), 0xe8f4ff, 18, 3, 3, 0.6);
+}
+function updateShards(dt) {
+  for (const s2 of shards) {
+    if (s2.rest) continue;
+    s2.v.y -= 9.8 * dt; s2.m.position.addScaledVector(s2.v, dt); s2.m.rotation.x += s2.w.x * dt; s2.m.rotation.y += s2.w.y * dt; s2.m.rotation.z += s2.w.z * dt;
+    const floor = s2.m.position.z > SLIDER.VD ? IN(1.2) + 0.005 : 0.005;
+    if (s2.m.position.y <= floor) { s2.m.position.y = floor; s2.rest = true; s2.m.rotation.set(-Math.PI / 2, 0, Math.random() * 6); if (Math.random() < 0.3) tone(3000 + Math.random() * 2000, 2500, 0.05, 'triangle', 0.015); }
+  }
+}
+function coonShot() {
+  coon.dead = true; coonSet('dying'); unlock('coonShot'); cops.at = clock + 10; cops.t = -1;
+  showWalkName('🦝 ...the raccoon has been hit!'); chitter(3, 2600);
+}
+function coonDying(R, t, b) {                                        // a long, hammy, theatrical death
+  const g = R.g; g.rotation.y = Math.PI;
+  if (t < 0.3) {                                                     // BLAM: jolted back, arms flung up
+    const k = t / 0.3; b.position.z = -0.25 * k; R.arms.forEach((a, i) => a.rotation.set(0, 0, (i ? 1 : -1) * (Math.PI - 0.6) * k)); R.eyes.forEach(e => e.scale.setScalar(1.6));
+  } else if (t < 2.4) {                                              // staggers about clutching its chest
+    const k = t - 0.3; b.position.z = -0.25 + Math.sin(k * 2) * 0.08; b.rotation.z = Math.sin(k * 5) * 0.2; b.rotation.x = -k * 0.08;
+    R.arms.forEach((a, i) => a.rotation.set(-1.35, 0, (i ? -1 : 1) * 0.55)); R.head.rotation.x = -0.3 + Math.sin(k * 3) * 0.2; R.head.rotation.z = Math.sin(k * 4) * 0.25;
+    R.eyes.forEach(e => e.scale.setScalar(1.2)); R.legs[0].rotation.x = Math.sin(k * 6) * 0.4; R.legs[1].rotation.x = -Math.sin(k * 6) * 0.4;
+    if (coon.said < 1) { coon.said = 1; coonSay('You... you got me...', 'bad'); speak('You... you got me...', { pitch: 1.8, rate: 0.75 }); }
+    if (k > 1.1 && coon.said < 2) { coon.said = 2; coonSay('Tell the trash cans... I loved them...'); }
+  } else if (t < 3.4) {                                              // a slow pirouette... and down it goes, flat on its back
+    const k = (t - 2.4) / 1.0, e = k * k;
+    g.rotation.y = Math.PI + k * Math.PI * 2; b.rotation.x = -0.19 - e * 1.35; b.position.y = e * 0.24; b.position.z = -0.25;
+    R.arms.forEach((a, i) => a.rotation.set(-0.4, 0, (i ? 1 : -1) * (1.2 + k))); R.head.rotation.x = -0.4;
+    if (coon.said < 3) { coon.said = 3; [392, 370, 349, 262].forEach((f, i) => tone(f, f * (i === 3 ? 0.94 : 0.99), i === 3 ? 1.1 : 0.4, 'sawtooth', 0.04, i * 0.42)); }   // wah wah wah waaaah
+  } else {                                                           // lies there, feet in the air, twitching... then still. A little halo appears.
+    const k = t - 3.4, tw = Math.max(0, 1 - k / 2) * Math.sin(k * 30);
+    b.rotation.x = -1.54; b.position.set(0, 0.24, -0.25); R.arms.forEach((a, i) => a.rotation.set(-0.3, 0, (i ? 1 : -1) * 2.2));
+    R.legs.forEach((l, i) => { l.rotation.x = -1.3 + (i ? tw : -tw) * 0.3; }); R.tongue.visible = true; R.eyes.forEach(e => e.scale.set(1.3, 0.12, 1));   // X_X
+    R.tail.forEach(sg => { sg.rotation.set(0.05, 0, 0); });
+    if (!R.halo) { R.halo = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.018, 8, 24), basic(0xffe27a)); R.halo.rotation.x = Math.PI / 2; g.add(R.halo); }
+    R.halo.visible = k > 0.8; R.halo.position.set(0, 0.6 + Math.sin(clock * 2) * 0.03, -1.25);
+    if (coon.said < 4 && k > 0.8) { coon.said = 4; coonSay('✝ R.I.P. Trash Panda ✝'); }
+  }
+}
+function updateCops(dt) {
+  if (!cops.at || !SLIDER) return;
+  if (!walk.on) { if (cops.rig) cops.rig.visible = false; return; }
+  if (cops.t < 0) { if (clock < cops.at) return; cops.t = 0; unlock('copsCalled'); showWalkName('🚨 Uh oh... someone called the cops'); }
+  cops.t += dt;
+  if (!cops.rig) {                                                    // red and blue lights flashing up from the street beyond the back fence
+    const g = new THREE.Group(); g.userData.noWalk = true; povEndWall.add(g); cops.rig = g; cops.lights = [];
+    const beam = canvasTex(64, 64, (c, w, h) => { const gr = c.createRadialGradient(32, 32, 1, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.18, 'rgba(255,255,255,.9)'); gr.addColorStop(0.5, 'rgba(255,255,255,.3)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); }, 1, 1);   // (bright enough to read against a daytime sky)
+    const z = SLIDER.VD + FT(34) + 2.2;                                // just over the fence, in front of the neighbours' trees
+    for (const [x, c] of [[-6, 0xff2a2a], [-4.4, 0x2a5bff], [3.6, 0xff2a2a], [5.2, 0x2a5bff], [-5.2, 0xffffff]]) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: beam, color: c, depthWrite: false, transparent: true, opacity: 0, fog: false }));
+      sp.position.set(x, 4.9, z); sp.scale.setScalar(c === 0xffffff ? 3 : 7.5); g.add(sp); cops.lights.push({ sp, c });
+    }
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: beam, color: 0xffffff, depthWrite: false, transparent: true, opacity: 0, fog: false }));
+    glow.material.depthTest = false; glow.renderOrder = 2; glow.position.set(0, 7, z + 4); glow.scale.set(46, 16, 1); g.add(glow); cops.glow = glow;   // the flashing wash over the sky and treetops
+  }
+  cops.rig.visible = true;
+  const fade = Math.min(1, cops.t / 2) * Math.max(0, Math.min(1, (40 - cops.t) / 4)), ph = Math.floor(clock * 7) % 2;
+  cops.lights.forEach((L, i) => { const on = L.c === 0xffffff ? Math.sin(clock * 40) > 0.6 : (L.c === 0xff2a2a) === (ph === 0); L.sp.material.opacity = (on ? 0.95 : 0.12) * fade; });
+  cops.glow.material.color.setHex(ph ? 0x3355ff : 0xff3333); cops.glow.material.opacity = 0.22 * fade;
+  cops.next -= dt; if (cops.next <= 0 && fade > 0.05) { cops.next = 1.1; tone(620, 920, 0.5, 'sine', 0.018 * fade); tone(920, 620, 0.5, 'sine', 0.018 * fade, 0.55); }   // wee-woo, far off
+}
+function resetSliderScene() {                                         // a fresh Free walk: new glass, no mess, the raccoon's back to its old tricks
+  sliderGlass.forEach(g => { g.visible = true; }); shards.forEach(s2 => povEndWall.remove(s2.m)); shards.length = 0;
+  coon.dead = false; if (coon.rig && coon.rig.halo) coon.rig.halo.visible = false; cops.at = 0; cops.t = -1; if (cops.rig) cops.rig.visible = false;
 }
 function walkMeow() {
   if (!walk.on || state !== 'playing') return;
@@ -8107,7 +8216,7 @@ function frame(now) {
   candleLight.intensity = (0.32 + flick / flames.length * 0.1) * lit / flames.length;
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
   if (sliderDisco) updateSliderDisco(dt);
-  updateRaccoon(dt); updateLaundry(dt);                              // the slider's little disco ball turns (and runs the disco)
+  updateRaccoon(dt); updateLaundry(dt); updateShards(dt); updateCops(dt);                              // the slider's little disco ball turns (and runs the disco)
 
   if (povEndWall) povEndWall.visible = camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02;   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
