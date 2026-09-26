@@ -2729,7 +2729,7 @@ const blanketBlackMat = lam(0xffffff, { map: blanketBlackTex }), blanketFuzzMat 
   const Hs = (x, z) => Math.max(H(x, z), H(x - PAD, z), H(x + PAD, z), H(x, z - PAD), H(x, z + PAD));
   const W = FT(2.8), L = FT(2.1), ang = 0.62, ca = Math.cos(ang), sa = Math.sin(ang), cx = FRONT - 0.22, cz = armIn - 0.1;
   const NX = 41, NZ = 31, g = new THREE.PlaneGeometry(1, 1, NX - 1, NZ - 1), q = g.attributes.position;
-  const top0 = new Float32Array(q.count), drop = new Float32Array(q.count), dir = new Uint8Array(q.count), hang = new Uint8Array(q.count), XZ = new Float32Array(q.count * 2);
+  const top0 = new Float32Array(q.count), drop = new Float32Array(q.count), dir = new Uint8Array(q.count), hang = new Uint8Array(q.count), XZ = new Float32Array(q.count * 2), PHI = new Float32Array(q.count);
   for (let i = 0; i < q.count; i++) {                                  // 1) where each point sits in plan, and how far it hangs past an edge
     const u = q.getX(i), v = q.getY(i);
     let x = cx + u * W * ca - v * L * sa, z = cz + u * W * sa + v * L * ca;
@@ -2737,11 +2737,14 @@ const blanketBlackMat = lam(0xffffff, { map: blanketBlackTex }), blanketFuzzMat 
     const ex = Math.min(x, FRONT - 0.01), ez = Math.min(z, armOut - 0.01);
     top0[i] = Hs(ex, ez) + LIFT + Math.sin(u * 13 + v * 9) * 0.008;
     const ox = Math.max(0, x - FRONT), oz = Math.max(0, z - armOut);
-    if (ox > 0 || oz > 0) {
+    if (ox > 0 && oz > 0) {                                            // past the arm's front corner: the cloth wraps round it as a rounded bell
+      const phi = Math.atan2(oz, ox), mx = Math.max(ox, oz), rho = 0.03 + Math.min(mx, 0.25) * 0.08 + 0.55 * Math.min(ox, oz);
+      hang[i] = 1; drop[i] = mx + 0.3 * (Math.hypot(ox, oz) - mx); dir[i] = 2; PHI[i] = phi;
+      x = FRONT + rho * Math.cos(phi); z = armOut + rho * Math.sin(phi);
+    } else if (ox > 0 || oz > 0) {
       hang[i] = 1; drop[i] = Math.max(ox, oz); dir[i] = ox >= oz ? 0 : 1;
-      const flare = ox > 0 && oz > 0 ? 0.95 * Math.min(ox, oz) : 0;     // the corner bells out like a skirt
-      if (ox > 0) x = FRONT + 0.03 + flare + Math.min(ox, 0.25) * 0.08;
-      if (oz > 0) z = armOut + 0.03 + flare + Math.min(oz, 0.25) * 0.08;
+      if (ox > 0) x = FRONT + 0.03 + Math.min(ox, 0.25) * 0.08;
+      if (oz > 0) z = armOut + 0.03 + Math.min(oz, 0.25) * 0.08;
     }
     XZ[i * 2] = x; XZ[i * 2 + 1] = z;
   }
@@ -2754,7 +2757,7 @@ const blanketBlackMat = lam(0xffffff, { map: blanketBlackTex }), blanketFuzzMat 
   }
   for (let i = 0; i < q.count; i++) {                                  // 3) hanging points fall from that smooth edge, pooling on the carpet if long
     let x = XZ[i * 2], z = XZ[i * 2 + 1], y = T[i] - drop[i];
-    if (y < 0.02) { const pool = 0.02 - y; y = 0.02; if (dir[i] === 0) x += pool; else z += pool; }
+    if (y < 0.02) { const pool = 0.02 - y; y = 0.02; if (dir[i] === 0) x += pool; else if (dir[i] === 1) z += pool; else { x += pool * Math.cos(PHI[i]); z += pool * Math.sin(PHI[i]); } }
     q.setXYZ(i, x - cx, y, z - cz);
   }
   g.computeVertexNormals();
@@ -5034,6 +5037,7 @@ const ACHIEVEMENTS = [
     ['copsCalled', '🚨', 'Someone called the cops', 'Stick around until the sirens show up after the raccoon incident'],
     ['laundryMess', '🧺', 'Laundry day', 'In Free walk, swipe the folded laundry off the armchair'],
     ['tvTop', '📺', 'King of the TV', 'In Free walk, stand on top of the TV'],
+    ['chippy', '🐰', 'Wind-up warrior', 'Swipe Chippy the wind-up bunny off the credenza and let it hunt down 10 mice'],
     ['blanketGhost', '👻', 'Blanket ghost', 'In Free walk, get caught under a blanket, then swipe it off'],
     ['raccoon', '🦝', 'Trash panda, begone', 'In Free walk, swipe at the raccoon taunting you through the slider until it runs off'],
     ['darkKitty', '😈', 'Through the looking glass', 'Beat the evil dark kitty in the mirror world (9 hits)'],
@@ -5048,7 +5052,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-26 14:44';                                              // stamped when the site is published
+const BUILD = '2026-09-26 15:08';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5421,7 +5425,8 @@ function interactables() {
   if (diffuserRig && diffuserRig.state === 'rest') list.push({ obj: diffuserRig.vase.children[0], pos: diffuserRig.center, r: 0.45 });
   if (fanRig && fanRig.state !== 'falling' && fanRig.state !== 'broken') { fanRig.cap.getWorldPosition(_ip); let fm = null; fanRig.tip.traverse(o => { if (!fm && o.isMesh) fm = o; }); list.push({ obj: fm, pos: _ip.clone().setY(_ip.y * 0.6), r: 0.75 }); }   // the fan: a big bubble round its column
   if (tableRig && !tableRig.broken) list.push({ obj: tableRig.pieces[0].mesh, pos: tableRig.center, r: 0.9 });
-  if (laser.state === 'floor') list.push({ obj: laser.pickupMesh, pos: laser.pickup.position.clone(), r: 0.9 });   // a big, forgiving target on the dropped laser pointer
+  if (laser.state === 'floor') list.push({ obj: laser.pickupMesh, pos: laser.pickup.position.clone(), r: 0.9 });
+  if (chippy.state === 'shelf') { let cm = null; chippy.g.traverse(o => { if (!cm && o.isMesh) cm = o; }); list.push({ obj: cm, pos: chippy.home.clone().setY(chippy.home.y + 0.2), r: 0.5 }); }   // Chippy the wind-up bunny   // a big, forgiving target on the dropped laser pointer
   if (windowRig) { windowRig.bl.getWorldPosition(_ip); list.push({ obj: windowRig.bl, pos: _ip.clone(), r: 1.2 }); }
   if (mirrorRig) { mirrorRig.glass.getWorldPosition(_ip); list.push({ obj: mirrorRig.glass, pos: _ip.clone(), r: 1.1 }); }
   if (gloveRig) { gloveRig.pivots[0].getWorldPosition(_ip); list.push({ obj: gloveRig.pivots[0].children[0], pos: _ip.clone().setY(_ip.y - IN(8)), r: 0.45 }); }
@@ -5470,6 +5475,7 @@ function interact(o, point, face) {
   if (o.userData.fan) { if (fanRig.state === 'falling' || fanRig.state === 'broken') return false; startSwipe(point, true); setTimeout(hitFan, 90); tapShake(); return true; }
   if (o.userData.prop) { const pr = o.userData.prop; startSwipe(point, true); setTimeout(() => knockProp(pr), 90); tapShake(); return true; }
   if (o.userData.laserPickup) { if (laser.state !== 'floor') return false; startSwipe(point, true); setTimeout(takeLaser, 90); return true; }
+  if (o.userData.chippy) { if (chippy.state !== 'shelf') return false; startSwipe(point, true); setTimeout(hitChippy, 90); tapShake(); return true; }
   return false;
 }
 function tapShake() { shake = Math.max(shake, reduceMotion ? 0.03 : 0.13); }
@@ -6223,6 +6229,153 @@ function resetLaser() {
   laserMouseDone = false; laserMousePending = false; laserRetryAt = 0;
 }
 
+/* ---------- Chippy: a fluffy white wind-up Easter bunny on the credenza, just right of the TV's soundbar. Swipe it and it hops down
+   beside her box, wound up for 10 hunts: whenever mice are out it winds its key, hops off after the nearest one and takes it out
+   (one mouse per wind-up), then hops back to her side. After the tenth it runs down and keels over. ---------- */
+const CHIPPY_USES = 10;
+const chippy = { g: null, rig: null, key: null, feet: [], tag: null, tagCtx: null, tagTex: null, state: 'shelf', uses: 0, t: 0, hop: 0, target: null,
+                 from: new THREE.Vector3(), to: new THREE.Vector3(), home: new THREE.Vector3(), seat: new THREE.Vector3(), cool: 0, shown: -1 };
+{
+  const furTex = canvasTex(128, 128, (c, w, h) => {                                    // a mask of loose fibres (white = fibre): a fuzzy white halo
+    c.fillStyle = '#000'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 1500; i++) { const x = Math.random() * w, y = Math.random() * h, a = Math.random() * 6.28, l = 3 + Math.random() * 7, v = 238 + Math.random() * 17 | 0;
+      c.strokeStyle = `rgb(${v},${v},${v})`; c.lineWidth = 1 + Math.random(); c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke(); }
+  }, 3, 2);
+  const skin = lam(0xf8f7f4, { emissive: 0x484644 }), fuzz = new THREE.MeshLambertMaterial({ color: 0xfbfaf8, emissive: 0x484644, alphaMap: furTex, alphaTest: 0.5 });   // (a mask, so the fibres' soft edges never pick up dark fringes)
+  const pink = lam(0xf3a3ba), plastic = new THREE.MeshPhongMaterial({ color: 0xf7f7f5, shininess: 70, specular: 0x666666 });
+  const g = new THREE.Group(); g.userData.name = 'Chippy'; chippy.g = g; scene.add(g);
+  const rig = new THREE.Group(); g.add(rig); chippy.rig = rig; rig.scale.setScalar(0.78);
+  const ball = (r, sx, sy, sz, x, y, z, m, fur) => {                                    // a fluffy ball: a solid core plus a fringe of fibres
+    const o = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), m); o.scale.set(sx, sy, sz); o.position.set(x, y, z); rig.add(o);
+    if (fur) { const f = new THREE.Mesh(new THREE.SphereGeometry(r * 1.1, 24, 16), fuzz); o.add(f); }
+    return o;
+  };
+  ball(IN(2.2), 1, 0.95, 1.1, 0, IN(2.9), -IN(0.3), skin, true);                       // the round fluffy body...
+  ball(IN(1.9), 1, 1, 1, 0, IN(4.2), IN(0.9), skin, true);                              // ...and head, all one fuzzball
+  ball(IN(0.9), 1, 1, 1, 0, IN(3.4), -IN(2.6), skin, true);                             // pom-pom tail
+  for (const sx of [-1, 1]) {
+    const ear = new THREE.Group(); ear.position.set(sx * IN(0.8), IN(5.7), IN(0.5)); ear.rotation.set(-0.12, 0, -sx * 0.22); rig.add(ear);
+    const outer = new THREE.Mesh(new THREE.SphereGeometry(IN(1.2), 18, 12), skin); outer.scale.set(0.6, 1.55, 0.3); outer.position.y = IN(1.6); ear.add(outer);
+    outer.add(new THREE.Mesh(new THREE.SphereGeometry(IN(1.2) * 1.08, 18, 12), fuzz));
+    const inner = new THREE.Mesh(new THREE.SphereGeometry(IN(1.2), 18, 12), pink); inner.scale.set(0.4, 1.3, 0.12); inner.position.set(0, IN(1.55), IN(0.28)); ear.add(inner);   // pink felt inside
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(IN(0.36), 12, 10), new THREE.MeshPhongMaterial({ color: 0x0c0c0e, shininess: 120, specular: 0xffffff }));
+    eye.position.set(sx * IN(0.78), IN(4.7), IN(2.72)); rig.add(eye);                   // shiny black bead eyes
+    const foot = new THREE.Group(); foot.position.set(sx * IN(0.95), IN(1.2), IN(0.4)); rig.add(foot); chippy.feet.push(foot);   // white plastic feet (pivot at the hip, so they kick)
+    const sole = new THREE.Mesh(new THREE.SphereGeometry(IN(1), 14, 10), plastic); sole.scale.set(0.7, 0.32, 1.35); sole.position.set(0, IN(0.3) - IN(1.2), IN(0.6)); foot.add(sole);
+    for (const tx of [-1, 0, 1]) { const toe = new THREE.Mesh(new THREE.SphereGeometry(IN(0.34), 10, 8), plastic); toe.scale.set(1, 0.8, 1.3); toe.position.set(tx * IN(0.42), IN(0.3) - IN(1.2), IN(1.85)); foot.add(toe); }
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.4), IN(0.5), IN(1.0), 10), plastic); leg.position.set(0, IN(0.85) - IN(1.2), 0); foot.add(leg);
+  }
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(IN(0.34), 12, 10), new THREE.MeshPhongMaterial({ color: 0xf2939f, shininess: 80, specular: 0x886666 }));
+  nose.position.set(0, IN(3.85), IN(2.95)); rig.add(nose);                              // little pink bead nose
+  const key = new THREE.Group(); key.position.set(IN(2.35), IN(2.5), -IN(0.6)); rig.add(key); chippy.key = key;   // the wind-up key on its right side
+  const axle = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.3), IN(0.3), IN(0.8), 10), plastic); axle.rotation.z = Math.PI / 2; axle.position.x = IN(0.3); key.add(axle);
+  const knob = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.72), IN(0.72), IN(1.0), 14), new THREE.MeshPhongMaterial({ color: 0xf2f2ef, shininess: 60, flatShading: true }));
+  knob.rotation.z = Math.PI / 2; knob.position.x = IN(1.1); key.add(knob);
+  for (let i = 0; i < 7; i++) { const rid = new THREE.Mesh(new THREE.BoxGeometry(IN(0.95), IN(0.12), IN(0.2)), plastic); const a = i / 7 * Math.PI * 2; rid.position.set(IN(1.1), Math.cos(a) * IN(0.72), Math.sin(a) * IN(0.72)); rid.rotation.x = -a; key.add(rid); }   // grip ridges
+  g.traverse(o => { if (o.isMesh) { o.userData.chippy = true; tapTargets.push(o); } });
+  const tc = document.createElement('canvas'); tc.width = 160; tc.height = 64; chippy.tagCtx = tc.getContext('2d');   // the hunts-left tag over its head
+  chippy.tagTex = new THREE.CanvasTexture(tc);
+  chippy.tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: chippy.tagTex, depthTest: false, transparent: true })); chippy.tag.scale.set(0.95, 0.38, 1); chippy.tag.renderOrder = 9; chippy.tag.visible = false; scene.add(chippy.tag);
+  chippy.home.set(MAIN_CX + IN(25), CAB_H, IN(15));                                     // on the credenza, just right of the soundbar
+  g.position.copy(chippy.home); g.rotation.y = -0.35;
+}
+function chippyTag() {
+  if (chippy.shown === chippy.uses) return; chippy.shown = chippy.uses;
+  const c = chippy.tagCtx; c.clearRect(0, 0, 160, 64);
+  c.font = 'bold 40px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 7; c.strokeStyle = '#d4497a'; c.fillStyle = '#fff';
+  const t = chippy.uses > 0 ? `🐰 ×${chippy.uses}` : '🐰 💤'; c.strokeText(t, 80, 34); c.fillText(t, 80, 34); chippy.tagTex.needsUpdate = true;
+}
+function chippyKick(h) {                                             // both feet flick back on take-off and swing forward to land
+  const a = -0.9 * Math.sin(h * Math.PI * 2); for (const f of chippy.feet) f.rotation.x = a;
+}
+function hitChippy() {
+  if (chippy.state !== 'shelf') return;
+  if (gameMode !== 'classic' && gameMode !== 'chaos') { chippy.state = 'dance'; chippy.t = 0; windUpSound(); return; }   // (Free walk: no mice to hunt, it just does a happy wind-up hop)
+  chippy.from.copy(chippy.home); chippy.seat.set(CAT_POS.x + BOX.w / 2 + 0.38, 0, CAT_POS.z + 0.25);
+  chippy.to.copy(chippy.seat); chippy.state = 'leap'; chippy.t = 0; chippy.uses = CHIPPY_USES; chippy.shown = -1;
+  sfx.whoosh(); showBanner('Chippy!'); floatText(chippy.home.clone().setY(chippy.home.y + 0.8), 'Wound up: 10 hunts!', 'clutch');
+}
+function chippyClick() { tone(3400, 2100, 0.016, 'square', 0.03); tone(950, 700, 0.02, 'triangle', 0.02, 0.005); }   // the clockwork clack of a landing
+function windUpSound() { for (let i = 0; i < 6; i++) tone(2200 + (i % 2) * 300, 2000, 0.025, 'square', 0.02, i * 0.07); }   // krrk-krrk-krrk
+function chippyPrey() {                                              // the nearest mouse it can get at
+  let best = null, bd = Infinity; const p = chippy.g.position;
+  for (const m of mice) {
+    if (!m.active || !m.hittable || m.state === 'whacked') continue;
+    const d = Math.hypot(m.root.position.x - p.x, m.root.position.z - p.z); if (d < bd) { bd = d; best = m; }
+  }
+  return best;
+}
+function chippyKill(m) {                                              // one wind-up, one mouse
+  burst(m.center.clone().setY(0.35), 0xffffff, 10, 2.4, 3, 0.8); burst(m.center.clone().setY(0.3), 0xf3a3ba, 5, 1.8, 2.5, 0.6); sfx.squeak(2);
+  if (m.boss) { if (!hurtBoss(m, 1)) return; }
+  if (m.kind === 'karen') { if (!hurtKaren(m)) return; }
+  if (m.kind === 'laser' && m.pointer && m.pointer.visible) dropLaser(m);
+  if (m.isBomb && !m.boss) { floatText(m.center.clone().setY(0.9), 'Chippy defused it!', ''); m.release(); return; }
+  const saved = m.state === 'carry' || m.state === 'grab';
+  if (saved) { m.dropCheese(); tailWag = 1.4; }
+  combo++;
+  const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP)), pts = CFG.SCORE_WHACK * mult * (m.kind === 'rainbow' ? 5 : 1);
+  score += pts; whackedCount++; m.helmetHP = 0; m.helmet.visible = false;
+  m.setState('whacked'); sfx.whack(false);
+  floatText(m.center.clone().setY(0.9), saved ? `Chippy saved it! +${pts}` : `Chippy! +${pts}`, 'clutch');
+  updateHud();
+}
+function updateChippy(dt) {
+  const C = chippy, g = C.g, p = g.position, live = state === 'playing'; C.t += dt;
+  const hopTo = (tx, tz, speed) => {                                  // bounce along the carpet towards a spot; true once there
+    const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
+    g.rotation.y = Math.atan2(dx, dz); C.key.rotation.x += dt * 9;
+    const hop0 = C.hop; C.hop = (C.hop + dt / 0.22) % 1; if (C.hop < hop0) chippyClick();   // click! with every landing
+    const push = 0.35 + 1.3 * Math.sin(C.hop * Math.PI);                 // it springs forward off its feet, then coasts in to land
+    const step = Math.min(d, speed * dt * push); p.x += dx / (d || 1) * step; p.z += dz / (d || 1) * step;
+    p.y = Math.sin(C.hop * Math.PI) * 0.13; C.rig.rotation.x = 0.22 * Math.sin(C.hop * Math.PI);   // pitches forward in the air
+    chippyKick(C.hop);
+    return d < 0.05;
+  };
+  if (C.state === 'dance') {                                         // a hop and a spin on the spot
+    const k = Math.min(1, C.t / 1.4), ph = (k * 4) % 1; p.copy(C.home); p.y += Math.sin(ph * Math.PI) * 0.12; chippyKick(ph); if (Math.floor(k * 4) !== Math.floor((C.t - dt) / 1.4 * 4)) chippyClick(); g.rotation.y = -0.35 + k * Math.PI * 2; C.key.rotation.x -= dt * 14;
+    if (k >= 1) { C.state = 'shelf'; g.rotation.y = -0.35; p.copy(C.home); chippyKick(0); }
+  } else if (C.state === 'leap') {                                    // off the credenza and down beside her box
+    const k = Math.min(1, C.t / 0.8), e = k * (2 - k);
+    p.lerpVectors(C.from, C.to, e); p.y += Math.sin(k * Math.PI) * 0.9; C.rig.rotation.x = -k * Math.PI * 2;
+    g.rotation.y = Math.atan2(C.to.x - C.from.x, C.to.z - C.from.z);
+    chippyKick(Math.min(0.5, k));
+    if (k >= 1) { C.rig.rotation.x = 0; p.copy(C.seat); g.rotation.y = 0; C.state = 'cat'; C.cool = 0.6; chippyClick(); chippyKick(0); }
+  } else if (C.state === 'cat') {                                     // waiting beside her, wobbling gently, for a mouse to show
+    C.rig.rotation.z = Math.sin(C.t * 3) * 0.04; C.rig.rotation.x = 0; p.y = 0;
+    C.cool -= dt;
+    if (live && C.cool <= 0 && C.uses > 0) { const m = chippyPrey(); if (m) { C.target = m; C.state = 'wind'; C.t = 0; windUpSound(); g.rotation.y = Math.atan2(m.root.position.x - p.x, m.root.position.z - p.z); } }
+  } else if (C.state === 'wind') {                                    // krrk-krrk: the key cranks round, and off it goes
+    C.key.rotation.x -= dt * 22; C.rig.position.y = Math.abs(Math.sin(C.t * 30)) * 0.015;
+    if (C.t > 0.55) { C.rig.position.y = 0; C.state = 'hunt'; C.t = 0; }
+  } else if (C.state === 'hunt') {
+    if (!live) return;
+    let m = C.target;
+    if (!m || !m.active || !m.hittable || m.state === 'whacked') m = C.target = chippyPrey();   // lost it? the next nearest
+    if (!m || C.t > 9) { C.state = 'return'; C.target = null; }
+    else {
+      const q = m.root.position;
+      hopTo(THREE.MathUtils.clamp(q.x, -ROOM.halfW + 0.2, ROOM.halfW - 0.2), THREE.MathUtils.clamp(q.z, 0.3, ROOM.depth - 0.2), 4.2);
+      if (Math.hypot(q.x - p.x, q.z - p.z) < 0.4 + (m.boss ? 0.4 : 0)) {
+        chippyKill(m); chippyKick(0); C.uses--; C.target = null; C.state = 'return'; C.t = 0;
+        if (C.uses === 0) { unlock('chippy'); floatText(p.clone().setY(0.9), 'Chippy\'s all wound down!', 'warn'); }
+      }
+    }
+  } else if (C.state === 'return') {
+    if (!live) return;
+    if (hopTo(C.seat.x, C.seat.z, 3.6)) { p.y = 0; C.rig.rotation.x = 0; chippyKick(0); g.rotation.y = 0; C.cool = 0.5; C.state = C.uses > 0 ? 'cat' : 'spent'; C.t = 0; }
+  } else if (C.state === 'spent') {                                   // run down: it keels over on its side
+    C.rig.rotation.z = Math.min(1.35, C.t * 3); C.rig.position.y = Math.min(1, C.t * 3) * IN(1.2);
+  }
+  const out = C.state !== 'shelf' && C.state !== 'dance' && C.state !== 'leap';
+  C.tag.visible = out && gameMode !== 'walk';
+  if (C.tag.visible) { chippyTag(); C.tag.position.set(p.x, p.y + 0.75 + Math.sin(clock * 3) * 0.03, p.z); }
+}
+function resetChippy() {
+  const C = chippy; C.state = 'shelf'; C.uses = 0; C.target = null; C.t = 0; C.shown = -1;
+  C.g.position.copy(C.home); C.g.rotation.set(0, -0.35, 0); C.rig.rotation.set(0, 0, 0); C.rig.position.set(0, 0, 0); C.tag.visible = false; chippyKick(0);
+}
+
 /* =====================================================================
    CATNIP MODE (25 s, like the rave): open the catnip cupboard, tap the jar. Every time, the catnip takes her a
    different way (never the same twice running), each with its own look, soundtrack and perk:
@@ -6595,7 +6748,7 @@ function resetGame() {
   cheeses.forEach(c => c.reset());
   if (gameMode === 'chaos') cheeses.forEach(c => c.lose());
   document.querySelector('.c-cheese').style.visibility = gameMode === 'chaos' ? 'hidden' : '';
-  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); clearPaint(); resetLaser(); resetCatnip(); resetKaren(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
+  resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); clearPaint(); resetLaser(); resetChippy(); resetCatnip(); resetKaren(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false; bossDone = false; bossLevel = 0; waveNo = 1;
   lastTimeShown = -1; D = getDifficulty(0);
@@ -7521,7 +7674,7 @@ function walkBlocked(nx, nz, ox, oz) {
 }
 function startWalk() {
   if (!walk.rig) walk.rig = makeWalker();
-  const skip = new Set([walk.rig.g, cat, heist.player.root, heistGoal.g, heist.ring, gunRig.held, ...blanketRigs.map(b => b.lump), ...mice.map(m => m.root), ...(MW.dk ? [MW.dk.rig.g] : [])]);
+  const skip = new Set([walk.rig.g, cat, heist.player.root, heistGoal.g, heist.ring, gunRig.held, chippy.g, ...blanketRigs.map(b => b.lump), ...mice.map(m => m.root), ...(MW.dk ? [MW.dk.rig.g] : [])]);
   walk.meshes = [];
   scene.traverse(o => {
     if (!o.isMesh) return;
@@ -8493,7 +8646,7 @@ function frame(now) {
   updateBoom(dt);
   updateCatCrown(dt);
   updateRoomFx(dt);
-  updateWallpaper(dt); updateBlood(dt); updatePaint(dt); updateLaser(dt); updateCatnip(dt); updateFire(dt); updateMantleMirror(dt);
+  updateWallpaper(dt); updateBlood(dt); updatePaint(dt); updateLaser(dt); updateChippy(dt); updateCatnip(dt); updateFire(dt); updateMantleMirror(dt);
   updateFan(dt);
   updateBombFx(dt);
 
