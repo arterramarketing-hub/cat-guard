@@ -3290,6 +3290,7 @@ function updateRoomFx(dt) {
 SECT = 'Dome light';
 /* ---------- 8 ft ceiling with three frosted dome lights (the near end of the room is left open, dollhouse style). Both face into
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
+let ducks = [];
 let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null, laundry = null, mosaicGlints = [], mosaicArt = null;
 const sliderGlass = [];
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
@@ -3439,6 +3440,35 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         for (const o of [-1, 1]) rod(g, new THREE.Vector3(tx + o * IN(3.2), top, tz), foot.clone().add(new THREE.Vector3(o * IN(0.5), 0, 0)), IN(0.3), metal);
         const f = new THREE.Mesh(new THREE.CylinderGeometry(IN(0.9), IN(0.9), IN(0.5), 10), lam(0x9a9a9a)); f.position.set(foot.x, IN(0.25), foot.z); g.add(f);
         BX(g, IN(8), IN(0.3), IN(2.5), metal, tx, top - IN(0.15), tz);                                           // mounting plate
+      }
+      { // the rubber duck army (from the photo): two dozen little ducks in every colour, some in hats, lined up on the table facing the room
+        const Y = 0xf6cf2a, O = 0xf58a2c, G = 0x6fd16a, B = 0x3f7fe6, P = 0xe24aa8, U = 0xa77ae0, W = 0xf1f0ec, S = 0xf29a72;
+        const army = [[W, 'sailor'], [Y, 'sailor'], [W, 'helmet'], [Y, 'hair'], [Y, 'cowboy'], [Y, 0], [G, 'flower'], [B, 0], [Y, 'pirate'], [S, 0],
+                      [Y, 'bucket'], [O, 0], [Y, 0], [O, 0], [Y, 'smile'], [G, 0], [U, 0], [S, 0], [G, 0], [B, 0], [Y, 0], [P, 0], [Y, 'cap'], [O, 0], [Y, 0], [G, 0]];
+        const beak = new THREE.MeshPhongMaterial({ color: 0xff7a1a, shininess: 60 }), eyeW = basic(0xffffff), eyeB = basic(0x111111);
+        const hatM = c => new THREE.MeshPhongMaterial({ color: c, shininess: 40 });
+        army.forEach(([col, hat], i) => {
+          const d = new THREE.Group(); d.userData.name = 'Rubber duck'; d.userData.noWalk = true; povEndWall.add(d);
+          const mat = new THREE.MeshPhongMaterial({ color: col, shininess: 80, specular: 0x555555 }), sc = 0.8 + (i % 5 === 2 ? 0.35 : Math.random() * 0.25);
+          const M = (geo, m, x, y, z, par) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); (par || d).add(o); return o; };
+          M(new THREE.SphereGeometry(0.08, 16, 12), mat, 0, 0.06, 0).scale.set(1, 0.78, 1.2);                       // body
+          M(new THREE.ConeGeometry(0.035, 0.07, 10), mat, 0, 0.1, -0.1).rotation.x = -0.8;                           // tail flick
+          M(new THREE.SphereGeometry(0.056, 14, 12), mat, 0, 0.14, 0.045);                                          // head
+          M(new THREE.SphereGeometry(0.03, 10, 8), beak, 0, 0.128, 0.1).scale.set(1.25, 0.45, 1.25);               // beak
+          for (const sx of [-1, 1]) { M(new THREE.SphereGeometry(0.012, 8, 6), eyeW, sx * 0.026, 0.155, 0.088); M(new THREE.SphereGeometry(0.007, 6, 5), eyeB, sx * 0.026, 0.156, 0.098); }
+          if (hat === 'sailor') { M(new THREE.CylinderGeometry(0.04, 0.045, 0.035, 14), hatM(0xffffff), 0, 0.2, 0.045); M(new THREE.CylinderGeometry(0.046, 0.046, 0.01, 14), hatM(0x2a4a9a), 0, 0.19, 0.045); }
+          else if (hat === 'helmet') M(new THREE.SphereGeometry(0.06, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), hatM(0xf4f4f4), 0, 0.15, 0.04);
+          else if (hat === 'hair') M(new THREE.SphereGeometry(0.06, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hatM(0x1a1412), 0, 0.15, 0.035);
+          else if (hat === 'cowboy') { M(new THREE.CylinderGeometry(0.075, 0.075, 0.008, 16), hatM(0x6a4424), 0, 0.19, 0.045); M(new THREE.CylinderGeometry(0.032, 0.04, 0.045, 12), hatM(0x6a4424), 0, 0.21, 0.045); }
+          else if (hat === 'bucket') M(new THREE.CylinderGeometry(0.045, 0.062, 0.04, 14), hatM(0x5a9a4a), 0, 0.19, 0.045);
+          else if (hat === 'pirate') { M(new THREE.CylinderGeometry(0.04, 0.066, 0.04, 3), hatM(0x151515), 0, 0.2, 0.045).rotation.y = Math.PI / 6; M(new THREE.SphereGeometry(0.009, 6, 5), eyeW, 0, 0.205, 0.08); }
+          else if (hat === 'cap') { M(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 14), hatM(0x2f6fd6), 0, 0.19, 0.04); M(new THREE.SphereGeometry(0.03, 8, 6), hatM(0x2f6fd6), 0, 0.2, 0.0).scale.set(1, 0.4, 1); }
+          else if (hat === 'flower') { M(new THREE.SphereGeometry(0.014, 8, 6), hatM(0xff7aa8), -0.012, 0.2, 0.04); M(new THREE.SphereGeometry(0.014, 8, 6), hatM(0xff7aa8), 0.012, 0.2, 0.04); }
+          else if (hat === 'smile') M(new THREE.CircleGeometry(0.02, 12), basic(0xfff3a0), 0.075, 0.05, 0.03).rotation.y = Math.PI / 2;
+          const row = i % 5, colI = Math.floor(i / 5), hx = WTABLE.x - 0.52 + row * 0.26 + (colI % 2) * 0.12, hz = WTABLE.z - 0.95 + colI * 0.34 + (Math.random() - 0.5) * 0.06;
+          d.scale.setScalar(sc); d.position.set(hx, WTABLE.h, hz); d.rotation.y = Math.PI / 2 + (Math.random() - 0.5) * 0.35;
+          ducks.push({ g: d, home: d.position.clone(), yaw: d.rotation.y, state: 'table', v: new THREE.Vector3(), w: new THREE.Vector3(), hop: 0, hopDelay: 0 });
+        });
       }
       const plastic = new THREE.MeshPhongMaterial({ color: 0xf6f5f1, shininess: 45, specular: 0x3a3a3a, side: THREE.DoubleSide }), beech = lam(0xd8ae72);
       const SH = IN(17.5);
@@ -4685,7 +4715,7 @@ class Mouse {
         const T = karenTV(); this.pop = 1;
         p.set(T.x, T.top - 0.55 + Math.min(1, this.t / 0.7) * 0.55, T.z); this.root.rotation.y = Math.sin(this.t * 2) * 0.4;
         if (this.t > 0.7 && !this.saidHi) { this.saidHi = true; karenSay(this, 'Excuse me. EXCUSE me!'); }
-        if (this.t > 2.2 && !cine) { this.jFrom = p.clone(); this.jTo = new THREE.Vector3(CAT_POS.x + 0.95, 0, CAT_POS.z + 1.35); this.setState('kJump'); tone(500, 900, 0.2, 'triangle', 0.04); }
+        if (this.t > 2.2 && !cine) { this.jFrom = p.clone(); this.jTo = new THREE.Vector3(CAT_POS.x + 1.5, 0, CAT_POS.z + 0.85); this.setState('kJump'); tone(500, 900, 0.2, 'triangle', 0.04); }
         break;
       }
       case 'kJump': {                                                  // ...and jumps down to march up to the cat
@@ -4695,13 +4725,13 @@ class Mouse {
         break;
       }
       case 'kLecture': {                                               // wagging her finger at the cat
-        this.faceToward(CAT_POS.x, CAT_POS.z, dt); this.model.rotation.z = Math.sin(this.t * 6) * 0.08; bob = Math.abs(Math.sin(this.t * 5)) * 0.03;
+        this.faceToward(CAT_POS.x * 0.55 + camera.position.x * 0.45, CAT_POS.z * 0.55 + camera.position.z * 0.45, dt);   // (half to the cat, half to the camera, so we see her face) this.model.rotation.z = Math.sin(this.t * 6) * 0.08; bob = Math.abs(Math.sin(this.t * 5)) * 0.03;
         this.lineT -= dt; if (this.lineT <= 0) { this.lineT = 2.8; karenSay(this, KAREN_LECTURE[this.lineI++ % KAREN_LECTURE.length]); }
         if (this.t > 17) { this.setState('kLeave'); karenSay(this, "I'm leaving a one-star review!"); }
         break;
       }
-      case 'kRant': {                                                  // "LET ME SPEAK TO A MANAGER!": stomping, hopping mad
-        this.faceToward(CAT_POS.x, CAT_POS.z, dt); bob = Math.abs(Math.sin(this.t * 14)) * 0.09; this.model.rotation.z = Math.sin(this.t * 20) * 0.1;
+      case 'kRant': {                                                  // "LET ME SPEAK TO A MANAGER!": stomping, hopping mad... straight at the camera (you're the manager)
+        this.faceToward(camera.position.x, camera.position.z, dt); bob = Math.abs(Math.sin(this.t * 14)) * 0.09; this.model.rotation.z = Math.sin(this.t * 20) * 0.1;
         p.x += Math.sin(this.t * 3.1) * dt * 0.6;
         this.lineT -= dt; if (this.lineT <= 0) { this.lineT = 2.6; karenSay(this, KAREN_RANT[this.lineI++ % KAREN_RANT.length], true); }
         if (this.t > 15) { this.setState('kLeave'); karenSay(this, "Fine! I'm leaving a one-star review!", true); }
@@ -4981,6 +5011,7 @@ const ACHIEVEMENTS = [
     ['karen', '💇‍♀️', 'Complaint dismissed', 'Vanquish the Karen mouse (rare: she turns up around 3,000 points)'],
     ['discoFever', '🕺', 'Disco fever', 'In Free walk, leap onto the little disco ball hanging on the slider'],
     ['catNap', '😴', 'Cat nap', 'In Free walk, curl up for a nap in the cat tree condo'],
+    ['duckArmy', '🦆', 'Duck-pocalypse', 'In Free walk, knock the whole rubber duck army off the table'],
     ['mosaicSmash', '🪞', 'Seven years bad luck', 'In Free walk, leap into the mosaic mirror art and bring it crashing down'],
     ['coonShot', '🎯', 'Trash panda down', 'In Free walk, shoot the raccoon taunting you at the slider'],
     ['glassBreak', '💥', 'Slider smasher', 'Shatter the sliding glass door'],
@@ -5001,7 +5032,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-26 14:17';                                              // stamped when the site is published
+const BUILD = '2026-09-26 14:29';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5110,7 +5141,7 @@ function updateHeist(dt) {
   } else {
     const k = heist.keys; let fx = (k.arrowright || k.d ? 1 : 0) - (k.arrowleft || k.a ? 1 : 0), fz = (k.arrowdown || k.s ? 1 : 0) - (k.arrowup || k.w ? 1 : 0);
     if (!fx && !fz) { fx = walk.stick.x; fz = walk.stick.y; }        // the on-screen stick
-    if (Math.hypot(fx, fz) > 0.12) { const y = fc.s.yaw; _hD.set(fx * Math.cos(y) + fz * Math.sin(y), 0, -fx * Math.sin(y) + fz * Math.cos(y)); }
+    if (Math.hypot(fx, fz) > 0.12) { camera.getWorldDirection(_hP); _hP.y = 0; if (_hP.lengthSq() < 1e-6) _hP.set(0, 0, -1); _hP.normalize(); _hD.set(-_hP.z * fx - _hP.x * fz, 0, _hP.x * fx - _hP.z * fz); }   // (screen up = away from the camera)
   }
   if (heist.respawnT > 0) _hD.set(0, 0, 0);                            // flattened: can't move until she's respawned
   const speed = (heist.carrying ? 2.1 : 2.8) * (heist.dashT > 0 ? 2.1 : 1);
@@ -5438,15 +5469,15 @@ function checkBoss() {                                             // 1000 point
    he roars, his name slams onto the screen, then the camera pulls back and play resumes. */
 let cine = null;
 let karenCam = null;
-const _kcL = new THREE.Vector3(), _kcP = new THREE.Vector3(), _kcD = new THREE.Vector3(-0.8, 0.62, 0.75).normalize();   // (a three-quarter view from her front: her face and the cat both in shot)
+const _kcL = new THREE.Vector3(), _kcP = new THREE.Vector3(), _kcD = new THREE.Vector3(-0.55, 0.62, 1).normalize();   // (a three-quarter view from her front: her face and the cat both in shot)
 function updateKarenCam(dt) {                                         // follows Karen (and keeps the cat in shot) until she's dealt with
   const kc = karenCam; if (!kc) return;
   const m = kc.m, done = !m.active || m.kind !== 'karen' || m.state === 'whacked' || m.state === 'retreat' || m.state === 'home' || (state !== 'playing' && state !== 'ending' && state !== 'paused');
   if (done || gameMode !== 'classic' || CAM_VIEWS[camView].pov) { karenCam = null; if (state === 'playing' || state === 'ending') fitCamera(); return; }
   if (state === 'paused') return;
   const p = m.root.position, onTV = p.y > 0.5;
-  _kcL.set(p.x * 0.72 + CAT_POS.x * 0.28, onTV ? p.y + 0.3 : 0.55, p.z * 0.72 + CAT_POS.z * 0.28);
-  _kcP.copy(_kcL).addScaledVector(_kcD, onTV ? 2.6 : 3.3);
+  _kcL.set(p.x * 0.55 + CAT_POS.x * 0.45, onTV ? p.y + 0.3 : 0.62, p.z * 0.55 + CAT_POS.z * 0.45);
+  _kcP.copy(_kcL).addScaledVector(_kcD, onTV ? 3.2 : 4.8);            // pulled well back: Karen, her face and the cat she's yelling at all in shot
   const k = 1 - Math.exp(-dt * 2.5); camBase.lerp(_kcP, k); kc.look.lerp(_kcL, k);
   camera.clearViewOffset();
 }
@@ -5973,10 +6004,11 @@ function tossGun() {                                                 // empty: s
   showFireBtn();
 }
 const _gH = new THREE.Vector3(), _gAim = new THREE.Vector3(), _gF = new THREE.Vector3();
-function gunHand() {                                                  // where the pistol is held: by the cat in her box, or (Free walk) gripped in her mouth
+function gunHand() {                                                  // where the pistol is held: by the cat in her box, or (Free walk) at her mouth
   if (!walk.on || !walk.rig) return gunRig.hand;
-  walk.rig.head.getWorldPosition(_gH); return _gH.add(_gF.set(Math.sin(walk.face) * 0.2, -0.1, Math.cos(walk.face) * 0.2));
+  return walk.rig.head.localToWorld(_gH.set(0, -0.12, 0.15));
 }
+const _gGrip = new THREE.Vector3(0, -1.8 / 15.6, -0.4 / 15.6), _gG = new THREE.Vector3();   // the middle of the pistol grip (pistol-local)
 function updateGun(dt) {
   const gr = gunRig;
   const reveal = gr.state === 'cupboard' && pistolDoor && pistolDoor.angle < -0.9 && cupboardPistol.visible;   // the pistol glints when its cupboard opens
@@ -5997,6 +6029,10 @@ function updateGun(dt) {
     if (walk.on && walk.rig) { if (gr.recoil <= 0) gr.aim.lerp(_gAim.copy(hand).add(_gF.set(Math.sin(walk.face) * 4, 0, Math.cos(walk.face) * 4)), Math.min(1, dt * 10)); }   // Free walk: pointing where she's facing
     else if (idle && gr.recoil <= 0) gr.aim.lerp(idle.center, Math.min(1, dt * 6));
     gr.held.position.copy(hand); gr.held.lookAt(gr.aim);
+    if (walk.on && walk.rig) {                                         // Free walk: flipped over so she bites the grip; the gun hangs under her chin, barrel pointing where she looks
+      gr.held.scale.setScalar(0.62); gr.held.rotateZ(Math.PI); gr.held.updateMatrixWorld(true);
+      gr.held.localToWorld(_gG.copy(_gGrip)); gr.held.position.add(hand.clone().sub(_gG));
+    } else gr.held.scale.setScalar(1.8);
     ammoPop = Math.max(0, ammoPop - dt * 4);
     ammoTag.position.set(hand.x + 0.75, hand.y + 0.55 + Math.sin(clock * 3) * 0.05, hand.z + 0.1); ammoTag.scale.setScalar(0.85 * (1 + ammoPop * 0.35));
     gr.held.rotateX(-gr.recoil * 0.5); gr.held.translateZ(-gr.recoil * 0.12);
@@ -7485,7 +7521,7 @@ function startWalk() {
   Object.assign(walk, { on: true, vy: 0, grounded: true, face: Math.PI, phase: 0, batT: 0, squash: 0, fp: false, jumpQ: -1, burnCD: 0, look: null, tableHops: 0, meowRun: 0, lastMeow: -9, meowT: 0, puff: 0, inBox: false });
   catTail.visible = false;
   walk.vel.set(0, 0, 0); walk.stick.x = walk.stick.y = 0;
-  resetLaundry(); resetSliderScene();
+  resetLaundry(); resetSliderScene(); resetDucks();
   walk.pos.set(0.9, 0, 4.4); walk.pos.y = surfaceTop(walk.pos.x, walk.pos.z, 0.9);
   walk.rig.g.visible = true; walk.rig.shadow.visible = true; cat.visible = false;
   fcStart(); Object.assign(fc, { dist0: 3.3, el0: 20, zoom: 1, tilt: 0, yaw: 0 });
@@ -7773,7 +7809,7 @@ function hitDark() {
     d.state = 'dead'; d.t = 0; MW.done = true;
     for (let i = 0; i < 4; i++) burst(at, [0x2a2733, 0x19e6d0, 0x3cb043, 0xffffff][i], 12, 3, 3, 0.8);
     [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f, 0.18, 'triangle', 0.05, i * 0.1));
-    unlock('darkKitty'); showBanner('Dark kitty defeated!');
+    unlock('darkKitty'); showBanner('Dark kitty defeated!'); MW.beaten = true;   // (and the mirror world closes behind her for good)
     setTimeout(() => { if (mirrorWorld) startMirrorTrans('out', 'You beat the dark kitty! 👑'); }, 2300);
   } else floatText(at.setY(at.y + 0.8), `${MW.hp} to go!`, 'clutch');
 }
@@ -7796,8 +7832,8 @@ function updateDarkKitty(dt) {
       if (!MW.done && ((dist < 3.0 && dz > 0.35) || dist < 1.3)) { d.state = 'taunt'; d.t = 0; d.said = 0; }
       break;
     case 'taunt':                                                    // rises up in the box and speaks, two lines, then pounces
-      if (d.said === 0) { d.said = 1; const l = "I've been waiting for you..."; speak(l, { pitch: 0.45, rate: 0.8 }); showWalkName('😈 ' + l); floatText(q.clone().setY(q.y + 1.5), l, 'name'); tone(110, 80, 1.2, 'sawtooth', 0.04); }
-      if (d.said === 1 && d.t > 2.2) { d.said = 2; const l = 'Time to take your place!'; speak(l, { pitch: 0.45, rate: 0.85 }); showWalkName('😈 ' + l); floatText(q.clone().setY(q.y + 1.5), l, 'bad'); }
+      if (d.said === 0) { d.said = 1; const l = "I've been waiting for you..."; speak(l, { pitch: 0.45, rate: 0.8 }); showWalkName('😈 ' + l); tone(110, 80, 1.2, 'sawtooth', 0.04); }
+      if (d.said === 1 && d.t > 2.2) { d.said = 2; const l = 'Time to take your place!'; speak(l, { pitch: 0.45, rate: 0.85 }); showWalkName('😈 ' + l); }
       if (d.t > 4.2) { d.state = 'leap'; d.perched = false; d.t = 0; d.vy = 9.5; d.grounded = false; d.vel.set(dx / dist * 3.2, 0, dz / dist * 3.2); sfx.meow(true); MW.battle = true; mirrorHud(); }
       break;
     case 'leap': if (d.grounded && d.t > 0.2) { d.state = 'hunt'; d.t = 0; } break;
@@ -7863,6 +7899,7 @@ function updateMirrorWorld(dt) {
     const ahead = new THREE.Vector3(p.x + Math.sin(walk.face) * 0.45, p.y + 0.4, p.z + Math.cos(walk.face) * 0.45);
     const push = spd > 0.4 ? new THREE.Vector3(p.x + walk.vel.x / spd * 0.45, p.y + 0.4, p.z + walk.vel.z / spd * 0.45) : ahead;
     into = !MW.trans && mirrorPortals().some(b => b.containsPoint(ahead) || b.containsPoint(push));
+    if (into && MW.beaten && !mirrorWorld) { into = false; if (clock > (MW.sealNote || 0)) { MW.sealNote = clock + 4; showWalkName('🪞 Just a mirror now... the dark kitty is gone'); tone(660, 440, 0.4, 'sine', 0.02); } }
   }
   const was = MW.pushT || 0; MW.pushT = into ? was + dt : Math.max(0, was - dt * 3);   // ...and keep pushing for two seconds before it lets her through
   if (into && was === 0) tone(880, 1320, 0.3, 'sine', 0.02);
@@ -7877,7 +7914,7 @@ function walkLanded() {                                              // landing 
   const o = walk.hitObj;
   if (o && o.userData.table && tableRig && !tableRig.broken) {
     walk.tableHops++;
-    if (walk.tableHops === 1) { sfx.crack ? sfx.crack() : sfx.clack(); showWalkName('Crack... careful!'); floatText(walk.pos.clone().setY(walk.pos.y + 0.8), 'Creak!', 'warn'); }
+    if (walk.tableHops === 1) { sfx.crack ? sfx.crack() : sfx.clack(); showWalkName('Creak... careful!'); }
     else { breakTable(); walk.tableHops = 0; walk.grounded = false; walk.vy = 1.5; showWalkName('Smash! The table shattered'); }
   }
 }
@@ -7893,7 +7930,8 @@ function walkSwipe() {                                               // swipe at
   if (blanketRigs.some(r => r.state === 'cat')) { shrugBlanket(); return; }   // under a blanket: the swipe flings it off
   if (gunRig.state === 'cat') { fireGun(); return; }                 // armed: the swipe pulls the trigger
   if (coonSwipe(paw)) return;                                        // the raccoon at the slider: whack the glass right in front of it
-  if (laundrySwipe(paw)) return;                                     // the folded laundry on the armchair: all over the floor
+  if (laundrySwipe(paw)) return;
+  if (duckSwipe(paw)) return;                                        // the rubber ducks on the table                                     // the folded laundry on the armchair: all over the floor
   if (mirrorWorld && MW.dk && MW.dk.state !== 'dead') {                // the dark kitty within reach: that's who gets it
     const q = MW.dk.pos; if (Math.hypot(q.x - paw.x, q.z - paw.z) < 1.0 && Math.abs(q.y + 0.4 - paw.y) < 0.9) { hitDark(); return; }
   }
@@ -7957,7 +7995,7 @@ function dropPoop() {
   walk.squatT = 0.8; walk.poopPop = g;
   tone(260, 80, 0.14, 'sine', 0.09); noise(0.08, 0.05, 500);
   for (let i = 0; i < 3; i++) setTimeout(() => burst(g.position.clone().setY(g.position.y + 0.15), 0x9acd32, 2, 0.25, 0.9, 0.35), 300 + i * 350);   // stink wafts
-  floatText(g.position.clone().setY(g.position.y + 0.55), '💩 Plop!', 'name'); showWalkName('💩 Plop! Business done');
+  showWalkName('💩 Plop! Business done');
   unlock('poop');
 }
 /* ---------- the raccoon: in Free walk a raccoon waddles up to the slider now and then and taunts her through the glass
@@ -8279,17 +8317,58 @@ function resetSliderScene() {                                         // a fresh
   if (mosaicArt) { const MA = mosaicArt; MA.bits.forEach(b => povEndWall.remove(b.m)); MA.bits = []; MA.state = 'wall'; MA.g.visible = true; MA.g.position.copy(MA.home); MA.g.rotation.set(0, Math.PI, 0); }
   coon.dead = false; if (coon.rig && coon.rig.halo) coon.rig.halo.visible = false; if (coon.pool) { povEndWall.remove(coon.pool); coon.pool = null; } cops.at = 0; cops.t = -1; if (cops.rig) cops.rig.visible = false;
 }
+function duckSqueak(pitch) { const f = pitch || 1300 + Math.random() * 500; tone(f, f * 0.72, 0.09, 'square', 0.028); tone(f * 1.5, f * 1.1, 0.06, 'sine', 0.02, 0.02); }
+function knockDuck(d, dx, dz, power) {                                // batted off: flies, spins, squeaks
+  if (d.state !== 'table') return;
+  d.state = 'fly'; const l = Math.hypot(dx, dz) || 1; d.v.set(dx / l * power + (Math.random() - 0.5), 1.2 + Math.random() * 1.6, dz / l * power + (Math.random() - 0.5));
+  d.w.set((Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16); duckSqueak();
+}
+function duckSwipe(paw) {                                             // a swipe across the table sends the nearest ducks flying
+  const near = ducks.filter(d => d.state === 'table' && Math.hypot(d.g.position.x - paw.x, d.g.position.z - paw.z) < 0.5 && Math.abs(d.g.position.y - paw.y) < 0.9);
+  if (!near.length) return false;
+  const fx = Math.sin(walk.face), fz = Math.cos(walk.face); near.forEach(d => knockDuck(d, fx + (d.g.position.x - paw.x) * 2, fz + (d.g.position.z - paw.z) * 2, 2.2));
+  showWalkName(near.length > 3 ? '🦆 Duck strike!' : '🦆 Rubber duck'); return true;
+}
+function duckChorus() {                                                // meow at them and the whole army squeaks back, one after another, up a scale
+  const on = ducks.filter(d => d.state === 'table'); if (!on.length) return;
+  const scale = [0, 2, 4, 5, 7, 9, 11, 12]; on.forEach((d, i) => { d.hopDelay = 0.15 + i * 0.07; d.hopNote = 988 * Math.pow(2, scale[i % 8] / 12 + Math.floor(i / 8) * 0.25); });
+  showWalkName('🦆 The duck army squeaks back!');
+}
+function updateDucks(dt) {
+  if (!ducks.length) return;
+  const top = WTABLE.h, onTable = (x, z) => x > WTABLE.x - WTABLE.dep / 2 && x < WTABLE.x + WTABLE.dep / 2 && Math.abs(z - WTABLE.z) < WTABLE.len / 2;
+  if (walk.on && walk.rig && Math.abs(walk.pos.y - top) < 0.15) {    // up on the table: she bowls straight through them
+    const p = walk.pos, fx = Math.sin(walk.face), fz = Math.cos(walk.face);
+    for (const d of ducks) if (d.state === 'table') { const dx = d.g.position.x - (p.x + fx * 0.2), dz = d.g.position.z - (p.z + fz * 0.2); if (Math.hypot(dx, dz) < 0.3) knockDuck(d, dx + fx, dz + fz, 1.6 + Math.hypot(walk.vel.x, walk.vel.z) * 0.3); }
+  }
+  for (const d of ducks) {
+    if (d.hopDelay > 0) { d.hopDelay -= dt; if (d.hopDelay <= 0) { d.hop = 0.35; duckSqueak(d.hopNote); } }
+    if (d.hop > 0) { d.hop = Math.max(0, d.hop - dt); const k = d.hop / 0.35; d.g.position.y = d.home.y + Math.sin(k * Math.PI) * 0.1; d.g.rotation.y = d.yaw + Math.sin(k * Math.PI * 2) * 0.3; }
+    if (d.state !== 'fly') continue;
+    d.v.y -= 9.8 * dt; d.g.position.addScaledVector(d.v, dt); d.g.rotation.x += d.w.x * dt; d.g.rotation.y += d.w.y * dt; d.g.rotation.z += d.w.z * dt;
+    const px = d.g.position.x, pz = d.g.position.z; if (px < -ROOM.halfW + 0.1) { d.g.position.x = -ROOM.halfW + 0.1; d.v.x = Math.abs(d.v.x) * 0.4; }
+    const floor = onTable(px, pz) && d.g.position.y > top - 0.05 ? top : 0;
+    if (d.g.position.y <= floor && d.v.y < 0) {
+      d.g.position.y = floor;
+      if (d.v.y < -1.6) { d.v.y *= -0.35; d.v.x *= 0.6; d.v.z *= 0.6; duckSqueak(900 + Math.random() * 300); }
+      else { d.state = floor ? 'table' : 'floor'; d.home.copy(d.g.position); d.yaw = Math.random() * 6; d.g.rotation.set(Math.random() < 0.5 ? 0 : Math.PI / 2, d.yaw, 0); if (floor) d.g.rotation.x = 0; }
+    }
+  }
+  if (!ducks.duckDone && ducks.every(d => d.state === 'floor')) { ducks.duckDone = true; unlock('duckArmy'); showBanner('Duck-pocalypse!'); showWalkName('🦆 The whole duck army is down!'); }
+}
+function resetDucks() { ducks.duckDone = false; for (const d of ducks) { d.state = 'table'; d.v.set(0, 0, 0); d.hop = d.hopDelay = 0; d.g.position.copy(d.home0 || (d.home0 = d.home.clone())); d.home.copy(d.home0); d.g.rotation.set(0, d.yaw0 || (d.yaw0 = d.yaw), 0); d.yaw = d.yaw0; } }
 function walkMeow() {
   if (!walk.on || state !== 'playing') return;
   initAudio();
   walk.meowRun = clock - walk.lastMeow < 1.8 ? walk.meowRun + 1 : 1; walk.lastMeow = clock;
   const head = walk.pos.clone().setY(walk.pos.y + 1.05);
   if (walkInLitter() && clock > (walk.poopReady || 0)) { walk.poopReady = clock + 2; setTimeout(dropPoop, 450); }   // a meow in the litter box... and then a little present
-  coonReact(walk.meowRun >= 10 ? 'angry' : 'meow');                  // the raccoon at the slider has opinions about her meows
+  coonReact(walk.meowRun >= 10 ? 'angry' : 'meow');
+  if (Math.hypot(walk.pos.x - WTABLE.x, walk.pos.z - WTABLE.z) < 3.6) duckChorus();   // the rubber duck army answers                  // the raccoon at the slider has opinions about her meows
   if (walk.meowRun >= 10) {                                          // the tenth in a row: a furious, LOUD yowl
     walk.meowRun = 0; walk.meowT = 1.1; walk.puff = 1;
     sfx.meow(true); vibrate(120); shake = Math.max(shake, reduceMotion ? 0.06 : 0.45);
-    floatText(head.setY(head.y + 0.2), 'MRRRAAOWW!!', 'bad'); showWalkName('😾 MRRRAAOWW!!'); unlock('hiss');
+    showWalkName('😾 MRRRAAOWW!!'); unlock('hiss');
   } else {
     walk.meowT = 0.4; sfx.meow(false);
     floatText(head, walk.meowRun >= 7 ? 'Meow!!' : 'Meow', 'name');
@@ -8318,7 +8397,7 @@ function walkTap(x, y) {
     if (q) { walk.look = MW.dk.pos.clone(); walk.batT = 0.35; if (MW.dk.pos.distanceTo(walk.pos) < 1.7) hitDark(); else floatText(h.point.clone().setY(h.point.y + 0.4), 'Get closer!', 'warn'); return; }
   }
   if (h) {
-    const name = walkName(h); floatText(h.point.clone().setY(h.point.y + 0.3), name, 'name'); showWalkName(name);
+    const name = walkName(h); showWalkName(name);
     walk.look = h.point.clone(); walk.batT = 0.35;
   }
   handleTap(x, y);                                                   // and she still bats it, knocks it, opens it... (no points)
@@ -8425,7 +8504,7 @@ function frame(now) {
   candleLight.intensity = (0.32 + flick / flames.length * 0.1) * lit / flames.length;
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
   if (sliderDisco) updateSliderDisco(dt);
-  updateRaccoon(dt); updateLaundry(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
+  updateRaccoon(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
 
   if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && camera.position.z >= ROOM.visDepth - 0.05);   // (or out in the yard)   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
