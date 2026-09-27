@@ -1,7 +1,7 @@
 /* Princess Kitty Defender: offline support.
    The game page is fetched fresh whenever there's a connection (so updates show up right away) and
    kept as a fallback; everything else (Three.js, fonts, icons) comes straight from the cache. */
-const CACHE = 'pkd-v2';
+const CACHE = 'pkd-v3';
 const CORE = [
   './', './index.html', './apple-touch-icon.png', './icon-512.png', './manifest.json',
   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
@@ -9,7 +9,7 @@ const CORE = [
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(CORE.map(u =>
-    fetch(u, u.startsWith('http') ? { mode: 'no-cors' } : {}).then(r => c.put(u, r)).catch(() => {})))));
+    fetch(u, u.startsWith('http') ? { mode: 'cors' } : { cache: 'no-cache' }).then(r => { if (r && r.ok) return c.put(u, r); }).catch(() => {})))));   // (only a good copy is kept: a failed download never gets stuck in the cache)
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
@@ -22,7 +22,7 @@ self.addEventListener('fetch', e => {
   const isPage = req.mode === 'navigate' || (req.destination === 'document');
   e.respondWith(caches.open(CACHE).then(async c => {
     if (isPage) {                                                     // network first: always the latest version when online
-      try { const r = await fetch(req); if (r && r.ok) c.put('./index.html', r.clone()); return r; }
+      try { const r = await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }); if (r && r.ok) c.put('./index.html', r.clone()); return r; }   // (no-cache: skip the browser's 10-minute copy right after an update)
       catch (err) { return (await c.match('./index.html')) || (await c.match('./')) || Response.error(); }
     }
     const hit = await c.match(req, { ignoreSearch: true });            // cache first for scripts, fonts and pictures

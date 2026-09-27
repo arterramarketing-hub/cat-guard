@@ -39,7 +39,7 @@
 
   /* ---------- HUD ---------- */
   .hud{position:fixed;top:0;left:0;right:0;z-index:5;pointer-events:none;display:flex;justify-content:center;
-       padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 0}
+       padding:calc(env(safe-area-inset-top,0px) + 8px) max(12px, env(safe-area-inset-right,0px)) 0 max(12px, env(safe-area-inset-left,0px))}
   .hud-bar{width:100%;max-width:780px;background:var(--hud);border:1.5px solid rgba(251,241,220,.14);border-radius:16px;
            padding:8px 12px;display:grid;align-items:center;column-gap:0;row-gap:8px;
            grid-template-columns:auto auto auto auto 1fr auto;grid-template-areas:"score time cheese lives heat pause"}
@@ -77,7 +77,7 @@
     .hud{top:auto;bottom:0;padding:0 10px calc(env(safe-area-inset-bottom,0px) + 10px)}   /* portrait phones: HUD along the bottom, game fills the top */
   }
   .heat i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cheese),var(--lilac));transition:width .5s}
-  @media (max-width:560px){
+  @media (max-width:780px){                                         /* phones (incl. on their side) and small tablets: the compact one-row HUD */
     .hud-bar{grid-template-columns:auto auto auto auto 1fr auto;grid-template-areas:"score time cheese lives heat pause";padding:6px 7px;border-radius:13px}   /* one compact row on phones */
     .hud-cell{padding:0 3px;gap:2px}
     .c-score{padding-left:0}
@@ -88,7 +88,7 @@
     .cheeses{gap:2px}
     .lives{grid-template-columns:repeat(9,11px);gap:1px}
     .pip{width:11px;height:11px}
-    .heat{min-width:22px}
+    .heat{min-width:0}
     .hud-btns{gap:4px}
     .time{font-size:13px;min-width:3.4ch}
     .lbl-split{gap:4px}
@@ -142,8 +142,9 @@
   body.heist-ui #heistDash{display:grid}
   body.heist-ui #walkJump,body.heist-ui #walkSwipe,body.heist-ui #walkMeow,body.heist-ui #walkCaption{display:none}
   body.heist-ui .hud{top:0;bottom:auto;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 0}
-  #walkCaption{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translateX(-50%);z-index:7;pointer-events:none;white-space:nowrap;opacity:0;
-               background:rgba(58,20,52,.88);color:#fff;border:2px solid rgba(255,244,248,.45);border-radius:999px;padding:7px 18px;font:800 17px var(--body)}
+  #walkCaption{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translateX(-50%);z-index:7;pointer-events:none;white-space:nowrap;opacity:0;max-width:calc(100vw - 24px);width:max-content;
+               background:rgba(58,20,52,.88);color:#fff;border:2px solid rgba(255,244,248,.45);border-radius:22px;padding:7px 18px;font:800 17px var(--body)}
+  @media (max-width:560px){#walkCaption{white-space:normal;text-align:center;font-size:15px}}
   #walkCaption.show{animation:caption 2.4s ease forwards}
   @keyframes caption{0%{opacity:0;transform:translate(-50%,-6px) scale(.9)}8%,78%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0}}
   .float.name{font-family:var(--body);font-weight:800;font-size:15px;color:#fff;background:rgba(58,20,52,.82);border:1.5px solid rgba(255,244,248,.35);
@@ -161,7 +162,7 @@
   .hitmarker{position:fixed;width:52px;height:52px;margin:-26px 0 0 -26px;z-index:9;pointer-events:none;animation:hitm .55s ease-out forwards}
   .hitmarker line{stroke-linecap:round}.hitmarker .o{stroke:rgba(0,0,0,.6);stroke-width:7}.hitmarker .i{stroke:#fff;stroke-width:4}.hitmarker.kill .i{stroke:#ff2a2a}
   @keyframes hitm{0%{transform:scale(1.6) rotate(8deg);opacity:1}22%{transform:scale(1) rotate(0)}70%{opacity:1}100%{transform:scale(1.08);opacity:0}}
-  @media (max-width:560px){#tagHud{top:calc(env(safe-area-inset-top,0px) + 54px)}}   /* (clear of the camera / pause buttons up in the corner) */
+  @media (max-width:560px){#tagHud,#mirrorHud{top:calc(env(safe-area-inset-top,0px) + 54px)}}   /* (clear of the camera / pause buttons up in the corner) */
   #tagHud .row{display:flex;justify-content:space-between;gap:12px;align-items:center}#tagHud b{font-size:17px;color:#ffe27a}#tagHud .to{font-size:10px;opacity:.7;letter-spacing:.06em;text-transform:uppercase}#tagHud .sub{font-size:12px;white-space:normal}
   #mirrorHud .row{display:flex;justify-content:space-between;gap:10px;align-items:center}
   #mirrorHud .hp{font-size:12px;letter-spacing:1px}
@@ -190,6 +191,8 @@
                        conic-gradient(from 0deg,rgba(255,60,170,.5),rgba(255,210,60,.5),rgba(70,255,140,.5),rgba(60,170,255,.5),rgba(190,90,255,.5),rgba(255,60,170,.5));
             animation:nip 5s linear infinite}
   #catnipFx.on{opacity:1}
+  #catnipFx:not(.on){animation-play-state:paused}   /* (no endless colour-cycling while it's invisible) */
+  @media (max-width:560px){.banner{white-space:normal;text-align:center}}
   #catnipFx.k-trip{animation-duration:2s}
   #catnipFx.k-slowmo{mix-blend-mode:normal;animation:none;background:radial-gradient(ellipse at 50% 50%,rgba(0,0,0,0) 38%,rgba(30,60,120,.5) 100%);
                      -webkit-backdrop-filter:saturate(.3) contrast(1.08);backdrop-filter:saturate(.3) contrast(1.08)}
@@ -211,7 +214,7 @@
             width:34px;height:34px;border-radius:10px;display:grid;place-items:center;cursor:pointer;padding:0}
   .icon-btn:focus-visible{outline:2px solid var(--cheese);outline-offset:2px}
 
-  .banner{position:fixed;left:50%;top:40%;z-index:8;pointer-events:none;white-space:nowrap;
+  .banner{position:fixed;left:50%;top:40%;z-index:8;pointer-events:none;white-space:nowrap;max-width:calc(100vw - 24px);width:max-content;
           font:400 clamp(30px,9vw,64px)/1 var(--display);color:var(--cheese);-webkit-text-stroke:2px var(--ink);
           text-shadow:0 5px 0 var(--ink),0 10px 24px rgba(0,0,0,.45);transform:translate(-50%,-50%) scale(.2) rotate(-6deg);opacity:0;
           animation:bannerPop 2.4s cubic-bezier(.2,1.6,.4,1) forwards}
@@ -230,7 +233,8 @@
   @keyframes cineOut{to{opacity:0}}
 
   /* ---------- Screens ---------- */
-  .screen{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;overflow-y:auto;
+  .screen > *{margin-top:auto;margin-bottom:auto}   /* centred when it fits; when it doesn't (a phone on its side) it scrolls from the very top instead of hiding the top above the screen */
+  .screen{position:fixed;inset:0;z-index:10;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;
           padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 16px);
           background:radial-gradient(ellipse at 50% 45%,rgba(22,33,30,.25),rgba(10,14,12,.8))}
   .card{width:100%;max-width:380px;background:var(--paper);color:var(--ink);border:3px solid var(--ink);border-radius:22px;
@@ -289,7 +293,7 @@
   .modes{display:flex;align-items:center;gap:5px;white-space:nowrap}.modes .dot{opacity:.5}
   .heist-ring{}
   .btn-share{background:#c9a8ff;font-size:18px;padding:10px 16px}
-  .ach-card{max-height:calc(100vh - 40px);overflow:hidden;display:flex;flex-direction:column}
+  .ach-card{box-sizing:border-box;max-height:calc(100vh - 40px);overflow:hidden;display:flex;flex-direction:column}
   .ach-count{font:800 14px var(--body);color:#8a4a70;margin-top:-6px}
   .ach-list{overflow:auto;display:grid;gap:8px;padding-right:4px;margin:4px 0 6px;-webkit-overflow-scrolling:touch;touch-action:pan-y}
   .ach{display:grid;grid-template-columns:38px 1fr;gap:10px;align-items:center;background:var(--paper-2);border:2px solid rgba(58,20,52,.12);border-radius:12px;padding:7px 10px}
@@ -684,6 +688,7 @@ const cordTexH = canvasTex(32, 64, (g, w, h) => {         // same corduroy, ribs
   g.fillStyle = 'rgba(255,253,248,.45)'; for (let y = 3; y < h; y += 6) g.fillRect(0, y, w, 1);
 }, 1, 3);
 
+const TOUCH_DEV = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);   // phones / tablets: go a bit easier on the GPU
 SECT = 'Carpet';
 /* ---------- room: carpet, white paneling ---------- */
 const lam = (color, extra) => new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {}));
@@ -1370,6 +1375,7 @@ let consoleRig = null;
 function tapConsole() {
   const c = consoleRig; if (!c) return;
   if (c.on && tvMode === 3 && !tvBroken && state === 'playing') { startTvPlay(); return; }   // it's already on: she grabs the controller and plays
+  if (c.on && tvMode !== 3 && !tvBroken) { tvGame = tvNextGame(); setTVMode(3); setTimeout(gameJingle, 250); bonus(5); return; }   // (it's on, the TV's just on another channel: back to the game)
   c.on = !c.on; c.led.material.color.setHex(c.on ? 0x3cff6a : 0x2a2a2a);
   tone(1200, 1500, 0.05, 'square', 0.03); if (c.on) tone(900, 1800, 0.12, 'sine', 0.04, 0.06);   // the little 'click-click' boot chime
   if (tvBroken) { tvSpark(); return; }
@@ -1601,12 +1607,12 @@ function updateGame(dt) {
 }
 function gameInput(k) {
   if (k === 'exit') return exitTvPlay();
-  if (k === 'swap') { hush(); const i = TV_GAMES.indexOf(tvGame); tvGame = TV_GAMES[(i + 1) % TV_GAMES.length]; startConsoleGame(); return; }
+  if (k === 'swap') { hush(); payConsolePrizes(); const i = TV_GAMES.indexOf(tvGame); tvGame = TV_GAMES[(i + 1) % TV_GAMES.length]; startConsoleGame(); return; }
   if (tvGame === 'story') { if (k === 'a' || k === 'b') { hush(); startRetro(); } return; }
   if (tvGame === 'retro') { if (k === 'a') retroSwipe(); return; }
   if (tvGame === 'flappy') { flappyFlap(); return; }
   if (tvGame === 'kart') return kartInput(k);
-  if (game.over) { if (k === 'a') { resetBoardGame(); gameMsg('New game!'); } return; }
+  if (game.over) { if (k === 'a') { payConsolePrizes(); resetBoardGame(); gameMsg('New game!'); } return; }   // (the finished game's prize is banked first)
   if (k === 'up' || k === 'left') { game.cursor = (game.cursor + 2) % 3; tone(660, 660, 0.03, 'square', 0.02); }
   if (k === 'down' || k === 'right') { game.cursor = (game.cursor + 1) % 3; tone(660, 660, 0.03, 'square', 0.02); }
   if (k === 'b') { game.msgT = 0; game.cursor = 0; }
@@ -1670,6 +1676,13 @@ function exitTvPlay() {
   setTimeout(() => {
     $('tvPlay').hidden = true; ui.hud.hidden = false; state = 'playing'; last = performance.now();
     hush();
+    payConsolePrizes();
+    game.player = false; for (const k in tvHeld) tvHeld[k] = false;
+    tvGame = tvNextGame(); resetKart(); resetBoardGame(); resetFlappy(); retro.won = false; setTVMode(3);   // the TV now shows the next game up
+    setTimeout(() => $('tvFade').classList.remove('on'), 60);
+  }, 380);
+}
+function payConsolePrizes() {                                         // console wins pay out in the real game (once each)
     if (game.over && !game.rewarded) {         // a board-game win pays out in the real game
       game.rewarded = true; const place = gameRanking().indexOf(0);
       const pts = CONSOLE_PRIZES[place]; bonus(pts, consoleRig.g.position, place === 0 ? 'Board champ!' : 'Game night'); if (!place) { unlock('boardWin'); consoleWin('Board game champion!', pts); }
@@ -1682,10 +1695,6 @@ function exitTvPlay() {
     }
     if (flappy.won && !flappy.rewarded) { flappy.rewarded = true; bonus(1000, consoleRig.g.position, 'Flappy champ!'); unlock('flappy'); consoleWin('Flappy Kitty champion!', 1000); }
     else if (flappy.sessionBest > 0 && !flappy.rewarded) { flappy.rewarded = true; bonus(flappy.sessionBest * 20, consoleRig.g.position, 'Flappy'); }
-    game.player = false; for (const k in tvHeld) tvHeld[k] = false;
-    tvGame = tvNextGame(); resetKart(); resetBoardGame(); resetFlappy(); retro.won = false; setTVMode(3);   // the TV now shows the next game up
-    setTimeout(() => $('tvFade').classList.remove('on'), 60);
-  }, 380);
 }
 
 /* ---------- the console's first game: a kart racer (pseudo-3D road, 3 laps vs 3 CPU karts, coins, ? boxes, mushroom boost) ---------- */
@@ -1774,8 +1783,8 @@ function updateKart(dt) {
 }
 function kartUseItem() { if (kart.item !== 'mushroom') return; kart.item = null; kart.boost = 1.6; kart.speed = Math.max(kart.speed, KART.MAX * 1.2); [400, 600, 800].forEach((f, i) => tone(f, f * 1.5, 0.08, 'sawtooth', 0.025, i * 0.04)); }
 function kartInput(k) {
-  if (kart.state === 'finish') { if (k === 'a') { kart.state = 'done'; kart.t = 1.2; hush(); } return; }   // skip the ceremony
-  if (kart.over) { if (k === 'a' && kart.t > 0.6) { if (kart.finalPlace === 1) { startStory(); return; } resetKart(); kart.msg = 'Get ready!'; kart.msgT = 1; } return; }   // (a press in the first moment is ignored, so a skip-tap can't restart the race)
+  if (kart.state === 'finish') { if (k === 'a') { kart.state = 'done'; kart.t = 0; hush(); } return; }   // skip the ceremony (the results still get their moment)
+  if (kart.over) { if (k === 'a' && kart.t > 0.6) { if (kart.finalPlace === 1) { startStory(); return; } payConsolePrizes(); resetKart(); kart.msg = 'Get ready!'; kart.msgT = 1; } return; }   // (a press in the first moment is ignored, so a skip-tap can't restart the race)
   if (k === 'b') kartUseItem();
 }
 function cineOverlay(g, W, H, line, age, fade, bar, skipLabel) {   // letterbox bars, fade to black, a little film grain and a subtitle in the bottom bar
@@ -1969,7 +1978,7 @@ const STORY = [
 ];
 const STORY_END = 14.6;
 const story = { t: 0, said: -1 };
-function startStory() { tvGame = 'story'; story.t = 0; story.said = -1; for (const k in tvHeld) tvHeld[k] = false; setJoyLabels(); }
+function startStory() { tvGame = 'story'; story.t = 0; story.said = -1; resetRetro(); for (const k in tvHeld) tvHeld[k] = false; setJoyLabels(); }
 function updateStory(dt) {
   story.t += dt;
   const i = STORY.findLastIndex ? STORY.findLastIndex(s => story.t >= s.t) : STORY.map(s => story.t >= s.t).lastIndexOf(true);
@@ -2052,6 +2061,7 @@ const R_SHROOMS = [[74, 58], [118, 58], [96, 80]];
 const R_GOAL = 12;
 const retro = { state: 'title', t: 0, mice: [], shrooms: [], whacked: 0, spawnT: 1, cx: 96, cy: 64, swipe: 0, poofs: [], zoomT: 0, won: false, rewarded: false };
 function resetRetro() {
+  retro.leaving = false;
   Object.assign(retro, { state: 'title', t: 0, mice: [], whacked: 0, spawnT: 1.2, cx: 96, cy: 66, swipe: 0, poofs: [], zoomT: 0, won: false, rewarded: false });
   retro.shrooms = R_SHROOMS.map(([x, y]) => ({ x, y, hx: x, hy: y, alive: true, by: null }));
 }
@@ -2064,6 +2074,7 @@ function retroSwipe(x, y) {
   for (const m of retro.mice) { const d = Math.hypot(m.x - retro.cx, m.y - retro.cy); if (d < bd) { bd = d; best = m; } }
   if (!best) return;
   if (best.carry) { best.carry.by = null; best.carry.x = best.x; best.carry.y = best.y; }   // it drops the mushroom where it was
+  else if (best.tgt && best.tgt.by === best) best.tgt.by = null;                                  // (whacked mid-grab: the mushroom's free again)
   retro.mice.splice(retro.mice.indexOf(best), 1); retro.whacked++;
   retro.poofs.push({ x: best.x, y: best.y, t: 0.35 }); tone(1047, 1568, 0.08, 'square', 0.03);
   if (retro.whacked >= R_GOAL) { retro.state = 'won'; retro.t = 0; [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, f, 0.12, 'square', 0.03, i * 0.09)); }
@@ -2072,7 +2083,7 @@ function updateRetro(dt) {
   const R = retro; R.t += dt; R.swipe = Math.max(0, R.swipe - dt); R.poofs.forEach(p => p.t -= dt); R.poofs = R.poofs.filter(p => p.t > 0);
   if (R.state === 'title') { if (R.t > 2.4) { R.state = 'play'; R.t = 0; } return; }
   if (R.state === 'won') { if (R.t > 1.3) { R.state = 'zoom'; R.zoomT = 0; speak('And on that little TV… an even tinier kart race.'); } return; }
-  if (R.state === 'zoom') { R.zoomT += dt; if (R.zoomT > 3.4) { R.won = true; hush(); exitTvPlay(); } return; }
+  if (R.state === 'zoom') { R.zoomT += dt; if (R.zoomT > 3.4 && !R.leaving) { R.leaving = true; R.won = true; hush(); exitTvPlay(); } return; }
   if (R.state !== 'play') return;
   const sp = 90 * dt;                                                 // D-pad moves the paw
   if (tvHeld.left) R.cx -= sp; if (tvHeld.right) R.cx += sp; if (tvHeld.up) R.cy -= sp; if (tvHeld.down) R.cy += sp;
@@ -2264,6 +2275,7 @@ function updateTV(dt) {
   if (tvBroken) { tvLight.intensity = 0; if (Math.random() < dt * 0.5) tvSpark(true); return; }   // broken: the odd little spark
   if (!tvOn) { tvLight.intensity = 0; return; }
   if (tvAudio.gain) tvAudio.gain.gain.value = state === 'playing' || state === 'debug' ? 0.03 : 0;   // hush while paused
+  if (tvMode === 3 && state !== 'playing' && state !== 'tvgame' && state !== 'debug' && !tvCine) return;   // (paused, game over, menu: the TV game holds still and quiet)
   if (tvMode === 3) {                                                     // the console game (kart racer or party board)
     const every = game.player || (staticTick = (staticTick + 1) % 2) === 0;
     if (tvGame === 'kart') { updateKart(dt); if (every) drawKart(); }
@@ -2520,7 +2532,7 @@ const DOOR2_Z = ROOM.visDepth - 1.5 - FT(4), DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DO
     box(bw, bh, IN(0.6), frameDark, x, y, IN(0.9), lean);                                        // raised panel moulding
   const GW = MIR_W - IN(5), GH = MIR_H - IN(5), glassMat = basic(0xffffff, { map: mirrorTex });
   const glass = THREE.Reflector                                         // a real reflection of the room, like the mantle mirror
-    ? new THREE.Reflector(new THREE.PlaneGeometry(GW, GH), { clipBias: 0.003, textureWidth: 768, textureHeight: 1536, color: 0xb9c2c6 }   /* seen at a steep angle: needs a sharp texture or the reflection breaks into jagged 'cracks' */)
+    ? new THREE.Reflector(new THREE.PlaneGeometry(GW, GH), { clipBias: 0.003, textureWidth: TOUCH_DEV ? 512 : 768, textureHeight: TOUCH_DEV ? 1024 : 1536, color: 0xb9c2c6 }   /* seen at a steep angle: needs a sharp texture or the reflection breaks into jagged 'cracks' */)
     : new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), glassMat);
   glass.position.set(0, MIR_H / 2, IN(0.8)); lean.add(glass);
   box(GW, GH, IN(0.2), lam(0x3b3e44), 0, MIR_H / 2, IN(0.6), lean);                            // dark backing board (seen once the glass is gone)
@@ -3097,10 +3109,11 @@ SECT = 'Wallpaper';
 let wallRig = null;
 {
   const zones = [
-    { geo: new THREE.PlaneGeometry(ROOM.halfW * 2, 9), pos: new THREE.Vector3(0, 4.6, 0.02), rotY: 0, n: new THREE.Vector3(0, 0, 1) },            // back wall
-    { geo: new THREE.PlaneGeometry(ROOM.visDepth, 9), pos: new THREE.Vector3(-ROOM.halfW + 0.02, 4.6, ROOM.visDepth / 2), rotY: Math.PI / 2, n: new THREE.Vector3(1, 0, 0) },   // left wall
+    { geo: new THREE.PlaneGeometry(ROOM.halfW * 2, ROOM.wallH), pos: new THREE.Vector3(0, ROOM.wallH / 2, 0.02), rotY: 0, n: new THREE.Vector3(0, 0, 1) },            // back wall
+    { geo: new THREE.PlaneGeometry(ROOM.visDepth, ROOM.wallH), pos: new THREE.Vector3(-ROOM.halfW + 0.02, ROOM.wallH / 2, ROOM.visDepth / 2), rotY: Math.PI / 2, n: new THREE.Vector3(1, 0, 0) },   // left wall
   ];
-  for (const z of zones) { const m = new THREE.Mesh(z.geo, basic(0xffffff, { transparent: true, opacity: 0, depthWrite: false })); m.position.copy(z.pos); m.rotation.y = z.rotY; m.userData.wallpaper = true; m.userData.normal = z.n; scene.add(m); tapTargets.push(m); }
+  for (const z of zones) { const m = new THREE.Mesh(z.geo, basic(0xffffff, { transparent: true, opacity: 0, depthWrite: false, visible: false }));   // (never drawn; taps still find it)
+    m.position.copy(z.pos); m.rotation.y = z.rotY; m.userData.wallpaper = true; m.userData.normal = z.n; scene.add(m); tapTargets.push(m); }
   const clawTex = canvasTex(128, 128, (g, w, h) => {
     for (let i = 0; i < 4; i++) {
       const x0 = 30 + i * 20, y0 = 16 + i * 4;
@@ -3122,6 +3135,9 @@ let wallRig = null;
 }
 function hitWallpaper(point, normal) {
   const w = wallRig; if (!w) return;
+  if (point.y > ROOM.wallH - 1.15 / 2 - 0.1) { sfx.miss(); return; }  // (too near the ceiling for a whole strip)
+  if (normal && normal.x > 0.5 && Math.abs(point.z - FIRE.z) < FIRE.w / 2 + IN(2) && point.y < FIRE.h + IN(8)) { sfx.thump(); return; }   // the fireplace stone is in the way
+  if (normal && normal.z > 0.5 && point.x > SHELF_X - SHELF_W / 2 - 0.1 && point.y < SHELF_H + IN(14)) { sfx.thump(); return; }         // ...and so's the corner shelf
   const mm = mantleMirror;                                            // the mirror covers the wall behind it until it's knocked down
   if (mm && mm.state === 'wall' && point.x < -ROOM.halfW + 0.4 && Math.abs(point.z - mm.world.z) < mm.MW / 2 + IN(3) && Math.abs(point.y - mm.world.y) < mm.MH / 2 + IN(3)) { sfx.thump(); return; }
   let r = w.rips.find(q => q.at.distanceTo(point) < 0.6);
@@ -3203,6 +3219,8 @@ const galaxyRig = (() => {
   return { nebula, stars, nebMat, starMat, planes, domes, rave, level: 0 };
 })();
 let raveKick = -1, remoteLed = null, danceUntil = 0, raveUntil = 0;
+const raveKickQ = [];                                                 // kicks are scheduled a little ahead: the lights follow the last one that's actually sounded
+function raveKickNow() { if (!actx) return -1; const now = actx.currentTime; let k = -1; for (const t of raveKickQ) if (t <= now && t > k) k = t; return k; }
 const RAVE_SECS = 40;                                                  // the party shuts itself off after this long
 // disco fever: land on the little disco ball on the slider and the room turns into a 70s dance floor. The lights drop, the
 // ball spins up and throws a hundred spots of light round the walls, floor and ceiling, coloured spots sweep, the mice dance,
@@ -3252,7 +3270,7 @@ function updateSliderDisco(dt) {
   if (!povEndWall.visible && !disco.on) return;
   disco.spin += dt * (disco.on ? 2.2 : 0.5);
   D.ball.rotation.y = disco.spin; D.g.rotation.z = Math.sin(clock * 0.7) * 0.025;
-  const beat = disco.on && actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 7) : 0;
+  const beat = disco.on && actx && raveKickNow() > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKickNow()) * 7) : 0;
   for (const d of D.glints) d.gl.material.opacity = disco.on ? Math.max(0, Math.sin(clock * d.speed * 4 + d.phase)) * (0.7 + beat) : Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.7) * 3;
   D.ball.material.emissive.setScalar(disco.on ? 0.3 + 0.45 * beat : 0.29);
   if (!disco.on) return;
@@ -3289,7 +3307,7 @@ function updateRoomFx(dt) {
   const outK = walk && walk.on && !mirrorWorld ? THREE.MathUtils.clamp((walk.pos.z - (ROOM.visDepth - 0.3)) / 1.5, 0, 1) : 0;   // out through the slider: back to daylight
   const litF = lightF + (1 - lightF) * outK;
   for (const r of roomLights) r.l.intensity = r.base * litF;
-  const dimK = 0.03 + 0.97 * lightF; for (const m of stuffMats) m.color.setScalar(dimK); for (const m of scratchMats) m.color.setScalar(dimK);   // unlit stuffing + rips: darken with the lights
+  const dimK = 0.03 + 0.97 * lightF; for (const m of stuffMats) m.color.setScalar(dimK); for (const m of scratchMats) m.color.setScalar(dimK); if (wallRig) wallRig.clawMat.color.setScalar(dimK);   // unlit stuffing + rips: darken with the lights
   const g = galaxyRig;
   g.level += ((galaxyOn ? 1 : 0) - g.level) * Math.min(1, dt * 3);
   const on = g.level > 0.01;
@@ -3298,7 +3316,7 @@ function updateRoomFx(dt) {
   g.nebMat.opacity = 0.75 * g.level * dark; g.starMat.opacity = (0.75 + 0.25 * Math.sin(clock * 3)) * g.level * dark;
   g.nebula.offset.x += dt * 0.012; g.stars.offset.x -= dt * 0.02; g.stars.offset.y += dt * 0.006;
   for (const d of g.domes) { d.glow.material.opacity = 0.85 * g.level * dark; d.dome.material.color.setHex(g.level > 0.5 ? 0xc9b8ff : 0x6f62c8); }
-  const beat = actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 7) : 0;
+  const beat = actx && raveKickNow() > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKickNow()) * 7) : 0;
   g.rave.forEach((l, i) => {
     const a = clock * (0.7 + i * 0.25) + i * 2.1;
     l.position.set(Math.sin(a) * 3.8, 3.2 + Math.sin(clock * 1.3 + i) * 0.8, disco.on ? ROOM.visDepth - 5.5 + Math.cos(a * 0.8) * 4 : 7 + Math.cos(a * 0.8) * 5.5);   // (disco: sweeping round the dance floor by the slider)
@@ -3742,7 +3760,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const soffitTex = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#e3dac2'; c.fillRect(0, 0, w, h); for (let i = 0; i < 26; i++) { const x = Math.random() * w, y = Math.random() * h, r = 6 + Math.random() * 22, gr = c.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(150,135,100,.22)'); gr.addColorStop(1, 'rgba(150,135,100,0)'); c.fillStyle = gr; c.fillRect(x - r, y - r, r * 2, r * 2); } }, 2, 2);   // water stains
       const SW = FT(7), SD = FT(6.2), SY = FT(7.3), ST2 = IN(8), SX = DX;   // just big enough to cover the concrete pads
       const slab = new THREE.Mesh(new THREE.BoxGeometry(SW, ST2, SD), [OB(0xd9d0b9), OB(0xd9d0b9), OB(0xe6dfcb), new THREE.MeshBasicMaterial({ map: soffitTex, color: 0xf2eee4, fog: false }), OB(0xe9e2cf), OB(0xcfc6ae)]);
-      slab.position.set(SX, SY + ST2 / 2, VD + 0.08 + SD / 2);   // (just clear of the house wall, so the two don't flicker through each other) slab.userData.name = 'Balcony above'; yard.add(slab);
+      slab.position.set(SX, SY + ST2 / 2, VD + 0.08 + SD / 2); slab.userData.name = 'Balcony above'; yard.add(slab);   // (just clear of the house wall, so the two don't flicker through each other)
       const beam = new THREE.Mesh(new THREE.BoxGeometry(SW, IN(6), IN(7)), [OB(0xd3cab3), OB(0xd3cab3), OB(0xe6dfcb), OB(0xc9c0a8), OB(0xeee8d8), OB(0xe2dac6)]);
       beam.position.set(SX, SY - IN(3), VD + SD - IN(3.5)); beam.userData.name = 'Balcony beam'; yard.add(beam);
       for (const px of [SX - SW / 2 + IN(5), SX + SW / 2 - IN(5)]) {
@@ -3786,7 +3804,8 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       yard.add(bm);
       // bushes along the fence and leafy trees behind it: lumpy blobs, lighter on top, in one instanced mesh
       const blob = new THREE.IcosahedronGeometry(1, 1), bp = blob.attributes.position, shade = [];
-      for (let i = 0; i < bp.count; i++) { const y = bp.getY(i), k = 0.55 + 0.45 * (y * 0.5 + 0.5) + (Math.random() - 0.5) * 0.12; bp.setXYZ(i, bp.getX(i) * (0.92 + Math.random() * 0.16), y * (0.92 + Math.random() * 0.16), bp.getZ(i) * (0.92 + Math.random() * 0.16)); shade.push(k, k, k); }
+      const hsh = (x, y, z, sd) => { const v = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + sd) * 43758.5453; return v - Math.floor(v); };   // (random, but the same for every copy of a corner)
+      for (let i = 0; i < bp.count; i++) { const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i), k = 0.55 + 0.45 * (y * 0.5 + 0.5) + (hsh(x, y, z, 4) - 0.5) * 0.12; bp.setXYZ(i, x * (0.92 + hsh(x, y, z, 1) * 0.16), y * (0.92 + hsh(x, y, z, 2) * 0.16), z * (0.92 + hsh(x, y, z, 3) * 0.16)); shade.push(k, k, k); }
       blob.setAttribute('color', new THREE.Float32BufferAttribute(shade, 3));
       const leaves = [], trunks = [];
       for (let x = -FL / 2 + 1.5; x < FL / 2 - 1; x += 2.6 + Math.random() * 1.6) {
@@ -3942,7 +3961,7 @@ function burnPaw() {
   updateHud(); checkEnd();
 }
 function resetFire() { const f = fireRig; if (!f) return; f.level = f.target = f.blow = 0; f.fly = null; f.ember.visible = false; f.g.visible = false; f.light.intensity = 0; }
-function resetRoomFx() { stopDisco(); setRoomMode(0); lightF = 1; danceUntil = 0; raveUntil = 0; }
+function resetRoomFx() { stopDisco(); setRoomMode(0); lightF = 1; danceUntil = 0; raveUntil = 0; if (galaxyRig) galaxyRig.level = 0; }
 SECT = 'TV remote';
 { // the TV remote, lying on the right sofa's seat
   const rm = new THREE.Group(); rm.position.set(ROOM.halfW - COUCH_DEPTH + IN(9), IN(18.3), COUCH_RIGHT_Z0 + FT(2.85) * 1.5); rm.rotation.y = 0.5; rm.scale.setScalar(1.7); scene.add(rm);   // middle cushion, near the front
@@ -4121,7 +4140,42 @@ catTail.add(tailCard);
   // Free-walk / cat's-eye only, since from the usual camera up above they'd stand between it and the room)
   const ROOM_WIDE = new Set(['Armchair', 'Wooden table', 'Rubber duck', 'Cork board', 'Litter box', 'Cat tree']);
   for (const o of [...povEndWall.children]) if (ROOM_WIDE.has(o.userData.name)) scene.attach(o);
+  // ...and since they're drawn every frame now (twice, with the mirrors), fuse their many little plain-coloured parts: a rubber duck
+  // was ten separate meshes; now it's two (glossy + flat), with each part's colour baked into the vertices. Ducks still move as a whole.
+  ducks.forEach(d => fuseParts(d.g));
+  for (const o of scene.children) if (o.userData.name === 'Wooden table') fuseParts(o);
 }
+function fuseParts(root) {                                            // merge a static group's untextured meshes into one vertex-coloured mesh per shading type
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), buckets = new Map();
+  root.traverse(o => {
+    if (!o.isMesh || Array.isArray(o.material) || o.material.map || o.material.transparent || Object.keys(o.userData).length || tapTargets.includes(o)) return;   // (textured, see-through, named or tappable parts stay as they are)
+    const m = o.material, k = m.type + '|' + m.side + '|' + (m.shininess || 0);
+    if (m.type !== 'MeshPhongMaterial' && m.type !== 'MeshLambertMaterial' && m.type !== 'MeshBasicMaterial') return;
+    if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(o);
+  });
+  for (const [k, list] of buckets) {
+    if (list.length < 2) continue;
+    let n = 0; const _m = new THREE.Matrix4();
+    const parts = list.map(o => { const geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); _m.multiplyMatrices(inv, o.matrixWorld); geo.applyMatrix4(_m); if (_m.determinant() < 0) { const P = geo.attributes.position, N = geo.attributes.normal; for (let i = 0; i + 2 < P.count; i += 3) for (const A of [P, N]) { if (!A) continue; for (let c = 0; c < A.itemSize; c++) { const t = A.array[(i + 1) * A.itemSize + c]; A.array[(i + 1) * A.itemSize + c] = A.array[(i + 2) * A.itemSize + c]; A.array[(i + 2) * A.itemSize + c] = t; } } }   // (a mirrored part: keep its faces pointing out)
+      n += geo.attributes.position.count; return { geo, c: o.material.color }; });
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3); let at = 0;
+    for (const { geo, c } of parts) {
+      const P = geo.attributes.position, N = geo.attributes.normal; pos.set(P.array, at * 3); if (N) nor.set(N.array, at * 3);
+      for (let i = 0; i < P.count; i++) { col[(at + i) * 3] = c.r; col[(at + i) * 3 + 1] = c.g; col[(at + i) * 3 + 2] = c.b; }
+      at += P.count; geo.dispose();
+    }
+    const merged = new THREE.BufferGeometry();
+    merged.setAttribute('position', new THREE.BufferAttribute(pos, 3)); merged.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); merged.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    merged.computeBoundingSphere(); merged.computeBoundingBox();
+    const src = list[0].material, mats = fuseParts.mats || (fuseParts.mats = {}), prm = { vertexColors: true, side: src.side };   // (k includes the shininess, so a table's metal isn't given the ducks' gloss)
+    if (src.type === 'MeshPhongMaterial') { prm.shininess = src.shininess; prm.specular = src.specular; }
+    const mat = mats[k] || (mats[k] = new src.constructor(prm));
+    const fused = new THREE.Mesh(merged, mat); root.add(fused);
+    list.forEach(o => o.parent.remove(o));
+  }
+}
+
 SECT = null;
 /* ---------- mouse holes ---------- */
 function archShape(w, h) {
@@ -4247,7 +4301,7 @@ class Cheese {
   }
   get available() { return this.alive && !this.claimant && !this.fall; }   // (not while it's still dropping from the ceiling)
   get grabRadius() { return this.state === 'home' ? CFG.PLATE_GRAB_RADIUS : CFG.FLOOR_GRAB_RADIUS; }
-  startCarry(m) { this.state = 'carried'; this.claimant = m; this.hitT = 0.3; }
+  startCarry(m) { this.state = 'carried'; this.claimant = m; this.hitT = 0.3; this.roll = null; }   // (any roll it was in is over: it's in a mouth now)
   drop() {
     if (this.state === 'carried') {
       this.state = 'dropped'; this.dropT = 0.45;
@@ -4423,7 +4477,7 @@ function updateCat(dt, time, danger) {
   catCard.scale.x = 1 + Math.sin(time * (1.6 + danger * 3)) * 0.012;          // breathing; quicker when mice close in
   catFlinch = Math.max(0, catFlinch - dt);
   catCard.position.x = catFlinch > 0 ? Math.sin(catFlinch * 60) * 0.12 * catFlinch : 0;
-  const raveBeat = roomMode === 2 && actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 7) : 0;
+  const raveBeat = roomMode === 2 && actx && raveKickNow() > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKickNow()) * 7) : 0;
   catBounce += ((roomMode === 2 ? raveBeat * 0.22 : 0) - catBounce) * Math.min(1, dt * 20);   // hops in her box to the kick drum
   catCard.position.y = CAT_CARD_Y + catBounce; catTail.position.y = CAT_TAIL_Y + catBounce;
   catMat.color.setHex(catFlinch > 0.25 ? 0x4a403a : CAT_BASE_HEX);
@@ -4652,6 +4706,7 @@ class Mouse {
   }
   spawn(hole, isBomb, D, opts) {
     if (opts.boss) isBomb = false;                                    // (belt and braces: never a bomb king)
+    this.route = null; this.routeGoal = null; this.routeT = 0;          // (no old detour from its last life)
     this.active = true; this.root.visible = true;
     this.hole = hole; this.isBomb = isBomb; this.attract = !!opts.attract;
     this.speed = D.runSpeed * (1 + (Math.random() * 2 - 1) * CFG.SPEED_VARIANCE);
@@ -4691,6 +4746,7 @@ class Mouse {
     if (this.kind === 'karen' && !this.karenHair) this.karenHair = makeKarenHair(this.model);
     if (this.karenHair) this.karenHair.visible = this.kind === 'karen';
     for (const e of this.ears) e.parent.scale.setScalar(this.kind === 'karen' ? 0.55 : 1);   // (Karen's ears tucked under that hair)
+    if (this.boss) this.ears[0].parent.scale.set(0.75, 0.6, 1);         // (and the Rat King's torn one)
     this.ring.visible = false;     // coloured threat rings removed; threat reads through size, shadows stay
     this.ringMat.opacity = 0;
     this.setState('emerge');
@@ -4722,7 +4778,7 @@ class Mouse {
     if (danceUntil > clock && this.state !== 'whacked' && this.state !== 'emerge' && this.state !== 'home' && !this.attract
         && this.state !== 'player' && (gameMode !== 'chaos' || (this.state === 'wander' && !this.wp && this.hops >= 1))) {   // chaos: scamper out onto the carpet first, then dance
       if (!this.dancing) { this.dancing = true; this.dancePhase = Math.random() * 6; }
-      const beat = actx && raveKick > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKick) * 6) : Math.abs(Math.sin(clock * 8.1));
+      const beat = actx && raveKickNow() > 0 ? Math.exp(-Math.max(0, actx.currentTime - raveKickNow()) * 6) : Math.abs(Math.sin(clock * 8.1));
       const ph = this.dancePhase, s = this.model.scale.y || 1;
       this.model.rotation.set(-1.2 + Math.sin(clock * 8.1 + ph) * 0.12, Math.sin(clock * 1.9 + ph) * 1.1, Math.sin(clock * 4.05 + ph) * 0.3);   // upright, twisting and swaying
       this.model.position.y = (0.34 + beat * 0.14) * s;                      // bounces on every kick
@@ -4756,7 +4812,7 @@ class Mouse {
         const T = karenTV(); this.pop = 1;
         p.set(T.x, T.top - 0.55 + Math.min(1, this.t / 0.7) * 0.55, T.z); this.root.rotation.y = Math.sin(this.t * 2) * 0.4;
         if (this.t > 0.7 && !this.saidHi) { this.saidHi = true; karenSay(this, 'Excuse me. EXCUSE me!'); }
-        if (this.t > 2.2 && !cine) { this.jFrom = p.clone(); this.jTo = new THREE.Vector3(CAT_POS.x + 1.5, 0, CAT_POS.z + 0.85); this.setState('kJump'); tone(500, 900, 0.2, 'triangle', 0.04); }
+        if (this.t > 2.2 && !cine) { this.jFrom = p.clone(); this.jTo = isPov() ? new THREE.Vector3(CAT_POS.x + 0.35, 0, CAT_POS.z + 3.2) : new THREE.Vector3(CAT_POS.x + 1.5, 0, CAT_POS.z + 0.85); this.setState('kJump'); tone(500, 900, 0.2, 'triangle', 0.04); }   // (cat's-eye view: Karen marches out in front of the box, in plain sight)
         break;
       }
       case 'kJump': {                                                  // ...and jumps down to march up to the cat
@@ -4828,6 +4884,7 @@ class Mouse {
       case 'grab': {   // tugging the cheese loose
         const c = this.target;
         if (!c || !c.alive || c.claimant !== this) { this.model.rotation.set(0, 0, 0); this.tug = 0; this.setState('run'); break; }
+        if (Math.hypot(c.pos.x - p.x, c.pos.z - p.z) > c.grabRadius + 0.3) { c.claimant = null; this.model.rotation.set(0, 0, 0); this.tug = 0; this.setState('run'); break; }   // (it rolled away: after it)
         this.faceToward(c.pos.x, c.pos.z, dt);
         // digs its heels in and heaves: leans back, yanks in jerks, wobbling side to side with the effort
         this.tug = Math.pow(Math.max(0, Math.sin(this.t * 9)), 3);
@@ -4949,6 +5006,7 @@ class Mouse {
       this.threat = 0;
     }
     this.visScale = (1 + CFG.THREAT_SCALE * this.threat) * (this.boss ? 2.1 : 1) * CFG.MOUSE_SIZE;   // the Rat King is twice the size
+    if (this.state !== 'whacked') { const e = Math.min(1, dt * 8); this.sqY += (1 - this.sqY) * e; this.sqXZ += (1 - this.sqXZ) * e; }   // (squashed by a hit: it springs back)
     const s = Math.max(0.001, this.pop * this.visScale);
     this.model.scale.set(s * this.sqXZ, s * this.sqY, s * this.sqXZ);
     this.model.position.y = bob;
@@ -5079,7 +5137,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-27 12:02';                                              // stamped when the site is published
+const BUILD = '2026-09-27 12:39';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5217,6 +5275,7 @@ function updateHeist(dt) {
       break;
     }
   }
+  if (state !== 'playing') return;                                   // (the heist just ended)
   // ---- the cat hunts you: red rings show where her paw will land, then it strikes. She gets quicker and trickier the
   // longer the heist goes on, and later on she swipes twice: once where you're heading and once where you are
   heist.dashT = Math.max(0, heist.dashT - dt); heist.dashCD = Math.max(0, heist.dashCD - dt);
@@ -5242,6 +5301,7 @@ function updateHeist(dt) {
     }
   }
   heist.strikes = heist.strikes.filter(s2 => !s2.done);
+  if (state !== 'playing') return;                                   // (caught just now: game over)
   // ---- where to go: the nearest mushroom (gold), or once you've got one, the nearest mouse hole (green)
   let goal = null, best = Infinity;
   if (heist.carrying) { for (const h of HOLES) { const d = Math.hypot(h.mouthOut.x - pos.x, h.mouthOut.z - pos.z); if (d < best) { best = d; goal = h.mouthOut; } } }
@@ -5582,7 +5642,7 @@ function claimCrown(m) {
   m.crown.updateMatrixWorld(true);
   const from = m.crown.getWorldPosition(new THREE.Vector3());
   catCard.updateMatrixWorld(true);
-  const top = new THREE.Box3().setFromObject(catCard).max.y;
+  const top = cat.position.y + (new THREE.Box3().setFromObject(catCard).max.y - cat.position.y) / (cat.scale.y || 1);   // (her normal-size head, even mid-catnip)
   crownFlight = { t: 0, from, to: new THREE.Vector3(CAT_POS.x - 0.03, top - 0.1, CAT_POS.z - 0.04) };   // perched on top of her head, not over her face
   catCrown.position.copy(from); catCrown.scale.setScalar(2.4); catCrown.visible = true;
   m.crown.visible = false;
@@ -5624,9 +5684,10 @@ function hurtBoss(m, dmg) {                                         // returns t
     return false;
   }
   score += 500; showBanner('Rat King defeated! +500'); burst(m.center.clone().setY(0.6), 0xf2c14a, 16, 3.5, 4, 1.2); sfx.gasp();
-  if (!m.bossLevel) claimCrown(m);                                    // first win: his crown goes on the cat
+  const nth = ++kingWins;
+  if (nth === 1) claimCrown(m);                                    // first win: his crown goes on the cat
   else { m.crown.visible = false; returnMushroom(m.center.clone()); }   // later wins: he coughs up a stolen mushroom
-  unlock(m.bossLevel ? 'kingAgain' : 'king'); if (m.bossLevel >= 2) unlock('kingAll');
+  unlock(nth > 1 ? 'kingAgain' : 'king'); if (nth >= 3) unlock('kingAll');
   return true;
 }
 function knockHelmet(m) {                                           // first tap on a helmet mouse: the helmet goes flying
@@ -5711,9 +5772,11 @@ function showFireBtn() {
   ammoTex.needsUpdate = true; ammoTag.visible = gunRig.state === 'cat' || las; ammoPop = 1;
 }
 let bannerFreeAt = 0;
+addEventListener('blur', () => { for (const k in heist.keys) heist.keys[k] = false; });   // (a key held as the window loses focus doesn't stay 'held')
 function showBanner(text) {                                          // one at a time: a second banner waits its turn (e.g. 'Rat King defeated!' then 'A mushroom is back!')
-  const now = performance.now(), at = Math.max(now, bannerFreeAt); bannerFreeAt = at + 1700;
+  const now = performance.now(), at = Math.max(now, bannerFreeAt), g0 = gameId; bannerFreeAt = at + 1700;
   setTimeout(() => {
+    if (g0 !== gameId) return;                                        // (queued in a game that's since been restarted)
     document.querySelectorAll('.banner').forEach(b => b.remove());   // (clear the last one's fading tail)
     const el = document.createElement('div'); el.className = 'banner'; el.textContent = text; document.body.appendChild(el);
     setTimeout(() => el.remove(), 2500);
@@ -5729,6 +5792,7 @@ function takeGun() {
 }
 function tracer(a, b, delay) {
   const t = gunRig.tracers.find(t => t.life <= 0); if (!t) return;
+  t.life = 0.25;                                                       // (reserved now, so the next shot in the volley takes another)
   setTimeout(() => { t.l.geometry.setFromPoints([a, b]); t.l.visible = true; t.life = 0.2; }, delay || 0);
 }
 function onScreen(p) { const v = p.clone().project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1 && v.z < 1; }
@@ -5753,7 +5817,7 @@ function rollBlocked(x, z) {
    A* route round it, pulled tight so it hugs the corners instead of zig-zagging cell to cell. ---------- */
 const NAV = { cell: 0.2, x0: -ROOM.halfW, z0: 0, nx: 0, nz: 0, blocked: null, key: '' };
 function navGrid() {
-  const key = `${tableRig && tableRig.broken ? 1 : 0}${fanRig && fanRig.state === 'broken' ? 1 : 0}`;   // rebuilt when the table smashes or the fan comes down
+  const key = (tableRig && tableRig.broken ? 1 : 0) + (fanRig && fanRig.state === 'broken' ? 2 : 0);   // rebuilt when the table smashes or the fan comes down (a number: no string built per call)
   if (NAV.blocked && NAV.key === key) return NAV;
   NAV.nx = Math.ceil(ROOM.halfW * 2 / NAV.cell); NAV.nz = Math.ceil(ROOM.visDepth / NAV.cell);
   NAV.blocked = new Uint8Array(NAV.nx * NAV.nz);
@@ -5831,8 +5895,11 @@ Mouse.prototype.navAim = function (gx, gz, dt) {                      // null = 
   if (r.length > 1 && clearLine(p.x, p.z, r[1].x, r[1].z, 0.2, 0.05)) r.shift();   // the next corner's already in view: cut straight to it
   return r[0];
 };
+let kingWins = 0, gameId = 0;                                     // Rat Kings beaten this game; which game we're in (so a delayed event can't spill into the next one)
 function burritoMouse(m) {                                          // special kill: wrapped up and rolled away
+  if (!m.active || m.state === 'whacked' || !m.hittable || m.boss || m.kind === 'karen') return;   // (already dealt with while the blanket was in the air)
   unlock('burrito');
+  if (m.kind === 'laser' && m.pointer && m.pointer.visible) dropLaser(m);   // (the laser mouse lets go of its pointer, like any other kill)
   if (m.isBomb) { floatText(m.center.clone().setY(1), 'Smothered!', 'clutch'); m.release(); return; }
   const saved = m.state === 'carry' || m.state === 'grab';
   if (saved) { m.dropCheese(); tailWag = 1.4; }
@@ -5996,7 +6063,7 @@ function fireGun() {
       gr.aim.copy(at); gr.held.lookAt(at); gr.held.updateMatrixWorld(true);
       tracer(gr.held.localToWorld(gr.held.userData.muzzle.clone()), at, 0);
       setTimeout(() => shatterSlider(at), 40);
-      if (gr.ammo === 0) setTimeout(tossGun, 900);
+      if (gr.ammo === 0) { const g0 = gameId; setTimeout(() => { if (g0 === gameId) tossGun(); }, 900); }
       showFireBtn(); return;
     }
   }
@@ -6005,7 +6072,7 @@ function fireGun() {
     gr.aim.copy(c); gr.held.lookAt(c); gr.held.updateMatrixWorld(true);
     tracer(gr.held.localToWorld(gr.held.userData.muzzle.clone()), c, 0);
     setTimeout(() => { shatterSlider(c); coonShot(c); }, 40);
-    if (gr.ammo === 0) setTimeout(tossGun, 900);
+    if (gr.ammo === 0) { const g0 = gameId; setTimeout(() => { if (g0 === gameId) tossGun(); }, 900); }
     showFireBtn(); return;
   }
   const targets = mice.filter(m => m.active && m.hittable && onScreen(m.center));
@@ -6033,7 +6100,7 @@ function fireGun() {
       tracer(path[i], path[i + 1], i * STEP);
       if (i < hops.length) { const h = hops[i]; setTimeout(() => { burst(h.clone(), 0xfff0a0, 6, 2, 2, 0.3); sfx.ricochet(); }, (i + 1) * STEP - 20); }
     }
-    setTimeout(breakTV, path.length * STEP - 60);
+    { const g0 = gameId; setTimeout(() => { if (g0 === gameId) breakTV(); }, path.length * STEP - 60); }
     setTimeout(tossGun, path.length * STEP + 600);
   }
   showFireBtn();
@@ -6257,6 +6324,7 @@ function updateLaser(dt) {
   if (armed && gunRig.state !== 'cat') { const gr = gunRig; ammoPop = Math.max(0, ammoPop - dt * 4); ammoTag.position.set(gr.hand.x + 0.75, gr.hand.y + 0.55 + Math.sin(clock * 3) * 0.05, gr.hand.z + 0.1); ammoTag.scale.setScalar(0.85 * (1 + ammoPop * 0.35)); }
 }
 function resetLaser() {
+  if (typeof ammoTag !== 'undefined') ammoTag.visible = false;
   laser.state = 'none'; laser.ammo = 0; laser.pickup.visible = false; laser.dot.visible = false; laser.mouseBeam.g.visible = false;
   for (const b of laser.beams) { b.life = 0; b.g.visible = false; }
   for (const e of laser.eyes) e.visible = false;
@@ -6590,7 +6658,7 @@ function updateCatnip(dt) {
       catnip.zenT = 4;
       const at = inWalk ? walk.pos.clone().setY(walk.pos.y + 1.1) : new THREE.Vector3(CAT_POS.x, BOX.h + 1.4, CAT_POS.z);
       burst(at, 0xff6fae, 6, 0.8, 1.4, 0.5);
-      if (!inWalk && gameMode !== 'mouse' && lives < CFG.LIVES) { lives++; updateHud(); floatText(at.clone().setY(at.y + 0.4), '+1 life ♥', 'clutch'); }
+      if (!inWalk && gameMode !== 'mouse' && state === 'playing' && lives < CFG.LIVES) { lives++; updateHud(); floatText(at.clone().setY(at.y + 0.4), '+1 life ♥', 'clutch'); }
     }
   }
   catnip.fxT -= dt;
@@ -6655,7 +6723,8 @@ function makeKarenHair(model) {                                       // THE hai
   for (let i = 0; i < 9; i++) { const a = (i / 8 - 0.5) * 2.2; M(new THREE.SphereGeometry(0.022, 8, 6), pearl, Math.sin(a) * 0.17, 0.2 - Math.cos(a) * 0.03, 0.42 + Math.cos(a) * 0.08); }   // pearls
   return g;
 }
-function karenTV() { const b = new THREE.Box3().setFromObject(screen); return { x: (b.min.x + b.max.x) / 2 + 0.25, top: b.max.y, z: (b.min.z + b.max.z) / 2 - 0.05 }; }
+let _karenTV = null;
+function karenTV() { if (_karenTV) return _karenTV; const b = new THREE.Box3().setFromObject(screen); return (_karenTV = { x: (b.min.x + b.max.x) / 2 + 0.25, top: b.max.y, z: (b.min.z + b.max.z) / 2 - 0.05 }); }   // (the TV never moves: worked out once)
 function karenSay(m, line, mad) {
   m.karenLine = line; m.karenMad = !!mad || m.karenMad;
   speak(line, mad ? { pitch: 1.9, rate: 1.25 } : { pitch: 1.7, rate: 1.1 });
@@ -6680,7 +6749,7 @@ function hurtKaren(m) {                                              // true onc
     return false;
   }
   hush(); unlock('karen'); score += 300; showBanner('Complaint dismissed!'); floatText(m.center.clone().setY(1.5), 'Karen vanquished! +300', 'clutch');
-  { const at = m.center.clone(); setTimeout(() => returnMushroom(at, 'Karen\'s refund!'), 700); }   // she drops a mushroom on her way out (a refund if you've lost none)
+  { const at = m.center.clone(), g0 = gameId; setTimeout(() => { if (g0 === gameId) returnMushroom(at, 'Karen\'s refund!'); }, 700); }   // she drops a mushroom on her way out (a refund if you've lost none)
   m.karenLine = ''; burst(m.center.clone().setY(0.6), 0xfdfaf2, 14, 3, 3.5, 0.6);
   return true;
 }
@@ -6811,9 +6880,10 @@ function resetGame() {
   cheeses.forEach(c => c.reset());
   if (gameMode === 'chaos') cheeses.forEach(c => c.lose());
   document.querySelector('.c-cheese').style.visibility = gameMode === 'chaos' ? 'hidden' : '';
-  resetDucks(); resetLaundry();
+  resetDucks(); resetLaundry(); if (consoleRig) { consoleRig.on = false; consoleRig.led.material.color.setHex(0x2a2a2a); }
   resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); clearPaint(); resetLaser(); resetChippy(); resetCatnip(); resetKaren(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
+  kingWins = 0; gameId++; bannerFreeAt = 0; for (const k in heist.keys) heist.keys[k] = false;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false; bossDone = false; bossLevel = 0; waveNo = 1;
   lastTimeShown = -1; D = getDifficulty(0);
   ui.fx.innerHTML = '';
@@ -6836,6 +6906,7 @@ function pauseGame() {
 }
 function resumeGame() {
   if (state !== 'paused') return;
+  initAudio();                                                        // (back from another app: wake the sound up)
   state = 'playing'; ui.pause.hidden = true;
 }
 function quitToTitle() {
@@ -6966,9 +7037,10 @@ renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
    AUDIO (tiny WebAudio synth, started from the Start button)
    ===================================================================== */
 let actx = null; const soundOn = true;            // sound effects are always on (music has its own toggle)
+addEventListener('pointerdown', () => { if (actx && actx.state !== 'running') initAudio(); }, true);   // any tap wakes the sound back up after the phone put it to sleep
 function initAudio() {
-  if (actx || !soundOn) { if (actx && actx.state === 'suspended') actx.resume(); return; }
-  try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
+  if (actx || !soundOn) { if (actx && actx.state !== 'running') actx.resume().catch(() => {}); return; }   // (iOS can also report 'interrupted')
+  try { actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state !== 'running') actx.resume().catch(() => {}); } catch (e) { actx = null; }
 }
 function tone(f0, f1, dur, type, vol, delay) {
   if (!actx || !soundOn) return;
@@ -7228,7 +7300,7 @@ function rKick(t) {
   const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sine';
   o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(46, t + 0.12);
   g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
-  o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.35); raveKick = t;
+  o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.35); raveKick = t; raveKickQ.push(t); if (raveKickQ.length > 8) raveKickQ.shift();
 }
 function rNoise(t, dur, vol, type, f, q) {
   const n = Math.floor(actx.sampleRate * dur), b = actx.createBuffer(1, n, actx.sampleRate), d = b.getChannelData(0);
@@ -7420,7 +7492,7 @@ function fitCamera() {
   if (w !== fitW || h !== fitH) { renderer.setSize(w, h); fitW = w; fitH = h; }   // (resizing the canvas is costly: only when the window changes)
   const povOn = !!CAM_VIEWS[camView].pov && !fc.on;
   if (povEndWall) povEndWall.visible = povOn;                          // she's facing the open end of the room: close it off in her view
-  catCard.visible = catTail.visible = !povOn && !blanketRigs.some(r => r.state === 'cat');   // in her own view she isn't in the box
+  catCard.visible = catTail.visible = !povOn && gameMode !== 'walk' && !blanketRigs.some(r => r.state === 'cat');   // in her own view she isn't in the box
   if (catCrown) catCrown.visible = !!catCrown.userData.claimed && !povOn;
   if (CAM_VIEWS[camView].pov && !fc.on) {                             // cat's eye: looking out from her box over the rim, down the room
     camera.aspect = aspect; camSqueeze = 1;
@@ -7767,7 +7839,9 @@ function startWalk() {
 function endWalk() {
   stopDisco(); walk.napT = 0; coonHide();
   walk.on = false; walkPtr = null; walk.stick.x = walk.stick.y = 0;
-  if (walk.poops) { walk.poops.forEach(o => scene.remove(o)); walk.poops = []; }
+  if (walk.poops) { walk.poops.forEach(o => freeMesh(o)); walk.poops = []; }
+  MW.pushT = 0; { const rp = document.getElementById('mirrorRipple'); if (rp) rp.style.opacity = 0; }
+  resetSliderScene();                                                 // (the broken glass, the raccoon's mess... all tidied for the next mode)
   if (mirrorWorld || MW.trans) exitMirror(null, true);
   walk.frozen = false;
   if (walk.rig) { walk.rig.g.visible = false; walk.rig.shadow.visible = false; }
@@ -7800,7 +7874,8 @@ function updateWalk(dt) {
       if (walkBlocked(nx, nz, p.x, p.z)) {
         if (walk.grounded || walk.vy > 4) return false;
         const mx = nx - p.x, mz = nz - p.z, ml = Math.hypot(mx, mz) || 1;   // mid-air, just short of a ledge: she hooks her paws over it and pulls herself up
-        const lx2 = THREE.MathUtils.clamp(nx + mx / ml * WALK.reach, -lx, lx), lz2 = yardOpen() ? nz + mz / ml * WALK.reach : THREE.MathUtils.clamp(nz + mz / ml * WALK.reach, 0.3, ROOM.visDepth - 0.45);
+        const yo = yardOpen(), lx2 = yo ? nx + mx / ml * WALK.reach : THREE.MathUtils.clamp(nx + mx / ml * WALK.reach, -lx, lx), lz2 = yo ? nz + mz / ml * WALK.reach : THREE.MathUtils.clamp(nz + mz / ml * WALK.reach, 0.3, ROOM.visDepth - 0.45);
+        if (yo && !walkZoneOK(lx2, lz2)) return false;                 // (slider open: never a grab that lands her inside a wall)
         const top = surfaceTop(lx2, lz2, p.y + 0.5);
         if (!(top > p.y - 0.05 && top - p.y < 0.5) || surfaceTop(lx2, lz2, top + WALK.height) > top + WALK.step) return false;
         p.set(lx2, top, lz2); walk.vy = 0; walk.grounded = true; walk.squash = 0.6; sfx.padThud(0.3); return true;
@@ -7847,7 +7922,7 @@ function updateWalk(dt) {
   if (inBox && !walk.inBox) { unlock('boxJump'); showWalkName('Home sweet box!'); tailWag = 2; }
   walk.inBox = inBox;
   const MA = mosaicArt;                                               // leaping into the mosaic mirror art knocks it off the wall
-  if (MA && MA.state === 'wall' && !walk.grounded && Math.abs(p.x - MA.home.x) < 0.85 && p.z > ROOM.visDepth - 0.85 && p.y + 0.75 > MA.home.y - MA.half) { MA.state = 'fall'; MA.t = 0; MA.vy = 0; sfx.crack ? sfx.crack() : noise(0.2, 0.2, 900); showWalkName('Uh oh... the mirror art!'); }
+  if (MA && MA.state === 'wall' && !walk.grounded && Math.abs(p.x - MA.home.x) < 0.85 && p.z > ROOM.visDepth - 0.85 && p.z < ROOM.visDepth && p.y + 0.75 > MA.home.y - MA.half) { MA.state = 'fall'; MA.t = 0; MA.vy = 0; sfx.crack ? sfx.crack() : noise(0.2, 0.2, 900); showWalkName('Uh oh... the mirror art!'); }
   if (walk.grounded && _tvTop && Math.abs(p.y - _tvTop.max.y) < 0.02 && p.x > _tvTop.min.x && p.x < _tvTop.max.x) unlock('tvTop');   // up on the TV
   // a nap in the cat tree's condo: curl up on the cushion in there and she dozes off (any move wakes her)
   const cc = catCondo, snug = cc && walk.grounded && cc.box.containsPoint(_nap.set(p.x, p.y + 0.1, p.z));
@@ -7923,11 +7998,15 @@ function updateWalk(dt) {
   fc.focus.set(p.x, p.y + 0.55, p.z);
   updateMirrorWorld(dt);
 }
+const _fpA = new THREE.Vector3(), _fpB = new THREE.Vector3();
 function walkCam(S) {                                                // keep the follow camera inside the room, or look out through her eyes
   if (walk.fp && walk.rig) {
     walk.rig.head.getWorldPosition(_wc);
     const pitch = THREE.MathUtils.degToRad(THREE.MathUtils.clamp(-S.tilt * 0.9, -60, 50)), fx = -Math.sin(S.yaw), fz = -Math.cos(S.yaw);
     camera.position.set(_wc.x + fx * 0.14, _wc.y + 0.04, _wc.z + fz * 0.14);
+    { const from = _fpA.set(walk.pos.x, camera.position.y, walk.pos.z), d = _fpB.subVectors(camera.position, from), L = d.length();   // eyes ahead of her body: not inside the sofa she's nosing
+      if (L > 0.01 && walk.meshes.length) { raycaster.set(from, d.divideScalar(L)); raycaster.far = L + 0.1; const h = raycaster.intersectObjects(walk.meshes, false)[0]; raycaster.far = Infinity; if (h && h.distance < L + 0.08) camera.position.copy(from).addScaledVector(d, Math.max(0, h.distance - 0.1)); }
+      const VD = ROOM.visDepth, c = camera.position; c.x = THREE.MathUtils.clamp(c.x, -ROOM.halfW + 0.1, ROOM.halfW - 0.1); if (!yardOpen() && c.z > VD - 0.1) c.z = VD - 0.1; }   // (and never through the back wall / glass)
     camera.lookAt(camera.position.x + fx * Math.cos(pitch), camera.position.y + Math.sin(pitch), camera.position.z + fz * Math.cos(pitch));
   } else {
     const c = camera.position, f = S.focus, VD = ROOM.visDepth, SD = SLIDER;
@@ -8045,7 +8124,7 @@ function hurtPlayer(dx, dz, dist) {
 }
 function hitDark() {
   const d = MW.dk; if (!d || d.state === 'dead' || MW.done) return;
-  MW.hp--; if (!MW.battle) { MW.battle = true; hush(); } mirrorHud();
+  MW.hp--; d.perched = false; if (!MW.battle) { MW.battle = true; hush(); } mirrorHud();   // (knocked off its perch on the box)
   const dx = d.pos.x - walk.pos.x, dz = d.pos.z - walk.pos.z, dist = Math.hypot(dx, dz) || 1;
   d.state = 'stun'; d.t = 0; d.cd = Math.max(d.cd, 0.5); d.vel.set(dx / dist * 5, 0, dz / dist * 5); d.vy = 3.5; d.grounded = false;   // knocked back, dazed
   const at = d.pos.clone().setY(d.pos.y + 0.5);
@@ -8239,7 +8318,7 @@ function dropPoop() {
   const lb = scene.children.find(c => c.userData.name === 'Litter box');
   if (lb) { const bb = new THREE.Box3().setFromObject(lb); g.position.x = THREE.MathUtils.clamp(g.position.x, bb.min.x + 0.18, bb.max.x - 0.18); g.position.z = THREE.MathUtils.clamp(g.position.z, bb.min.z + 0.18, bb.max.z - 0.18); }   // ...but always in the tray
   g.rotation.y = Math.random() * 6; g.scale.setScalar(0.2); scene.add(g);
-  walk.poops = walk.poops || []; walk.poops.push(g); if (walk.poops.length > 6) scene.remove(walk.poops.shift());
+  walk.poops = walk.poops || []; walk.poops.push(g); if (walk.poops.length > 6) freeMesh(walk.poops.shift());
   walk.squatT = 0.8; walk.poopPop = g;
   tone(260, 80, 0.14, 'sine', 0.09); noise(0.08, 0.05, 500);
   for (let i = 0; i < 3; i++) setTimeout(() => burst(g.position.clone().setY(g.position.y + 0.15), 0x9acd32, 2, 0.25, 0.9, 0.35), 300 + i * 350);   // stink wafts
@@ -8432,7 +8511,7 @@ function updateLaundry(dt) {
 }
 function resetLaundry() {
   const L = laundry; if (!L) return;
-  for (const b of L.bits) povEndWall.remove(b.m); L.bits = []; L.stack.visible = true; L.state = 'folded';
+  for (const b of L.bits) freeMesh(b.m); L.bits = []; L.stack.visible = true; L.state = 'folded';
 }
 /* ---------- shooting the raccoon: the slider shatters, the raccoon dies a long, dramatic, theatrical death on the patio, and
    ten seconds later the police lights come flashing up beyond the back fence (with a siren, far off) ---------- */
@@ -8730,7 +8809,7 @@ function coonDying(R, t, b) {                                        // a long, 
   }
 }
 function updateCops(dt) {
-  if (!cops.at || !SLIDER) return;
+  if (!cops.at || !SLIDER || state !== 'playing') return;
   if (!walk.on) { if (cops.rig) cops.rig.visible = false; return; }
   if (cops.t < 0) { if (clock < cops.at) return; cops.t = 0; unlock('copsCalled'); showWalkName('🚨 Uh oh... someone called the cops'); }
   cops.t += dt;
@@ -8751,11 +8830,15 @@ function updateCops(dt) {
   cops.glow.material.color.setHex(ph ? 0x3355ff : 0xff3333); cops.glow.material.opacity = 0.22 * fade;
   cops.next -= dt; if (cops.next <= 0 && fade > 0.05) { cops.next = 1.1; tone(620, 920, 0.5, 'sine', 0.018 * fade); tone(920, 620, 0.5, 'sine', 0.018 * fade, 0.55); }   // wee-woo, far off
 }
+function freeMesh(m) {                                               // take a one-off mesh (a shard, a scrap of laundry...) out of the scene AND out of GPU memory
+  if (!m) return; if (m.parent) m.parent.remove(m);
+  m.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(x => x.dispose()); });
+}
 function resetSliderScene() {                                         // a fresh Free walk: new glass, no mess, the raccoon's back to its old tricks
   dog.state = 'hidden'; dog.match = false; if (dog.rig) dog.rig.g.visible = false;     // (and the Doberman's back over its own fence)
-  sliderGlass.forEach(g => { g.visible = true; }); shards.forEach(s2 => povEndWall.remove(s2.m)); shards.length = 0;
-  if (mosaicArt) { const MA = mosaicArt; MA.bits.forEach(b => povEndWall.remove(b.m)); MA.bits = []; MA.state = 'wall'; MA.g.visible = true; MA.g.position.copy(MA.home); MA.g.rotation.set(0, Math.PI, 0); }
-  coon.dead = false; if (coon.rig && coon.rig.halo) coon.rig.halo.visible = false; if (coon.pool) { povEndWall.remove(coon.pool); coon.pool = null; } cops.at = 0; cops.t = -1; if (cops.rig) cops.rig.visible = false;
+  sliderGlass.forEach(g => { g.visible = true; }); shards.forEach(s2 => freeMesh(s2.m)); shards.length = 0;
+  if (mosaicArt) { const MA = mosaicArt; MA.bits.forEach(b => freeMesh(b.m)); MA.bits = []; MA.state = 'wall'; MA.g.visible = true; MA.g.position.copy(MA.home); MA.g.rotation.set(0, Math.PI, 0); }
+  coon.dead = false; if (coon.rig && coon.rig.halo) coon.rig.halo.visible = false; if (coon.pool) { freeMesh(coon.pool); coon.pool = null; } cops.at = 0; cops.t = -1; if (cops.rig) cops.rig.visible = false;
 }
 function duckSqueak(pitch) { const f = pitch || 1300 + Math.random() * 500; tone(f, f * 0.72, 0.09, 'square', 0.028); tone(f * 1.5, f * 1.1, 0.06, 'sine', 0.02, 0.02); }
 function knockDuck(d, dx, dz, power) {                                // batted off: flies, spins, squeaks
