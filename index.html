@@ -5362,7 +5362,7 @@ const ACHIEVEMENTS = [
     ['laundryMess', '🧺', 'Laundry day', 'In Free roam, swipe the folded laundry off the armchair'],
     ['tvTop', '📺', 'King of the TV', 'In Free roam, stand on top of the TV'],
     ['dogMeet', '🐕', 'Who let the dog in?', 'In Free roam, get out into the backyard and go up to the back fence'],
-    ['dogTag', '🏃', 'Tag, you\'re it!', 'Beat Porter the Doberman at tag in the backyard (first to 5)'],
+    ['dogTag', '🏃', 'Gotcha, Porter!', 'In Free roam, chase Porter round the backyard and catch up'],
     ['chippy', '🐰', 'Wind-up warrior', 'Swipe Chippy the wind-up bunny off the credenza and let it loose on the mice'],
     ['chippyNo', '💥', 'Rest in fluff', 'Find out what happens when Chippy gets carried away'],
     ['blanketGhost', '👻', 'Blanket ghost', 'In Free roam, get caught under a blanket, then swipe it off'],
@@ -5379,7 +5379,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-27 13:01';                                              // stamped when the site is published
+const BUILD = '2026-09-27 18:47';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -7693,12 +7693,13 @@ const FIT_POINTS = [
 ];
 // what must always stay on screen when the player zooms/tilts: every hole, every mushroom and the cat
 const ESSENTIAL_POINTS = [...HOLES.map(h => h.mouthOut.clone()), ...CHEESE_SPOTS.map(c => new THREE.Vector3(c.x, 0.3, c.z)), new THREE.Vector3(CAT_POS.x, 1.3, CAT_POS.z)];
+const PORTRAIT_POINTS = [...ESSENTIAL_POINTS, new THREE.Vector3(-3.4, CAB_H, 0.4), new THREE.Vector3(3.4, CAB_H, 0.4)];   // upright phones: every hole, the mushrooms, the cat and the cupboards either side of her (the far scenery can go)
 // camera views (the 📷 button cycles them) and the player's own pinch zoom / two-finger tilt, remembered on this device
 const CAM_VIEWS = [{ name: 'Auto view', el: null }, { name: 'Overhead', el: 70 }, { name: 'Angled', el: 44 }, { name: 'Low', el: 24 }, { name: "Cat's eye", pov: true }];
 let camView = 0, camZoom = 1, camTilt = 0;
-try { const sv = JSON.parse(localStorage.getItem('catguard.cam') || '{}'); camView = sv.v | 0; camZoom = sv.z || 1; camTilt = sv.t || 0; if (sv.d !== 2) { camView = 3; camZoom = 1; camTilt = 0; } } catch (e) { camView = 3; }   // (Low is the default view)
-const saveCam = () => { try { localStorage.setItem('catguard.cam', JSON.stringify({ v: camView, z: camZoom, t: camTilt, d: 2 })); } catch (e) {} };
-try { if (JSON.parse(localStorage.getItem('catguard.cam') || '{}').d !== 2) saveCam(); } catch (e) {}   // (store the switch to Low now, so an old zoom/tilt can't creep back)
+try { const sv = JSON.parse(localStorage.getItem('catguard.cam') || '{}'); camView = sv.v | 0; camZoom = sv.z || 1; camTilt = sv.t || 0; if (sv.d !== 3) { camView = 0; camZoom = 1; camTilt = 0; } } catch (e) { camView = 0; }   // (Auto is the default: Low 24° on desktop / landscape, a closer 38° on upright phones)
+const saveCam = () => { try { localStorage.setItem('catguard.cam', JSON.stringify({ v: camView, z: camZoom, t: camTilt, d: 3 })); } catch (e) {} };
+try { if (JSON.parse(localStorage.getItem('catguard.cam') || '{}').d !== 3) saveCam(); } catch (e) {}   // (store the switch to Low now, so an old zoom/tilt can't creep back)
 let camSqueeze = 1;
 { const up = camera.updateProjectionMatrix.bind(camera);             // every projection update keeps the squeeze (raycasts use the same matrix)
   camera.updateProjectionMatrix = function () { up(); if (camSqueeze !== 1) { this.projectionMatrix.elements[0] *= camSqueeze; this.projectionMatrixInverse.copy(this.projectionMatrix).invert(); } }; }
@@ -7757,7 +7758,8 @@ function fitCamera() {
   camera.clearViewOffset();
   const phoneLand = aspect > 1.3 && h < 520;                           // phone on its side
   const pre = CAM_VIEWS[camView].el;                                  // chosen view (Auto = the device's default angle)
-  const el = THREE.MathUtils.degToRad(THREE.MathUtils.clamp((pre != null ? pre : (aspect < 0.75 ? 30 : phoneLand ? 17 : aspect < 1.3 ? 46 : 40)) + camTilt, 12, 82));   // phones: a low 30° view down the room towards the cat   // camera tilt: lower = more 'standing in the room'
+  const el = THREE.MathUtils.degToRad(THREE.MathUtils.clamp((pre != null ? pre : (aspect < 0.75 ? 38 : 24)) + camTilt, 12, 82));   // Auto: a closer 38° on upright phones, Low 24° everywhere else
+  const fitPts = pre == null && aspect < 0.75 ? PORTRAIT_POINTS : FIT_POINTS, edgeX = fitPts === PORTRAIT_POINTS ? 0.95 : 0.99;   // (upright phones frame what matters, not the whole floor; a mouse coming out of a side hole stays on screen)
   const dir = new THREE.Vector3(0, Math.sin(el), Math.cos(el));
   const topLimit = aspect < 0.75 ? 0.97 : phoneLand ? 0.6 : aspect < 1 ? 0.66 : 0.74;   // phones: the HUD sits at the bottom, so the room can use the full top   // leave room for the HUD
   let hudPx = 0;
@@ -7768,9 +7770,9 @@ function fitCamera() {
     camera.position.copy(camTarget).addScaledVector(dir, dist);
     camera.lookAt(camTarget); camera.updateMatrixWorld();
     let ok = true; minY = Infinity; maxY = -Infinity;
-    for (const p of FIT_POINTS) {
+    for (const p of fitPts) {
       v.copy(p).project(camera);
-      if (Math.abs(v.x) > 0.99) ok = false;
+      if (Math.abs(v.x) > edgeX) ok = false;
       minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
     }
     if (ok && maxY - minY <= topLimit - bottom) break;
@@ -7794,7 +7796,7 @@ function fitCamera() {
   }
   camera.position.copy(camTarget).addScaledVector(dir, dist); camera.lookAt(camTarget); camera.updateMatrixWorld();
   minY = Infinity; maxY = -Infinity;
-  for (const p of (custom ? ESSENTIAL_POINTS : FIT_POINTS)) { v.copy(p).project(camera); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); }
+  for (const p of (custom ? ESSENTIAL_POINTS : fitPts)) { v.copy(p).project(camera); minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y); }
   // pin the top of the play area (TV + dresser) just under the HUD; phones and custom views centre it instead
   const shift = aspect < 0.75 || custom ? (topLimit + bottom) / 2 - (maxY + minY) / 2 : topLimit - maxY;
   camera.setViewOffset(w, h, 0, shift * h / 2, w, h);
@@ -8758,12 +8760,10 @@ function resetLaundry() {
 /* ---------- shooting the raccoon: the slider shatters, the raccoon dies a long, dramatic, theatrical death on the patio, and
    ten seconds later the police lights come flashing up beyond the back fence (with a siren, far off) ---------- */
 const shards = [], cops = { at: 0, t: -1, rig: null, next: 0 };
-/* ---------- the neighbours' Doberman (blue, with tan points and cropped ears): when she wanders out near the back fence it comes
-   sailing over it, lands in the yard and wants to PLAY TAG. Swipe it to start: then it's IT, and after a moment's head start it
-   chases her (a bit slower than her yard sprint, but it lunges when it's close). Tagged? Now she's IT: the dog flees, jinking
-   sideways when she closes in, and she has to swipe it. No tag-backs for a moment after each tag. First to 5 wins; then it
-   flops down panting, and play-bows for a rematch. Going back indoors pauses the game (it waits at the slider). ---------- */
-const TAG_TO = 5;
+/* ---------- Porter, the neighbours' Doberman (blue, with tan points and cropped ears): when she wanders out near the back fence Porter
+   comes sailing over it, lands in the yard and wants to PLAY. Swipe Porter to start the chase: Porter bolts, and she has to catch up
+   (Porter's nearly as quick as her yard sprint, jinks sideways when she closes in, and tires as a chase drags on) and swipe. Caught:
+   Porter rolls over, belly up, then springs away for another go. Going back indoors pauses it (Porter waits at the slider). ---------- */
 const dog = { rig: null, state: 'hidden', t: 0, from: new THREE.Vector3(), to: new THREE.Vector3(), barkAt: 0, bowAt: 0, ph: 0, hopV: new THREE.Vector3(),
               after: null, grace: 0, lunge: 0, lungeCD: 0, juke: 0, jukeDir: 1, jukeCD: 0, you: 0, them: 0, match: false, won: null, hud: '' };
 function makeDog() {
@@ -8817,36 +8817,31 @@ function makeDog() {
 }
 function bark(n) { for (let i = 0; i < (n || 1); i++) setTimeout(() => { noise(0.09, 0.16, 650); tone(420, 190, 0.12, 'sawtooth', 0.05); tone(240, 140, 0.14, 'square', 0.03); }, i * 230); }
 function dogSet(st) { dog.state = st; dog.t = 0; }
-function dogSwipe(paw) {                                              // she bats at it: starts a game of tag, or tags it when she's IT
+function dogSwipe(paw) {                                              // she bats at Porter: that starts the chase, or (mid-chase) catches Porter
   const R = dog.rig; if (!R || !R.g.visible) return false;
-  const q = R.g.position; if (Math.hypot(q.x - paw.x, q.z - paw.z) > 1.5 || paw.y > 2.4) return false;
-  if (dog.state === 'play' || (dog.state === 'tagRest' && dog.t > 2.5)) {   // let's play! (the swipe that starts it makes the dog IT)
-    dog.you = dog.them = 0; dog.match = true; dog.won = null; tagDog(false); return true;
-  }
-  if (dog.state === 'tagRun' && dog.grace <= 0 && Math.hypot(q.x - paw.x, q.z - paw.z) < 1.2) { dog.you++; if (dog.you >= TAG_TO) tagEnd(true); else tagDog(true); return true; }
+  const q = R.g.position, d = Math.hypot(q.x - paw.x, q.z - paw.z); if (d > 1.5 || paw.y > 2.4) return false;
+  if (dog.state === 'play') { dog.match = true; porterBolt(1.2); showWalkName('🐕 Catch Porter!'); return true; }
+  if (dog.state === 'run' && dog.grace <= 0 && d < 1.2) { caughtPorter(); return true; }
   return false;
 }
-function tagDog(point) {                                              // the dog's been tagged: a yelp, a bounce back, and now it's IT
+function porterBolt(grace) {                                          // a playful spring away from her... and off Porter goes
   const dx = dog.rig.g.position.x - walk.pos.x, dz = dog.rig.g.position.z - walk.pos.z, d = Math.hypot(dx, dz) || 1;
-  dog.hopV.set(dx / d * 3.2, 4.2, dz / d * 3.2); dogSet('hop'); dog.after = 'tagIt'; dog.grace = 1.6; bark(2);
-  tone(1200, 1700, 0.08, 'triangle', 0.04); showWalkName(point ? '🐕 Tagged Porter! Now Porter\'s IT... RUN!' : '🐕 TAG! Porter\'s IT... RUN!');
+  dog.hopV.set(dx / d * 3.2, 4.2, dz / d * 3.2); dogSet('hop'); dog.after = 'run'; dog.grace = grace; bark(2); tone(1200, 1700, 0.08, 'triangle', 0.04);
 }
-function tagEnd(youWon) {
-  dog.match = false; dog.won = youWon; dogSet('tagRest');
-  if (youWon) { unlock('dogTag'); showBanner('You win at tag!'); [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.14, 'triangle', 0.05, i * 0.1)); }
-  else { showBanner('Porter wins!'); bark(3); }
-  showWalkName(`🐕 ${youWon ? 'You win' : 'Porter wins'} ${Math.max(dog.you, dog.them)}–${Math.min(dog.you, dog.them)}! Porter needs a breather...`);
+function caughtPorter() {                                             // got Porter! a roll onto the back, tail going like mad, then off again
+  dog.you++; dogSet('caught'); unlock('dogTag'); bark(1);
+  [659, 784, 1047].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.04, i * 0.08));
+  burst(dog.rig.g.position.clone().setY(1.2), 0xff6fae, 10, 2, 3, 0.5); walk.puff = 0.3;
+  showWalkName(dog.you > 1 ? `🐾 Caught Porter! (${dog.you})` : '🐾 Caught Porter!');
 }
-function tagHud() {                                                   // the scoreboard pill up top
+function tagHud() {                                                   // the little prompt up top
   const el = document.getElementById('tagHud'); if (!el) return;
   const on = gameMode === 'walk' && walk.on && !mirrorWorld && dog.rig && dog.rig.g.visible && dog.state !== 'leap' && dog.state !== 'hidden';
   let html = '';
   if (on) {
     const inside = walk.pos.z < SLIDER.VD + 0.4;
-    const board = `<div class="row"><span>🐾 You <b>${dog.you}</b></span><span class="to">first to ${TAG_TO}</span><span><b>${dog.them}</b> Porter 🐕</span></div>`;
-    if (dog.match) html = board + `<div class="sub">${inside ? 'Tag paused: come back outside!' : dog.state === 'tagRun' ? (dog.grace > 0 ? 'You\'re IT! (no tag-backs...)' : 'You\'re IT! Swipe Porter!') : dog.grace > 0 || dog.state === 'hop' ? 'Porter\'s IT! Head start... RUN!' : 'Porter\'s IT! RUN!'}</div>`;
-    else if (dog.state === 'tagRest') html = board + `<div class="sub">${dog.won ? 'You win! 🏆' : 'Porter wins!'} ${dog.t > 2.5 ? 'Swipe Porter for a rematch' : 'Porter\'s catching a breath...'}</div>`;
-    else html = `<div class="sub">🐕 Porter wants to play tag! Swipe Porter to start</div>`;
+    if (!dog.match) html = `<div class="sub">🐕 Swipe Porter to play!</div>`;
+    else html = `<div class="row"><span>🐕 ${inside ? 'Porter\'s waiting outside...' : dog.state === 'caught' ? 'Caught Porter! 🐾' : 'Catch Porter!'}</span>${dog.you ? `<span class="to">caught <b>${dog.you}</b></span>` : ''}</div>`;
   }
   if (html !== dog.hud) { dog.hud = html; el.innerHTML = html; el.hidden = !html; }
 }
@@ -8882,8 +8877,8 @@ function updateDog(dt) {
     pos.lerpVectors(dog.from, dog.to, k); pos.y = Math.sin(k * Math.PI) * 5.2;
     R.body.rotation.x = -0.55 * (1 - 2 * k);                          // nose up on take-off, down to land
     R.legs[0].rotation.x = R.legs[1].rotation.x = -1.1 + k * 0.6; R.legs[2].rotation.x = R.legs[3].rotation.x = 0.9 - k * 0.5;   // stretched out, front and back
-    if (k >= 1) { pos.y = 0; dogSet('play'); shake = Math.max(shake, reduceMotion ? 0.03 : 0.2); noise(0.18, 0.2, 400); burst(pos.clone().setY(0.1), 0x6a8a3a, 8, 2, 2, 0.6); dog.barkAt = clock + 1.2; dog.bowAt = clock + 0.4; setTimeout(() => { if (dog.state === 'play') showWalkName('🐕 Porter wants to play TAG! Swipe Porter to start'); }, 1600); }
-  } else if (dog.state === 'hop') {                                   // tagged: a happy bounce backwards
+    if (k >= 1) { pos.y = 0; dogSet('play'); shake = Math.max(shake, reduceMotion ? 0.03 : 0.2); noise(0.18, 0.2, 400); burst(pos.clone().setY(0.1), 0x6a8a3a, 8, 2, 2, 0.6); dog.barkAt = clock + 1.2; dog.bowAt = clock + 0.4; setTimeout(() => { if (dog.state === 'play') showWalkName('🐕 Swipe Porter to play!'); }, 1600); }
+  } else if (dog.state === 'hop') {                                   // a happy bounce away
     dog.hopV.y -= 22 * dt; pos.addScaledVector(dog.hopV, dt); clampYard();
     face(walk.pos.x, walk.pos.z); R.body.rotation.x = -0.25; R.legs.forEach((l, i) => l.rotation.x = i < 2 ? -0.7 : 0.6);
     if (pos.y <= 0 && dog.hopV.y < 0) { pos.y = 0; dogSet(dog.after || 'play'); dog.after = null; dog.bowAt = clock + 0.1; }
@@ -8898,21 +8893,7 @@ function updateDog(dt) {
       clampYard(); pos.y = 0;
       if (clock > dog.barkAt) { dog.barkAt = clock + 3 + Math.random() * 4; bark(1 + (Math.random() * 2 | 0)); R.head.rotation.x = -0.2; if (!bowing && Math.random() < 0.6) dog.bowAt = clock + 0.2; }
     }
-  } else if (dog.state === 'tagIt') {                                 // the dog's IT: a head start for her (it bows, counting), then the chase
-    if (inside) waitAtSlider();
-    else if (dog.grace > 0) { dog.grace -= dt; face(walk.pos.x, walk.pos.z); bow(Math.min(1, dog.grace * 2)); }
-    else {
-      dog.lungeCD -= dt; if (dog.lunge > 0) dog.lunge -= dt;
-      if (cd < 3.2 && dog.lungeCD <= 0) { dog.lunge = 0.5; dog.lungeCD = 1.8; bark(1); }   // close: a lunge!
-      const lead = Math.min(0.35, cd / 12);                           // aims a little ahead of where she's running
-      moveTo(walk.pos.x + walk.vel.x * lead, walk.pos.z + walk.vel.z * lead, dog.lunge > 0 ? 8.4 : 5.3); clampYard(); pos.y = 0; R.tongue.visible = true;
-      if (cd < 0.95 && walk.pos.y < 1.9) {                            // TAGGED!
-        dog.them++; noise(0.1, 0.15, 900); tone(700, 400, 0.12, 'square', 0.04); shake = Math.max(shake, reduceMotion ? 0.02 : 0.12); walk.puff = 0.5;
-        if (dog.them >= TAG_TO) tagEnd(false);
-        else { dogSet('tagRun'); dog.grace = 2; dog.jukeCD = 0.6; bark(2); showWalkName('🐕 Porter tagged you! You\'re IT... swipe Porter!'); }
-      }
-    }
-  } else if (dog.state === 'tagRun') {                                // she's IT: it runs for it, jinking away when she gets close
+  } else if (dog.state === 'run') {                                   // the chase: Porter runs for it, jinking away when she gets close
     if (inside) waitAtSlider();
     else {
       if (dog.grace > 0) dog.grace -= dt;
@@ -8922,21 +8903,22 @@ function updateDog(dt) {
       ax += wall(pos.x + SX, 1) + wall(SX - pos.x, -1); az += wall(pos.z - Z0, 1) + wall(Z1 - pos.z, -1);
       { const mx = -pos.x, mz = (Z0 + Z1) / 2 - pos.z, ml = Math.hypot(mx, mz) || 1; ax += mx / ml * 0.45; az += mz / ml * 0.45; }   // ...and it heads for open lawn, not along the fences where it'd get cornered
       if (dog.juke > 0 && dog.grace <= 0) { dog.juke -= dt; ax = -cdz / (cd || 1) * dog.jukeDir; az = cdx / (cd || 1) * dog.jukeDir; }
-      else if (cd < 2.2 && dog.jukeCD <= 0 && dog.grace <= 0) {   // (no sidesteps while it's bolting off after tagging her)                         // she's closing in: a sudden sidestep
+      else if (cd < 2.2 && dog.jukeCD <= 0 && dog.grace <= 0) {       // she's closing in: a sudden sidestep (not while Porter's still bolting off)
         dog.juke = 0.4; dog.jukeCD = 1.8;
         const px = -cdz / (cd || 1), pz = cdx / (cd || 1); dog.jukeDir = Math.abs(pos.x + px * 3) < SX && pos.z + pz * 3 > Z0 && pos.z + pz * 3 < Z1 ? 1 : -1;   // (the side with room to run)
       }
       const al = Math.hypot(ax, az) || 1, tired = Math.min(1.2, dog.t * 0.05);
-      const sp = dog.grace > 0 ? 8.2 : dog.juke > 0 ? 7.5 : cd < 6 ? 6.25 - tired : cd < 9 ? 3 : 0;   // (nearly her sprint speed, tiring as the round drags on)   // (just tagged her: it bolts, to open up a gap before she can tag back)
+      const sp = dog.grace > 0 ? 8.2 : dog.juke > 0 ? 7.5 : cd < 6 ? 6.25 - tired : cd < 9 ? 3 : 0;   // (a head start first; then nearly her sprint speed, tiring as the chase drags on)
       if (sp > 0) { moveTo(pos.x + ax / al, pos.z + az / al, sp); R.tongue.visible = true; }
       else { face(walk.pos.x, walk.pos.z); bow(0.5 + 0.5 * Math.sin(clock * 5)); if (clock > dog.barkAt) { dog.barkAt = clock + 1.5; bark(1); } }   // too far off: a teasing bow ("come get me!")
       clampYard(); pos.y = 0;
     }
-  } else if (dog.state === 'tagRest') {                               // game over: flopped down on the grass, panting
-    const k = Math.min(1, t / 0.5); face(walk.pos.x, walk.pos.z, 3);
-    R.body.position.y = -0.62 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = -1.45 * k; R.legs[2].rotation.x = R.legs[3].rotation.x = -1.3 * k;
-    R.head.rotation.x = Math.sin(clock * 9) * 0.05; R.tongue.visible = true; pos.y = 0;
-    if (t > 2.5 && clock > dog.bowAt + 4) dog.bowAt = clock;         // (rested: swipe it for a rematch)
+  } else if (dog.state === 'caught') {                                // caught! over onto Porter's back, legs paddling, tongue out, tail a blur
+    const k = Math.min(1, t / 0.35); face(walk.pos.x, walk.pos.z, 3);
+    const ra = 2.6 * k, hc = 1.3 + (0.5 - 1.3) * k;                   // (rolled about Porter's middle, not the feet: the body ends up belly-up, just off the grass)
+    R.body.rotation.z = ra; R.body.position.set(1.3 * Math.sin(ra), hc - 1.3 * Math.cos(ra), 0); R.head.rotation.x = -0.3 * k; R.tongue.visible = true; pos.y = 0;
+    R.legs.forEach((l, i) => { l.rotation.x = Math.sin(clock * 14 + i * 1.7) * 0.5 * k; });
+    if (t > 1.8) porterBolt(1.6);                                     // ...and up and away for another go
   }
   tagHud();
 }
@@ -9020,11 +9002,15 @@ function coonShot(at) {
     burst(at.clone(), 0xd01212, 18, 3.2, 3.2, 0.9); burst(at.clone(), 0x6a0008, 10, 2.2, 2.6, 1.2); burst(at.clone().setY(at.y + 0.2), 0xff3030, 6, 1.6, 3.6, 0.5);
     for (let i = 0; i < 3; i++) spawnBlood(new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.9, 0, at.z + 0.3 + Math.random() * 0.9), 0.7 + Math.random() * 0.5, IN(1.2));   // spatters on the pads round it (on top of the concrete)
   }
-  coon.dead = true; coonSet('dying'); unlock('coonShot'); cops.at = clock + 10; cops.t = -1;
+  coon.dead = true; coon.dieFrom = coon.rig ? coon.rig.g.position.clone() : null; coonSet('dying'); unlock('coonShot'); cops.at = clock + 10; cops.t = -1;
   showWalkName('🦝 ...the raccoon has been hit!'); chitter(3, 2600);
 }
 function coonDying(R, t, b) {                                        // a long, hammy, theatrical death
   const g = R.g; g.rotation.y = Math.PI;
+  if (coon.dieFrom) {                                                 // it staggers off to the side of the doorway before it drops, so the way out stays clear
+    const S = SLIDER, k = THREE.MathUtils.smoothstep(t, 0.3, 2.6), tx = S.DX + S.DW / 2 + 0.95, tz = S.VD + 0.75, f = coon.dieFrom;
+    g.position.set(f.x + (tx - f.x) * k, f.y * (1 - k), f.z + (tz - f.z) * k);
+  }
   if (t < 0.3) {                                                     // BLAM: jolted back, arms flung up
     const k = t / 0.3; b.position.z = -0.25 * k; R.arms.forEach((a, i) => a.rotation.set(0, 0, (i ? 1 : -1) * (Math.PI - 0.6) * k)); R.eyes.forEach(e => e.scale.setScalar(1.6));
   } else if (t < 2.4) {                                              // staggers about clutching its chest
@@ -9046,13 +9032,6 @@ function coonDying(R, t, b) {                                        // a long, 
     if (!R.halo) { R.halo = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.018, 8, 24), basic(0xffe27a)); R.halo.rotation.x = Math.PI / 2; g.add(R.halo); }
     R.halo.visible = k > 0.8; R.halo.position.set(0, 0.6 + Math.sin(clock * 2) * 0.03, -1.25);
     if (coon.said < 4 && k > 0.8) { coon.said = 4; coonSay('✝ R.I.P. Trash Panda ✝'); }
-    if (!coon.pool) {                                                  // a dark pool of blood spreading out under it
-      const cg = new THREE.CircleGeometry(1, 48), cp = cg.attributes.position;
-      for (let i = 1; i < cp.count; i++) { const a = Math.atan2(cp.getY(i), cp.getX(i)), r = 1 + Math.sin(a * 3 + 1) * 0.12 + Math.sin(a * 7) * 0.07 + (Math.random() - 0.5) * 0.06; cp.setXY(i, cp.getX(i) * r, cp.getY(i) * r); }
-      coon.pool = new THREE.Mesh(cg, new THREE.MeshPhongMaterial({ color: 0x3a0404, shininess: 30, specular: 0x2a0c0c, polygonOffset: true, polygonOffsetFactor: -2 }));
-      coon.pool.rotation.x = -Math.PI / 2; coon.pool.userData.noWalk = true; povEndWall.add(coon.pool);
-    }
-    coon.pool.position.set(g.position.x, g.position.y + 0.006, g.position.z + 0.45); coon.pool.scale.setScalar(0.05 + Math.min(1, k / 4) * 0.72);
   }
 }
 function updateCops(dt) {
