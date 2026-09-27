@@ -140,6 +140,21 @@
   #heistDash:active{transform:translateY(4px);box-shadow:0 1px 0 #1f6fae}
   #heistDash.cool{filter:grayscale(.8) brightness(.8)}
   body.heist-ui #heistDash{display:grid}
+  /* Mouse mode's level-up: two power-up cards side by side */
+  .lvl-card{max-width:420px}
+  .lvl-picks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .lvl-pick{appearance:none;display:grid;justify-items:center;align-content:start;gap:5px;text-align:center;background:var(--paper-2);color:var(--ink);border:3px solid var(--ink);border-radius:16px;
+            padding:12px 8px 10px;box-shadow:0 5px 0 var(--ink);cursor:pointer;font:600 12.5px/1.3 var(--body);transition:transform .06s,box-shadow .06s}
+  .lvl-pick:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+  .lvl-pick:focus-visible{outline:3px solid var(--danger);outline-offset:3px}
+  .lvl-pick .ic{font-size:34px;line-height:1.1}
+  .lvl-pick b{font:400 18px/1.05 var(--display);color:var(--cheese-deep)}
+  .lvl-pick .lv{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#b0467e}
+  .lvl-pick .pips{font-size:10px;letter-spacing:2px;color:var(--cheese-deep)}
+  .lvl-have{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .lvl-have span{background:var(--paper-2);border-radius:999px;padding:3px 9px;font:800 12px var(--body);color:#6e3a5c}
+  .lvl-val{font-family:var(--display);font-size:22px;line-height:1;color:var(--paper)}
+  .heat i.reign{background:linear-gradient(90deg,#7fd8ff,#b98cff)}
   body.heist-ui #walkJump,body.heist-ui #walkSwipe,body.heist-ui #walkMeow,body.heist-ui #walkCaption{display:none}
   body.heist-ui .hud{top:0;bottom:auto;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 0}
   #walkCaption{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translateX(-50%);z-index:7;pointer-events:none;white-space:nowrap;opacity:0;max-width:calc(100vw - 24px);width:max-content;
@@ -354,7 +369,7 @@
 <div id="blanketCover" hidden><span>Mmmph! Tap to fling it off</span></div>
 <div id="fx"></div>
 <div id="paintSplash"></div>
-<div id="walkUI" hidden><div id="walkStick"><div id="walkKnob"></div></div><button id="walkJump">Jump</button><button class="walk-btn" id="heistDash"><span><b>💨</b>Dash</span></button><button class="walk-btn" id="walkSwipe"><span><b>🐾</b>Swipe</span></button><button class="walk-btn" id="walkMeow"><span><b>😺</b>Meow</span></button><div id="walkCaption"></div><div id="mirrorHud" hidden></div><div id="tagHud" hidden></div></div>
+<div id="walkUI" hidden><div id="walkStick"><div id="walkKnob"></div></div><button id="walkJump">Jump</button><button class="walk-btn" id="heistDash"><span><b>🦘</b>Jump</span></button><button class="walk-btn" id="walkSwipe"><span><b>🐾</b>Swipe</span></button><button class="walk-btn" id="walkMeow"><span><b>😺</b>Meow</span></button><div id="walkCaption"></div><div id="mirrorHud" hidden></div><div id="tagHud" hidden></div></div>
 <div id="mirrorFlash"></div>
 <div id="mirrorRipple"></div>
 <div id="karenBubble" hidden></div>
@@ -362,11 +377,11 @@
 <!-- HUD: one bar across the top -->
 <div class="hud" id="hud" hidden>
   <div class="hud-bar">
-    <div class="hud-cell c-score"><span class="lbl">Score</span><div class="val-row"><span class="score-val" id="score">0</span><span class="combo" id="combo" hidden>x2</span></div></div>
+    <div class="hud-cell c-score"><span class="lbl" id="scoreLbl">Score</span><div class="val-row"><span class="score-val" id="score">0</span><span class="combo" id="combo" hidden>x2</span></div></div>
     <div class="hud-cell c-time"><span class="lbl">Time</span><span class="time" id="time">0:00</span></div>
     <div class="hud-cell c-cheese"><span class="lbl" id="prizeLabel">Cheese</span><div class="cheeses" id="cheeses"></div></div>
     <div class="hud-cell c-lives"><span class="lbl">Lives</span><div class="lives" id="lives"></div></div>
-    <div class="hud-cell c-heat"><span class="lbl">Heat</span><div class="heat"><i id="heat"></i></div></div>
+    <div class="hud-cell c-heat"><span class="lbl" id="heatLbl">Heat</span><div class="heat"><i id="heat"></i></div></div>
     <div class="c-pause hud-btns">
       <button class="icon-btn" id="camBtn" aria-label="Change camera view"><svg width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M1.5 4.5h3l1.3-2h4.4l1.3 2h3v8h-13z"/><circle cx="8" cy="8.3" r="2.6"/></svg></button>
       <button class="icon-btn" id="pauseBtn" aria-label="Pause">
@@ -422,6 +437,16 @@
   </div>
 </section>
 
+<!-- Mouse mode: level up, pick one of two power-ups -->
+<section class="screen" id="levelScreen" hidden>
+  <div class="card lvl-card">
+    <p class="eyebrow">Level up! Pick a power-up</p>
+    <h2 id="lvlTitle">Level 2!</h2>
+    <div class="lvl-picks" id="lvlPicks"></div>
+    <div class="lvl-have" id="lvlHave"></div>
+  </div>
+</section>
+
 <!-- Game over -->
 <section class="screen" id="overScreen" hidden>
   <div class="card">
@@ -429,7 +454,7 @@
     <h2 id="overTitle">The cheese is gone</h2>
     <p class="reason" id="overReason"></p>
     <dl class="stats">
-      <div><dt>Score</dt><dd id="oScore">0</dd></div>
+      <div><dt id="oScoreLbl">Score</dt><dd id="oScore">0</dd></div>
       <div><dt>Survived</dt><dd id="oTime">0:00</dd></div>
       <div><dt id="oWhackedLbl">Mice whacked</dt><dd id="oWhacked">0</dd></div>
       <div><dt>Best</dt><dd id="oBest">0</dd></div>
@@ -4548,7 +4573,7 @@ class Cheese {
     if (this.state === 'carried') {
       this.state = 'dropped'; this.dropT = 0.45;
       this.pos.x = Math.max(-ROOM.halfW + 0.5, Math.min(ROOM.halfW - 0.5, this.pos.x));
-      this.pos.z = Math.max(0.5, Math.min(ROOM.depth - 0.5, this.pos.z));
+      this.pos.z = Math.max(0.5, Math.min(gameMode === 'mouse' ? ROOM.visDepth - 0.6 : ROOM.depth - 0.5, this.pos.z));   // (Mouse mode uses the whole room)
     }
     this.claimant = null;
   }
@@ -4557,13 +4582,14 @@ class Cheese {
     this.roll = { t: 0, e: 0, dur: dist ? 0.6 + dist * 0.2 : 0.75, dist: dist || 1.0 + Math.random() * 0.6 }; this.downT = 0; sfx.nudge(); }
   lose() { this.state = 'gone'; this.alive = false; this.claimant = null; this.wedge.visible = false; }
   update(dt, time) {
-    let y = 0, s = 1;                                    // cheese sits right on the carpet
+    let y = this.pos.y, s = 1;                           // sits on the carpet (Mouse mode: or a sofa, a table, the mantel...)
     if (this._pre) { this.wedge.rotation.copy(this._pre); this._pre = null; }   // undo last frame's tug tilt
     if (this.fall) {                                                 // ...dropping from the ceiling, spinning end over end; a bounce, then it tumbles away
       const f = this.fall; f.vy -= 16 * dt; f.y += f.vy * dt; f.rx += f.spin * dt;
-      if (f.y <= 0) {
-        f.y = 0;
-        if (f.vy < -3.5 && f.bounces < 1) { f.vy *= -0.32; f.bounces++; f.spin *= 0.6; sfx.thump(); burst(this.pos.clone().setY(0.1), 0xb08a64, 6, 1.4, 1.2, 0.7); shake = Math.max(shake, reduceMotion ? 0.02 : 0.08); }
+      if (f.y <= this.pos.y) {
+        f.y = this.pos.y;
+        if (f.vy < -3.5 && f.bounces < 1) { f.vy *= -0.32; f.bounces++; f.spin *= 0.6; sfx.thump(); burst(this.pos.clone().setY(this.pos.y + 0.1), 0xb08a64, 6, 1.4, 1.2, 0.7); shake = Math.max(shake, reduceMotion ? 0.02 : 0.08); }
+        else if (f.stay) { this.fall = null; this.wedge.rotation.set(0, this.yaw, 0); this.wob = 1; this.downT = 0; sfx.nudge(); burst(this.pos.clone().setY(this.pos.y + 0.3), 0xffd23a, 8, 1.4, 1.6, 0.5); }   // (Mouse mode: it stays where it lands, up on the furniture too)
         else { this.fall = null; this.wedge.rotation.set(0, this.yaw, 0); this.tdir = Math.random() * Math.PI * 2; this.roll = { t: 0, e: 0, dur: 0.9, dist: 1.1 + Math.random() * 0.4 }; this.wob = 1; this.downT = 0; sfx.nudge(); }
       }
       if (this.fall) {
@@ -4574,9 +4600,11 @@ class Cheese {
     }
     if (this.state === 'carried' && this.claimant) {   // gripped by the stem in the mouse's mouth, cap sticking out in front of its nose
       const m = this.claimant; m.model.updateMatrixWorld(true);
-      const mouth = m.model.localToWorld(_mouth.set(0, 0.21, 0.6));
+      const k = this.slot || 0, mouth = m.model.localToWorld(_mouth.set(0, k ? 0.62 + 0.3 * (k - 1) : 0.21, k ? -0.12 : 0.6));   // (Pack Rat: the extras ride stacked on her back)
       this.pos.set(mouth.x, 0, mouth.z);
-      this.wedge.rotation.set(1.45 + Math.sin(time * 9) * 0.1, m.root.rotation.y, Math.sin(time * 6.3) * 0.14, 'YXZ'); this.yaw = m.root.rotation.y;   // tipped forward, swinging as it trots
+      if (k) this.wedge.rotation.set(Math.sin(time * 7 + k) * 0.14, m.root.rotation.y + k * 0.7, Math.cos(time * 6 + k) * 0.12, 'YXZ');
+      else this.wedge.rotation.set(1.45 + Math.sin(time * 9) * 0.1, m.root.rotation.y, Math.sin(time * 6.3) * 0.14, 'YXZ');   // tipped forward, swinging as it trots
+      this.yaw = m.root.rotation.y;
       y = mouth.y - 0.03; s = 0.5;
     }
     if (this.dropT > 0) { this.dropT = Math.max(0, this.dropT - dt); y += Math.sin((1 - this.dropT / 0.45) * Math.PI) * 0.45; }
@@ -5373,13 +5401,19 @@ const ACHIEVEMENTS = [
   ['Other modes', [
     ['chaos', '🌪️', 'Chaos complete', 'Finish a Chaos mode round'],
     ['director', '🎥', 'Director', 'Pinch, twist and drag the camera in Chaos mode'],
-    ['heist', '🧀', 'Master thief', 'Steal all three mushrooms in Mouse mode'],
-    ['ghost', '🥷', 'Ghost', 'Win Mouse mode without being hit'],
+    ['heist', '🧀', 'Master thief', 'Stash 10 mushrooms in one Mouse mode run'],
+    ['ghost', '🥷', 'Ghost', 'Stash 5 mushrooms in Mouse mode without being hit'],
+    ['mouse25', '🍄', 'Mushroom baron', 'Stash 25 mushrooms in one Mouse mode run'],
+    ['mouseLvl', '⭐', 'Level 5', 'Reach level 5 in Mouse mode'],
+    ['mouseMax', '💪', 'Maxed out', 'Max out a power-up in Mouse mode'],
+    ['mouseDodge', '🦘', 'Hop to it', 'Jump clear of 10 paws in one Mouse mode run'],
+    ['mouseHigh', '🔥', 'Mantel thief', 'In Mouse mode, snatch a mushroom off the fireplace mantel'],
+    ['mouseNap', '🧶', 'Lights out', 'In Mouse mode, throw the blanket over the cat'],
   ]],
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-27 18:47';                                              // stamped when the site is published
+const BUILD = '2026-09-27 19:40';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5427,59 +5461,234 @@ const heistGoal = (() => {
   const edge = document.createElement('div'); edge.className = 'edge-arrow goal'; edge.hidden = true; document.body.appendChild(edge);
   return { g, ring, arrow, mat, edge };
 })();
-const heist = { player: new Mouse(), hold: null, keys: {}, strike: null, strikeT: 2, invuln: 0, carrying: null, stolen: 0, vel: new THREE.Vector3(),
+const heist = { player: new Mouse(), hold: null, keys: {}, strike: null, strikeT: 2, invuln: 0, bag: [], stolen: 0, vel: new THREE.Vector3(), pw: {}, cam: 'follow', lvl: 1, xp: 0, blanketT: 0,
   ring: (() => { const g = new THREE.Group(); g.visible = false; scene.add(g);
     g.add(new THREE.Mesh(new THREE.RingGeometry(0.42, 0.55, 40), basic(0xff2a2a, { transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide })));
     g.add(new THREE.Mesh(new THREE.CircleGeometry(0.42, 40), basic(0xff2a2a, { transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide })));
     g.children.forEach(m => { m.rotation.x = -Math.PI / 2; m.renderOrder = 3; }); return g; })() };
+try { if (localStorage.getItem('catguard.mouseCam') === 'chase') heist.cam = 'chase'; } catch (e) {}
 window.addEventListener('keydown', e => { heist.keys[e.key.toLowerCase()] = true; });
 window.addEventListener('keyup', e => { heist.keys[e.key.toLowerCase()] = false; });
-const _hRay = new THREE.Raycaster(), _hN = new THREE.Vector2(), _hP = new THREE.Vector3(), _hD = new THREE.Vector3();
-function heistBlocked(x, z) {
-  if (rollBlocked(x, z)) return true;                                // sofas, fireplace, table, fan, the side walls
-  if (z < DEPTH + 0.25 || z > PLAY_END - 0.4) return true;          // the credenza along the back; the bottom of the screen
-  return Math.abs(x - CAT_POS.x) < BOX.w / 2 + 0.25 && Math.abs(z - CAT_POS.z) < BOX.d / 2 + 0.25;   // the cat's box
-}
+const _hRay = new THREE.Raycaster(), _hN = new THREE.Vector2(), _hP = new THREE.Vector3(), _hD = new THREE.Vector3(), _hZero = new THREE.Vector3(), _pawDown = new THREE.Vector3(0, -1, 0);
+/* ---------- Mouse mode is endless: mushrooms keep turning up all over the room (the sofas, the tables, the hearth, now and then
+   the mantel), the cat gets meaner the longer it goes, and every few mushrooms she levels up and picks one of two power-ups.
+   Jump dodges a paw and gets her up onto the furniture. ---------- */
+const FUR_CD = [0, 30, 24, 19, 15, 12];                                // Thick Fur: seconds for the shield to grow back, by level
+const PUPS = [
+  { id: 'speed', ic: '🏃', name: 'Quick Feet', max: 5, say: L => `Run ${10 * L}% faster` },
+  { id: 'spring', ic: '🦘', name: 'Spring Legs', max: 5, say: L => `Jump ${12 * L}% higher, ready again ${10 * L}% sooner` },
+  { id: 'fur', ic: '🛡️', name: 'Thick Fur', max: 5, say: L => `A shield soaks up one paw, and grows back every ${FUR_CD[L]}s` },
+  { id: 'whisker', ic: '👂', name: 'Whisker Sense', max: 5, say: L => `Paw warnings last ${15 * L}% longer` },
+  { id: 'magnet', ic: '🧲', name: 'Mushroom Magnet', max: 5, say: L => `Grab and stash mushrooms from ${35 * L}% further away` },
+  { id: 'pack', ic: '🎒', name: 'Pack Rat', max: 4, say: L => `Carry ${1 + L} mushrooms at once, and they slow you less` },
+  { id: 'heart', ic: '❤️', name: 'Nine Lives', max: 5, say: L => `+1 life now, and room for ${HEIST_LIVES + L}` },
+  { id: 'lucky', ic: '🍀', name: 'Lucky Tail', max: 5, say: L => `${8 * L}% chance a paw slips right off you` },
+  { id: 'double', ic: '💰', name: 'Double Stash', max: 5, say: L => `${15 * L}% chance a mushroom counts twice` },
+  { id: 'nap', ic: '😴', name: 'Sleepy Cat', max: 5, say: L => `The cat swipes ${8 * L}% less often` },
+  { id: 'shadow', ic: '👻', name: 'Shadow Step', max: 5, say: L => `After a jump the cat loses you for ${(0.3 * L).toFixed(1)}s` },
+  { id: 'blanket', ic: '🧶', name: 'Blanket Toss', max: 5, say: L => `The blanket goes over the cat: ${25 + 5 * L}s of free reign` },
+];
+const PUP_BY_ID = Object.fromEntries(PUPS.map(u => [u.id, u]));
+const pupL = id => heist.pw[id] || 0;                                 // a power-up's level (0 = not picked yet)
+const heistNeed = lvl => 2 + lvl;                                     // mushrooms from one level to the next: 3, 4, 5...
+const heistMaxLives = () => HEIST_LIVES + pupL('heart');
+const MJ = { grav: 24, h: 1.3, step: 0.14, mh: 0.3 };                // her jump: gravity, height (a sofa seat with room to spare), the step she walks up, how tall she is
+const spareCheeses = [];                                              // extra mushrooms from the last Mouse mode run, kept for the next
 function startHeist() {
   const p = heist.player, hole = HOLES.find(h => h.kind === 'fire') || HOLES[0];
   p.spawn(hole, false, D, {}); p.pop = 1; p.setState('player'); p.root.position.copy(hole.mouthOut); p.root.rotation.y = Math.atan2(hole.normal.x, hole.normal.z);
-  Object.assign(heist, { hold: null, strike: null, strikeT: 3.0, invuln: 0, carrying: null, stolen: 0, strikes: [], dashT: 0, dashCD: 0, respawnT: 0 }); heist.vel.set(0, 0, 0);
-  if (!heist.rings) { heist.rings = [heist.ring]; for (let i = 0; i < 2; i++) { const r = heist.ring.clone(true); r.children.forEach(c => c.material = c.material.clone()); r.visible = false; scene.add(r); heist.rings.push(r); } }
+  Object.assign(heist, { hold: null, strike: null, strikeT: 3.0, invuln: 0, bag: [], stolen: 0, strikes: [], respawnT: 0, vy: 0, air: false, jumpCD: 0, jumpQ: -1, nowHits: 0,
+    lvl: 1, xp: 0, pw: {}, picks: 0, lvlT: 0, furUp: false, furT: 0, ghostT: 0, blanketT: 0, blanketMax: 1, reignShown: -1, tier: 0, hits: 0, dodges: 0, mantel: false });
+  heist.vel.set(0, 0, 0); heist.ghostAt = new THREE.Vector3();
+  if (!heist.rings) { heist.rings = [heist.ring]; for (let i = 0; i < 5; i++) { const r = heist.ring.clone(true); r.children.forEach(c => c.material = c.material.clone()); r.visible = false; scene.add(r); heist.rings.push(r); } }
   heist.rings.forEach(r => r.visible = false);
-  walk.stick.x = walk.stick.y = 0; document.body.classList.add('heist-ui'); document.getElementById('walkUI').hidden = false;   // the same on-screen stick as Free walk, plus Dash
-  lives = HEIST_LIVES; updateHud();
-  fcStart(); fc.zoom = 0.55;                                         // the camera follows you, down closer to the floor
+  if (!heist.bubble) { heist.bubble = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 14), basic(0x7fd8ff, { transparent: true, opacity: 0.2, depthWrite: false })); heist.bubble.visible = false; scene.add(heist.bubble); }
+  walk.meshes = standMeshes(cheeses.concat(spareCheeses).flatMap(c => [c.cheeseVis, c.mushVis]).concat(heist.bubble));   // (the same solid-furniture list Free roam uses: sofas, tables, the hearth, the mantel...)
+  p.root.position.y = surfaceTop(p.root.position.x, p.root.position.z, 0.5);   // (the fireplace hole opens onto the hearth)
+  walk.stick.x = walk.stick.y = 0; document.body.classList.add('heist-ui'); document.getElementById('walkUI').hidden = false;   // the same on-screen stick as Free roam, plus Jump
+  lives = HEIST_LIVES; heistHudSetup(); heistHud();
+  fcStart(); heist.f0 = { dist0: fc.dist0, el0: fc.el0, yaw: fc.yaw }; heistCam(true);
 }
-function queueStrike(at, tele) {
+function heistCam(snap) {                                             // Follow: the room view, trailing her. Chase: low behind her, turning as she turns
+  const p = heist.player.root, chase = heist.cam === 'chase', want = chase && !snap ? p.rotation.y + Math.PI : heist.f0.yaw;   // (a new run starts from the room view's angle: she comes out of a hole with her back to the wall)
+  Object.assign(fc, chase ? { dist0: 3.4, el0: 19, zoom: 1, tilt: 0 } : { dist0: heist.f0.dist0, el0: heist.f0.el0, zoom: 0.55, tilt: 0 });
+  fc.yaw = snap ? want : fc.s.yaw + Math.atan2(Math.sin(want - fc.s.yaw), Math.cos(want - fc.s.yaw));   // (the short way round)
+  fc.focus.set(p.position.x, p.position.y + 0.2, p.position.z);
+  if (snap) { fc.s.focus.copy(fc.focus); Object.assign(fc.s, { yaw: fc.yaw, zoom: fc.zoom, tilt: fc.tilt }); }
+  heist.camS = null;                                                  // (the chase cam's eased position starts fresh)
+}
+function heistFloorY(q) { return heist.air && q === heist.player.root.position ? surfaceTop(q.x, q.z, q.y + 0.02) : q.y; }   // what she's standing on (or will land on)
+function heistBodyHits(x, z, face, lim, top) {                        // how much of her (nose, middle, rump) is inside something taller than a step
+  const fx = Math.sin(face), fz = Math.cos(face); let n = 0;
+  for (const f of [0.2, 0, -0.16]) n += Math.min(1, Math.max(0, surfaceTop(x + fx * f, z + fz * f, top) - lim));
+  return n;
+}
+function heistBlocked(nx, nz, ox, oz) {
+  const y = heist.player.root.position.y, lim = y + (heist.air ? 0.04 : MJ.step), top = y + MJ.mh;
+  if (Math.abs(nx) > ROOM.halfW - 0.26 || nz < 0.3 || nz > ROOM.visDepth - 0.45) return true;
+  const inBox = (x, z) => Math.abs(x - CAT_POS.x) < BOX.w / 2 + 0.2 && Math.abs(z - CAT_POS.z) < BOX.d / 2 + 0.2;
+  if (inBox(nx, nz) && !inBox(ox, oz)) return true;                  // the cat's box: she's sitting in it (never a way in, even jumping off the credenza)
+  if (y < CAB_H - 0.15 && nz < DEPTH + 0.08 && nx > LEFT_X0 - 0.15 && nx < MAIN_X0 + MAIN_W + 0.15) return true;   // the credenza (open or shut, the cupboards aren't a way in)
+  const mx = nx - ox, mz = nz - oz, face = mx || mz ? Math.atan2(mx, mz) : heist.player.root.rotation.y;
+  if (y > CAB_H - 0.3 && tvHits(nx, nz, face, y) > tvHits(ox, oz, face, y)) return true;
+  if (sideBlocked(ox, oz, y, mx, mz, 0.42)) return true;               // walls, sofa fronts, table legs: feelers at her height
+  const now = heist.nowHits, next = heistBodyHits(nx, nz, face, lim, top);
+  return now > 0.001 ? next > now - 0.0005 && next > 0.001 : next > 0.001;   // tangled: only moves that ease her out
+}
+function queueStrike(at, tele, size) {
   const ring = heist.rings.find(r => !heist.strikes.some(s2 => s2.ring === r)); if (!ring) return;
-  ring.position.copy(at); ring.visible = true; heist.strikes.push({ at, t: 0, tele, struck: false, ring });
+  ring.position.set(at.x, at.y + 0.03, at.z); ring.visible = true; heist.strikes.push({ at, t: 0, tele, struck: false, ring, size: size || 1 });
 }
-function heistDash() {                                               // a quick burst of speed to dodge the paw
-  if (gameMode !== 'mouse' || state !== 'playing' || heist.dashCD > 0 || heist.respawnT > 0) return;
-  heist.dashT = 0.32; heist.dashCD = 1.5; noise(0.2, 0.08, 2600); tone(600, 1200, 0.12, 'triangle', 0.03);
-  burst(heist.player.root.position.clone().setY(0.15), 0xb08a64, 5, 1.2, 1, 0.5);
+function heistJump() {                                                // the Jump button / space bar (a press just before she lands, or just before it's ready, still counts)
+  if (gameMode !== 'mouse' || state !== 'playing' || heist.respawnT > 0) return;
+  heist.jumpQ = clock;
+}
+function heistLaunch() {                                              // up she goes: clear of the paw, and high enough for a sofa seat
+  const p = heist.player, pos = p.root.position;
+  heist.vy = Math.sqrt(2 * MJ.grav * MJ.h * (1 + 0.12 * pupL('spring'))); heist.air = true; heist.jumpQ = -1;
+  heist.jumpCD = 1.6 * (1 - 0.1 * pupL('spring')); heist.ghostAt.copy(pos);
+  p.sqY = 1.3; p.sqXZ = 0.8; tone(620, 1250, 0.1, 'triangle', 0.035); sfx.squeak(1);
+  burst(pos.clone().setY(pos.y + 0.1), 0xb08a64, 5, 1.2, 1, 0.5);
+}
+function heistLand() {
+  const p = heist.player, pos = p.root.position;
+  heist.vy = 0; heist.air = false; p.sqY = 0.7; p.sqXZ = 1.25; sfx.padThud(0.1);
+  if (pupL('shadow')) heist.ghostT = 0.3 * pupL('shadow');            // Shadow Step: the cat's still pawing at where she jumped from
+  if (!heist.mantel && pos.y > FIRE.h && pos.x < -ROOM.halfW + 1.2 && Math.abs(pos.z - FIRE.z) < FIRE.w / 2 + 0.3) { heist.mantel = true; floatText(pos.clone().setY(pos.y + 0.9), 'Up on the mantel!', 'clutch'); }
 }
 function heistRespawn() {                                            // back out of a mouse hole, well away from where she got you
   const p = heist.player, pos = p.root.position, hs = HOLES.slice().sort((a, b) => Math.hypot(b.mouthOut.x - pos.x, b.mouthOut.z - pos.z) - Math.hypot(a.mouthOut.x - pos.x, a.mouthOut.z - pos.z));
   const h = hs[(Math.random() * Math.min(3, hs.length)) | 0];
-  burst(pos.clone().setY(0.3), 0xffffff, 8, 1.5, 2, 0.5);
-  pos.copy(h.mouthOut); p.root.rotation.y = Math.atan2(h.normal.x, h.normal.z); p.sqY = 1; p.sqXZ = 1; heist.vel.set(0, 0, 0);
+  burst(pos.clone().setY(pos.y + 0.3), 0xffffff, 8, 1.5, 2, 0.5);
+  pos.copy(h.mouthOut); pos.y = surfaceTop(pos.x, pos.z, 0.5); heist.air = false; heist.vy = 0; p.root.rotation.y = Math.atan2(h.normal.x, h.normal.z); p.sqY = 1; p.sqXZ = 1; heist.vel.set(0, 0, 0);
   burst(pos.clone().setY(0.3), 0xff6fae, 10, 1.8, 2.4, 0.6); sfx.squeak(2); floatText(pos.clone().setY(1), 'Respawned!', '');
   heist.invuln = 1.4;
 }
 function heistHurt() {
-  const p = heist.player;
-  lives--; heist.invuln = 2.2; heist.respawnT = 0.75; combo = 0;       // squashed: drops the mushroom and respawns at a hole a moment later
-  if (heist.carrying) { heist.carrying.drop(); heist.carrying = null; p.target = null; }   // you drop what you were carrying
+  const p = heist.player, pos = p.root.position, gy = heistFloorY(pos);
+  lives--; heist.hits++; heist.invuln = 2.2; heist.respawnT = 0.75; combo = 0;   // squashed: drops the mushrooms and respawns at a hole a moment later
+  heist.bag.forEach((c, i, all) => { c.drop(); c.slot = 0; c.pos.x += (i - (all.length - 1) / 2) * 0.35; c.pos.y = surfaceTop(c.pos.x, c.pos.z, gy + 0.4); });   // (they land where she was: on the sofa, if that's where she got squashed)
+  heist.bag = []; p.target = null;
   p.sqY = 0.35; p.sqXZ = 1.5;                                        // squashed flat for a moment
   sfx.whack(true); sfx.squeak(3); vibrate(60); shake = Math.max(shake, reduceMotion ? 0.05 : 0.3);
-  burst(p.root.position.clone().setY(0.3), 0xff6fae, 10, 2.4, 3, 0.8);
-  floatText(p.root.position.clone().setY(1.1), '−1 life', 'bad');
+  burst(pos.clone().setY(pos.y + 0.3), 0xff6fae, 10, 2.4, 3, 0.8);
+  floatText(pos.clone().setY(pos.y + 1.1), '−1 life', 'bad');
   updateHud();
   if (lives <= 0) endGame('caught');
 }
+function heistBank() {                                                // into a mouse hole with the loot
+  const p = heist.player, pos = p.root.position; let n = 0, dbl = 0;
+  for (const c of heist.bag) { c.lose(); c.slot = 0; n++; if (Math.random() < 0.15 * pupL('double')) { n++; dbl++; } }
+  heist.bag = []; p.target = null; heist.stolen += n; heist.xp += n; score = heist.stolen;
+  floatText(pos.clone().setY(pos.y + 1.1), dbl ? `Double stash! +${n}` : n > 1 ? `Stashed ${n}!` : 'Stashed!', 'clutch');
+  burst(pos.clone().setY(pos.y + 0.3), 0xf4c13d, 12, 2, 3, 0.7); sfx.bite(false);
+  if (heist.stolen >= 10) unlock('heist');
+  if (heist.stolen >= 5 && !heist.hits) unlock('ghost');
+  if (heist.stolen >= 25) unlock('mouse25');
+  while (heist.xp >= heistNeed(heist.lvl)) { heist.xp -= heistNeed(heist.lvl); heist.lvl++; heist.picks++; }
+  if (heist.picks && heist.lvlT <= 0) heist.lvlT = 0.55;              // a beat to see them go in, then the level-up
+  if (heist.lvl >= 5) unlock('mouseLvl');
+  heistHud();
+}
+function heistSpot() {                                                // somewhere new for a mushroom: the floor, a sofa, a table, the hearth... now and then the mantel
+  const pos = heist.player.root.position, hw = ROOM.halfW, high = Math.random() < 0.5, onMantel = high && Math.random() < 0.2;   // half of them up on the furniture; now and then the mantel
+  for (let i = 0; i < 160; i++) {
+    const loose = i >= 110, pick = onMantel && !loose;                // (nothing suitable up high: anywhere will do)
+    const x = pick ? -hw + 0.25 + Math.random() * 0.2 : (Math.random() * 2 - 1) * (hw - 0.45), z = pick ? FIRE.z + (Math.random() * 2 - 1) * (FIRE.w / 2 - 0.45) : 1.6 + Math.random() * (ROOM.visDepth - 2.5);
+    if (Math.abs(x - CAT_POS.x) < BOX.w / 2 + 0.6 && Math.abs(z - CAT_POS.z) < BOX.d / 2 + 0.6) continue;   // not in the cat's lap
+    if (cheeses.some(c => c.alive && Math.hypot(c.pos.x - x, c.pos.z - z) < 1.5)) continue;
+    const y = surfaceTop(x, z, 3.6), mantel = x < -hw + 0.75 && Math.abs(z - FIRE.z) < FIRE.w / 2 - 0.2 && y > FIRE.h;
+    if (y > 2.05 && !mantel) continue;                               // shelves, the TV, lamps: out of reach
+    if (Math.hypot(x - pos.x, z - pos.z) + Math.abs(y - pos.y) < 2.4) continue;   // (not right under her nose: the mantel over her head is fine)
+    if (high && !loose && (y < 0.3 || (y > 1.6 && !mantel && Math.random() < 0.5))) continue;   // (sofa backs and tabletops, two jumps up: half as often as the seats)
+    if (z < DEPTH + 0.1 && y > 1 && pupL('spring') < 2) continue;    // (the credenza top needs Spring Legs)
+    if (y < 0.5 && HOLES.some(h => Math.hypot(h.mouthOut.x - x, h.mouthOut.z - z) < 1.8)) continue;   // (right by a hole is too easy)
+    let flat = true; for (const [ox, oz] of [[0.2, 0], [-0.2, 0], [0, 0.2], [0, -0.2]]) if (Math.abs(surfaceTop(x + ox, z + oz, y + 0.4) - y) > 0.06) { flat = false; break; }
+    if (!flat || surfaceTop(x, z, y + 0.9) > y + 0.05) continue;      // a level spot, with nothing hanging just over it
+    return new THREE.Vector3(x, y, z);
+  }
+  return null;
+}
+function heistNewMushroom() {                                         // one mushroom left on the field: another drops in from above
+  const at = heistSpot() || new THREE.Vector3(CHEESE_SPOTS[1].x, 0, CHEESE_SPOTS[1].z);
+  let c = cheeses.find(k => !k.alive && k.state === 'gone');
+  if (!c) {
+    c = spareCheeses.pop();
+    if (!c) { c = new Cheese({ x: at.x, z: at.z }); [c.cheeseVis, c.mushVis].forEach(v => v.traverse(o => { if (o.isMesh) { o.userData.prize = c; tapTargets.push(o); o.layers.set(1); } })); }
+    cheeses.push(c);
+  }
+  c.reset(); c.slot = 0; c.pos.copy(at);
+  c.fall = { y: Math.min(CEIL_H - 0.3, at.y + 3.5), vy: 0, rx: 0, spin: 5 + Math.random() * 4, bounces: 0, stay: true };
+}
+function catBlind() { return heist.blanketT > 0 || blanketRigs.some(r => r.state === 'cat' || (r.state === 'flying' && r.dest === 'cat')); }
+function heistBlanket(sec) {                                          // Blanket Toss: over the cat it goes, and the room's all hers
+  heist.blanketT = Math.max(0, heist.blanketT) + sec; heist.blanketMax = heist.blanketT;
+  if (!blanketRigs.some(r => r.state === 'cat' || (r.state === 'flying' && r.dest === 'cat'))) { const b = blanketRigs.find(r => r.state === 'sofa' || r.state === 'floor'); if (b) blanketToCat(null, b); }
+  heist.strikes.forEach(st => st.ring.visible = false); heist.strikes = [];
+  camToast(`🧶 Blanket on the cat: ${Math.round(heist.blanketT)}s of free reign!`, 2600); unlock('mouseNap');
+}
+function openLevelUp() {
+  const pool = PUPS.filter(u => pupL(u.id) < u.max);
+  if (!pool.length) { heist.picks = 0; lives = Math.min(CFG.LIVES, lives + 1); updateHud(); return; }   // (everything maxed: a life instead)
+  const picks = []; while (picks.length < Math.min(2, pool.length)) { const u = pool[(Math.random() * pool.length) | 0]; if (!picks.includes(u)) picks.push(u); }
+  state = 'levelup'; heist.hold = null; heist.jumpQ = -1;
+  heist.strikes.forEach(st => st.ring.visible = false); heist.strikes = []; heist.strikeT = Math.max(heist.strikeT, 1.2);   // (no paw waiting to drop the moment she's back)
+  $('lvlTitle').textContent = `Level ${heist.lvl - heist.picks + 1}!`;
+  const box = $('lvlPicks'); box.innerHTML = '';
+  picks.forEach(u => {
+    const L = pupL(u.id) + 1, b = document.createElement('button'); b.className = 'lvl-pick';
+    b.innerHTML = '<span class="ic"></span><b></b><span class="lv"></span><span class="say"></span><span class="pips"></span>';
+    b.querySelector('.ic').textContent = u.ic; b.querySelector('b').textContent = u.name; b.querySelector('.lv').textContent = L > 1 ? `Level ${L - 1} → ${L}` : 'New!';
+    b.querySelector('.say').textContent = u.say(L); b.querySelector('.pips').textContent = '●'.repeat(L) + '○'.repeat(u.max - L);
+    b.addEventListener('click', () => pickPup(u.id)); box.appendChild(b);
+  });
+  const have = $('lvlHave'); have.innerHTML = '';
+  for (const u of PUPS) if (pupL(u.id)) { const t = document.createElement('span'); t.textContent = `${u.ic} ${pupL(u.id)}`; t.title = u.name; have.appendChild(t); }
+  have.hidden = !have.childElementCount;
+  $('levelScreen').hidden = false; if (sfx.sparkle) sfx.sparkle(); heist.lvlOpenAt = performance.now();
+}
+function pickPup(id) {
+  if (state !== 'levelup' || performance.now() - (heist.lvlOpenAt || 0) < 400) return;   // (a tap or a jump press meant for the game doesn't pick a card)
+  heist.pw[id] = pupL(id) + 1; heist.picks--;
+  const L = pupL(id), u = PUP_BY_ID[id], pos = heist.player.root.position;
+  if (id === 'heart') lives = Math.min(heistMaxLives(), lives + 1);
+  if (id === 'fur') { heist.furUp = true; heist.furT = 0; }
+  $('levelScreen').hidden = true; state = 'playing'; heist.invuln = Math.max(heist.invuln, 1.0);
+  if (id === 'blanket') heistBlanket(25 + 5 * L);
+  if (L >= u.max) unlock('mouseMax');
+  floatText(pos.clone().setY(pos.y + 1.1), `${u.ic} ${u.name}${L > 1 ? ' ' + L : ''}!`, 'clutch');
+  heistHud();
+  if (heist.picks > 0) heist.lvlT = 0.25;                            // (two levels at once: the second pick)
+}
+function heistHudSetup() {                                            // the HUD in Mouse mode: mushrooms stolen, her level, and progress to the next
+  $('scoreLbl').textContent = 'Stolen'; $('prizeLabel').textContent = 'Level'; ui.cheeses.innerHTML = '<span class="lvl-val" id="lvlVal">1</span>'; $('heatLbl').textContent = 'Next level';
+}
+function heistHud() {
+  score = heist.stolen;
+  const lv = document.getElementById('lvlVal'); if (lv) lv.textContent = heist.lvl;
+  const reign = heist.blanketT > 0;
+  $('heatLbl').textContent = reign ? `🧶 Free reign ${Math.ceil(heist.blanketT)}s` : 'Next level';
+  ui.heat.classList.toggle('reign', reign);
+  ui.heat.style.width = `${Math.round(Math.min(1, reign ? heist.blanketT / heist.blanketMax : heist.xp / heistNeed(heist.lvl)) * 100)}%`;
+  updateHud();
+}
+const PAW_SKIP = ['prize', 'pistol', 'catnip', 'blanket', 'fireHit', 'gameConsole', 'laserPickup', 'chippy', 'dresser', 'remote'];
+function pawImpact(at) {                                              // Mouse mode: wherever her paw comes down, it bats whatever's there, the same as a tap in her own games
+  const ok = o => { if (!o || PAW_SKIP.some(k => o.userData[k])) return false; const dd = o.userData.dresserDoor; return !(dd && (dd === pistolDoor || dd === catnip.door)); };
+  let best = null, bd = Infinity;
+  for (const it of interactables()) {                                // (anything sitting on the spot, or standing up to about a paw's height over it)
+    if (!ok(it.obj)) continue; const dy = it.pos.y - at.y; if (dy < -0.4 || dy > 0.9) continue;
+    const d = Math.hypot(it.pos.x - at.x, it.pos.z - at.z) + Math.max(0, -dy); if (d < Math.max(0.45, it.r * 0.7) && d < bd) { bd = d; best = it; }
+  }
+  if (best) return interact(best.obj, best.pos);
+  _hP.set(at.x, at.y + 0.6, at.z); raycaster.set(_hP, _pawDown); raycaster.far = 0.9; raycaster.camera = camera;
+  const hit = raycaster.intersectObjects(tapTargets, false).find(h => { for (let q = h.object; q; q = q.parent) if (!q.visible) return false; return true; });
+  raycaster.far = Infinity;
+  return !!(hit && ok(hit.object) && !hit.object.userData.wallpaper && interact(hit.object, hit.point, hit.face));   // (a sofa gets scratched, a pillow flies...)
+}
 function updateHeist(dt) {
   const p = heist.player, pos = p.root.position;
+  if (heist.lvlT > 0) { heist.lvlT -= dt; if (heist.lvlT <= 0 && heist.picks > 0) { openLevelUp(); return; } }
   // ---- steering: toward the finger on the floor, or the arrow keys (relative to the camera)
   _hD.set(0, 0, 0);
   if (heist.hold) {
@@ -5491,68 +5700,130 @@ function updateHeist(dt) {
     if (Math.hypot(fx, fz) > 0.12) { camera.getWorldDirection(_hP); _hP.y = 0; if (_hP.lengthSq() < 1e-6) _hP.set(0, 0, -1); _hP.normalize(); _hD.set(-_hP.z * fx - _hP.x * fz, 0, _hP.x * fx - _hP.z * fz); }   // (screen up = away from the camera)
   }
   if (heist.respawnT > 0) _hD.set(0, 0, 0);                            // flattened: can't move until she's respawned
-  const speed = (heist.carrying ? 2.1 : 2.8) * (heist.dashT > 0 ? 2.1 : 1);
+  const n = heist.bag.length, speed = 2.8 * (1 + 0.1 * pupL('speed')) * (n ? Math.max(0.6, 1 - Math.max(0.05, 0.25 - 0.05 * pupL('pack')) - 0.05 * (n - 1)) : 1);
   if (_hD.lengthSq() > 0) {
     _hD.normalize().multiplyScalar(speed * dt);
-    const nx = pos.x + _hD.x, nz = pos.z + _hD.z;
-    if (heistBlocked(pos.x, pos.z) || !heistBlocked(nx, nz)) { pos.x = nx; pos.z = nz; }   // (holes sit right by the furniture: you can always walk out)
-    else if (!heistBlocked(nx, pos.z)) pos.x = nx;
-    else if (!heistBlocked(pos.x, nz)) pos.z = nz;
+    heist.nowHits = heistBodyHits(pos.x, pos.z, p.root.rotation.y, pos.y + (heist.air ? 0.04 : MJ.step), pos.y + MJ.mh);   // (how tangled she is right now)
+    const tryMove = (nx, nz) => {
+      if (!heistBlocked(nx, nz, pos.x, pos.z)) { pos.x = nx; pos.z = nz; return true; }
+      if (!heist.air || heist.vy > 3) return false;
+      const mx = nx - pos.x, mz = nz - pos.z, ml = Math.hypot(mx, mz) || 1, lx = nx + mx / ml * 0.18, lz = nz + mz / ml * 0.18;   // mid-air, just short of a ledge: she scrabbles up over the edge
+      if (Math.abs(lx) > ROOM.halfW - 0.26 || (Math.abs(lx - CAT_POS.x) < BOX.w / 2 + 0.2 && Math.abs(lz - CAT_POS.z) < BOX.d / 2 + 0.2)) return false;
+      const top = surfaceTop(lx, lz, pos.y + 0.36);
+      if (!(top > pos.y - 0.05 && top - pos.y < 0.36) || surfaceTop(lx, lz, top + MJ.mh) > top + MJ.step) return false;
+      pos.set(lx, top, lz); heistLand(); return true;
+    };
+    tryMove(pos.x + _hD.x, pos.z + _hD.z) || tryMove(pos.x + _hD.x, pos.z) || tryMove(pos.x, pos.z + _hD.z);
     p.faceToward(pos.x + _hD.x * 10, pos.z + _hD.z * 10, dt);
-    heist.vel.copy(_hD).divideScalar(Math.max(dt, 1e-3)); p.playerRun = true;
+    heist.vel.copy(_hD).divideScalar(Math.max(dt, 1e-3)); p.playerRun = !heist.air;
   } else { heist.vel.multiplyScalar(0.8); p.playerRun = false; }
+  // ---- up and down: a jump; standing on whatever's under her; dropping off an edge
+  heist.jumpCD = Math.max(0, heist.jumpCD - dt);
+  if (heist.jumpQ > 0 && clock - heist.jumpQ < 0.2 && !heist.air && heist.jumpCD <= 0 && heist.respawnT <= 0) heistLaunch();
+  if (!heist.air) {
+    const g = surfaceTop(pos.x, pos.z, pos.y + MJ.step);
+    if (g >= pos.y - MJ.step) pos.y = g; else { heist.air = true; heist.vy = 0; heist.ghostAt.copy(pos); }   // ran off the edge
+  } else {
+    heist.vy -= MJ.grav * dt;
+    let ny = pos.y + heist.vy * dt; const cap = CEIL_H - 0.45; if (ny > cap) { ny = cap; heist.vy = Math.min(heist.vy, 0); }
+    if (heist.vy <= 0) { const g = surfaceTop(pos.x, pos.z, pos.y + 0.02); if (ny <= g) { pos.y = g; heistLand(); } else pos.y = ny; } else pos.y = ny;
+  }
+  const gy = heistFloorY(pos);
+  p.model.rotation.x = heist.air ? THREE.MathUtils.clamp(-heist.vy * 0.05, -0.45, 0.45) : 0;   // nose up on the way up, down on the way down
+  p.shadow.position.y = gy - pos.y + 0.012;                           // (her shadow stays on whatever's under her)
   p.sqY += (1 - p.sqY) * Math.min(1, dt * 4); p.sqXZ += (1 - p.sqXZ) * Math.min(1, dt * 4);
   heist.invuln = Math.max(0, heist.invuln - dt); p.root.visible = heist.invuln <= 0 || Math.sin(clock * 30) > 0;   // blinks while safe
-  // ---- grab a mushroom, bank it at a hole
-  if (!heist.carrying && heist.respawnT <= 0) {                        // (not while squashed: the mushroom she dropped stays dropped)
-    for (const c of cheeses) if (c.available && Math.hypot(c.pos.x - pos.x, c.pos.z - pos.z) < 0.55) {
-      c.startCarry(p); p.target = c; heist.carrying = c; sfx.squeak(2); floatText(pos.clone().setY(1), 'Got one!', ''); break;
-    }
-  } else if (heist.carrying) {
-    for (const h of HOLES) if (Math.hypot(h.mouthOut.x - pos.x, h.mouthOut.z - pos.z) < 0.95) {
-      const c = heist.carrying; heist.carrying = null; p.target = null; c.lose(); heist.stolen++;
-      const pts = 100 * heist.stolen; score += pts; floatText(pos.clone().setY(1.1), `Stolen! +${pts}`, 'clutch');
-      burst(pos.clone().setY(0.3), 0xf4c13d, 12, 2, 3, 0.7); sfx.bite(false); updateHud();
-      if (heist.stolen >= cheeses.length) { score += Math.max(0, 600 - Math.round(elapsed) * 3); updateHud(); endGame('heist'); }   // a speed bonus for a quick heist
-      break;
+  heist.ghostT = Math.max(0, heist.ghostT - dt);
+  if (pupL('fur') && !heist.furUp) { heist.furT -= dt; if (heist.furT <= 0) { heist.furUp = true; tone(900, 1500, 0.15, 'sine', 0.03); } }   // Thick Fur grows back
+  const bub = heist.bubble; bub.visible = heist.furUp && p.root.visible; if (bub.visible) { bub.position.set(pos.x, pos.y + 0.24, pos.z); bub.scale.setScalar(1 + Math.sin(clock * 5) * 0.05); }
+  if (heist.blanketT > 0) {                                           // free reign: counting down until she throws the blanket off
+    heist.blanketT -= dt;
+    if (Math.ceil(heist.blanketT) !== heist.reignShown) { heist.reignShown = Math.ceil(heist.blanketT); heistHud(); }
+    if (heist.blanketT <= 0) {
+      heist.blanketT = 0; heistHud();
+      const b = blanketRigs.find(r => r.state === 'cat'); if (b) throwBlanket(new THREE.Vector3(THREE.MathUtils.clamp(-pos.x * 0.6 + (Math.random() - 0.5) * 2, -3.5, 3.5), 0, 3.5 + Math.random() * 6), b);
+      showBanner("She's out! Watch the paws!"); heist.strikeT = 1.4;
     }
   }
-  if (state !== 'playing') return;                                   // (the heist just ended)
-  // ---- the cat hunts you: red rings show where her paw will land, then it strikes. She gets quicker and trickier the
-  // longer the heist goes on, and later on she swipes twice: once where you're heading and once where you are
-  heist.dashT = Math.max(0, heist.dashT - dt); heist.dashCD = Math.max(0, heist.dashCD - dt);
-  const dashBtn = document.getElementById('heistDash'); if (dashBtn) dashBtn.classList.toggle('cool', heist.dashCD > 0);
+  // ---- grab mushrooms (Pack Rat: more than one), stash them at a hole
+  const reach = 1 + 0.35 * pupL('magnet');
+  if (heist.respawnT <= 0 && heist.bag.length < 1 + pupL('pack')) {   // (not while squashed: what she dropped stays dropped)
+    for (const c of cheeses) if (c.available && Math.hypot(c.pos.x - pos.x, c.pos.z - pos.z) < 0.55 * reach && Math.abs(c.pos.y - gy) < 0.5 + 0.15 * pupL('magnet')) {
+      if (c.pos.y > FIRE.h) unlock('mouseHigh');
+      c.startCarry(p); c.slot = heist.bag.length; heist.bag.push(c); p.target = heist.bag[0]; sfx.squeak(2);
+      floatText(pos.clone().setY(pos.y + 1), heist.bag.length > 1 ? `Got ${heist.bag.length}!` : 'Got one!', ''); break;
+    }
+  }
+  if (heist.bag.length && gy < 0.45) for (const h of HOLES) if (Math.hypot(h.mouthOut.x - pos.x, h.mouthOut.z - pos.z) < 0.95 * reach) { heistBank(); break; }
+  // ---- bumping into things: candles, pillows, whatever's loose goes flying
+  if (heist.vel.lengthSq() > 0.3 || heist.air) for (const pr of props) {
+    if (pr.state !== 'rest' || pr.broken || pr.restHalf === 0) continue;   // (the disco balls are glued to the wall)
+    const o = pr.obj.position, dy = o.y - pos.y;
+    if (dy < -0.15 || dy > 0.7 || Math.hypot(o.x - pos.x, o.z - pos.z) > pr.restHalf + 0.18) continue;
+    knockProp(pr); const ax = o.x - pos.x, az = o.z - pos.z, al = Math.hypot(ax, az) || 1;
+    pr.v.set(ax / al * 1.2 + heist.vel.x * 0.25, 0.9, az / al * 1.2 + heist.vel.z * 0.25); sfx.clink();
+  }
+  for (const c of cheeses) {                                          // the table under a mushroom got smashed, a pillow under it got knocked flying: it drops
+    if (!c.alive || c.state === 'carried' || c.fall || c.pos.y < 0.05) continue;
+    const top = surfaceTop(c.pos.x, c.pos.z, c.pos.y + 0.05); if (top < c.pos.y - 0.05) { c.fall = { y: c.pos.y, vy: 0, rx: 0, spin: 2, bounces: 1, stay: true }; c.pos.y = top; }
+  }
+  // ---- never run dry: down to one mushroom on the field, and another drops in
+  if (cheeses.filter(c => c.alive && c.state !== 'carried').length <= 1) heistNewMushroom();
+  // ---- the cat hunts you: red rings show where her paw will land, then it strikes. She gets meaner as the heist goes on:
+  // a second paw, then pounce sweeps (a row of three), then big slams you have to jump or outrun
+  $('heistDash').classList.toggle('cool', heist.jumpCD > 0 || heist.air);
   if (heist.respawnT > 0) { heist.respawnT -= dt; if (heist.respawnT <= 0) heistRespawn(); }
-  const tele = Math.max(0.38, 0.72 - 0.3 * D.d - elapsed * 0.002);
+  const tier = Math.floor(elapsed / 50 + heist.stolen * 0.12);
+  if (tier > heist.tier) {
+    heist.tier = tier; const say = ['', "The cat's getting serious: double paws!", 'Pounce sweeps!', 'Big slams: jump them!', "She's furious!"];
+    if (tier < say.length) showBanner(say[tier]);
+  }
+  const tele = Math.max(0.34, 0.72 - 0.045 * tier - elapsed * 0.001) * (1 + 0.15 * pupL('whisker'));
+  if (catBlind()) heist.strikeT = Math.max(heist.strikeT, 0.8);       // (under the blanket: she can't see a thing)
   heist.strikeT -= dt;
   if (heist.strikeT <= 0 && heist.respawnT <= 0) {
-    const aim = (lead, jit) => { const at = new THREE.Vector3(pos.x + heist.vel.x * lead + (Math.random() - 0.5) * jit, 0.02, pos.z + heist.vel.z * lead + (Math.random() - 0.5) * jit);
-      at.x = THREE.MathUtils.clamp(at.x, -ROOM.halfW + 0.4, ROOM.halfW - 0.4); at.z = THREE.MathUtils.clamp(at.z, DEPTH + 0.3, PLAY_END - 0.5); return at; };
-    queueStrike(aim(0.5 + Math.random() * 0.35, 0.35), tele);
-    if (elapsed > 25 && Math.random() < Math.min(0.55, 0.2 + elapsed * 0.004)) queueStrike(aim(0, 0.2), tele + 0.28);   // a second paw, right where you are
-    heist.strikeT = Math.max(0.45, 1.15 - 0.6 * D.d - elapsed * 0.004) + Math.random() * 0.45 + tele;
+    const ghost = pupL('shadow') && (heist.air || heist.ghostT > 0), src = ghost ? heist.ghostAt : pos, v = ghost ? _hZero : heist.vel, sy = ghost ? heist.ghostAt.y : gy, hw = ROOM.halfW;
+    const spot = (x, z) => { const at = new THREE.Vector3(THREE.MathUtils.clamp(x, -hw + 0.35, hw - 0.35), 0, THREE.MathUtils.clamp(z, 0.6, ROOM.visDepth - 0.6)); at.y = surfaceTop(at.x, at.z, sy + 0.45); return at; };
+    const aim = (lead, jit) => spot(src.x + v.x * lead + (Math.random() - 0.5) * jit, src.z + v.z * lead + (Math.random() - 0.5) * jit);
+    const r = Math.random();
+    if (tier >= 3 && r < Math.min(0.3, 0.12 + 0.04 * (tier - 3))) queueStrike(spot(src.x, src.z), tele + 0.45, 2.1);   // a big slam, right on top of her
+    else if (tier >= 2 && r < 0.45) {                                // a pounce sweep: three paws in a row across her path
+      const c = aim(0.35, 0.2), sp = Math.hypot(v.x, v.z), dx = sp > 0.3 ? -v.z / sp : 1, dz = sp > 0.3 ? v.x / sp : 0;
+      for (const k of [-1, 0, 1]) queueStrike(spot(c.x + dx * k * 0.95, c.z + dz * k * 0.95), tele + 0.12 + Math.abs(k) * 0.08);
+    } else {
+      queueStrike(aim(0.5 + Math.random() * 0.35, 0.35), tele);
+      if (tier >= 1 && Math.random() < Math.min(0.6, 0.25 + 0.1 * tier)) queueStrike(aim(0, 0.2), tele + 0.28);   // a second paw, right where she is
+    }
+    heist.strikeT = Math.max(0.42, 1.2 - 0.1 * tier - elapsed * 0.0015) * (1 + 0.08 * pupL('nap')) + Math.random() * 0.45 + tele;
     if (sfx.angryMeow && Math.random() < 0.25) sfx.angryMeow();
   }
   for (const st of heist.strikes) {
     st.t += dt; const k = Math.min(1, st.t / st.tele);
-    st.ring.scale.setScalar(1.25 - 0.25 * k); st.ring.children[0].material.opacity = 0.5 + 0.5 * Math.abs(Math.sin(st.t * 18));
-    if (!st.struck && st.t >= st.tele) { st.struck = true; startSwipe(st.at); sfx.whoosh(); }
+    st.ring.scale.setScalar((1.25 - 0.25 * k) * st.size); st.ring.children[0].material.opacity = 0.5 + 0.5 * Math.abs(Math.sin(st.t * 18));
+    if (!st.struck && st.t >= st.tele) { st.struck = true; if (!pawImpact(st.at)) startSwipe(st.at.clone().setY(st.at.y + 0.2), true); sfx.whoosh(); }   // (it bats whatever's there, too)
     if (st.struck && st.t >= st.tele + 0.12) {                          // the paw lands
-      st.done = true; st.ring.visible = false; burst(st.at.clone().setY(0.15), 0xb08a64, 5, 1.4, 1.5, 0.7);
-      if (heist.invuln <= 0 && heist.respawnT <= 0 && Math.hypot(pos.x - st.at.x, pos.z - st.at.z) < 0.6) heistHurt(); else sfx.miss();
+      st.done = true; st.ring.visible = false; burst(st.at.clone().setY(st.at.y + 0.15), 0xb08a64, 5, 1.4, 1.5, 0.7);
+      const under = Math.hypot(pos.x - st.at.x, pos.z - st.at.z) < 0.6 * st.size && Math.abs(gy - st.at.y) < 0.35;
+      if (!under || heist.respawnT > 0 || state !== 'playing') { sfx.miss(); continue; }
+      if (heist.air) { heist.dodges++; floatText(pos.clone().setY(pos.y + 0.9), 'Dodged!', ''); if (heist.dodges >= 10) unlock('mouseDodge'); sfx.miss(); }   // over the paw!
+      else if (heist.invuln > 0) sfx.miss();
+      else if (heist.furUp) { heist.furUp = false; heist.furT = FUR_CD[pupL('fur')]; heist.invuln = 0.6; floatText(pos.clone().setY(pos.y + 0.9), 'Blocked!', 'clutch'); sfx.clink(); burst(pos.clone().setY(pos.y + 0.3), 0x7fd8ff, 10, 1.8, 2, 0.6); }
+      else if (Math.random() < 0.08 * pupL('lucky')) { heist.invuln = 0.6; floatText(pos.clone().setY(pos.y + 0.9), 'Lucky!', 'clutch'); sfx.miss(); }
+      else heistHurt();
     }
   }
   heist.strikes = heist.strikes.filter(s2 => !s2.done);
   if (state !== 'playing') return;                                   // (caught just now: game over)
-  // ---- where to go: the nearest mushroom (gold), or once you've got one, the nearest mouse hole (green)
-  let goal = null, best = Infinity;
-  if (heist.carrying) { for (const h of HOLES) { const d = Math.hypot(h.mouthOut.x - pos.x, h.mouthOut.z - pos.z); if (d < best) { best = d; goal = h.mouthOut; } } }
-  else for (const c of cheeses) if (c.available) { const d = Math.hypot(c.pos.x - pos.x, c.pos.z - pos.z); if (d < best) { best = d; goal = c.pos; } }
+  // ---- where to go: the nearest mushroom (gold), or once her paws are full, the nearest mouse hole (green)
+  let hole = null, bh = Infinity, mush = null, bm = Infinity;
+  if (heist.bag.length) for (const h of HOLES) { const d = Math.hypot(h.mouthOut.x - pos.x, h.mouthOut.z - pos.z); if (d < bh) { bh = d; hole = h.mouthOut; } }
+  if (heist.bag.length < 1 + pupL('pack')) for (const c of cheeses) if (c.available) { const d = Math.hypot(c.pos.x - pos.x, c.pos.z - pos.z); if (d < bm) { bm = d; mush = c.pos; } }
+  const home = !!hole && (!mush || bh <= bm), goal = home ? hole : mush;
   const G = heistGoal; G.g.visible = !!goal;
   if (goal) {
-    const home = !!heist.carrying, col = home ? 0x43e27a : 0xffd23a;
+    const col = home ? 0x43e27a : 0xffd23a;
     G.mat.color.setHex(col); G.arrow.material.color.setHex(col);
-    G.g.position.set(goal.x, 0, goal.z); G.arrow.position.y = 1.15 + Math.abs(Math.sin(clock * 4)) * 0.25; G.arrow.rotation.y = clock * 2;
+    G.g.position.set(goal.x, goal.y || 0, goal.z); G.arrow.position.y = 1.15 + Math.abs(Math.sin(clock * 4)) * 0.25; G.arrow.rotation.y = clock * 2;
     G.ring.scale.setScalar(1 + Math.sin(clock * 5) * 0.08); G.mat.opacity = 0.6 + 0.3 * Math.abs(Math.sin(clock * 5));
     // off screen? an arrow at the edge points the way
     _ea.set(goal.x, 0.3, goal.z).project(camera);
@@ -5564,8 +5835,12 @@ function updateHeist(dt) {
       G.edge.hidden = false; G.edge.classList.toggle('home', home); G.edge.style.transform = `translate(${sx - 14}px, ${sy - 13}px) rotate(${Math.atan2(x, y)}rad)`;
     } else G.edge.hidden = true;
   } else G.edge.hidden = true;
-  // ---- the camera follows along
-  fc.focus.set(pos.x, 0.2, pos.z);
+  // ---- the camera follows along (Chase: swinging round behind her as she turns; running back toward it doesn't spin the view)
+  if (heist.cam === 'chase' && fc.on && heist.vel.lengthSq() > 0.5) {
+    let d = p.root.rotation.y + Math.PI - fc.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+    if (Math.abs(d) < 2.3) fc.yaw += d * Math.min(1, dt * 2.4);
+  }
+  fc.focus.set(pos.x, gy + 0.2 + (pos.y - gy) * 0.4, pos.z);
 }
 
 /* =====================================================================
@@ -7039,7 +7314,7 @@ function endGame(reason) {
   if (reason === 'chaos') unlock('chaos');
   if (reason === 'heist') { unlock('heist'); if (lives >= HEIST_LIVES) unlock('ghost'); }
   state = 'ending'; endReason = reason; endTimer = 1.2;
-  (heist.rings || [heist.ring]).forEach(r => r.visible = false); heist.strikes = []; heist.strike = null; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true;
+  (heist.rings || [heist.ring]).forEach(r => r.visible = false); heist.strikes = []; heist.strike = null; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true; if (heist.bubble) heist.bubble.visible = false;
   sfx.over();
 }
 
@@ -7075,9 +7350,10 @@ function updateHud() {
   ui.score.textContent = score;
   const mult = Math.min(CFG.COMBO_MAX, 1 + Math.floor(combo / CFG.COMBO_STEP));
   ui.combo.hidden = mult <= 1; ui.combo.textContent = `x${mult}`;
-  ui.lives.querySelectorAll('.pip').forEach((p, i) => { p.classList.toggle('lost', i >= lives); p.style.display = gameMode === 'mouse' && i >= HEIST_LIVES ? 'none' : ''; });
+  ui.lives.querySelectorAll('.pip').forEach((p, i) => { p.classList.toggle('lost', i >= lives); p.style.display = gameMode === 'mouse' && i >= heistMaxLives() ? 'none' : ''; });
   const wedges = ui.cheeses.querySelectorAll('.wedge');
   cheeses.forEach((c, i) => {
+    if (!wedges[i]) return;                                          // (Mouse mode: that cell shows her level instead)
     wedges[i].classList.toggle('moved', c.state === 'dropped');
     wedges[i].classList.toggle('carried', c.state === 'carried');
     wedges[i].classList.toggle('gone', c.state === 'gone');
@@ -7085,12 +7361,12 @@ function updateHud() {
 }
 function updateClockHud() {
   const s = Math.floor(elapsed);
-  if (s !== lastTimeShown) { lastTimeShown = s; ui.time.textContent = fmtTime(gameMode === 'chaos' ? Math.max(0, CHAOS_SECS - s) : elapsed); ui.heat.style.width = `${Math.round(D.d * 100)}%`; }
+  if (s !== lastTimeShown) { lastTimeShown = s; ui.time.textContent = fmtTime(gameMode === 'chaos' ? Math.max(0, CHAOS_SECS - s) : elapsed); if (gameMode !== 'mouse') ui.heat.style.width = `${Math.round(D.d * 100)}%`; }
 }
 
 // little extra points for every bit of mess the kitty makes
 function bonus(pts, pos, label) {
-  if (state !== 'playing' || gameMode === 'walk') return;          // free walk: no scores, just looking around
+  if (state !== 'playing' || gameMode === 'walk' || gameMode === 'mouse') return;   // free walk: no scores, just looking around (Mouse mode counts mushrooms, not points)
   score += pts; updateHud();
   const at = pos ? new THREE.Vector3(pos.x, (pos.y || 0) + 0.6, pos.z) : new THREE.Vector3(CAT_POS.x, 1.6, CAT_POS.z + 0.6);
   floatText(at, (label ? label + ' ' : '') + '+' + pts, 'chaos');
@@ -7110,16 +7386,18 @@ function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } cat
 
 /* ---------- best score ---------- */
 const BEST_KEY = 'catguard.best';
-function getBest() { try { return +(localStorage.getItem(BEST_KEY) || 0); } catch (e) { return 0; } }
-function setBest(v) { try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) {} }
+function getBest(mouse) { try { return +(localStorage.getItem(BEST_KEY + (mouse ? '.mouse' : '')) || 0); } catch (e) { return 0; } }   // (Mouse mode keeps its own best: mushrooms)
+function setBest(v, mouse) { try { localStorage.setItem(BEST_KEY + (mouse ? '.mouse' : ''), String(v)); } catch (e) {} }
 function showBestOnStart() { const b = getBest(); $('bestStart').textContent = b ? b : '—'; }
 showBestOnStart();
 
 /* ---------- screens ---------- */
-function clearField() { if (typeof cine !== 'undefined' && cine) { cine = null; document.querySelectorAll('.cine').forEach(e => e.remove()); } if (state === 'tvgame' || tvCine) { tvCine = null; if (tvPad) tvPad.visible = false; $('tvPlay').hidden = true; $('tvFade').classList.remove('on'); game.player = false; } for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.strike = null; (heist.rings || [heist.ring]).forEach(r => r.visible = false); heist.strikes = []; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true; } }
+function clearField() { if (typeof cine !== 'undefined' && cine) { cine = null; document.querySelectorAll('.cine').forEach(e => e.remove()); } if (state === 'tvgame' || tvCine) { tvCine = null; if (tvPad) tvPad.visible = false; $('tvPlay').hidden = true; $('tvFade').classList.remove('on'); game.player = false; } for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.player.shadow.position.y = 0.012; if (heist.bubble) heist.bubble.visible = false; heist.blanketT = 0; heist.strike = null; (heist.rings || [heist.ring]).forEach(r => r.visible = false); heist.strikes = []; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true; } }
 function resetGame() {
   clearField(); endWalk();
-  cheeses.forEach(c => c.reset());
+  while (cheeses.length > CHEESE_SPOTS.length) { const c = cheeses.pop(); c.lose(); c.fall = null; c.slot = 0; spareCheeses.push(c); }   // (Mouse mode's extra mushrooms: put away)
+  $('levelScreen').hidden = true; $('scoreLbl').textContent = 'Score'; $('heatLbl').textContent = 'Heat'; ui.heat.classList.remove('reign'); buildPrizeIcons();
+  cheeses.forEach(c => { c.reset(); c.slot = 0; });
   if (gameMode === 'chaos') cheeses.forEach(c => c.lose());
   document.querySelector('.c-cheese').style.visibility = gameMode === 'chaos' ? 'hidden' : '';
   resetDucks(); resetLaundry(); if (consoleRig) { consoleRig.on = false; consoleRig.led.material.color.setHex(0x2a2a2a); }
@@ -7139,7 +7417,7 @@ function startGame(mode) {
   state = 'playing';
   resetChaosCam();
   if (gameMode === 'chaos') showBanner('Chaos mode!');
-  if (gameMode === 'mouse') { startHeist(); showBanner('Mouse mode!'); camToast('Stick to run · Dash to dodge · steal the mushrooms', 3400); }
+  if (gameMode === 'mouse') { startHeist(); showBanner('Mouse mode!'); camToast('Stick to run · Jump to dodge and climb · stash the mushrooms', 3400); }
   if (gameMode === 'walk') startWalk();
 }
 function pauseGame() {
@@ -7177,17 +7455,17 @@ function prepareScoreCard() {
     g.font = '72px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; g.fillStyle = '#ffc2dc'; g.strokeText('Defender', W / 2, 222); g.fillText('Defender', W / 2, 222);
     const modeName = gameMode === 'chaos' ? 'Chaos mode' : gameMode === 'mouse' ? 'Mouse mode' : 'Classic';
     g.fillStyle = '#8a4a70'; g.font = '800 44px Figtree, system-ui, sans-serif'; g.fillText(`${modeName} · ${$('overTitle').textContent}`, W / 2, 950);
-    g.fillStyle = '#3a1434'; g.font = '150px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; g.fillText(String(score), W / 2, 1100);
+    g.fillStyle = '#3a1434'; g.font = '150px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; g.fillText(gameMode === 'mouse' ? `${heist.stolen} 🍄` : String(score), W / 2, 1100);
     const crown = catCrown && catCrown.userData.claimed ? '  ·  👑 Crown won' : '';
     g.fillStyle = '#6b3d5c'; g.font = '700 40px Figtree, system-ui, sans-serif';
-    g.fillText(`⏱ ${fmtTime(elapsed)}   ·   ${gameMode === 'mouse' ? `🍄 ${heist.stolen} stolen` : `🐭 ${whackedCount} whacked`}${crown}`, W / 2, 1170);
+    g.fillText(`⏱ ${fmtTime(elapsed)}   ·   ${gameMode === 'mouse' ? `⭐ Level ${heist.lvl}` : `🐭 ${whackedCount} whacked`}${crown}`, W / 2, 1170);
     g.fillText(`🏆 ${achGot()}/${achTotal()} achievements`, W / 2, 1225);
     g.fillStyle = '#ff5fa2'; g.font = '800 36px Figtree, system-ui, sans-serif'; g.fillText('Can you beat me? 🐾', W / 2, 1282);
     c.toBlob(b => { shareBlob = b; }, 'image/png');
   } catch (e) { shareBlob = null; }
 }
 async function shareScore() {
-  const title = 'Princess Kitty Defender', text = `I scored ${score} in Princess Kitty Defender! 🐱👑 Can you beat me? ${SHARE_URL}`;
+  const title = 'Princess Kitty Defender', text = gameMode === 'mouse' ? `I stashed ${heist.stolen} mushrooms in Princess Kitty Defender's Mouse mode! 🐭🍄 Can you beat me? ${SHARE_URL}` : `I scored ${score} in Princess Kitty Defender! 🐱👑 Can you beat me? ${SHARE_URL}`;
   try {
     if (shareBlob) {
       const file = new File([shareBlob], 'princess-kitty-score.png', { type: 'image/png' });
@@ -7202,16 +7480,16 @@ async function shareScore() {
 }
 function showGameOver() {
   state = 'over';
-  const best = getBest(), isNew = score > best;
-  if (isNew) setBest(score);
-  $('overEyebrow').textContent = isNew && score > 0 ? 'New best!' : 'Game over';
+  const mm = gameMode === 'mouse', val = mm ? heist.stolen : score, best = getBest(mm), isNew = val > best;
+  if (isNew) setBest(val, mm);
+  $('overEyebrow').textContent = isNew && val > 0 ? 'New best!' : 'Game over';
   $('overTitle').textContent = endReason === 'heist' ? 'Heist complete!' : endReason === 'caught' ? 'The cat got you' : endReason === 'chaos' ? 'Chaos complete!' : endReason === 'cheese' ? (prizeMode === 'mushroom' ? 'The mushrooms are gone' : 'The cheese is gone') : 'Out of lives';
   $('overReason').textContent = ''; $('overReason').hidden = true;
-  $('oScore').textContent = score;
+  $('oScore').textContent = val; $('oScoreLbl').textContent = mm ? 'Mushrooms' : 'Score';
   $('oTime').textContent = fmtTime(elapsed);
-  $('oWhacked').textContent = gameMode === 'mouse' ? heist.stolen : whackedCount; $('oWhackedLbl').textContent = gameMode === 'mouse' ? 'Mushrooms stolen' : 'Mice whacked';
-  $('oBest').textContent = Math.max(best, score);
-  $('oBest').classList.toggle('new', isNew && score > 0);
+  $('oWhacked').textContent = mm ? heist.lvl : whackedCount; $('oWhackedLbl').textContent = mm ? 'Level reached' : 'Mice whacked';
+  $('oBest').textContent = Math.max(best, val);
+  $('oBest').classList.toggle('new', isNew && val > 0);
   ui.over.hidden = false;
   $('againBtn').focus({ preventScroll: true });
   prepareScoreCard();
@@ -7809,6 +8087,7 @@ fitCamera();
 function camToast(text, ms) { document.querySelectorAll('.cam-toast').forEach(e => e.remove()); const el = document.createElement('div'); el.className = 'cam-toast'; el.textContent = text; if (ms) el.style.animationDuration = (ms - 100) / 1000 + 's'; document.body.appendChild(el); setTimeout(() => el.remove(), ms || 1500); }
 $('camBtn').addEventListener('click', e => {                          // cycle views; switching view also clears any pinch/tilt
   if (gameMode === 'walk') { walk.fp = !walk.fp; camToast(walk.fp ? 'Her eyes' : 'Behind her'); e.currentTarget.blur(); return; }   // free walk: follow cam ↔ first person
+  if (gameMode === 'mouse') { heist.cam = heist.cam === 'chase' ? 'follow' : 'chase'; try { localStorage.setItem('catguard.mouseCam', heist.cam); } catch (err) {} if (fc.on && heist.f0) heistCam(false); camToast(heist.cam === 'chase' ? 'Chase cam: turns as you turn' : 'Follow cam'); e.currentTarget.blur(); return; }
   camView = (camView + 1) % CAM_VIEWS.length; camZoom = 1; camTilt = 0; fc.on = false; saveCam(); fitCamera(); camToast(CAM_VIEWS[camView].name); e.currentTarget.blur();
 });
 // two fingers on the game: pinch to zoom, drag up/down together to tilt the camera
@@ -7853,12 +8132,32 @@ function fcPan(x0, y0, x1, y1) {                                      // the flo
   fcPlace(vcam, fc.focus, fc.yaw, fc.zoom, fc.tilt);
   const a = fcGround(x0, y0), b = fcGround(x1, y1); if (a && b) { fc.focus.add(a.sub(b)); fcClamp(); }
 }
+const _camRay = new THREE.Raycaster(), _camV = new THREE.Vector3(), _camP = new THREE.Vector3();
+function camHit(f, c) {                                               // Mouse mode's chase cam: the first solid thing between her and the camera (or null)
+  _camV.subVectors(c, f); const L = _camV.length(); if (L < 0.01 || !walk.meshes.length) return null;
+  _camRay.set(f, _camV.divideScalar(L)); _camRay.far = L;
+  return _camRay.intersectObjects(walk.meshes, false).find(h => { for (let q = h.object; q; q = q.parent) if (!q.visible) return false; return true; }) || null;
+}
 function updateFreeCam(dt) {
   if (!fc.on) return;
   const k = dt >= 1 ? 1 : 1 - Math.exp(-dt * 16), S = fc.s;             // ~60 ms glide toward the target
   S.focus.lerp(fc.focus, k); S.yaw += (fc.yaw - S.yaw) * k; S.zoom += (fc.zoom - S.zoom) * k; S.tilt += (fc.tilt - S.tilt) * k;
   const el = fcPlace(camera, S.focus, S.yaw, S.zoom, S.tilt);
   if (gameMode === 'walk') walkCam(S);
+  if (gameMode === 'mouse' && heist.cam === 'chase') {                // the chase cam never backs out through a wall: pushed in by one, it rides up instead, keeping its distance
+    const c = camera.position, f = S.focus, d = c.distanceTo(f);
+    c.x = THREE.MathUtils.clamp(c.x, -ROOM.halfW + 0.12, ROOM.halfW - 0.12); c.z = THREE.MathUtils.clamp(c.z, 0.12, ROOM.visDepth - 0.12);
+    const hz = Math.hypot(c.x - f.x, c.z - f.z); c.y = THREE.MathUtils.clamp(Math.max(c.y, f.y + Math.sqrt(Math.max(0, d * d - hz * hz))), 0.2, CEIL_H - 0.12);
+    if (camHit(f, c)) {                                                // a sofa, the mantel, a lamp in the way: it looks down on her from higher up instead (boxed in: straight down from above)
+      const L = c.distanceTo(f), bx = c.x - f.x, bz = c.z - f.z, bl = Math.hypot(bx, bz) || 1;
+      for (const el of [0.7, 1.0, 1.25, 1.45, 1.52]) {                 // (steeper and steeper, up to nearly overhead)
+        _camP.set(THREE.MathUtils.clamp(f.x + bx / bl * Math.cos(el) * L, -ROOM.halfW + 0.12, ROOM.halfW - 0.12), Math.min(CEIL_H - 0.12, f.y + Math.sin(el) * L), THREE.MathUtils.clamp(f.z + bz / bl * Math.cos(el) * L, 0.12, ROOM.visDepth - 0.12));
+        if (el === 1.52 || !camHit(f, _camP)) { c.copy(_camP); break; }
+      }
+    }
+    if (!heist.camS || dt >= 1) heist.camS = c.clone(); else { heist.camS.lerp(c, 1 - Math.exp(-dt * 9)); c.copy(heist.camS); }   // (eases between the low and high spots instead of popping)
+    camera.lookAt(f); camera.updateMatrixWorld();
+  }
   camBase.copy(camera.position);
   catCard.rotation.y = S.yaw; catCard.scale.y = Math.min(2.2, 1 / Math.cos(el));   // her photo keeps facing you
 }
@@ -8055,19 +8354,7 @@ function walkBlocked(nx, nz, ox, oz) {
 }
 function startWalk() {
   if (!walk.rig) walk.rig = makeWalker();
-  const skip = new Set([walk.rig.g, cat, heist.player.root, heistGoal.g, heist.ring, gunRig.held, chippy.g, ...blanketRigs.map(b => b.lump), ...mice.map(m => m.root), ...(MW.dk ? [MW.dk.rig.g] : [])]);
-  walk.meshes = [];
-  scene.traverse(o => {
-    if (!o.isMesh) return;
-    for (let q = o; q; q = q.parent) if (skip.has(q) || q.userData.noWalk) return;
-    if (o.userData.name === 'Sky' || o.userData.name === 'Backyard lawn') return;
-    if (o.userData.table) { walk.meshes.push(o); return; }             // the acrylic table is see-through, but she can stand on it
-    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
-    const ws = new THREE.Vector3(); o.getWorldScale(ws); if (o.geometry.boundingSphere.radius * Math.max(ws.x, ws.y, ws.z) < 0.03) return;   // tiny decor (buttons, studs): nothing to stand on
-    const m = o.material;
-    if (!Array.isArray(m) && (m.visible === false || m.blending === THREE.AdditiveBlending || (m.transparent && (m.opacity < 0.3 || m.depthWrite === false)))) return;
-    walk.meshes.push(o);
-  });
+  walk.meshes = standMeshes();
   Object.assign(walk, { on: true, vy: 0, grounded: true, face: Math.PI, phase: 0, batT: 0, squash: 0, fp: false, jumpQ: -1, burnCD: 0, look: null, tableHops: 0, meowRun: 0, lastMeow: -9, meowT: 0, puff: 0, inBox: false });
   catTail.visible = false;
   walk.vel.set(0, 0, 0); walk.stick.x = walk.stick.y = 0;
@@ -8079,6 +8366,23 @@ function startWalk() {
   document.body.classList.add('walking'); $('walkUI').hidden = false;
   fitCamera();
   showBanner('Free roam!');
+}
+function standMeshes(extra) {                                         // everything solid enough to stand on or bump into (Free roam, and the mouse in Mouse mode)
+  if (!walk.rig) { walk.rig = makeWalker(); if (!walk.on) { walk.rig.g.visible = false; walk.rig.shadow.visible = false; } }
+  const skip = new Set([walk.rig.g, cat, heist.player.root, heistGoal.g, heist.ring, gunRig.held, chippy.g, ...blanketRigs.map(b => b.lump), ...mice.map(m => m.root), ...(MW.dk ? [MW.dk.rig.g] : []), ...(extra || [])]);
+  const list = [];
+  scene.traverse(o => {
+    if (!o.isMesh) return;
+    for (let q = o; q; q = q.parent) if (skip.has(q) || q.userData.noWalk) return;
+    if (o.userData.name === 'Sky' || o.userData.name === 'Backyard lawn') return;
+    if (o.userData.table) { list.push(o); return; }                   // the acrylic table is see-through, but she can stand on it
+    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+    const ws = new THREE.Vector3(); o.getWorldScale(ws); if (o.geometry.boundingSphere.radius * Math.max(ws.x, ws.y, ws.z) < 0.03) return;   // tiny decor (buttons, studs): nothing to stand on
+    const m = o.material;
+    if (!Array.isArray(m) && (m.visible === false || m.blending === THREE.AdditiveBlending || (m.transparent && (m.opacity < 0.3 || m.depthWrite === false)))) return;
+    list.push(o);
+  });
+  return list;
 }
 function endWalk() {
   stopDisco(); walk.napT = 0; coonHide();
@@ -9125,9 +9429,10 @@ function walkMeow() {
 }
 {
   const hold = (id, fn) => document.getElementById(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(); });
-  hold('walkSwipe', walkSwipe); hold('walkMeow', walkMeow); hold('heistDash', heistDash);
+  hold('walkSwipe', walkSwipe); hold('walkMeow', walkMeow); hold('heistDash', heistJump);
   window.addEventListener('keydown', e => {
-    if (gameMode === 'mouse' && state === 'playing' && (e.key === ' ' || e.key === 'Shift')) { e.preventDefault(); heistDash(); return; }
+    if (gameMode === 'mouse' && state === 'levelup' && (e.key === '1' || e.key === '2')) { const b = document.getElementById('lvlPicks').children[+e.key - 1]; if (b) b.click(); return; }   // level-up: 1 or 2 picks a card
+    if (gameMode === 'mouse' && state === 'playing' && (e.key === ' ' || e.key === 'Shift')) { e.preventDefault(); heistJump(); return; }
     if (gameMode !== 'walk' || state !== 'playing' || e.repeat) return;
     const k = e.key.toLowerCase(); if (k === 'e' || k === 'f') walkSwipe(); if (k === 'm' || k === 'q') walkMeow();
   });
