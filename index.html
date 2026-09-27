@@ -155,14 +155,14 @@
   #mirrorHud{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:7;pointer-events:none;white-space:nowrap;
              background:rgba(20,8,32,.88);color:#fff;border:2px solid rgba(255,244,248,.35);border-radius:14px;padding:6px 14px;font:800 13px var(--body);display:grid;gap:3px}
   #mirrorHud[hidden]{display:none}
-  #tagHud{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:7;pointer-events:none;white-space:nowrap;
+  #tagHud{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:7;pointer-events:none;white-space:nowrap;max-width:calc(100vw - 24px);
           background:rgba(12,30,20,.86);color:#fff;border:2px solid rgba(220,255,230,.35);border-radius:14px;padding:6px 14px;font:800 13px var(--body);display:grid;gap:3px;text-align:center}
   #tagHud[hidden]{display:none}
   .hitmarker{position:fixed;width:52px;height:52px;margin:-26px 0 0 -26px;z-index:9;pointer-events:none;animation:hitm .55s ease-out forwards}
   .hitmarker line{stroke-linecap:round}.hitmarker .o{stroke:rgba(0,0,0,.6);stroke-width:7}.hitmarker .i{stroke:#fff;stroke-width:4}.hitmarker.kill .i{stroke:#ff2a2a}
   @keyframes hitm{0%{transform:scale(1.6) rotate(8deg);opacity:1}22%{transform:scale(1) rotate(0)}70%{opacity:1}100%{transform:scale(1.08);opacity:0}}
   @media (max-width:560px){#tagHud{top:calc(env(safe-area-inset-top,0px) + 54px)}}   /* (clear of the camera / pause buttons up in the corner) */
-  #tagHud .row{display:flex;justify-content:space-between;gap:12px;align-items:center}#tagHud b{font-size:17px;color:#ffe27a}#tagHud .to{font-size:10px;opacity:.7;letter-spacing:.06em;text-transform:uppercase}#tagHud .sub{font-size:12px}
+  #tagHud .row{display:flex;justify-content:space-between;gap:12px;align-items:center}#tagHud b{font-size:17px;color:#ffe27a}#tagHud .to{font-size:10px;opacity:.7;letter-spacing:.06em;text-transform:uppercase}#tagHud .sub{font-size:12px;white-space:normal}
   #mirrorHud .row{display:flex;justify-content:space-between;gap:10px;align-items:center}
   #mirrorHud .hp{font-size:12px;letter-spacing:1px}
   #mirrorHud .hp .lost{opacity:.22;filter:grayscale(1)}
@@ -4804,7 +4804,7 @@ class Mouse {
           }
           else if (this.willRetreat) this.setState('retreat');
           else if (gameMode === 'chaos') { this.wp = null; this.hops = 0; this.maxHops = 1; this.wpPause = 0; this.setState('wander'); }
-          else { this.target = nearestCheese(p); this.setState(this.target ? 'run' : 'retreat'); }
+          else { this.target = nearestCheese(p); this.setState(this.target || this.boss ? 'run' : 'retreat'); }   // (the Rat King stays out: 'run' with nothing to take sends him prowling)
         }
         break;
       }
@@ -5080,7 +5080,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-27 11:27';                                              // stamped when the site is published
+const BUILD = '2026-09-27 11:56';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5851,11 +5851,11 @@ const bloodTex = canvasTex(128, 128, (g, w, h) => {
   g.fillStyle = 'rgba(70,0,4,.6)'; blob(58, 60, 12);
 }, 1, 1);
 const bloodGeo = new THREE.PlaneGeometry(1, 1), bloods = [], BLOOD_LIFE = 25;
-function spawnBlood(at, size) {
+function spawnBlood(at, size, y) {
   if (bloods.length >= 24) { const old = bloods.shift(); scene.remove(old.mesh); old.mesh.material.dispose(); }
   const mesh = new THREE.Mesh(bloodGeo, new THREE.MeshLambertMaterial({ map: bloodTex, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
   mesh.rotation.set(-Math.PI / 2, 0, Math.random() * 6.28); mesh.scale.setScalar(size * (0.8 + Math.random() * 0.4));
-  mesh.position.set(at.x, 0.013 + bloods.length * 0.0004, at.z); scene.add(mesh);
+  mesh.position.set(at.x, (y || 0) + 0.013 + bloods.length * 0.0004, at.z); scene.add(mesh);
   bloods.push({ mesh, age: 0 });
 }
 function updateBlood(dt) {
@@ -6373,7 +6373,7 @@ function updateChippy(dt) {
   const hopTo = (tx0, tz0, speed) => {                                // bounce along the carpet towards a spot (round any furniture in the way); true once there
     let tx = tx0, tz = tz0;
     if (!clearLine(p.x, p.z, tx0, tz0, 0, 0.35)) {                    // a sofa / the table / the hearth in the way: follow a route round it, like the mice do
-      if (!C.path || clock > C.pathAt) { C.path = navPath(p.x, p.z, tx0, tz0); C.pathAt = clock + 0.45; }
+      if (clock > (C.pathAt || 0)) { C.path = navPath(p.x, p.z, tx0, tz0); C.pathAt = clock + 0.45; }
       const w = C.path && C.path.find((q, i) => i > 0 && Math.hypot(q.x - p.x, q.z - p.z) > 0.12); if (w) { tx = w.x; tz = w.z; }
     }
     const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
@@ -6425,7 +6425,7 @@ function updateChippy(dt) {
         C.cool = 0.4 + Math.random() * 0.8;
         for (let k = 0; k < 12; k++) {                                // somewhere open near the middle of the field
           const x = (Math.random() - 0.5) * (ROOM.halfW * 1.6), z = 1.4 + Math.random() * (Math.min(ROOM.depth, PLAY_END) - 3);
-          if (!rollBlocked(x, z)) { C.wander.set(x, 0, z); break; }
+          if (!rollBlocked(x, z) && !navBlockedAt(x, z)) { C.wander.set(x, 0, z); break; }
         }
       }
     }
@@ -6812,6 +6812,7 @@ function resetGame() {
   cheeses.forEach(c => c.reset());
   if (gameMode === 'chaos') cheeses.forEach(c => c.lose());
   document.querySelector('.c-cheese').style.visibility = gameMode === 'chaos' ? 'hidden' : '';
+  resetDucks(); resetLaundry();
   resetProps(); resetGun(); setTV(false); starSpin.target = starSpin.home; lastStandWarned = false; pawReadyAt = 0; clearBlood(); clearPaint(); resetLaser(); resetChippy(); resetCatnip(); resetKaren(); resetFire(); resetMantleMirror(); if (windowRig) windowRig.target = windowRig.base; resetTable(); dresserDoors.forEach(d => d.target = 0); resetCouches(); resetDiffuser(); resetBlanket(); resetMirror(); clearFluff(); resetFan(); resetWallpaper(); resetRoomFx(); resetCatCrown();
   elapsed = 0; score = 0; lives = CFG.LIVES; combo = 0; whackedCount = 0;
   spawnTimer = CFG.FIRST_SPAWN_DELAY; bombStreak = 0; spawnedCount = 0; seenBomb = false; bossDone = false; bossLevel = 0; waveNo = 1;
@@ -7935,7 +7936,11 @@ function walkCam(S) {                                                // keep the
       const ox0 = SD.DX - SD.DW / 2 + 0.12, ox1 = SD.DX + SD.DW / 2 - 0.12, oh = SD.DH - 0.08;
       if ((c.z - VD) * (f.z - VD) < 0) {                              // on the other side of the back wall from her...
         const t = (VD - f.z) / (c.z - f.z), ix = f.x + (c.x - f.x) * t, iy = f.y + (c.y - f.y) * t;
-        if (!(ix > ox0 && ix < ox1 && iy < oh)) { const k = Math.max(0, t - 0.08); c.set(f.x + (c.x - f.x) * k, f.y + (c.y - f.y) * k, f.z + (c.z - f.z) * k); }   // ...and not looking through the doorway: pull it in to her side
+        if (!(ix > ox0 && ix < ox1 && iy < oh)) {                      // ...and not looking through the doorway: pull it in to her side
+          const len = Math.hypot(c.x - f.x, c.y - f.y, c.z - f.z) || 1, k = Math.max(0, t - 0.15 / len);
+          if (k * len >= 0.9) c.set(f.x + (c.x - f.x) * k, f.y + (c.y - f.y) * k, f.z + (c.z - f.z) * k);
+          else c.z = f.z > VD ? VD + 0.35 : VD - 0.12;                // (she's right by the wall: don't end up in her fur, just keep it on her side)
+        }
       }
       if (c.z > VD - 0.12 && c.z < VD + 0.35) {                        // in the thickness of the wall: only inside the doorway itself
         if (c.x > ox0 && c.x < ox1) c.y = Math.min(c.y, oh); else c.z = f.z > VD ? VD + 0.35 : VD - 0.12;
@@ -8220,7 +8225,7 @@ function walkSwipe() {                                               // swipe at
   if (!(tapTargets.includes(h.object) && interact(h.object, h.point, h.face))) sfx.miss();
 }
 function walkInLitter() {
-  const lb = povEndWall && povEndWall.children.find(c => c.userData.name === 'Litter box'); if (!lb) return false;
+  const lb = scene.children.find(c => c.userData.name === 'Litter box'); if (!lb) return false;
   const b = new THREE.Box3().setFromObject(lb), p = walk.pos;
   return walk.grounded && p.y < 0.6 && p.x > b.min.x - 0.05 && p.x < b.max.x + 0.05 && p.z > b.min.z - 0.05 && p.z < b.max.z + 0.05;
 }
@@ -8232,7 +8237,7 @@ function dropPoop() {
   for (const [r, y] of tiers) { const t = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), brown); t.scale.y = 0.62; t.position.y = y; g.add(t); }
   const curl = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.05, 10), brown); curl.position.set(0.008, 0.145, 0); curl.rotation.z = -0.5; g.add(curl);
   g.position.set(p.x - Math.sin(walk.face) * 0.55, p.y, p.z - Math.cos(walk.face) * 0.55);   // just behind her tail...
-  const lb = povEndWall.children.find(c => c.userData.name === 'Litter box');
+  const lb = scene.children.find(c => c.userData.name === 'Litter box');
   if (lb) { const bb = new THREE.Box3().setFromObject(lb); g.position.x = THREE.MathUtils.clamp(g.position.x, bb.min.x + 0.18, bb.max.x - 0.18); g.position.z = THREE.MathUtils.clamp(g.position.z, bb.min.z + 0.18, bb.max.z - 0.18); }   // ...but always in the tray
   g.rotation.y = Math.random() * 6; g.scale.setScalar(0.2); scene.add(g);
   walk.poops = walk.poops || []; walk.poops.push(g); if (walk.poops.length > 6) scene.remove(walk.poops.shift());
@@ -8498,7 +8503,7 @@ function dogSwipe(paw) {                                              // she bat
   if (dog.state === 'play' || (dog.state === 'tagRest' && dog.t > 2.5)) {   // let's play! (the swipe that starts it makes the dog IT)
     dog.you = dog.them = 0; dog.match = true; dog.won = null; tagDog(false); return true;
   }
-  if (dog.state === 'tagRun' && dog.grace <= 0) { dog.you++; if (dog.you >= TAG_TO) tagEnd(true); else tagDog(true); return true; }
+  if (dog.state === 'tagRun' && dog.grace <= 0 && Math.hypot(q.x - paw.x, q.z - paw.z) < 1.2) { dog.you++; if (dog.you >= TAG_TO) tagEnd(true); else tagDog(true); return true; }
   return false;
 }
 function tagDog(point) {                                              // the dog's been tagged: a yelp, a bounce back, and now it's IT
@@ -8579,7 +8584,7 @@ function updateDog(dt) {
       if (cd < 0.95 && walk.pos.y < 1.9) {                            // TAGGED!
         dog.them++; noise(0.1, 0.15, 900); tone(700, 400, 0.12, 'square', 0.04); shake = Math.max(shake, reduceMotion ? 0.02 : 0.12); walk.puff = 0.5;
         if (dog.them >= TAG_TO) tagEnd(false);
-        else { dogSet('tagRun'); dog.grace = 1.2; dog.jukeCD = 0.6; bark(2); showWalkName('🐕 Porter tagged you! You\'re IT... swipe Porter!'); }
+        else { dogSet('tagRun'); dog.grace = 2; dog.jukeCD = 0.6; bark(2); showWalkName('🐕 Porter tagged you! You\'re IT... swipe Porter!'); }
       }
     }
   } else if (dog.state === 'tagRun') {                                // she's IT: it runs for it, jinking away when she gets close
@@ -8590,13 +8595,14 @@ function updateDog(dt) {
       let ax = -cdx / (cd || 1), az = -cdz / (cd || 1);               // straight away from her...
       const wall = (d, n) => d < 3 ? (3 - d) / 3 * 1.8 * n : 0;       // ...pushed off the fences so it doesn't get pinned in a corner
       ax += wall(pos.x + SX, 1) + wall(SX - pos.x, -1); az += wall(pos.z - Z0, 1) + wall(Z1 - pos.z, -1);
-      if (dog.juke > 0) { dog.juke -= dt; ax = -cdz / (cd || 1) * dog.jukeDir; az = cdx / (cd || 1) * dog.jukeDir; }
-      else if (cd < 2.2 && dog.jukeCD <= 0) {                         // she's closing in: a sudden sidestep
+      { const mx = -pos.x, mz = (Z0 + Z1) / 2 - pos.z, ml = Math.hypot(mx, mz) || 1; ax += mx / ml * 0.45; az += mz / ml * 0.45; }   // ...and it heads for open lawn, not along the fences where it'd get cornered
+      if (dog.juke > 0 && dog.grace <= 0) { dog.juke -= dt; ax = -cdz / (cd || 1) * dog.jukeDir; az = cdx / (cd || 1) * dog.jukeDir; }
+      else if (cd < 2.2 && dog.jukeCD <= 0 && dog.grace <= 0) {   // (no sidesteps while it's bolting off after tagging her)                         // she's closing in: a sudden sidestep
         dog.juke = 0.4; dog.jukeCD = 1.8;
         const px = -cdz / (cd || 1), pz = cdx / (cd || 1); dog.jukeDir = Math.abs(pos.x + px * 3) < SX && pos.z + pz * 3 > Z0 && pos.z + pz * 3 < Z1 ? 1 : -1;   // (the side with room to run)
       }
       const al = Math.hypot(ax, az) || 1, tired = Math.min(1.2, dog.t * 0.05);
-      const sp = dog.juke > 0 ? 7.5 : cd < 6 ? 5.5 - tired : cd < 9 ? 3 : 0;
+      const sp = dog.grace > 0 ? 8.2 : dog.juke > 0 ? 7.5 : cd < 6 ? 6.25 - tired : cd < 9 ? 3 : 0;   // (nearly her sprint speed, tiring as the round drags on)   // (just tagged her: it bolts, to open up a gap before she can tag back)
       if (sp > 0) { moveTo(pos.x + ax / al, pos.z + az / al, sp); R.tongue.visible = true; }
       else { face(walk.pos.x, walk.pos.z); bow(0.5 + 0.5 * Math.sin(clock * 5)); if (clock > dog.barkAt) { dog.barkAt = clock + 1.5; bark(1); } }   // too far off: a teasing bow ("come get me!")
       clampYard(); pos.y = 0;
@@ -8687,7 +8693,7 @@ function coonShot(at) {
   if (at) {                                                           // the hit: a hitmarker, and blood sprays out behind it
     hitMarker(at, true);
     burst(at.clone(), 0xd01212, 18, 3.2, 3.2, 0.9); burst(at.clone(), 0x6a0008, 10, 2.2, 2.6, 1.2); burst(at.clone().setY(at.y + 0.2), 0xff3030, 6, 1.6, 3.6, 0.5);
-    for (let i = 0; i < 3; i++) spawnBlood(new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.9, 0, at.z + 0.3 + Math.random() * 0.9), 0.7 + Math.random() * 0.5);   // spatters on the pads round it
+    for (let i = 0; i < 3; i++) spawnBlood(new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.9, 0, at.z + 0.3 + Math.random() * 0.9), 0.7 + Math.random() * 0.5, IN(1.2));   // spatters on the pads round it (on top of the concrete)
   }
   coon.dead = true; coonSet('dying'); unlock('coonShot'); cops.at = clock + 10; cops.t = -1;
   showWalkName('🦝 ...the raccoon has been hit!'); chitter(3, 2600);
