@@ -3328,6 +3328,7 @@ SECT = 'Dome light';
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
 let ducks = [];
 let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null, laundry = null, mosaicGlints = [], mosaicArt = null;
+let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [];     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
 const sliderGlass = [];
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
@@ -3342,12 +3343,50 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (ps.getX(i) + hw) / (2 * hw), ps.getY(i) / WH);   // same paneling as the other walls
     const wall = new THREE.Mesh(wg, lam(0xf2efe8, { map: panelTex })); wall.rotation.y = Math.PI; wall.position.z = VD; wall.userData.name = 'Wall'; povEndWall.add(wall);
     { // the outside of the house (only seen from the yard): pale lap siding with the slider opening, upstairs windows
-      const XW = 14, XH = FT(18), ex = new THREE.Shape(); ex.moveTo(-XW, 0); ex.lineTo(XW, 0); ex.lineTo(XW, XH); ex.lineTo(-XW, XH); ex.lineTo(-XW, 0);
+      const XW = 26, XH = FT(18), ex = new THREE.Shape(); ex.moveTo(-XW, 0); ex.lineTo(XW, 0); ex.lineTo(XW, XH); ex.lineTo(-XW, XH); ex.lineTo(-XW, 0);
       const hole = new THREE.Path(); hole.moveTo(DX - DW / 2, 0); hole.lineTo(DX - DW / 2, DH); hole.lineTo(DX + DW / 2, DH); hole.lineTo(DX + DW / 2, 0); hole.lineTo(DX - DW / 2, 0); ex.holes.push(hole);
       const sidTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#e4dccd'; c.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 8) { c.fillStyle = 'rgba(90,80,60,.25)'; c.fillRect(0, y, w, 1.5); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(0, y + 1.5, w, 1); } }, 1, 1);
       const eg = new THREE.ShapeGeometry(ex), euv = eg.attributes.uv, eps = eg.attributes.position; for (let i = 0; i < euv.count; i++) euv.setXY(i, eps.getX(i) / 2, eps.getY(i) / 2);
       sidTex.wrapS = sidTex.wrapT = THREE.RepeatWrapping;
       const outside = new THREE.Mesh(eg, new THREE.MeshBasicMaterial({ map: sidTex, color: 0xf0ebe0, fog: false })); outside.position.z = VD + IN(5); outside.userData.name = 'House'; povEndWall.add(outside);
+      { // house details: the roof edge (fascia, soffit, gutter, the shingles running back), downspouts, window trim and shutters,
+        // two ground-floor windows with a flower box, an AC unit on its pad, and a hose reel by the tap
+        const hd = new THREE.Group(); hd.userData.name = 'House details'; hd.userData.noWalk = true; povEndWall.add(hd);
+        const WZ = VD + IN(5), W2 = XW * 2 + 0.6;
+        yBox(hd, W2, 0.38, 0.12, 0xf6f3ee, 0, XH - 0.08, WZ + 0.95); yBox(hd, W2, 0.08, 0.95, 0xe6e0d4, 0, XH - 0.24, WZ + 0.48);   // fascia + soffit
+        yBox(hd, W2, 0.2, 0.2, 0xd9dadb, 0, XH - 0.02, WZ + 1.08);                                                                 // gutter
+        const HD = 12, RH = 3.6, run = 1.15 + HD / 2, th = Math.atan2(RH, run), sl = Math.hypot(RH, run);          // the house is 12 deep, with a gabled roof
+        { const r = yBox(hd, W2, 0.16, sl, 0x4d525a, 0, 0, 0); r.rotation.x = th; r.position.set(0, XH + 0.12 + RH / 2, WZ + 1.15 - run / 2); }   // the front slope of the roof, up over the room...
+        { const r = yBox(hd, W2, 0.16, sl, 0x474c54, 0, 0, 0); r.rotation.x = -th; r.position.set(0, XH + 0.12 + RH / 2, WZ - HD - 1.15 + run / 2); }   // ...and the back
+        for (const sx of [-1, 1]) {                                                                                 // the gable ends: siding, with an attic vent
+          const sh = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(sx * HD, 0), new THREE.Vector2(sx * HD, XH), new THREE.Vector2(sx * HD / 2, XH + RH), new THREE.Vector2(0, XH)]);
+          const sg = new THREE.ShapeGeometry(sh), su = sg.attributes.uv, spp = sg.attributes.position; for (let i = 0; i < su.count; i++) su.setXY(i, spp.getX(i) / 2, spp.getY(i) / 2);
+          const side = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ map: sidTex, color: 0xd9d0c0, fog: false, side: THREE.DoubleSide })); side.rotation.y = sx * Math.PI / 2; side.position.set(sx * XW, 0, WZ); side.userData.keep = true; hd.add(side);
+          yBox(hd, 0.08, 1.1, 0.9, 0xf7f5f0, sx * (XW + 0.03), XH + 1.1, WZ - HD / 2); for (let k = -2; k <= 2; k++) yBox(hd, 0.1, 0.05, 0.75, 0x9a948a, sx * (XW + 0.06), XH + 1.1 + k * 0.18, WZ - HD / 2);
+          for (const wz of [WZ - 3, WZ - 9]) { yBox(hd, 0.06, 2.1, 2.45, 0xf7f5f0, sx * (XW + 0.03), FT(12.5), wz); yBox(hd, 0.05, 1.9, 2.2, 0x34414f, sx * (XW + 0.06), FT(12.5), wz); }
+        }
+        for (const x of [-XW + 1.2, XW - 1.2, DX - 9.4]) { yBox(hd, 0.16, XH - 0.3, 0.16, 0xd9dadb, x, (XH - 0.3) / 2, WZ + 0.14); yBox(hd, 0.16, 0.16, 0.5, 0xd9dadb, x, 0.12, WZ + 0.36); }   // downspouts
+        const winAt = (x, y, w, h, shutters) => {                                                                   // a trimmed window: frame, glass, sill (and shutters)
+          yBox(hd, w + 0.3, h + 0.3, 0.06, 0xf7f5f0, x, y, WZ + 0.04); yBox(hd, w, h, 0.05, 0x34414f, x, y, WZ + 0.08);
+          yBox(hd, w * 0.04 + 0.04, h, 0.04, 0xf7f5f0, x, y, WZ + 0.11); yBox(hd, w, 0.05, 0.04, 0xf7f5f0, x, y, WZ + 0.11);   // muntins
+          yBox(hd, w + 0.6, 0.12, 0.3, 0xf7f5f0, x, y - h / 2 - 0.2, WZ + 0.16);
+          if (shutters) for (const sx of [-1, 1]) { yBox(hd, 0.55, h + 0.25, 0.06, 0x3d5a6e, x + sx * (w / 2 + 0.45), y, WZ + 0.06); for (let k = -3; k <= 3; k++) yBox(hd, 0.45, 0.05, 0.03, 0x33505f, x + sx * (w / 2 + 0.45), y + k * h / 8, WZ + 0.1); }
+        };
+        for (const wx of [DX - 4.2, DX + 3.4, DX - 11.5, DX + 10.5, DX - 18.5, DX + 17.5]) winAt(wx, FT(12.5), 2.2, 1.9, true);   // the upstairs row
+        for (const wx of [DX - 7, DX + 8.2]) {                                                                       // downstairs: kitchen and dining room windows, with a flower box
+          winAt(wx, 3.3, 2.6, 2.0, false);
+          yBox(hd, 2.9, 0.4, 0.45, 0x7a5638, wx, 2.0, WZ + 0.3);
+          for (let k = 0; k < 9; k++) { const c = [0xff6fae, 0xffd23a, 0xffffff, 0xb07aff, 0xff5a4e][k % 5]; yBlob(hd, 0.2, 0x3f7a36, wx - 1.2 + k * 0.3, 2.3, WZ + 0.32); yBlob(hd, 0.12, c, wx - 1.2 + k * 0.3 + 0.05, 2.45, WZ + 0.38); }
+        }
+        { const ax = DX + 12.5, az = WZ + 1.2;                                                                     // the AC condenser on its little pad
+          yBox(hd, 2.1, 0.12, 2.1, 0xbdb9b1, ax, 0.06, az); yBox(hd, 1.6, 1.35, 1.6, 0xd2d5d7, ax, 0.8, az); yBox(hd, 1.25, 0.05, 1.25, 0x4a4d52, ax, 1.5, az);
+          for (let k = -3; k <= 3; k++) yBox(hd, 1.62, 0.04, 0.05, 0xa9adb1, ax, 0.8 + k * 0.16, az + 0.81);
+          yBox(hd, 0.12, 0.12, 0.8, 0x9aa0a6, ax - 0.6, 1.0, az - 1.0); }
+        { const rx = DX + 5.4, rz = WZ + 0.55;                                                                     // hose reel under the tap
+          yBox(hd, 0.1, 0.3, 0.1, 0xb8bcc2, rx, 1.55, WZ + 0.1); for (const sx of [-1, 1]) yBox(hd, 0.08, 1.0, 0.7, 0x2f6b3a, rx + sx * 0.36, 0.5, rz);
+          const coil = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.14, 8, 18), yMat(0x3b9a4c)); coil.rotation.y = Math.PI / 2; coil.position.set(rx, 0.6, rz); hd.add(coil); }
+        bakeYard(hd);
+      }
       for (const wx of [DX - 4.2, DX + 3.4]) {                                                                     // upstairs windows
         const win = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.9), new THREE.MeshBasicMaterial({ color: 0x3d4a58, fog: false })); win.position.set(wx, FT(12.5), VD + IN(5.3)); win.userData.noWalk = true; povEndWall.add(win);
         const fr = new THREE.Mesh(new THREE.PlaneGeometry(2.45, 2.15), new THREE.MeshBasicMaterial({ color: 0xf7f5f0, fog: false })); fr.position.set(wx, FT(12.5), VD + IN(5.2)); fr.userData.noWalk = true; povEndWall.add(fr);
@@ -3829,10 +3868,40 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       for (let i = 0; i < 2600; i++) { const x = Math.random() * w, y = Math.random() * h; g.strokeStyle = Math.random() < 0.5 ? 'rgba(38,86,28,.5)' : 'rgba(150,204,96,.45)'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 3, y - 3 - Math.random() * 5); g.stroke(); }
     }, 36, 36);
     const lawn = new THREE.Mesh(new THREE.CircleGeometry(52, 48, Math.PI, Math.PI), new THREE.MeshBasicMaterial({ map: grassTex, fog: false })); lawn.rotation.x = -Math.PI / 2; lawn.position.set(0, -0.012, VD); lawn.userData.name = 'Backyard lawn'; povEndWall.add(lawn);   // a half-disc: only outside, never under the house
-    const R = 50, skyGeo = new THREE.SphereGeometry(R, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2), col = [], lo = new THREE.Color(0xe6f4ff), hi = new THREE.Color(0x6eb0f0);
-    for (let i = 0; i < skyGeo.attributes.position.count; i++) { const c = lo.clone().lerp(hi, Math.pow(Math.max(0, skyGeo.attributes.position.getY(i) / R), 0.55)); col.push(c.r, c.g, c.b); }
-    skyGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    const sky = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false })); sky.position.set(0, -0.6, VD + 4); sky.renderOrder = -1; sky.userData.name = 'Sky'; povEndWall.add(sky);
+    { // the sky: a painted sky sphere (deep blue overhead, hazy at the horizon, the afternoon sun's glow, and far-off hills and a tree
+      // line all round), with a second, slightly smaller sphere of clouds that drifts. Both follow the camera, so they're always 'at infinity'.
+      const W = 1024, H = 512, HZ = H / 2, wrap = (x) => [x - W, x, x + W];
+      const skyTex = canvasTex(W, H, (g) => {
+        const gr = g.createLinearGradient(0, 0, 0, HZ); gr.addColorStop(0, '#3f86d8'); gr.addColorStop(0.55, '#7db6ea'); gr.addColorStop(0.9, '#cfe6f7'); gr.addColorStop(1, '#e8f3fb');
+        g.fillStyle = gr; g.fillRect(0, 0, W, HZ); g.fillStyle = '#7aa36f'; g.fillRect(0, HZ, W, H - HZ);
+        for (const x of wrap(W * 0.18)) { const sg = g.createRadialGradient(x, 150, 4, x, 150, 150); sg.addColorStop(0, 'rgba(255,253,235,1)'); sg.addColorStop(0.08, 'rgba(255,248,215,.95)'); sg.addColorStop(0.3, 'rgba(255,240,200,.35)'); sg.addColorStop(1, 'rgba(255,240,200,0)'); g.fillStyle = sg; g.fillRect(x - 160, 0, 320, HZ); }   // the sun
+        const ridge = (base, amp, col, seed) => {                                                          // a seamless range of hills
+          g.fillStyle = col; g.beginPath(); g.moveTo(0, HZ + 6);
+          for (let x = 0; x <= W; x += 4) { const a = x / W * Math.PI * 2; g.lineTo(x, base - amp * (0.55 + 0.25 * Math.sin(a * 3 + seed) + 0.15 * Math.sin(a * 7 + seed * 2) + 0.05 * Math.sin(a * 17 + seed * 3))); }
+          g.lineTo(W, HZ + 6); g.closePath(); g.fill();
+        };
+        ridge(HZ, 22, '#a7c3c9', 1); ridge(HZ, 14, '#8fb3a5', 4);                                         // blue-hazed far hills, then nearer ones
+        g.fillStyle = '#6b955f'; for (let x = 0; x < W; x += 3) { const a = x / W * Math.PI * 2, t = 5 + 3 * Math.abs(Math.sin(a * 29)) + 2 * Math.sin(a * 11); g.fillRect(x, HZ - t, 3, t + 6); }   // a far tree line
+        g.fillStyle = '#7aa36f'; g.fillRect(0, HZ, W, H - HZ);
+      }, 1, 1);
+      const cloudTex = canvasTex(W, H, (g) => {
+        g.clearRect(0, 0, W, H);
+        const puff = (x, y, r, a) => { for (const px of wrap(x)) { const cg = g.createRadialGradient(px, y, r * 0.2, px, y, r); cg.addColorStop(0, `rgba(255,255,255,${a})`); cg.addColorStop(0.6, `rgba(250,252,255,${a * 0.75})`); cg.addColorStop(1, 'rgba(240,246,252,0)'); g.fillStyle = cg; g.beginPath(); g.arc(px, y, r, 0, 7); g.fill(); } };
+        let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+        for (let c = 0; c < 26; c++) {                                                                      // fluffy cumulus, bunched along the lower sky
+          const cx = rnd() * W, cy = 105 + rnd() * 120, sz = 18 + rnd() * 26;
+          for (let k = 0; k < 9; k++) puff(cx + (rnd() - 0.5) * sz * 4, cy + (rnd() - 0.6) * sz * 0.9, sz * (0.7 + rnd() * 0.8), 0.9);
+          g.fillStyle = 'rgba(160,178,200,.18)'; for (const px of wrap(cx)) { g.beginPath(); g.ellipse(px, cy + sz * 0.55, sz * 2.1, sz * 0.35, 0, 0, 7); g.fill(); }   // a greyer flat base
+        }
+        for (let c = 0; c < 6; c++) { const cx = rnd() * W, cy = 40 + rnd() * 60; for (let k = 0; k < 5; k++) puff(cx + k * 22 + rnd() * 10, cy + (rnd() - 0.5) * 6, 10 + rnd() * 8, 0.45); }   // wisps up high
+      }, 1, 1);
+      skyRig = new THREE.Group(); skyRig.userData.noWalk = true; povEndWall.add(skyRig);
+      const sky = new THREE.Mesh(new THREE.SphereGeometry(60, 48, 24), new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false }));
+      sky.renderOrder = -2; sky.userData.name = 'Sky'; skyRig.add(sky);
+      cloudDome = new THREE.Mesh(new THREE.SphereGeometry(57, 48, 16, 0, Math.PI * 2, 0, Math.PI * 0.52), new THREE.MeshBasicMaterial({ map: cloudTex, side: THREE.BackSide, transparent: true, fog: false, depthWrite: false }));
+      cloudDome.renderOrder = -1; cloudDome.userData.name = 'Sky'; skyRig.add(cloudDome);
+    }
+    buildYardLife(VD, DX, DW);
   }
   scene.add(povEndWall);
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.halfW * 2, VD), ceilMat); ceil.rotation.x = Math.PI / 2; ceil.position.set(0, CEIL_H, VD / 2); ceil.userData.name = 'Ceiling'; scene.add(ceil);
@@ -4144,6 +4213,179 @@ catTail.add(tailCard);
   // was ten separate meshes; now it's two (glossy + flat), with each part's colour baked into the vertices. Ducks still move as a whole.
   ducks.forEach(d => fuseParts(d.g));
   for (const o of scene.children) if (o.userData.name === 'Wooden table') fuseParts(o);
+}
+// ---- outdoor props: built from plain coloured parts, then 'baked': one vertex-coloured mesh per group, lit by the afternoon sun
+// (like the bushes and fence, they don't depend on the room's lights, so the yard stays a sunny day whatever's going on inside)
+var _yMats;                                                            // (var + lazy: these helpers are first used by the house, built further up the file)
+function yMat(hex) { _yMats = _yMats || {}; return _yMats[hex] || (_yMats[hex] = new THREE.MeshBasicMaterial({ color: hex })); }
+function yBox(par, w, h, d, hex, x, y, z, ry) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), yMat(hex)); m.position.set(x, y, z); if (ry) m.rotation.y = ry; par.add(m); return m; }
+function yCyl(par, rt, rb, h, hex, x, y, z, seg) { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 12), yMat(hex)); m.position.set(x, y, z); par.add(m); return m; }
+function yBlob(par, r, hex, x, y, z, sy) {                               // a lumpy leafy (or flowery) blob
+  const geo = new THREE.IcosahedronGeometry(r, 1), P = geo.attributes.position;
+  for (let i = 0; i < P.count; i++) { const a = P.getX(i), b = P.getY(i), c = P.getZ(i), v = Math.sin(a * 91.7 + b * 37.3 + c * 53.1) * 0.5 + 0.5; P.setXYZ(i, a * (0.9 + 0.2 * v), b * (0.9 + 0.2 * v) * (sy || 1), c * (0.9 + 0.2 * v)); }
+  geo.computeVertexNormals(); const m = new THREE.Mesh(geo, yMat(hex)); m.position.set(x, y, z); par.add(m); return m;
+}
+var YARD_SUN, _yardMat;
+function bakeYard(root) {
+  root.updateMatrixWorld(true); YARD_SUN = YARD_SUN || new THREE.Vector3(-0.45, 0.78, -0.43).normalize();   // (the afternoon sun)
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), list = [], _m = new THREE.Matrix4(), n3 = new THREE.Vector3();
+  root.traverse(o => { if (o.isMesh && !Array.isArray(o.material) && !o.material.map && !o.userData.keep) list.push(o); });
+  if (list.length < 1) return;
+  let n = 0; const parts = list.map(o => {
+    const gl = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(), gw = gl.clone();
+    gl.applyMatrix4(_m.multiplyMatrices(inv, o.matrixWorld)); gw.applyMatrix4(o.matrixWorld); n += gl.attributes.position.count;
+    return { gl, gw, c: o.material.color };
+  });
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3); let at = 0;
+  for (const { gl, gw, c } of parts) {
+    const P = gl.attributes.position, N = gw.attributes.normal; pos.set(P.array, at * 3);
+    for (let i = 0; i < P.count; i++) {
+      n3.set(N.getX(i), N.getY(i), N.getZ(i)); const k = 0.6 + 0.42 * Math.max(0, n3.dot(YARD_SUN)) + 0.06 * Math.max(0, n3.y) - 0.1 * Math.max(0, -n3.y);   // sunlit / shaded / underside
+      col[(at + i) * 3] = Math.min(1, c.r * k); col[(at + i) * 3 + 1] = Math.min(1, c.g * k); col[(at + i) * 3 + 2] = Math.min(1, c.b * k);
+    }
+    at += P.count; gl.dispose(); gw.dispose();
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals(); g.computeBoundingSphere();
+  const mesh = new THREE.Mesh(g, _yardMat || (_yardMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide })));
+  list.forEach(o => o.parent.remove(o)); root.add(mesh);
+}
+function buildYardLife(VD, DX, DW) {                                  // the backyard, lived in (only ever seen from Free roam / the cat's eyes)
+  const FZ = VD + FT(34), SXW = FT(30), FH = FT(6), grp = (name, walk) => { const g = new THREE.Group(); g.userData.name = name; if (!walk) g.userData.noWalk = true; povEndWall.add(g); return g; };
+  const block = (x0, x1, z0, z1) => YARD_BLOCKS.push([x0, x1, z0, z1]);
+  const shadow = (x, z, rx, rz) => { const m = new THREE.Mesh(new THREE.CircleGeometry(1, 24), yardShadowMat()); m.rotation.x = -Math.PI / 2; m.scale.set(rx, rz, 1); m.position.set(x, 0.006, z); m.userData.noWalk = true; povEndWall.add(m); };
+  // -- the garden shed in the back-left corner: sage boards, white trim, double doors with a Z-brace, a window with a flower box
+  { const sh = grp('Garden shed', true); sh.position.set(-SXW + 2.9, 0, FZ - 2.3);
+    yBox(sh, 4.5, 0.25, 3.7, 0x6b5a45, 0, 0.125, 0); yBox(sh, 4.2, 3.0, 3.4, 0x8fae8a, 0, 1.75, 0);
+    for (let x = -1.9; x <= 1.91; x += 0.38) { yBox(sh, 0.05, 3.0, 0.04, 0x7e9c79, x, 1.75, -1.72); yBox(sh, 0.05, 3.0, 0.04, 0x7e9c79, x, 1.75, 1.72); }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) yBox(sh, 0.18, 3.05, 0.18, 0xf4f1ea, sx * 2.08, 1.77, sz * 1.68);
+    yBox(sh, 2.0, 2.5, 0.06, 0xf4f1ea, 0, 1.5, -1.73); for (const sx of [-1, 1]) { yBox(sh, 0.84, 2.3, 0.08, 0x7a9676, sx * 0.43, 1.42, -1.77); const br = yBox(sh, 0.1, 2.45, 0.04, 0xf4f1ea, sx * 0.43, 1.42, -1.82); br.rotation.z = sx * 0.34; }
+    yBox(sh, 0.06, 0.24, 0.06, 0x2a2a2a, 0.12, 1.4, -1.84); yBox(sh, 0.06, 0.24, 0.06, 0x2a2a2a, -0.12, 1.4, -1.84);
+    yBox(sh, 0.06, 1.0, 1.3, 0xf4f1ea, 2.12, 2.1, 0.3); yBox(sh, 0.05, 0.82, 1.12, 0x2f3d4a, 2.14, 2.1, 0.3); yBox(sh, 0.4, 0.28, 1.4, 0x7a5638, 2.3, 1.45, 0.3);
+    for (let k = 0; k < 5; k++) yBlob(sh, 0.13, [0xff6fae, 0xffd23a, 0xffffff, 0xb07aff, 0xff5a4e][k], 2.36, 1.66, -0.25 + k * 0.28);
+    const th = Math.atan2(1.2, 2.1), sl = Math.hypot(2.1, 1.2) + 0.3;
+    for (const sx of [-1, 1]) { const r = yBox(sh, sl, 0.12, 4.0, 0x4a4f57, sx * 1.05, 3.25 + 0.62, 0); r.rotation.z = -sx * th; }
+    const tri = new THREE.Shape([new THREE.Vector2(-2.1, 0), new THREE.Vector2(2.1, 0), new THREE.Vector2(0, 1.2)]);
+    for (const sz of [-1, 1]) { const m = new THREE.Mesh(new THREE.ShapeGeometry(tri), yMat(0x8fae8a)); m.position.set(0, 3.25, sz * 1.705); if (sz < 0) m.rotation.y = Math.PI; sh.add(m); }
+    bakeYard(sh); shadow(-SXW + 2.9, FZ - 2.3, 3.0, 2.5); block(-SXW, -SXW + 5.3, FZ - 4.3, FZ); }
+  // -- Porter's doghouse in the back-right corner: red, white trim, arched door, and his name over it
+  { const dh = grp('Doghouse', true); dh.position.set(SXW - 3.6, 0, FZ - 2.8);
+    yBox(dh, 2.4, 0.15, 2.8, 0x6b5a45, 0, 0.075, 0); yBox(dh, 2.1, 1.6, 2.5, 0xc0392b, 0, 0.95, 0);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) yBox(dh, 0.12, 1.62, 0.12, 0xf4f1ea, sx * 1.04, 0.96, sz * 1.24);
+    const arch = new THREE.Shape(); arch.moveTo(-0.45, 0); arch.lineTo(-0.45, 0.65); arch.absarc(0, 0.65, 0.45, Math.PI, 0, true); arch.lineTo(0.45, 0); arch.lineTo(-0.45, 0);
+    const door = new THREE.Mesh(new THREE.ShapeGeometry(arch, 12), yMat(0x1c1414)); door.position.set(0, 0.16, -1.256); door.rotation.y = Math.PI; dh.add(door);
+    const th = Math.atan2(0.85, 1.05), sl = Math.hypot(1.05, 0.85) + 0.25;
+    for (const sx of [-1, 1]) { const r = yBox(dh, sl, 0.1, 2.9, 0x3d3f45, sx * 0.55, 1.75 + 0.43, 0); r.rotation.z = -sx * th; }
+    const tri = new THREE.Shape([new THREE.Vector2(-1.05, 0), new THREE.Vector2(1.05, 0), new THREE.Vector2(0, 0.85)]);
+    for (const sz of [-1, 1]) { const m = new THREE.Mesh(new THREE.ShapeGeometry(tri), yMat(0xc0392b)); m.position.set(0, 1.75, sz * 1.255); if (sz < 0) m.rotation.y = Math.PI; dh.add(m); }
+    yCyl(dh, 0.3, 0.26, 0.14, 0xb8bec6, 1.55, 0.07, -1.55); yCyl(dh, 0.25, 0.25, 0.02, 0x7a4a26, 1.55, 0.13, -1.55);   // his food bowl...
+    yCyl(dh, 0.3, 0.26, 0.14, 0xb8bec6, 2.2, 0.07, -1.3); yCyl(dh, 0.25, 0.25, 0.02, 0x8fc5e8, 2.2, 0.13, -1.3);     // ...and water
+    { const bn = new THREE.Group(); bn.position.set(-1.5, 0.08, -1.8); bn.rotation.y = 0.6; dh.add(bn); yCyl(bn, 0.06, 0.06, 0.55, 0xf2ece0, 0, 0, 0).rotation.z = Math.PI / 2; for (const sx of [-1, 1]) for (const sz of [-1, 1]) yBlob(bn, 0.08, 0xf2ece0, sx * 0.3, 0, sz * 0.05); }   // a chew bone
+    { const m = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), yMat(0xd4e84a)); m.position.set(-0.4, 0.1, -2.3); dh.add(m); }   // and his tennis ball
+    bakeYard(dh);
+    const signTex = canvasTex(256, 64, (c, w, h) => { c.fillStyle = '#f3e7cf'; c.fillRect(0, 0, w, h); c.strokeStyle = '#7a5638'; c.lineWidth = 6; c.strokeRect(3, 3, w - 6, h - 6); c.fillStyle = '#5a3a22'; c.font = 'bold 40px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('PORTER', w / 2, h / 2 + 2); c.fillStyle = '#8a7a66'; for (const x of [14, w - 14]) { c.beginPath(); c.arc(x, h / 2, 3, 0, 7); c.fill(); } }, 1, 1);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.29), new THREE.MeshBasicMaterial({ map: signTex, fog: false })); sign.position.set(0, 2.08, -1.27); sign.rotation.y = Math.PI; dh.add(sign);
+    shadow(SXW - 3.6, FZ - 2.8, 1.8, 2.0); block(SXW - 5, SXW - 2.2, FZ - 4.3, FZ - 1.3); }
+  // -- a big shade tree with a tire swing, left of middle
+  { const tr = grp('Tree', true), TX = -12.5, TZ = VD + 15.5; tr.position.set(TX, 0, TZ);
+    yCyl(tr, 0.42, 0.68, 5.4, 0x6b4a32, 0, 2.7, 0, 10);
+    const br = yCyl(tr, 0.16, 0.26, 3.4, 0x6b4a32, 1.35, 4.55, 0, 8); br.rotation.z = -1.05;
+    for (let k = 0; k < 10; k++) { const a = k * 2.4, r = 1.7 + (k % 3) * 0.45; yBlob(tr, r, [0x4f8a3a, 0x5c9a42, 0x6aa84a, 0x467e34][k % 4], Math.cos(a) * 2.2 + 0.6, 6.3 + (k % 4) * 0.55, Math.sin(a) * 1.9, 0.82); }
+    yCyl(tr, 0.03, 0.03, 3.9, 0xcbb892, 2.75, 3.2, 0, 5); const tire = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.15, 8, 18), yMat(0x1f1f21)); tire.position.set(2.75, 1.15, 0); tr.add(tire);
+    bakeYard(tr); shadow(TX + 0.8, TZ, 3.6, 3.0); block(TX - 0.9, TX + 0.9, TZ - 0.9, TZ + 0.9); }
+  // -- a stone birdbath
+  { const bb = grp('Birdbath', true); bb.position.set(-3.8, 0, VD + 19.5);
+    yCyl(bb, 0.34, 0.42, 0.14, 0xb9b3a8, 0, 0.07, 0); yCyl(bb, 0.13, 0.2, 1.05, 0xc2bcb1, 0, 0.66, 0); yCyl(bb, 0.68, 0.36, 0.2, 0xc2bcb1, 0, 1.25, 0, 18); yCyl(bb, 0.56, 0.56, 0.02, 0x8fc5e8, 0, 1.34, 0, 18);
+    bakeYard(bb); shadow(-3.8, VD + 19.5, 0.8, 0.8); block(-4.6, -3.0, VD + 18.7, VD + 20.3); }
+  // -- a raised vegetable bed along the right fence: lettuces and staked tomatoes
+  { const vb = grp('Vegetable bed', true), VX = SXW - 1.1, VZ = VD + 12; vb.position.set(VX, 0, VZ);
+    yBox(vb, 1.45, 0.58, 6.3, 0x8a6a45, 0, 0.29, 0); yBox(vb, 1.25, 0.05, 6.1, 0x4a3526, 0, 0.59, 0);
+    for (let k = 0; k < 6; k++) yBlob(vb, 0.26, k % 2 ? 0x7cc152 : 0x5fae3f, -0.3, 0.72, -2.6 + k * 0.62, 0.7);
+    for (let k = 0; k < 3; k++) { const z = -2.2 + k * 2.2; yCyl(vb, 0.025, 0.025, 1.4, 0xb89a6a, 0.32, 1.3, z, 5); yBlob(vb, 0.34, 0x4d8f3a, 0.32, 1.2, z, 1.3); for (let t = 0; t < 4; t++) yBlob(vb, 0.09, 0xd9392b, 0.32 + Math.cos(t * 1.7) * 0.28, 1.0 + t * 0.14, z + Math.sin(t * 1.7) * 0.28); }
+    bakeYard(vb); block(VX - 0.8, VX + 0.8, VZ - 3.2, VZ + 3.2); }
+  // -- a little bistro set on the grass by the patio, and potted plants either side of the door
+  { const bs = grp('Bistro set', true), BXp = DX - 4.6, BZ = VD + 3.6; bs.position.set(BXp, 0, BZ);
+    yCyl(bs, 0.28, 0.34, 0.06, 0x2b2d30, 0, 0.03, 0); yCyl(bs, 0.05, 0.05, 1.5, 0x2b2d30, 0, 0.8, 0, 8); yCyl(bs, 0.72, 0.72, 0.06, 0x2b2d30, 0, 1.56, 0, 20); yCyl(bs, 0.66, 0.66, 0.02, 0x3a7fa0, 0, 1.6, 0, 20);
+    for (const sx of [-1, 1]) { const ch = new THREE.Group(); ch.position.set(sx * 1.05, 0, 0.1); ch.rotation.y = sx * Math.PI / 2; bs.add(ch);
+      yCyl(ch, 0.36, 0.36, 0.05, 0x2b2d30, 0, 1.02, 0, 16); for (const [lx, lz] of [[-0.24, -0.24], [0.24, -0.24], [-0.24, 0.24], [0.24, 0.24]]) yCyl(ch, 0.025, 0.025, 1.0, 0x2b2d30, lx, 0.5, lz, 6);
+      const back = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.03, 6, 16, Math.PI), yMat(0x2b2d30)); back.position.set(0, 1.2, 0.33); ch.add(back); }
+    bakeYard(bs); shadow(BXp, BZ, 1.7, 1.0); block(BXp - 1.6, BXp + 1.6, BZ - 0.8, BZ + 0.9);
+    const pots = grp('Potted plants', true);
+    for (const sx of [-1, 1]) { const px = DX + sx * (DW / 2 + 0.75), pz = VD + 0.95;
+      yCyl(pots, 0.44, 0.32, 0.8, 0xb8643a, px, 0.4, pz, 14); yCyl(pots, 0.48, 0.48, 0.1, 0xa95a33, px, 0.8, pz, 14);
+      for (let k = 0; k < 6; k++) { const a = k * 1.1; yBlob(pots, 0.28, 0x3f8a45, px + Math.cos(a) * 0.22, 1.05 + (k % 2) * 0.25, pz + Math.sin(a) * 0.22); }
+      for (let k = 0; k < 4; k++) yBlob(pots, 0.1, [0xff6fae, 0xffffff, 0xffd23a, 0xff6fae][k], px + Math.cos(k * 1.6) * 0.3, 1.4, pz + Math.sin(k * 1.6) * 0.3); }
+    bakeYard(pots); }
+  // -- stepping stones from the patio out to the shed, and garden gates between the house and the side fences
+  { const st = grp('Stepping stones');
+    for (let k = 0; k < 11; k++) { const t = (k + 0.5) / 11, x = DX - 2.6 + (-SXW + 4.2 - (DX - 2.6)) * t + Math.sin(t * Math.PI) * -2.2, z = VD + 5.2 + (FZ - 5.2 - (VD + 5.2)) * t;
+      const m = yCyl(st, 0.46 + (k % 3) * 0.05, 0.5, 0.06, [0x9c9890, 0xa6a29a, 0x928e86][k % 3], x, 0.03, z, 9); m.rotation.y = k * 0.7; m.scale.z = 0.8; }
+    bakeYard(st);
+    const gt = grp('Garden gates', true);
+    for (const sx of [-1, 1]) { const x = sx * SXW, z0 = VD + IN(5), z1 = VD + FT(3), zc = (z0 + z1) / 2, L = z1 - z0;
+      yBox(gt, 0.14, FH * 0.92, L - 0.1, 0x8a7458, x, FH * 0.46, zc); for (let k = 0; k < 7; k++) yBox(gt, 0.06, FH * 0.9, 0.04, 0x735f46, x - sx * 0.08, FH * 0.46, z0 + 0.15 + k * (L - 0.3) / 6);
+      for (const y of [0.9, FH * 0.8]) yBox(gt, 0.08, 0.2, L - 0.2, 0x735f46, x - sx * 0.1, y, zc); const d = yBox(gt, 0.08, 0.16, Math.hypot(L - 0.3, FH * 0.8 - 0.9), 0x735f46, x - sx * 0.1, (0.9 + FH * 0.8) / 2, zc); d.rotation.x = Math.atan2(FH * 0.8 - 0.9, L - 0.3);
+      yBox(gt, 0.1, 0.1, 0.25, 0x2a2a2a, x - sx * 0.14, 2.6, z1 - 0.35); }
+    bakeYard(gt); }
+  // -- flower beds along the side fences, and daisies in the lawn
+  { const mounds = [], blooms = [], cols = [0xff6fae, 0xffd23a, 0xffffff, 0xb07aff, 0xff5a4e, 0xff9a3c];
+    let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (const sx of [-1, 1]) for (let z = VD + 3.2; z < FZ - 1.5; z += 1.25 + rnd() * 0.5) {
+      if (sx > 0 && z > VD + 8.4 && z < VD + 15.6) continue;                                         // (the vegetable bed's there)
+      if (z > FZ - 5 && (sx < 0 || sx > 0)) continue;                                                 // (shed / doghouse corners)
+      const x = sx * (SXW - 0.75 - rnd() * 0.3), r = 0.45 + rnd() * 0.25; mounds.push([x, r * 0.55, z, r, [0x3f7a36, 0x467f3a, 0x3a6f31][rnd() * 3 | 0]]);
+      const nb = 3 + (rnd() * 4 | 0), c = cols[rnd() * cols.length | 0]; for (let k = 0; k < nb; k++) { const a = rnd() * 6.28; blooms.push([x + Math.cos(a) * r * 0.6, r * 0.95 + rnd() * 0.15, z + Math.sin(a) * r * 0.6, 0.11 + rnd() * 0.06, rnd() < 0.8 ? c : cols[rnd() * cols.length | 0]]); }
+    }
+    for (let x = -FT(30) + 6; x < FT(30) - 6; x += 1.6 + rnd()) { const c = cols[rnd() * cols.length | 0]; for (let k = 0; k < 3; k++) blooms.push([x + (rnd() - 0.5) * 1.2, 0.9 + rnd() * 0.7, FZ - 2.25 + (rnd() - 0.5) * 0.5, 0.12 + rnd() * 0.05, c]); }   // colour in front of the back bushes
+    const inst = (list, geo, name) => { const im = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), list.length); im.userData.name = name; im.userData.noWalk = true;
+      const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), CC = new THREE.Color(), E = new THREE.Euler();
+      list.forEach(([x, y, z, r, c], i) => { Q.setFromEuler(E.set(0, rnd() * 6, 0)); M.compose(P.set(x, y, z), Q, S.set(r, r * 0.8, r)); im.setMatrixAt(i, M); im.setColorAt(i, CC.setHex(c)); }); povEndWall.add(im); };
+    const shaded = () => { const g = new THREE.IcosahedronGeometry(1, 1), P = g.attributes.position, sh = []; for (let i = 0; i < P.count; i++) { const k = 0.6 + 0.4 * (P.getY(i) * 0.5 + 0.5); sh.push(k, k, k); } g.setAttribute('color', new THREE.Float32BufferAttribute(sh, 3)); return g; };
+    inst(mounds, shaded(), 'Flower bed'); inst(blooms, shaded(), 'Flowers');
+    const dais = []; for (let i = 0; i < 420; i++) { const x = (rnd() - 0.5) * (SXW * 2 - 3), z = VD + 2 + rnd() * (FZ - VD - 4); if (Math.abs(x - DX) < 3.2 && z < VD + 5.5) continue; dais.push([x, 0.02, z, 0.05 + rnd() * 0.03, rnd() < 0.7 ? 0xffffff : 0xffe36a]); }
+    const dg = new THREE.CircleGeometry(1, 6); dg.rotateX(-Math.PI / 2); { const sh = []; for (let i = 0; i < dg.attributes.position.count; i++) sh.push(1, 1, 1); dg.setAttribute('color', new THREE.Float32BufferAttribute(sh, 3)); }
+    inst(dais, dg, 'Daisies'); }
+  // -- over the fence: the neighbours' houses, and a line of utility poles with sagging wires
+  { const nb = grp('Neighbourhood');
+    const house = (x, z, w, d, h, wall, roof, ry) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry || 0; nb.add(g);
+      yBox(g, w, h, d, wall, 0, h / 2, 0); const rh = h * 0.5, tri = new THREE.Shape([new THREE.Vector2(-w / 2 - 0.4, 0), new THREE.Vector2(w / 2 + 0.4, 0), new THREE.Vector2(0, rh)]);
+      const rg = new THREE.ExtrudeGeometry(tri, { depth: d + 0.8, bevelEnabled: false }); rg.translate(0, 0, -(d + 0.8) / 2); const rm = new THREE.Mesh(rg, yMat(roof)); rm.position.y = h; g.add(rm);
+      yBox(g, 0.9, rh + 0.8, 0.9, 0x8a5a48, w * 0.25, h + rh * 0.55, d * 0.1);
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) { const wx = (c - 1) * w * 0.3, wy = h * (0.3 + r * 0.42); yBox(g, 1.5, 1.3, 0.08, 0xf7f5f0, wx, wy, -d / 2 - 0.02); yBox(g, 1.25, 1.05, 0.08, 0x3a4a5a, wx, wy, -d / 2 - 0.05); }
+    };
+    house(-26, FZ + 18, 11, 8, 6.2, 0xd9e4ec, 0x5b4a44); house(-6, FZ + 21, 12, 8, 6.6, 0xf1e3b8, 0x3f4650); house(15, FZ + 18, 10, 8, 6.0, 0xcfdcc2, 0x6a4c3c); house(34, FZ + 16, 11, 8, 6.4, 0xead2c4, 0x4a4f57);
+    house(-37, VD + 15, 12, 9, 6.4, 0xe8e0cf, 0x51555c, Math.PI / 2); house(37, VD + 15, 12, 9, 6.2, 0xd6dfe8, 0x5b4a44, -Math.PI / 2);
+    const poles = [-36, -13, 10, 33].map(x => [x, FZ + 7]);
+    for (const [x, z] of poles) { yCyl(nb, 0.17, 0.22, 10.5, 0x5b4636, x, 5.25, z, 7); yBox(nb, 2.6, 0.18, 0.18, 0x5b4636, x, 9.6, z); for (const dx of [-1.1, 0, 1.1]) yCyl(nb, 0.06, 0.08, 0.25, 0x6f8a9a, x + dx, 9.8, z, 6); }
+    bakeYard(nb);
+    const wire = new THREE.LineBasicMaterial({ color: 0x2c2c30, fog: false });
+    for (let i = 0; i + 1 < poles.length; i++) for (const dx of [-1.1, 0, 1.1]) { const [x0, z0] = poles[i], [x1, z1] = poles[i + 1], pts = [];
+      for (let t = 0; t <= 1.0001; t += 1 / 20) pts.push(new THREE.Vector3(x0 + dx + (x1 - x0) * t, 9.92 - 1.1 * (1 - (2 * t - 1) ** 2), z0 + (z1 - z0) * t));
+      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), wire); l.userData.noWalk = true; nb.add(l); } }
+  // -- life: butterflies round the flower beds, a few birds wheeling overhead
+  yardLife = { butterflies: [], birds: [], chirpT: 3 };
+  for (let i = 0; i < 5; i++) { const b = makeButterfly(); b.scale.setScalar(0.75); b.userData.noWalk = true; povEndWall.add(b); const sx = i % 2 ? 1 : -1; yardLife.butterflies.push({ g: b, ax: sx * (SXW - 2.5), az: VD + 4 + i * 4.2, r: 1.5 + (i % 3) * 0.6, sp: 0.5 + i * 0.13, ph: i * 1.7 }); }
+  for (let i = 0; i < 4; i++) { const g = new THREE.Group(); g.userData.noWalk = true; povEndWall.add(g); const wings = [];
+    for (const sx of [-1, 1]) { const w = new THREE.Group(); g.add(w); const m = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.03, 0.16), yMat(0x2a2a2e)); m.position.x = sx * 0.27; w.add(m); wings.push([w, sx]); }
+    yardLife.birds.push({ g, wings, ph: i * 0.35, off: new THREE.Vector3((i % 2) * 1.2 - 0.6, (i % 3) * 0.5, i * 0.9) }); }
+}
+function yardShadowMat() {                                            // a soft round contact shadow on the grass
+  if (yardShadowMat.m) return yardShadowMat.m;
+  const t = canvasTex(64, 64, (c, w, h) => { const g = c.createRadialGradient(32, 32, 2, 32, 32, 32); g.addColorStop(0, 'rgba(20,35,15,.42)'); g.addColorStop(0.65, 'rgba(20,35,15,.22)'); g.addColorStop(1, 'rgba(20,35,15,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h); }, 1, 1);
+  return (yardShadowMat.m = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1 }));
+}
+function updateYardLife(dt) {                                         // the sky rides with the camera; clouds drift; butterflies flit; birds circle; birdsong outside
+  if (!skyRig || !povEndWall || !povEndWall.visible) return;
+  skyRig.position.copy(camera.position); cloudDome.rotation.y += dt * 0.006;
+  const L = yardLife; if (!L) return;
+  for (const b of L.butterflies) { const t = clock * b.sp + b.ph; b.g.position.set(b.ax + Math.cos(t) * b.r * 0.6, 0.35 + Math.abs(Math.sin(t * 1.7)) * 0.9, b.az + Math.sin(t * 1.3) * b.r); b.g.rotation.y = Math.atan2(-Math.sin(t) * b.r * 0.6, Math.cos(t * 1.3) * b.r * 1.3); b.g.userData.anim(clock, b.ph * 3); }
+  const VD = ROOM.visDepth, a = clock * 0.09;
+  for (const b of L.birds) { const aa = a + b.ph * 0.12, cx = Math.cos(aa) * 22, cz = VD + 16 + Math.sin(aa) * 16;
+    b.g.position.set(cx + b.off.x, 13 + b.off.y + Math.sin(clock * 0.7 + b.ph) * 0.8, cz + b.off.z); b.g.rotation.y = Math.atan2(-Math.sin(aa), Math.cos(aa)) + Math.PI / 2;
+    const f = Math.sin(clock * 9 + b.ph * 6) * 0.55; b.wings.forEach(([w, sx]) => { w.rotation.z = sx * f; }); }
+  if (walk.on && state === 'playing' && walk.pos.z > VD + 0.4 && (L.chirpT -= dt) <= 0) {        // birdsong, now and then, while she's outside
+    L.chirpT = 2.5 + Math.random() * 4; const n = 2 + (Math.random() * 3 | 0), f0 = 2900 + Math.random() * 1400;
+    for (let i = 0; i < n; i++) tone(f0 + (i % 2) * 500, f0 + 700 + (i % 2) * 300, 0.055, 'sine', 0.012, i * 0.09);
+  }
 }
 function fuseParts(root) {                                            // merge a static group's untextured meshes into one vertex-coloured mesh per shading type
   root.updateMatrixWorld(true);
@@ -5137,7 +5379,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-27 12:39';                                              // stamped when the site is published
+const BUILD = '2026-09-27 13:01';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -8626,7 +8868,12 @@ function updateDog(dt) {
   const gait = speed => { dog.ph += dt * (4 + speed * 2.2); const w = Math.sin(dog.ph), a = Math.min(0.9, 0.35 + speed * 0.08); R.legs[0].rotation.x = R.legs[3].rotation.x = w * a; R.legs[1].rotation.x = R.legs[2].rotation.x = -w * a; R.body.position.y = Math.abs(Math.cos(dog.ph)) * 0.06; R.body.rotation.x = speed > 4 ? 0.08 : 0; };
   const moveTo = (tx, tz, sp) => { const dx = tx - pos.x, dz = tz - pos.z, d = Math.hypot(dx, dz); if (d < 0.02) return 0; const st = Math.min(d, sp * dt); pos.x += dx / d * st; pos.z += dz / d * st; face(tx, tz); gait(sp); return d; };
   const bow = k => { R.body.rotation.x = 0.38 * k; R.body.position.y = -0.18 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = -0.9 * k; R.head.rotation.x = -0.25 * k; };
-  const clampYard = () => { pos.x = THREE.MathUtils.clamp(pos.x, -SX, SX); pos.z = THREE.MathUtils.clamp(pos.z, Z0, Z1); };
+  const clampYard = () => { pos.x = THREE.MathUtils.clamp(pos.x, -SX, SX); pos.z = THREE.MathUtils.clamp(pos.z, Z0, Z1);
+    for (const [x0, x1, z0, z1] of YARD_BLOCKS) {                     // (round the shed, the doghouse, the tree... not through them)
+      const a = x0 - 0.7, b = x1 + 0.7, c = z0 - 0.7, d = z1 + 0.7; if (pos.x <= a || pos.x >= b || pos.z <= c || pos.z >= d) continue;
+      const px = Math.min(pos.x - a, b - pos.x), pz = Math.min(pos.z - c, d - pos.z);
+      if (px < pz) pos.x = pos.x - a < b - pos.x ? a : b; else pos.z = pos.z - c < d - pos.z ? c : d;
+    } };
   const inside = walk.pos.z < VD + 0.4;                                // she's gone back indoors
   const waitAtSlider = () => { const tx = THREE.MathUtils.clamp(SLIDER.DX, -SX, SX), tz = VD + 1.6; if (!moveTo(tx, tz, 4) || Math.hypot(tx - pos.x, tz - pos.z) < 0.1) { face(walk.pos.x, walk.pos.z); R.head.rotation.z = Math.sin(clock * 2.3) * 0.18; } pos.y = 0; };
   const cdx = walk.pos.x - pos.x, cdz = walk.pos.z - pos.z, cd = Math.hypot(cdx, cdz);
@@ -8947,7 +9194,7 @@ let last = performance.now(), clock = 0, reflFrame = 0;
 // each mirror reflection is a whole extra render of the room: the two mirrors take turns refreshing (one per frame),
 // which roughly halves their cost with no visible difference
 { const refl = []; scene.traverse(o => { if (o.getRenderTarget && o.onBeforeRender) refl.push(o); });
-  refl.forEach((o, i) => { const obr = o.onBeforeRender; o.onBeforeRender = function (...a) { if ((reflFrame + i) % 2) return; obr.apply(this, a); }; }); }
+  refl.forEach((o, i) => { const obr = o.onBeforeRender; o.onBeforeRender = function (...a) { if ((reflFrame + i) % 2) return; if (walk.on && camera.position.z > ROOM.visDepth + 0.3) return; obr.apply(this, a); }; }); }   // (every other frame; and not at all while she's out in the yard, where the mirrors are hidden behind the house wall)
 function frame(now) {
   requestAnimationFrame(frame);
   reflFrame++;
@@ -9029,7 +9276,7 @@ function frame(now) {
   candleLight.intensity = (0.32 + flick / flames.length * 0.1) * lit / flames.length;
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
   if (sliderDisco) updateSliderDisco(dt);
-  updateRaccoon(dt); updateDog(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
+  updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
 
   if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && camera.position.z >= ROOM.visDepth - 0.05);   // (or out in the yard)   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
