@@ -1951,9 +1951,7 @@ function drawKart() {
    ===================================================================== */
 const TV_GAMES = ['kart', 'party', 'flappy'];
 const tvNextGame = () => TV_GAMES[tvPlays % TV_GAMES.length];
-function speak(line, v) {                                             // narration: spoken aloud (where the device can) + subtitles on screen; v = { pitch, rate } for characters
-  try { if (!window.speechSynthesis) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(line); u.rate = (v && v.rate) || 0.95; u.pitch = (v && v.pitch) || 1.05; u.volume = 1; speechSynthesis.speak(u); } catch (e) {}
-}
+function speak(line, v) {}                                           // (voices are off: every line is shown as text only, in its speech bubble / caption / subtitle)
 function hush() { try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) {} }
 
 // ---------- the cutscene: sunset drive → the sofa → over the shoulder into their Switch
@@ -3281,7 +3279,9 @@ function updateRoomFx(dt) {
   if (roomMode === 2 && raveUntil && clock > raveUntil) { setRoomMode(0); sfx.powerUp(); raveUntil = 0; danceUntil = Math.min(danceUntil, clock); }   // party's over: lights back on
   lightF += (lightTarget - lightF) * Math.min(1, dt * 4);
   if (remoteLed) remoteLed.material.opacity = 0.35 + 0.65 * (Math.sin(clock * 5) > 0 ? 1 : 0.2);   // standby light blinks so you can spot it
-  for (const r of roomLights) r.l.intensity = r.base * lightF;
+  const outK = walk && walk.on && !mirrorWorld ? THREE.MathUtils.clamp((walk.pos.z - (ROOM.visDepth - 0.3)) / 1.5, 0, 1) : 0;   // out through the slider: back to daylight
+  const litF = lightF + (1 - lightF) * outK;
+  for (const r of roomLights) r.l.intensity = r.base * litF;
   const dimK = 0.03 + 0.97 * lightF; for (const m of stuffMats) m.color.setScalar(dimK); for (const m of scratchMats) m.color.setScalar(dimK);   // unlit stuffing + rips: darken with the lights
   const g = galaxyRig;
   g.level += ((galaxyOn ? 1 : 0) - g.level) * Math.min(1, dt * 3);
@@ -3295,7 +3295,7 @@ function updateRoomFx(dt) {
   g.rave.forEach((l, i) => {
     const a = clock * (0.7 + i * 0.25) + i * 2.1;
     l.position.set(Math.sin(a) * 3.8, 3.2 + Math.sin(clock * 1.3 + i) * 0.8, disco.on ? ROOM.visDepth - 5.5 + Math.cos(a * 0.8) * 4 : 7 + Math.cos(a * 0.8) * 5.5);   // (disco: sweeping round the dance floor by the slider)
-    l.intensity = roomMode === 2 || disco.on ? 0.9 + 1.6 * beat : Math.max(0, l.intensity - dt * 4);
+    l.intensity = (roomMode === 2 || disco.on ? 0.9 + 1.6 * beat : Math.max(0, l.intensity - dt * 4)) * (1 - outK);   // (the party lights stay indoors)
   });
 }
 SECT = 'Dome light';
@@ -4110,6 +4110,11 @@ const tailCard = new THREE.Mesh(tailGeo, new THREE.MeshBasicMaterial({ map: tail
 catTail.add(tailCard);
 
 
+{ // the far end of the room, past the play area: in the main game too, not just from inside (the end wall, the slider and the yard stay
+  // Free-walk / cat's-eye only, since from the usual camera up above they'd stand between it and the room)
+  const ROOM_WIDE = new Set(['Armchair', 'Wooden table', 'Rubber duck', 'Cork board', 'Litter box', 'Cat tree']);
+  for (const o of [...povEndWall.children]) if (ROOM_WIDE.has(o.userData.name)) scene.attach(o);
+}
 SECT = null;
 /* ---------- mouse holes ---------- */
 function archShape(w, h) {
@@ -4752,16 +4757,15 @@ class Mouse {
         break;
       }
       case 'kLecture': {                                               // wagging her finger at the cat
-        this.faceToward(CAT_POS.x * 0.55 + camera.position.x * 0.45, CAT_POS.z * 0.55 + camera.position.z * 0.45, dt);   // (half to the cat, half to the camera, so we see her face) this.model.rotation.z = Math.sin(this.t * 6) * 0.08; bob = Math.abs(Math.sin(this.t * 5)) * 0.03;
+        this.faceToward(CAT_POS.x * 0.55 + camera.position.x * 0.45, CAT_POS.z * 0.55 + camera.position.z * 0.45, dt);   // (half to the cat, half to the camera, so we see her face)
+        this.model.rotation.z = Math.sin(this.t * 6) * 0.08; bob = Math.abs(Math.sin(this.t * 5)) * 0.03;
         this.lineT -= dt; if (this.lineT <= 0) { this.lineT = 2.8; karenSay(this, KAREN_LECTURE[this.lineI++ % KAREN_LECTURE.length]); }
-        if (this.t > 17) { this.setState('kLeave'); karenSay(this, "I'm leaving a one-star review!"); }
         break;
       }
       case 'kRant': {                                                  // "LET ME SPEAK TO A MANAGER!": stomping, hopping mad... straight at the camera (you're the manager)
         this.faceToward(camera.position.x, camera.position.z, dt); bob = Math.abs(Math.sin(this.t * 14)) * 0.09; this.model.rotation.z = Math.sin(this.t * 20) * 0.1;
         p.x += Math.sin(this.t * 3.1) * dt * 0.6;
         this.lineT -= dt; if (this.lineT <= 0) { this.lineT = 2.6; karenSay(this, KAREN_RANT[this.lineI++ % KAREN_RANT.length], true); }
-        if (this.t > 15) { this.setState('kLeave'); karenSay(this, "Fine! I'm leaving a one-star review!", true); }
         break;
       }
       case 'kLeave': {                                                 // storming off to the nearest hole
@@ -4796,7 +4800,7 @@ class Mouse {
       }
       case 'run': {
         if (!this.target || (!this.target.available && !(this.isBomb && this.target.alive))) this.target = nearestCheese(p);
-        if (!this.target) { this.setState('home'); break; }   // nothing left to steal
+        if (!this.target) { if (this.boss) { this.wp = null; this.hops = 0; this.maxHops = 1; this.wpPause = 0; this.setState('wander'); } else this.setState('home'); break; }   // nothing left to steal (the Rat King prowls instead)
         const c = this.target.pos, gr = this.isBomb ? 0.9 : this.target.grabRadius, dx = c.x - p.x, dz = c.z - p.z, dist = Math.hypot(dx, dz) || 0.001;
         const aim = this.navAim(c.x, c.z, dt);                           // a sofa in the way? follow a route round it
         if (aim) { const ax = aim.x - p.x, az = aim.z - p.z, ad = Math.hypot(ax, az) || 0.001, s2 = Math.min(this.speed * dt, ad); p.x += ax / ad * s2; p.z += az / ad * s2; this.faceToward(aim.x, aim.z, dt); }
@@ -4832,7 +4836,7 @@ class Mouse {
       }
       case 'carry': {  // hauling it back to the hole, slower than running
         const c = this.target;
-        if (!c || c.claimant !== this) { this.setState('home'); break; }
+        if (!c || c.claimant !== this) { this.setState(this.boss ? 'run' : 'home'); break; }   // (knocked loose: the Rat King goes straight back for a mushroom)
         const h = this.hole.mouthOut, dist = Math.hypot(h.x - p.x, h.z - p.z);
         const aim = this.navAim(h.x, h.z, dt), tx = aim ? aim.x : h.x, tz = aim ? aim.z : h.z, dx = tx - p.x, dz = tz - p.z, dd = Math.hypot(dx, dz) || 0.001;
         if (dist > 0.05) {
@@ -4845,6 +4849,7 @@ class Mouse {
       case 'wander': {   // chaos mode: scampers about the room, stopping to sniff, then heads home (the Rat King never leaves)
         if (this.wpPause > 0) { this.wpPause -= dt; this.model.rotation.y = Math.sin(time * 9) * 0.35; break; }
         this.model.rotation.y = 0;
+        if (this.boss && gameMode !== 'chaos') { const c = nearestCheese(p); if (c) { this.target = c; this.setState('run'); break; } }   // the Rat King's on a mission: the moment a mushroom's free, he's after it
         if (!this.wp) {
           if (!this.boss && this.hops >= this.maxHops) { this.setState('home'); break; }
           this.wp = pickWanderPoint(p); this.hops++; this.wpT = 0;
@@ -5048,8 +5053,8 @@ const ACHIEVEMENTS = [
     ['laundryMess', '🧺', 'Laundry day', 'In Free walk, swipe the folded laundry off the armchair'],
     ['tvTop', '📺', 'King of the TV', 'In Free walk, stand on top of the TV'],
     ['dogMeet', '🐕', 'Who let the dog in?', 'In Free walk, get out into the backyard and go up to the back fence'],
-    ['chippy', '🐰', 'Wind-up warrior', 'Swipe Chippy the wind-up bunny off the credenza and let it hunt down 10 mice'],
-    ['chippyNo', '💥', 'CHIPPY NOOOOO!', 'Watch Chippy, ten mice down, pounce on a bomb mouse'],
+    ['chippy', '🐰', 'Wind-up warrior', 'Swipe Chippy the wind-up bunny off the credenza and let it loose on the mice'],
+    ['chippyNo', '💥', 'CHIPPY NOOOOO!', 'Find out what happens when Chippy gets carried away'],
     ['blanketGhost', '👻', 'Blanket ghost', 'In Free walk, get caught under a blanket, then swipe it off'],
     ['raccoon', '🦝', 'Trash panda, begone', 'In Free walk, swipe at the raccoon taunting you through the slider until it runs off'],
     ['darkKitty', '😈', 'Through the looking glass', 'Beat the evil dark kitty in the mirror world (9 hits)'],
@@ -5064,7 +5069,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-26 15:54';                                              // stamped when the site is published
+const BUILD = '2026-09-27 11:11';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -6245,8 +6250,8 @@ function resetLaser() {
 
 /* ---------- Chippy: a fluffy white wind-up Easter bunny on the credenza, just right of the TV's soundbar. Swipe it once and it hops
    down beside her box, gets wound up, and from then on roams the field on its own: it bounces after the nearest mouse and takes it
-   out, 10 times over (bombs get defused). After the tenth it keeps going... until it jumps the next bomb mouse. CHIPPY NOOOOO! ---------- */
-const CHIPPY_USES = 10;
+   out, 5 times over (bombs get defused; the count is kept secret). After that it keeps going... until it jumps the next bomb mouse. CHIPPY NOOOOO! ---------- */
+const CHIPPY_USES = 5;                                               // (a secret: no counter shown)
 const chippy = { g: null, rig: null, key: null, feet: [], tag: null, tagCtx: null, tagTex: null, state: 'shelf', uses: 0, t: 0, hop: 0, target: null,
                  from: new THREE.Vector3(), to: new THREE.Vector3(), home: new THREE.Vector3(), seat: new THREE.Vector3(), wander: new THREE.Vector3(), cool: 0, shown: -1, kills: 0 };
 {
@@ -6308,7 +6313,7 @@ function hitChippy() {
   if (gameMode !== 'classic' && gameMode !== 'chaos') { chippy.state = 'dance'; chippy.t = 0; windUpSound(); return; }   // (Free walk: no mice to hunt, it just does a happy wind-up hop)
   chippy.from.copy(chippy.home); chippy.seat.set(CAT_POS.x + BOX.w / 2 + 0.38, 0, CAT_POS.z + 0.25);
   chippy.to.copy(chippy.seat); chippy.state = 'leap'; chippy.t = 0; chippy.uses = CHIPPY_USES; chippy.kills = 0; chippy.shown = -1;
-  sfx.whoosh(); showBanner('Chippy!'); floatText(chippy.home.clone().setY(chippy.home.y + 0.8), 'Wound up: 10 mice!', 'clutch');
+  sfx.whoosh(); showBanner('Chippy!'); floatText(chippy.home.clone().setY(chippy.home.y + 0.8), 'Wound up!', 'clutch');
 }
 function chippyClick() { tone(3400, 2100, 0.016, 'square', 0.03); tone(950, 700, 0.02, 'triangle', 0.02, 0.005); }   // the clockwork clack of a landing
 function windUpSound() { for (let i = 0; i < 6; i++) tone(2200 + (i % 2) * 300, 2000, 0.025, 'square', 0.02, i * 0.07); }   // krrk-krrk-krrk
@@ -6343,17 +6348,26 @@ function chippyBoom(m) {                                              // it jump
   showBanner('CHIPPY NOOOOO!'); floatText(p.clone().setY(1.2), 'CHIPPY NOOOOO!', 'bad'); speak('Chippy! Noooooo!', { pitch: 1.3, rate: 0.8 });
   setTimeout(() => sfx.angryMeow && sfx.angryMeow(), 500); catFlinch = 0.6; unlock('chippyNo');
 }
+function chippyStep(mx, mz) {                                         // move, sliding along furniture rather than through it
+  const p = chippy.g.position, free = (x, z) => !navBlockedAt(x, z) || navBlockedAt(p.x, p.z);   // (if it's somehow already inside something, let it out)
+  if (free(p.x + mx, p.z + mz)) { p.x += mx; p.z += mz; } else if (free(p.x + mx, p.z)) p.x += mx; else if (free(p.x, p.z + mz)) p.z += mz;
+}
 function updateChippy(dt) {
   const C = chippy, g = C.g, p = g.position, live = state === 'playing'; C.t += dt;
-  const hopTo = (tx, tz, speed) => {                                  // bounce along the carpet towards a spot; true once there
+  const hopTo = (tx0, tz0, speed) => {                                // bounce along the carpet towards a spot (round any furniture in the way); true once there
+    let tx = tx0, tz = tz0;
+    if (!clearLine(p.x, p.z, tx0, tz0, 0, 0.35)) {                    // a sofa / the table / the hearth in the way: follow a route round it, like the mice do
+      if (!C.path || clock > C.pathAt) { C.path = navPath(p.x, p.z, tx0, tz0); C.pathAt = clock + 0.45; }
+      const w = C.path && C.path.find((q, i) => i > 0 && Math.hypot(q.x - p.x, q.z - p.z) > 0.12); if (w) { tx = w.x; tz = w.z; }
+    }
     const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
     if (d > 0.02) g.rotation.y = Math.atan2(dx, dz); C.key.rotation.x += dt * 9;
     const hop0 = C.hop; C.hop = (C.hop + dt / 0.22) % 1; if (C.hop < hop0) chippyClick();   // click! with every landing
     const push = 0.35 + 1.3 * Math.sin(C.hop * Math.PI);                 // it springs forward off its feet, then coasts in to land
-    const step = Math.min(d, speed * dt * push); p.x += dx / (d || 1) * step; p.z += dz / (d || 1) * step;
+    const step = Math.min(d, speed * dt * push); chippyStep(dx / (d || 1) * step, dz / (d || 1) * step);
     p.y = Math.sin(C.hop * Math.PI) * 0.13; C.rig.rotation.x = 0.22 * Math.sin(C.hop * Math.PI);   // pitches forward in the air
     chippyKick(C.hop);
-    return d < 0.08;
+    return Math.hypot(tx0 - p.x, tz0 - p.z) < 0.08;
   };
   if (C.state === 'dance') {                                         // a hop and a spin on the spot
     const k = Math.min(1, C.t / 1.4), ph = (k * 4) % 1; p.copy(C.home); p.y += Math.sin(ph * Math.PI) * 0.12; chippyKick(ph); if (Math.floor(k * 4) !== Math.floor((C.t - dt) / 1.4 * 4)) chippyClick(); g.rotation.y = -0.35 + k * Math.PI * 2; C.key.rotation.x -= dt * 14;
@@ -6371,7 +6385,7 @@ function updateChippy(dt) {
     if (!live) return;
     if (C.rest > 0) {                                                 // just landed a hit: bounce back a little and catch its breath
       C.rest -= dt; C.key.rotation.x += dt * 4;
-      if (C.rest > 0.35) { p.x -= Math.sin(g.rotation.y) * 1.6 * dt; p.z -= Math.cos(g.rotation.y) * 1.6 * dt; p.y = Math.sin((C.rest - 0.35) / 0.35 * Math.PI) * 0.12; }
+      if (C.rest > 0.35) { chippyStep(-Math.sin(g.rotation.y) * 1.6 * dt, -Math.cos(g.rotation.y) * 1.6 * dt); p.y = Math.sin((C.rest - 0.35) / 0.35 * Math.PI) * 0.12; }
       else { p.y = 0; C.rig.rotation.x = 0; chippyKick(0); }
       return;
     }
@@ -6385,7 +6399,7 @@ function updateChippy(dt) {
         if (C.uses <= 0 && m.isBomb && !m.boss) { chippyBoom(m); return; }   // ten down, and it pounces on a bomb...
         if (chippyKill(m)) {                                          // (a bump on the Rat King or Karen doesn't use one up)
           C.kills++;
-          if (C.uses > 0 && --C.uses === 0) { unlock('chippy'); floatText(p.clone().setY(1.0), 'Ten! Chippy won\'t stop!', 'clutch'); }
+          if (C.uses > 0 && --C.uses === 0) unlock('chippy');
         }
       } else if (C.chaseT > 5) { C.skip = m; C.skipUntil = clock + 4; C.target = null; }   // can't get at that one: try another
     } else {                                                          // nothing out: little bounces round the carpet, sniffing about
@@ -6401,11 +6415,11 @@ function updateChippy(dt) {
     }
   }
   const out = C.state === 'wind' || C.state === 'roam';
-  C.tag.visible = out && gameMode !== 'walk';
+  C.tag.visible = false;                                              // (how many it has left is Chippy's secret)
   if (C.tag.visible) { chippyTag(); C.tag.position.set(p.x, p.y + 0.75 + Math.sin(clock * 3) * 0.03, p.z); }
 }
 function resetChippy() {
-  const C = chippy; C.state = 'shelf'; C.uses = 0; C.kills = 0; C.target = null; C.rest = 0; C.skip = null; C.t = 0; C.shown = -1; C.g.visible = true;
+  const C = chippy; C.state = 'shelf'; C.uses = 0; C.kills = 0; C.target = null; C.rest = 0; C.skip = null; C.path = null; C.t = 0; C.shown = -1; C.g.visible = true;
   C.g.position.copy(C.home); C.g.rotation.set(0, -0.35, 0); C.rig.rotation.set(0, 0, 0); C.rig.position.set(0, 0, 0); C.tag.visible = false; chippyKick(0);
 }
 
@@ -7394,7 +7408,7 @@ function fitCamera() {
   if (catCrown) catCrown.visible = !!catCrown.userData.claimed && !povOn;
   if (CAM_VIEWS[camView].pov && !fc.on) {                             // cat's eye: looking out from her box over the rim, down the room
     camera.aspect = aspect; camSqueeze = 1;
-    camera.fov = THREE.MathUtils.clamp((aspect < 0.75 ? 100 : aspect < 1 ? 88 : 76) * camZoom, 40, 116);   // a wide lens, to take in more of the room (pinch = zoom it)
+    camera.fov = THREE.MathUtils.clamp((aspect < 0.75 ? 112 : aspect < 1 ? 100 : 90) * camZoom, 40, 125);   // a wide lens, to take in more of the room (pinch = zoom it)
     camera.clearViewOffset(); camera.updateProjectionMatrix();
     camera.position.set(CAT_POS.x, POV_EYE_Y, CAT_POS.z + 0.5);        // from the cat in her box, peering over the rim down the room
     camera.lookAt(0, 0.35 - camTilt * 0.06, 9);                         // two-finger drag tips the gaze up / down
