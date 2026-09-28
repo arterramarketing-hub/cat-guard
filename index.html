@@ -138,8 +138,21 @@
   #walkMeow:active{transform:translateY(4px);box-shadow:0 1px 0 #b06a14}
   #heistDash{display:none;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(38px + env(safe-area-inset-bottom,0px));width:96px;height:96px;background:#3fa9f5;box-shadow:0 5px 0 #1f6fae,0 10px 20px rgba(0,0,0,.3)}
   #heistDash:active{transform:translateY(4px);box-shadow:0 1px 0 #1f6fae}
-  #heistDash.cool{filter:grayscale(.8) brightness(.8)}
+  #heistDash.cool{filter:grayscale(.5) brightness(.9)}
   body.heist-ui #heistDash{display:grid}
+  /* Mouse mode: the power-ups she has (the shield lit while it's up, timers counting down), and a ring round Jump that fills as it recharges */
+  body.heist-ui .hud{flex-direction:column;align-items:center}
+  body.heist-ui .hud-bar{box-sizing:border-box}                          /* (stacked in a column the bar can't shrink to fit, so its padding counts inside its width) */
+  .pup-bar{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:6px;max-width:780px}
+  .pup-chip{display:flex;align-items:center;gap:3px;background:var(--hud);border:1.5px solid rgba(255,244,248,.3);border-radius:999px;padding:2px 9px 2px 6px;font:800 12px/1.3 var(--body);color:#fff;white-space:nowrap}
+  .pup-chip b{font-size:14px;font-weight:400}
+  .pup-chip.on{border-color:#7fd8ff;box-shadow:0 0 8px rgba(127,216,255,.75)}
+  .pup-chip.off{opacity:.55}
+  .pup-chip.boss{background:#b3203a;border-color:#ffd0d6;animation:bossPulse .6s ease-in-out infinite alternate}
+  @keyframes bossPulse{to{box-shadow:0 0 12px rgba(255,80,100,.9)}}
+  #heistDash::after{content:'';position:absolute;inset:-8px;border-radius:50%;pointer-events:none;background:conic-gradient(#fff calc(var(--cd,1) * 360deg),rgba(255,255,255,.16) 0);
+    -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px))}
+  #heistDash.ready::after{background:#ffe27a;box-shadow:0 0 10px #ffe27a}
   /* Mouse mode's level-up: two power-up cards side by side */
   .lvl-card{max-width:420px}
   .lvl-picks{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -389,6 +402,7 @@
     </button>
     </div>
   </div>
+  <div class="pup-bar" id="pupBar" hidden></div>
 </div>
 
 <!-- Start -->
@@ -3353,7 +3367,13 @@ SECT = 'Dome light';
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
 let ducks = [];
 let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null, laundry = null, mosaicGlints = [], mosaicArt = null;
-let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [];     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
+// the backyard, from the drone photo: a long, narrow lot behind our half of the house. A chain-link fence runs down the middle from the
+// house (the other half's yard, where Porter lives, is over it: on the left as you look out of the slider), another runs down the
+// neighbours' side (the side yard beside the house, through a gate, leads round to the front), and one across the back; bushes and
+// tall trees crowd in behind them all. HL..XR is our half of the back wall, XR..HR the other half's.
+const YARD = { HL: -5.8, XR: 12.8, HR: 31.4, XL0: -14.3, XL1: -22.7, FZ: ROOM.visDepth + FT(52), FH: FT(4) };
+function yardXL(z) { const k = THREE.MathUtils.clamp((z - ROOM.visDepth) / (YARD.FZ - ROOM.visDepth), 0, 1); return YARD.XL0 + (YARD.XL1 - YARD.XL0) * k; }   // the neighbours'-side fence: the lot widens toward the back
+let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [], bbqRig = null;     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
 const sliderGlass = [];
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
@@ -3367,54 +3387,80 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     const wg = new THREE.ShapeGeometry(sh), uv = wg.attributes.uv, ps = wg.attributes.position;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (ps.getX(i) + hw) / (2 * hw), ps.getY(i) / WH);   // same paneling as the other walls
     const wall = new THREE.Mesh(wg, lam(0xf2efe8, { map: panelTex })); wall.rotation.y = Math.PI; wall.position.z = VD; wall.userData.name = 'Wall'; povEndWall.add(wall);
-    { // the outside of the house (only seen from the yard): pale lap siding with the slider opening, upstairs windows
-      const XW = 26, XH = FT(18), ex = new THREE.Shape(); ex.moveTo(-XW, 0); ex.lineTo(XW, 0); ex.lineTo(XW, XH); ex.lineTo(-XW, XH); ex.lineTo(-XW, 0);
-      const hole = new THREE.Path(); hole.moveTo(DX - DW / 2, 0); hole.lineTo(DX - DW / 2, DH); hole.lineTo(DX + DW / 2, DH); hole.lineTo(DX + DW / 2, 0); hole.lineTo(DX - DW / 2, 0); ex.holes.push(hole);
-      const sidTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#e4dccd'; c.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 8) { c.fillStyle = 'rgba(90,80,60,.25)'; c.fillRect(0, y, w, 1.5); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(0, y + 1.5, w, 1); } }, 1, 1);
-      const eg = new THREE.ShapeGeometry(ex), euv = eg.attributes.uv, eps = eg.attributes.position; for (let i = 0; i < euv.count; i++) euv.setXY(i, eps.getX(i) / 2, eps.getY(i) / 2);
-      sidTex.wrapS = sidTex.wrapT = THREE.RepeatWrapping;
-      const outside = new THREE.Mesh(eg, new THREE.MeshBasicMaterial({ map: sidTex, color: 0xf0ebe0, fog: false })); outside.position.z = VD + IN(5); outside.userData.name = 'House'; povEndWall.add(outside);
-      { // house details: the roof edge (fascia, soffit, gutter, the shingles running back), downspouts, window trim and shutters,
-        // two ground-floor windows with a flower box, an AC unit on its pad, and a hose reel by the tap
+    { // the outside of the house (only seen from the yard), after the photo of the front: brown brick below, white stucco with dark Tudor
+      // half-timbering above, white-framed windows, a hipped roof of grey-brown shingles. Our half runs from the side yard to the fence
+      // down the middle of the backyard; the other half of the house carries on past it
+      const HL = YARD.HL, HR = YARD.HR, XR = YARD.XR, XH = FT(18), BH = FT(9), WZ = VD + IN(5), W = HR - HL, MX = (HL + HR) / 2, HD = VD + 2;
+      const brickTex = canvasTex(128, 128, (c, w, h) => {
+        c.fillStyle = '#b3a38f'; c.fillRect(0, 0, w, h);                                                          // mortar
+        for (let r = 0; r < 8; r++) for (let k = -1; k < 4; k++) {                                                // eight courses of running bond
+          const x = k * 32 + (r % 2 ? 16 : 0), y = r * 16, v = Math.random();
+          c.fillStyle = `rgb(${104 + v * 36 | 0},${50 + v * 20 | 0},${34 + v * 14 | 0})`; c.fillRect(x + 1.5, y + 1.5, 29, 13);
+          for (let q = 0; q < 6; q++) { c.fillStyle = Math.random() < 0.5 ? 'rgba(40,18,10,.25)' : 'rgba(190,120,90,.22)'; c.fillRect(x + 2 + Math.random() * 26, y + 2 + Math.random() * 10, 2, 1.5); }
+        }
+      }, 1, 1);
+      const stuccoTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#f2ede3'; c.fillRect(0, 0, w, h); for (let i = 0; i < 520; i++) { const v = 212 + Math.random() * 42 | 0; c.fillStyle = `rgba(${v},${v - 4},${v - 12},.5)`; c.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5); } }, 1, 1);
+      const wallMesh = (shape, tex, tu, tv, side) => { const g = new THREE.ShapeGeometry(shape), U = g.attributes.uv, P = g.attributes.position; for (let i = 0; i < U.count; i++) U.setXY(i, P.getX(i) / tu, P.getY(i) / tv); const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, fog: false, side: side || THREE.FrontSide })); m.userData.name = 'House'; povEndWall.add(m); return m; };
+      const bs = new THREE.Shape([new THREE.Vector2(HL, 0), new THREE.Vector2(HR, 0), new THREE.Vector2(HR, BH), new THREE.Vector2(HL, BH)]);
+      const hole = new THREE.Path(); hole.moveTo(DX - DW / 2, 0); hole.lineTo(DX - DW / 2, DH); hole.lineTo(DX + DW / 2, DH); hole.lineTo(DX + DW / 2, 0); hole.lineTo(DX - DW / 2, 0); bs.holes.push(hole);
+      wallMesh(bs, brickTex, 2.05, 1.37).position.z = WZ;                                                        // brick: 8 courses a tile, 4 bricks across
+      wallMesh(new THREE.Shape([new THREE.Vector2(HL, BH), new THREE.Vector2(HR, BH), new THREE.Vector2(HR, XH), new THREE.Vector2(HL, XH)]), stuccoTex, 1.6, 1.6).position.z = WZ;
+      for (const x of [HL, HR]) for (const [y0, y1, tex, tu, tv] of [[0, BH, brickTex, 2.05, 1.37], [BH, XH, stuccoTex, 1.6, 1.6]]) {   // the two ends of the house (the side yard looks along one)
+        const m = wallMesh(new THREE.Shape([new THREE.Vector2(0, y0), new THREE.Vector2(HD, y0), new THREE.Vector2(HD, y1), new THREE.Vector2(0, y1)]), tex, tu, tv, THREE.DoubleSide);
+        m.rotation.y = Math.PI / 2; m.position.set(x, 0, WZ);
+      }
+      { // the timbering, trim, windows, downspouts, roof... all baked into one sunlit mesh
         const hd = new THREE.Group(); hd.userData.name = 'House details'; hd.userData.noWalk = true; povEndWall.add(hd);
-        const WZ = VD + IN(5), W2 = XW * 2 + 0.6;
-        yBox(hd, W2, 0.38, 0.12, 0xf6f3ee, 0, XH - 0.08, WZ + 0.95); yBox(hd, W2, 0.08, 0.95, 0xe6e0d4, 0, XH - 0.24, WZ + 0.48);   // fascia + soffit
-        yBox(hd, W2, 0.2, 0.2, 0xd9dadb, 0, XH - 0.02, WZ + 1.08);                                                                 // gutter
-        const HD = 12, RH = 3.6, run = 1.15 + HD / 2, th = Math.atan2(RH, run), sl = Math.hypot(RH, run);          // the house is 12 deep, with a gabled roof
-        { const r = yBox(hd, W2, 0.16, sl, 0x4d525a, 0, 0, 0); r.rotation.x = th; r.position.set(0, XH + 0.12 + RH / 2, WZ + 1.15 - run / 2); }   // the front slope of the roof, up over the room...
-        { const r = yBox(hd, W2, 0.16, sl, 0x474c54, 0, 0, 0); r.rotation.x = -th; r.position.set(0, XH + 0.12 + RH / 2, WZ - HD - 1.15 + run / 2); }   // ...and the back
-        for (const sx of [-1, 1]) {                                                                                 // the gable ends: siding, with an attic vent
-          const sh = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(sx * HD, 0), new THREE.Vector2(sx * HD, XH), new THREE.Vector2(sx * HD / 2, XH + RH), new THREE.Vector2(0, XH)]);
-          const sg = new THREE.ShapeGeometry(sh), su = sg.attributes.uv, spp = sg.attributes.position; for (let i = 0; i < su.count; i++) su.setXY(i, spp.getX(i) / 2, spp.getY(i) / 2);
-          const side = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ map: sidTex, color: 0xd9d0c0, fog: false, side: THREE.DoubleSide })); side.rotation.y = sx * Math.PI / 2; side.position.set(sx * XW, 0, WZ); side.userData.keep = true; hd.add(side);
-          yBox(hd, 0.08, 1.1, 0.9, 0xf7f5f0, sx * (XW + 0.03), XH + 1.1, WZ - HD / 2); for (let k = -2; k <= 2; k++) yBox(hd, 0.1, 0.05, 0.75, 0x9a948a, sx * (XW + 0.06), XH + 1.1 + k * 0.18, WZ - HD / 2);
-          for (const wz of [WZ - 3, WZ - 9]) { yBox(hd, 0.06, 2.1, 2.45, 0xf7f5f0, sx * (XW + 0.03), FT(12.5), wz); yBox(hd, 0.05, 1.9, 2.2, 0x34414f, sx * (XW + 0.06), FT(12.5), wz); }
+        const T = 0x4a2f22, TZ = WZ + 0.06, winY = FT(12.5), winW = 2.2, winH = 1.9, rails = [winY - winH / 2 - 0.24, winY + winH / 2 + 0.24];
+        const upWins = [DX - 3.0, DX + 5.4, DX + 11.2, XR + 3.6, XR + 9.8, XR + 15.8];                          // upstairs: ours, then theirs
+        yBox(hd, W + 0.12, 0.34, 0.16, T, MX, BH + 0.05, TZ);                                                     // the beam along the floor line
+        yBox(hd, W, 0.28, 0.12, T, MX, XH - 0.2, TZ);                                                             // ...and under the eaves
+        for (const y of rails) yBox(hd, W, 0.16, 0.1, T, MX, y, TZ);                                              // rails under and over the upstairs windows
+        const nP = Math.round(W / 2.3), step = W / nP;
+        for (let i = 0; i <= nP; i++) {                                                                           // posts, stopping short of the windows
+          const x = HL + i * step;
+          if (upWins.some(wx => Math.abs(x - wx) < winW / 2 + 0.2)) { yBox(hd, 0.2, rails[0] - BH, 0.1, T, x, (BH + rails[0]) / 2, TZ); yBox(hd, 0.2, XH - rails[1], 0.1, T, x, (rails[1] + XH) / 2, TZ); }
+          else yBox(hd, 0.2, XH - BH, 0.1, T, x, (BH + XH) / 2, TZ);
         }
-        for (const x of [-XW + 1.2, XW - 1.2, DX - 9.4]) { yBox(hd, 0.16, XH - 0.3, 0.16, 0xd9dadb, x, (XH - 0.3) / 2, WZ + 0.14); yBox(hd, 0.16, 0.16, 0.5, 0xd9dadb, x, 0.12, WZ + 0.36); }   // downspouts
-        const winAt = (x, y, w, h, shutters) => {                                                                   // a trimmed window: frame, glass, sill (and shutters)
-          yBox(hd, w + 0.3, h + 0.3, 0.06, 0xf7f5f0, x, y, WZ + 0.04); yBox(hd, w, h, 0.05, 0x34414f, x, y, WZ + 0.08);
-          yBox(hd, w * 0.04 + 0.04, h, 0.04, 0xf7f5f0, x, y, WZ + 0.11); yBox(hd, w, 0.05, 0.04, 0xf7f5f0, x, y, WZ + 0.11);   // muntins
-          yBox(hd, w + 0.6, 0.12, 0.3, 0xf7f5f0, x, y - h / 2 - 0.2, WZ + 0.16);
-          if (shutters) for (const sx of [-1, 1]) { yBox(hd, 0.55, h + 0.25, 0.06, 0x3d5a6e, x + sx * (w / 2 + 0.45), y, WZ + 0.06); for (let k = -3; k <= 3; k++) yBox(hd, 0.45, 0.05, 0.03, 0x33505f, x + sx * (w / 2 + 0.45), y + k * h / 8, WZ + 0.1); }
+        for (let i = 0; i < nP; i++) {                                                                            // and a brace across each lower panel between the windows
+          const cx = HL + (i + 0.5) * step; if (upWins.some(wx => Math.abs(cx - wx) < winW / 2 + step / 2)) continue;
+          const h = rails[0] - BH, br = yBox(hd, 0.16, Math.hypot(step, h), 0.08, T, cx, (BH + rails[0]) / 2, TZ - 0.01); br.rotation.z = (i % 2 ? 1 : -1) * Math.atan2(step, h);
+        }
+        const winAt = (x, y, w, h, glass) => {                                                                    // a white-framed window: frame, glass, a mullion and transom, a sill
+          yBox(hd, w + 0.3, h + 0.3, 0.06, 0xf7f5f0, x, y, WZ + 0.08); yBox(hd, w, h, 0.05, glass || 0x34414f, x, y, WZ + 0.12);
+          yBox(hd, 0.08, h, 0.04, 0xf7f5f0, x, y, WZ + 0.15); yBox(hd, w, 0.07, 0.04, 0xf7f5f0, x, y + h * 0.22, WZ + 0.15);
+          yBox(hd, w + 0.5, 0.12, 0.3, 0xf7f5f0, x, y - h / 2 - 0.2, WZ + 0.2);
         };
-        for (const wx of [DX - 4.2, DX + 3.4, DX - 11.5, DX + 10.5, DX - 18.5, DX + 17.5]) winAt(wx, FT(12.5), 2.2, 1.9, true);   // the upstairs row
-        for (const wx of [DX - 7, DX + 8.2]) {                                                                       // downstairs: kitchen and dining room windows, with a flower box
-          winAt(wx, 3.3, 2.6, 2.0, false);
-          yBox(hd, 2.9, 0.4, 0.45, 0x7a5638, wx, 2.0, WZ + 0.3);
-          for (let k = 0; k < 9; k++) { const c = [0xff6fae, 0xffd23a, 0xffffff, 0xb07aff, 0xff5a4e][k % 5]; yBlob(hd, 0.2, 0x3f7a36, wx - 1.2 + k * 0.3, 2.3, WZ + 0.32); yBlob(hd, 0.12, c, wx - 1.2 + k * 0.3 + 0.05, 2.45, WZ + 0.38); }
+        for (const wx of upWins) winAt(wx, winY, winW, winH);
+        winAt(DX + 5.8, 3.2, 2.8, 2.0);                                                                             // our kitchen window, with a flower box
+        yBox(hd, 3.1, 0.4, 0.45, 0x5a3a26, DX + 5.8, 1.9, WZ + 0.3);
+        for (let k = 0; k < 9; k++) { const c = [0xff6fae, 0xffd23a, 0xffffff, 0xb07aff, 0xff5a4e][k % 5]; yBlob(hd, 0.2, 0x3f7a36, DX + 4.6 + k * 0.3, 2.2, WZ + 0.32); yBlob(hd, 0.12, c, DX + 4.65 + k * 0.3, 2.35, WZ + 0.38); }
+        { const px = XR + 5.2;                                                                                      // next door's patio door and window
+          yBox(hd, 4.9, DH + 0.3, 0.06, 0xf7f5f0, px, (DH + 0.3) / 2, WZ + 0.08); yBox(hd, 4.5, DH, 0.05, 0x2f3a45, px, DH / 2, WZ + 0.12); yBox(hd, 0.1, DH, 0.04, 0xf7f5f0, px, DH / 2, WZ + 0.15);
+          winAt(XR + 12.6, 3.2, 2.6, 2.0); }
+        for (const x of [HL + 0.25, XR - 0.18, XR + 0.18, HR - 0.25]) { yBox(hd, 0.16, XH - 0.3, 0.16, 0x3a2a20, x, (XH - 0.3) / 2, WZ + 0.16); yBox(hd, 0.16, 0.16, 0.5, 0x3a2a20, x, 0.12, WZ + 0.38); }   // downspouts
+        yBox(hd, W + 1.2, 0.34, 0.12, 0x3a2a20, MX, XH - 0.06, WZ + 1.15); yBox(hd, W + 1.2, 0.08, 1.1, 0xe9e2d4, MX, XH - 0.22, WZ + 0.58);   // fascia and soffit
+        yBox(hd, W + 1.2, 0.2, 0.2, 0x2c2622, MX, XH + 0.02, WZ + 1.26);                                          // gutter
+        { // the hipped roof: four slopes of grey-brown shingle
+          const RH = 4.6, x0 = HL - 0.6, x1 = HR + 0.6, zF = WZ + 1.15, zB = WZ - HD - 1.15, zm = (zF + zB) / 2, run = (zF - zB) / 2, r0 = Math.min(x0 + run, (x0 + x1) / 2), r1 = Math.max(x1 - run, (x0 + x1) / 2), y0 = XH + 0.1, y1 = y0 + RH;
+          const A = [x0, y0, zF], B = [x1, y0, zF], C = [x1, y0, zB], D = [x0, y0, zB], R1 = [r0, y1, zm], R2 = [r1, y1, zm];
+          const tris = [A, B, R2, A, R2, R1, C, D, R1, C, R1, R2, D, A, R1, B, C, R2], g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.Float32BufferAttribute(tris.flat(), 3)); g.computeVertexNormals();
+          const roof = new THREE.Mesh(g, yMat(0x5a524b)); hd.add(roof);
+          for (const [sy, a, b] of [[0, A, R1], [0, B, R2]]) { const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz), hip = yBox(hd, 0.2, 0.14, L, 0x4a433d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 0.06, (a[2] + b[2]) / 2); hip.lookAt(new THREE.Vector3(b[0], b[1] + 0.06, b[2]).add(povEndWall.position)); }   // hip caps
+          yBox(hd, r1 - r0 + 0.2, 0.16, 0.24, 0x4a433d, (r0 + r1) / 2, y1 + 0.05, zm);                              // the ridge cap
         }
-        { const ax = DX + 12.5, az = WZ + 1.2;                                                                     // the AC condenser on its little pad
+        { const ax = XR - 1.9, az = WZ + 1.2;                                                                       // our AC condenser on its pad, by the middle fence
           yBox(hd, 2.1, 0.12, 2.1, 0xbdb9b1, ax, 0.06, az); yBox(hd, 1.6, 1.35, 1.6, 0xd2d5d7, ax, 0.8, az); yBox(hd, 1.25, 0.05, 1.25, 0x4a4d52, ax, 1.5, az);
           for (let k = -3; k <= 3; k++) yBox(hd, 1.62, 0.04, 0.05, 0xa9adb1, ax, 0.8 + k * 0.16, az + 0.81);
           yBox(hd, 0.12, 0.12, 0.8, 0x9aa0a6, ax - 0.6, 1.0, az - 1.0); }
-        { const rx = DX + 5.4, rz = WZ + 0.55;                                                                     // hose reel under the tap
+        { const rx = DX + 4.0, rz = WZ + 0.55;                                                                     // hose reel under the tap
           yBox(hd, 0.1, 0.3, 0.1, 0xb8bcc2, rx, 1.55, WZ + 0.1); for (const sx of [-1, 1]) yBox(hd, 0.08, 1.0, 0.7, 0x2f6b3a, rx + sx * 0.36, 0.5, rz);
           const coil = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.14, 8, 18), yMat(0x3b9a4c)); coil.rotation.y = Math.PI / 2; coil.position.set(rx, 0.6, rz); hd.add(coil); }
+        { const sx = HL - 0.04, sz = WZ - 3.2;                                                                      // a little window in the end wall, over the side yard
+          yBox(hd, 0.06, 1.7, 1.9, 0xf7f5f0, sx, winY, sz); yBox(hd, 0.05, 1.45, 1.65, 0x34414f, sx - 0.03, winY, sz);
+          yBox(hd, 0.1, 0.34, HD + 0.1, T, HL - 0.05, BH + 0.05, WZ - HD / 2); yBox(hd, 0.1, 0.28, HD, T, HL - 0.05, XH - 0.2, WZ - HD / 2); }
         bakeYard(hd);
-      }
-      for (const wx of [DX - 4.2, DX + 3.4]) {                                                                     // upstairs windows
-        const win = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.9), new THREE.MeshBasicMaterial({ color: 0x3d4a58, fog: false })); win.position.set(wx, FT(12.5), VD + IN(5.3)); win.userData.noWalk = true; povEndWall.add(win);
-        const fr = new THREE.Mesh(new THREE.PlaneGeometry(2.45, 2.15), new THREE.MeshBasicMaterial({ color: 0xf7f5f0, fog: false })); fr.position.set(wx, FT(12.5), VD + IN(5.2)); fr.userData.noWalk = true; povEndWall.add(fr);
       }
     }
     const bronze = new THREE.MeshPhongMaterial({ color: 0x2c2a28, shininess: 40, specular: 0x333333 }), trim = lam(0xf6f3ee);
@@ -3808,8 +3854,8 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const KR = IN(9), KY = IN(27);
       const bowl = new THREE.Mesh(new THREE.SphereGeometry(KR, 26, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), black); bowl.position.y = KY; bowl.scale.y = 0.9; bbq.add(bowl);
       const lid = new THREE.Mesh(new THREE.SphereGeometry(KR * 1.01, 26, 12, 0, Math.PI * 2, 0, Math.PI / 2), black); lid.position.y = KY + IN(0.3); lid.scale.y = 0.85; bbq.add(lid);
-      const vent = new THREE.Mesh(new THREE.CylinderGeometry(IN(1.6), IN(1.6), IN(0.3), 16), steel); vent.position.y = KY + KR * 0.85 + IN(0.4); bbq.add(vent);
-      BX(bbq, IN(4.5), IN(0.9), IN(1), lam(0x2a2a2a), 0, KY + KR * 0.85 + IN(2), 0);                                                   // lid handle
+      const vent = new THREE.Mesh(new THREE.CylinderGeometry(IN(1.6), IN(1.6), IN(0.3), 16), steel); vent.position.y = KR + IN(0.12); lid.add(vent);   // (on the lid, so they come off together)
+      BX(lid, IN(4.5), IN(0.9) / 0.85, IN(1), lam(0x2a2a2a), 0, KR + IN(2), 0);                                                         // lid handle
       for (const sx of [-1, 1]) BX(bbq, IN(1), IN(0.8), IN(4), lam(0x2a2a2a), sx * (KR + IN(0.5)), KY - IN(1), 0);                        // side handles
       const ash = new THREE.Mesh(new THREE.CylinderGeometry(IN(4.5), IN(4), IN(0.8), 20), steel); ash.position.y = IN(9); bbq.add(ash);
       for (let i = 0; i < 3; i++) {                                                                                                          // three splayed legs, wheels on two
@@ -3817,6 +3863,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         leg.position.set(Math.cos(a) * IN(5.5), KY / 2, Math.sin(a) * IN(5.5)); leg.rotation.set(Math.sin(a) * 0.22, 0, -Math.cos(a) * 0.22); bbq.add(leg);
         if (i < 2) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.2), IN(2.2), IN(0.9), 16), black); wh.rotation.z = Math.PI / 2; wh.position.set(Math.cos(a) * IN(8.5), IN(2.2), Math.sin(a) * IN(8.5)); bbq.add(wh); }
       }
+      bbqRig = { g: bbq, lid, home: bbq.position.clone(), lidHome: lid.position.clone(), crashed: false };   // (the raccoon's big death scene knocks it flying)
     }
     { // the upstairs balcony overhangs the slider: a square covered patio with a cream concrete soffit, a beam, two square posts, two jar lights
       const yard = named(new THREE.Group(), 'Covered patio'); yard.userData.noWalk = true;
@@ -3838,51 +3885,50 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         const cage = new THREE.Mesh(new THREE.TorusGeometry(IN(2.4), IN(0.25), 4, 16), OB(0x6f695e)); cage.rotation.x = Math.PI / 2; cage.position.y = -IN(3.5); f.add(cage);
       }
     }
-    { // the back fence on the property line: weathered wooden boards on posts and rails, the same both sides, with side fences
-      const yard = named(new THREE.Group(), 'Fence'); yard.userData.noWalk = true;
-      const fenceTex = canvasTex(256, 128, (c, w, h) => {
-        for (let b = 0; b < 16; b++) {
-          const x = b * 16, v = 118 + Math.random() * 40 | 0; c.fillStyle = `rgb(${v},${v - 12},${v - 26})`; c.fillRect(x, 0, 16, h);
-          for (let k = 0; k < 7; k++) { c.fillStyle = `rgba(${Math.random() < 0.5 ? '60,48,36' : '210,200,180'},.18)`; c.fillRect(x + 1 + Math.random() * 13, 0, 1, h); }   // grain
-          c.fillStyle = 'rgba(30,24,18,.75)'; c.fillRect(x + 15, 0, 1, h);                                        // the gap between boards
-        }
-      }, 1, 1);
-      const FH = FT(6), FZ = VD + FT(34), FL = 86, SIDE_X = FT(30), SL = FZ - VD - FT(3);
-      const mk = (len, rep) => { const t = fenceTex.clone(); t.needsUpdate = true; t.repeat.set(rep, 1); return new THREE.MeshBasicMaterial({ map: t, fog: false, side: THREE.DoubleSide }); };
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(FL, FH), mk(FL, FL / (IN(5.5) * 16))); back.rotation.y = Math.PI; back.position.set(0, FH / 2, FZ); yard.add(back);
-      for (const sx of [-1, 1]) { const side = new THREE.Mesh(new THREE.PlaneGeometry(SL, FH), mk(SL, SL / (IN(5.5) * 16))); side.rotation.y = -sx * Math.PI / 2; side.position.set(sx * SIDE_X, FH / 2, VD + FT(3) + SL / 2); yard.add(side); }
-      const wood = new THREE.MeshBasicMaterial({ color: 0x6e604e, fog: false }), rail = new THREE.MeshBasicMaterial({ color: 0x80725e, fog: false });
-      for (const ry of [FT(1), FT(5)]) BX(yard, FL, IN(3.5), IN(1.5), rail, 0, ry, FZ - IN(1));                     // rails on our side
-      for (let x = -FL / 2; x <= FL / 2; x += FT(8)) BX(yard, IN(4), FH + IN(3), IN(4), wood, x, (FH + IN(3)) / 2, FZ - IN(3));   // posts
-      // string lights along the top, sagging between the posts
-      const bulbs = [], wire = [], cols = [0xff5a4e, 0xffc24a, 0x5ed16a, 0x4aa8ff, 0xff7ad0, 0xfff1c8];
-      for (let x = -FL / 2; x < FL / 2; x += FT(8)) for (let t = 0; t <= 1.0001; t += 1 / 24) {
-        const px = x + t * FT(8), py = FH + IN(2) - 0.55 * (1 - (2 * t - 1) ** 2); wire.push(px, py, FZ - IN(5));
-        if (t > 0.02 && t < 0.98 && Math.round(t * 24) % 3 === 0) bulbs.push([px, py - IN(2.5)]);
-      }
-      const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wire, 3));
-      const wl = new THREE.Line(wg, new THREE.LineBasicMaterial({ color: 0x2a2724, fog: false })); wl.userData.name = 'String lights'; yard.add(wl);
-      const bm = new THREE.InstancedMesh(new THREE.SphereGeometry(IN(1.6), 8, 6), new THREE.MeshBasicMaterial({ fog: false }), bulbs.length); bm.userData.name = 'String lights';
-      const M = new THREE.Matrix4(), C = new THREE.Color();
-      bulbs.forEach(([bx, by], i) => { M.makeTranslation(bx, by, FZ - IN(5)); bm.setMatrixAt(i, M); bm.setColorAt(i, C.setHex(cols[i % cols.length])); });
-      yard.add(bm);
-      // bushes along the fence and leafy trees behind it: lumpy blobs, lighter on top, in one instanced mesh
+    { // chain-link fences round our half of the backyard: down the middle (the other half's yard over it), down the neighbours' side
+      // (through a gate, the side yard runs on round the house) and across the back. Galvanised mesh on posts with a top rail, and bushes
+      // and tall trees crowding in behind
+      const yard = named(new THREE.Group(), 'Chain-link fence'); yard.userData.noWalk = true;
+      const Y = YARD, FH = Y.FH, FZ = Y.FZ, posts = new THREE.Group(); posts.userData.name = 'Fence posts'; yard.add(posts);
+      const linkTex = canvasTex(64, 64, (c, w, h) => { c.clearRect(0, 0, w, h); c.strokeStyle = 'rgba(178,184,190,1)'; c.lineWidth = 3.4;
+        for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(k * 32, 0); c.lineTo(k * 32 + 64, 64); c.stroke(); c.beginPath(); c.moveTo(k * 32 + 64, 0); c.lineTo(k * 32, 64); c.stroke(); } }, 1, 1);
+      const run = (x0, z0, x1, z1, gate) => {                                                               // one straight stretch: mesh, posts every 8 ft, a top rail
+        const L = Math.hypot(x1 - x0, z1 - z0), t = linkTex.clone(); t.needsUpdate = true; t.repeat.set(L / 0.31, (FH - 0.1) / 0.31);
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(L, FH - 0.1), new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.06, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+        m.position.set((x0 + x1) / 2, (FH - 0.1) / 2 + 0.05, (z0 + z1) / 2); m.rotation.y = Math.atan2(-(z1 - z0), x1 - x0); m.userData.name = 'Chain-link fence'; yard.add(m);
+        const n = Math.max(1, Math.round(L / FT(8)));
+        for (let i = 0; i <= n; i++) { const k = i / n; yCyl(posts, 0.06, 0.06, FH + 0.12, 0x9ea4aa, x0 + (x1 - x0) * k, (FH + 0.12) / 2, z0 + (z1 - z0) * k, 8); }
+        yBox(posts, 0.07, 0.07, L, 0xa9afb5, (x0 + x1) / 2, FH, (z0 + z1) / 2, Math.atan2(x1 - x0, z1 - z0));
+        if (gate) { const gx = (x0 + x1) / 2, gz = (z0 + z1) / 2, ry = Math.atan2(x1 - x0, z1 - z0), gw = Math.min(L - 0.4, FT(4));   // a gate in the middle of it: a pipe frame, a brace, a latch
+          const gg = new THREE.Group(); gg.position.set(gx, 0, gz); gg.rotation.y = ry; posts.add(gg);
+          for (const sx of [-1, 1]) yCyl(gg, 0.05, 0.05, FH - 0.2, 0xb4babf, 0, (FH - 0.2) / 2 + 0.1, sx * gw / 2, 8);
+          for (const y of [0.15, FH - 0.12, FH / 2]) yBox(gg, 0.05, 0.05, gw, 0xb4babf, 0, y, 0);
+          yBox(gg, 0.08, 0.18, 0.12, 0x2a2a2a, 0.06, FH * 0.62, gw / 2 - 0.08); }
+      };
+      run(Y.XR, VD + IN(6), Y.XR, FZ);                                                                          // down the middle
+      run(Y.XL0, VD - 12, Y.XL0, VD + 0.2); run(Y.XL0, VD + 0.2, Y.XL1, FZ);                                    // down the neighbours' side
+      run(Y.XL0, VD + 0.2, Y.HL, VD + 0.2, true);                                                               // across the side yard, with the gate
+      run(-44, FZ, 44, FZ);                                                                                      // across the back (the lots behind share it)
+      run(Y.HR + 2.6, VD + IN(6), Y.HR + 2.6, FZ);                                                              // the far side of next door's yard
+      bakeYard(posts);
+      // bushes along the fences and tall leafy trees behind them: lumpy blobs, lighter on top, in one instanced mesh
       const blob = new THREE.IcosahedronGeometry(1, 1), bp = blob.attributes.position, shade = [];
       const hsh = (x, y, z, sd) => { const v = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + sd) * 43758.5453; return v - Math.floor(v); };   // (random, but the same for every copy of a corner)
       for (let i = 0; i < bp.count; i++) { const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i), k = 0.55 + 0.45 * (y * 0.5 + 0.5) + (hsh(x, y, z, 4) - 0.5) * 0.12; bp.setXYZ(i, x * (0.92 + hsh(x, y, z, 1) * 0.16), y * (0.92 + hsh(x, y, z, 2) * 0.16), z * (0.92 + hsh(x, y, z, 3) * 0.16)); shade.push(k, k, k); }
       blob.setAttribute('color', new THREE.Float32BufferAttribute(shade, 3));
-      const leaves = [], trunks = [];
-      for (let x = -FL / 2 + 1.5; x < FL / 2 - 1; x += 2.6 + Math.random() * 1.6) {
-        const n = 2 + (Math.random() * 3 | 0);
-        for (let k = 0; k < n; k++) { const r = 0.8 + Math.random() * 0.8; leaves.push([x + (Math.random() - 0.5) * 2, r * 0.7, FZ - 1.3 + (Math.random() - 0.5) * 0.8, r, [0x3c7431, 0x4a8638, 0x57963f, 0x335f2a][Math.random() * 4 | 0]]); }
-      }
-      for (const [tx, tz, th] of [[-30, 9, 9], [-17, 6, 11], [-6, 12, 10], [5, 7, 12], [16, 10, 9], [29, 6, 11]]) {
-        trunks.push([tx, FZ + tz, th]);
-        for (let k = 0; k < 7; k++) { const r = 2.2 + Math.random() * 1.8; leaves.push([tx + (Math.random() - 0.5) * 5, th + (Math.random() - 0.3) * 3.5, FZ + tz + (Math.random() - 0.5) * 4, r, [0x7fae4c, 0x6a9a40, 0x94bf5a, 0x5c8a38][Math.random() * 4 | 0]]); }
-      }
+      let seed = 23; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const leaves = [], trunks = [], BUSH = [0x3c7431, 0x4a8638, 0x57963f, 0x335f2a, 0x42803a], LEAF = [0x7fae4c, 0x6a9a40, 0x94bf5a, 0x5c8a38, 0x4f8a3a];
+      const bush = (x, z, r0) => { const n = 2 + (rnd() * 2 | 0); for (let k = 0; k < n; k++) { const r = r0 * (0.7 + rnd() * 0.5); leaves.push([x + (rnd() - 0.5) * 1.4, r * 0.72, z + (rnd() - 0.5) * 1.0, r, BUSH[rnd() * BUSH.length | 0]]); } };
+      const tree = (x, z, h) => { trunks.push([x, z, h]); for (let k = 0; k < 7; k++) { const r = 2 + rnd() * 1.7; leaves.push([x + (rnd() - 0.5) * 4.6, h + (rnd() - 0.3) * 3.2, z + (rnd() - 0.5) * 4.6, r, LEAF[rnd() * LEAF.length | 0]]); } };
+      for (let x = -44; x < 44; x += 2.1 + rnd() * 1.3) bush(x, FZ + 1.0, 1.1 + rnd() * 0.55);               // a hedge of bushes behind the back fence...
+      for (let x = -38; x < 40; x += 6 + rnd() * 4.5) tree(x, FZ + 3.5 + rnd() * 5.5, 9 + rnd() * 4.5);         // ...and a wall of trees behind that (their branches reach over)
+      for (let z = VD - 10; z < FZ - 0.5; z += 2.1 + rnd() * 1.1) bush(yardXL(z) - 1.15, z, 0.95 + rnd() * 0.5);   // bushes all down the neighbours' side
+      for (let z = VD + 13; z < FZ - 2; z += 6.5 + rnd() * 4) tree(yardXL(z) - 4 - rnd() * 3, z, 8.5 + rnd() * 4);
+      for (let z = VD + 17; z < FZ - 0.5; z += 2.3 + rnd()) bush(Y.XR + 1.15, z, 0.85 + rnd() * 0.4);         // over the middle fence toward the back of next door's
+      for (const [x, z, h] of [[Y.XR + 7, FZ - 6, 10.5], [Y.XR + 14, FZ - 13, 9], [Y.HR + 6, VD + 16, 10], [Y.HR + 8, FZ - 4, 11]]) tree(x, z, h);
       const lm = new THREE.InstancedMesh(blob, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), leaves.length); lm.userData.name = 'Bushes';
-      const Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), E = new THREE.Euler();
-      leaves.forEach(([lx, ly, lz, r, c], i) => { Q.setFromEuler(E.set(0, Math.random() * 6, 0)); M.compose(P.set(lx, ly, lz), Q, S.set(r, r * 0.85, r)); lm.setMatrixAt(i, M); lm.setColorAt(i, C.setHex(c)); });
+      const M = new THREE.Matrix4(), C = new THREE.Color(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), E = new THREE.Euler();
+      leaves.forEach(([lx, ly, lz, r, c], i) => { Q.setFromEuler(E.set(0, rnd() * 6, 0)); M.compose(P.set(lx, ly, lz), Q, S.set(r, r * 0.85, r)); lm.setMatrixAt(i, M); lm.setColorAt(i, C.setHex(c)); });
       yard.add(lm);
       const bark = new THREE.MeshBasicMaterial({ color: 0x5b4a3a, fog: false });
       for (const [tx, tz, th] of trunks) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, th, 8), bark); tr.position.set(tx, th / 2, tz); tr.userData.name = 'Tree'; yard.add(tr); }
@@ -3892,7 +3938,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       g.fillStyle = '#5c9c3c'; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(0, 0, w / 2, h);   // mower stripes
       for (let i = 0; i < 2600; i++) { const x = Math.random() * w, y = Math.random() * h; g.strokeStyle = Math.random() < 0.5 ? 'rgba(38,86,28,.5)' : 'rgba(150,204,96,.45)'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 3, y - 3 - Math.random() * 5); g.stroke(); }
     }, 36, 36);
-    const lawn = new THREE.Mesh(new THREE.CircleGeometry(52, 48, Math.PI, Math.PI), new THREE.MeshBasicMaterial({ map: grassTex, fog: false })); lawn.rotation.x = -Math.PI / 2; lawn.position.set(0, -0.012, VD); lawn.userData.name = 'Backyard lawn'; povEndWall.add(lawn);   // a half-disc: only outside, never under the house
+    const lawn = new THREE.Mesh(new THREE.CircleGeometry(72, 56, Math.PI, Math.PI), new THREE.MeshBasicMaterial({ map: grassTex, fog: false })); lawn.rotation.x = -Math.PI / 2; lawn.position.set(0, -0.012, VD); lawn.userData.name = 'Backyard lawn'; povEndWall.add(lawn);   // a half-disc: only outside, never under the house
     { // the sky: a painted sky sphere (deep blue overhead, hazy at the horizon, the afternoon sun's glow, and far-off hills and a tree
       // line all round), with a second, slightly smaller sphere of clouds that drifts. Both follow the camera, so they're always 'at infinity'.
       const W = 1024, H = 512, HZ = H / 2, wrap = (x) => [x - W, x, x + W];
@@ -4275,11 +4321,12 @@ function bakeYard(root) {
   list.forEach(o => o.parent.remove(o)); root.add(mesh);
 }
 function buildYardLife(VD, DX, DW) {                                  // the backyard, lived in (only ever seen from Free roam / the cat's eyes)
-  const FZ = VD + FT(34), SXW = FT(30), FH = FT(6), grp = (name, walk) => { const g = new THREE.Group(); g.userData.name = name; if (!walk) g.userData.noWalk = true; povEndWall.add(g); return g; };
+  const Y = YARD, FZ = Y.FZ, XR = Y.XR, grp = (name, walk) => { const g = new THREE.Group(); g.userData.name = name; if (!walk) g.userData.noWalk = true; povEndWall.add(g); return g; };
   const block = (x0, x1, z0, z1) => YARD_BLOCKS.push([x0, x1, z0, z1]);
   const shadow = (x, z, rx, rz) => { const m = new THREE.Mesh(new THREE.CircleGeometry(1, 24), yardShadowMat()); m.rotation.x = -Math.PI / 2; m.scale.set(rx, rz, 1); m.position.set(x, 0.006, z); m.userData.noWalk = true; povEndWall.add(m); };
-  // -- the garden shed in the back-left corner: sage boards, white trim, double doors with a Z-brace, a window with a flower box
-  { const sh = grp('Garden shed', true); sh.position.set(-SXW + 2.9, 0, FZ - 2.3);
+  // -- the garden shed, backed up to the neighbours' fence toward the back, doors facing the yard: sage boards, white trim, a Z-brace, a window box
+  const SZ = FZ - 11, SX = yardXL(SZ) + 2.3;
+  { const sh = grp('Garden shed', true); sh.position.set(SX, 0, SZ); sh.rotation.y = -Math.PI / 2;
     yBox(sh, 4.5, 0.25, 3.7, 0x6b5a45, 0, 0.125, 0); yBox(sh, 4.2, 3.0, 3.4, 0x8fae8a, 0, 1.75, 0);
     for (let x = -1.9; x <= 1.91; x += 0.38) { yBox(sh, 0.05, 3.0, 0.04, 0x7e9c79, x, 1.75, -1.72); yBox(sh, 0.05, 3.0, 0.04, 0x7e9c79, x, 1.75, 1.72); }
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) yBox(sh, 0.18, 3.05, 0.18, 0xf4f1ea, sx * 2.08, 1.77, sz * 1.68);
@@ -4291,43 +4338,28 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     for (const sx of [-1, 1]) { const r = yBox(sh, sl, 0.12, 4.0, 0x4a4f57, sx * 1.05, 3.25 + 0.62, 0); r.rotation.z = -sx * th; }
     const tri = new THREE.Shape([new THREE.Vector2(-2.1, 0), new THREE.Vector2(2.1, 0), new THREE.Vector2(0, 1.2)]);
     for (const sz of [-1, 1]) { const m = new THREE.Mesh(new THREE.ShapeGeometry(tri), yMat(0x8fae8a)); m.position.set(0, 3.25, sz * 1.705); if (sz < 0) m.rotation.y = Math.PI; sh.add(m); }
-    bakeYard(sh); shadow(-SXW + 2.9, FZ - 2.3, 3.0, 2.5); block(-SXW, -SXW + 5.3, FZ - 4.3, FZ); }
-  // -- Porter's doghouse in the back-right corner: red, white trim, arched door, and his name over it
-  { const dh = grp('Doghouse', true); dh.position.set(SXW - 3.6, 0, FZ - 2.8);
-    yBox(dh, 2.4, 0.15, 2.8, 0x6b5a45, 0, 0.075, 0); yBox(dh, 2.1, 1.6, 2.5, 0xc0392b, 0, 0.95, 0);
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) yBox(dh, 0.12, 1.62, 0.12, 0xf4f1ea, sx * 1.04, 0.96, sz * 1.24);
-    const arch = new THREE.Shape(); arch.moveTo(-0.45, 0); arch.lineTo(-0.45, 0.65); arch.absarc(0, 0.65, 0.45, Math.PI, 0, true); arch.lineTo(0.45, 0); arch.lineTo(-0.45, 0);
-    const door = new THREE.Mesh(new THREE.ShapeGeometry(arch, 12), yMat(0x1c1414)); door.position.set(0, 0.16, -1.256); door.rotation.y = Math.PI; dh.add(door);
-    const th = Math.atan2(0.85, 1.05), sl = Math.hypot(1.05, 0.85) + 0.25;
-    for (const sx of [-1, 1]) { const r = yBox(dh, sl, 0.1, 2.9, 0x3d3f45, sx * 0.55, 1.75 + 0.43, 0); r.rotation.z = -sx * th; }
-    const tri = new THREE.Shape([new THREE.Vector2(-1.05, 0), new THREE.Vector2(1.05, 0), new THREE.Vector2(0, 0.85)]);
-    for (const sz of [-1, 1]) { const m = new THREE.Mesh(new THREE.ShapeGeometry(tri), yMat(0xc0392b)); m.position.set(0, 1.75, sz * 1.255); if (sz < 0) m.rotation.y = Math.PI; dh.add(m); }
-    yCyl(dh, 0.3, 0.26, 0.14, 0xb8bec6, 1.55, 0.07, -1.55); yCyl(dh, 0.25, 0.25, 0.02, 0x7a4a26, 1.55, 0.13, -1.55);   // his food bowl...
-    yCyl(dh, 0.3, 0.26, 0.14, 0xb8bec6, 2.2, 0.07, -1.3); yCyl(dh, 0.25, 0.25, 0.02, 0x8fc5e8, 2.2, 0.13, -1.3);     // ...and water
-    { const bn = new THREE.Group(); bn.position.set(-1.5, 0.08, -1.8); bn.rotation.y = 0.6; dh.add(bn); yCyl(bn, 0.06, 0.06, 0.55, 0xf2ece0, 0, 0, 0).rotation.z = Math.PI / 2; for (const sx of [-1, 1]) for (const sz of [-1, 1]) yBlob(bn, 0.08, 0xf2ece0, sx * 0.3, 0, sz * 0.05); }   // a chew bone
-    { const m = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), yMat(0xd4e84a)); m.position.set(-0.4, 0.1, -2.3); dh.add(m); }   // and his tennis ball
-    bakeYard(dh);
-    const signTex = canvasTex(256, 64, (c, w, h) => { c.fillStyle = '#f3e7cf'; c.fillRect(0, 0, w, h); c.strokeStyle = '#7a5638'; c.lineWidth = 6; c.strokeRect(3, 3, w - 6, h - 6); c.fillStyle = '#5a3a22'; c.font = 'bold 40px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('PORTER', w / 2, h / 2 + 2); c.fillStyle = '#8a7a66'; for (const x of [14, w - 14]) { c.beginPath(); c.arc(x, h / 2, 3, 0, 7); c.fill(); } }, 1, 1);
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.29), new THREE.MeshBasicMaterial({ map: signTex, fog: false })); sign.position.set(0, 2.08, -1.27); sign.rotation.y = Math.PI; dh.add(sign);
-    shadow(SXW - 3.6, FZ - 2.8, 1.8, 2.0); block(SXW - 5, SXW - 2.2, FZ - 4.3, FZ - 1.3); }
-  // -- a big shade tree with a tire swing, left of middle
-  { const tr = grp('Tree', true), TX = -12.5, TZ = VD + 15.5; tr.position.set(TX, 0, TZ);
+    bakeYard(sh); shadow(SX, SZ, 2.5, 3.0); block(SX - 1.9, SX + 1.9, SZ - 2.3, SZ + 2.3); }
+  // -- a big shade tree with a tire swing, out in the middle of the lawn, and two more toward the back
+  { const tr = grp('Tree', true), TX = -1.5, TZ = VD + 21; tr.position.set(TX, 0, TZ);
     yCyl(tr, 0.42, 0.68, 5.4, 0x6b4a32, 0, 2.7, 0, 10);
     const br = yCyl(tr, 0.16, 0.26, 3.4, 0x6b4a32, 1.35, 4.55, 0, 8); br.rotation.z = -1.05;
     for (let k = 0; k < 10; k++) { const a = k * 2.4, r = 1.7 + (k % 3) * 0.45; yBlob(tr, r, [0x4f8a3a, 0x5c9a42, 0x6aa84a, 0x467e34][k % 4], Math.cos(a) * 2.2 + 0.6, 6.3 + (k % 4) * 0.55, Math.sin(a) * 1.9, 0.82); }
     yCyl(tr, 0.03, 0.03, 3.9, 0xcbb892, 2.75, 3.2, 0, 5); const tire = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.15, 8, 18), yMat(0x1f1f21)); tire.position.set(2.75, 1.15, 0); tr.add(tire);
     bakeYard(tr); shadow(TX + 0.8, TZ, 3.6, 3.0); block(TX - 0.9, TX + 0.9, TZ - 0.9, TZ + 0.9); }
+  for (const [TX, TZ, H] of [[Y.XL1 + 5.2, FZ - 3.6, 7.2], [XR - 4.2, FZ - 4.4, 7.8]]) {                   // (the drone photo's back half is all tree canopy)
+    const tr = grp('Tree', true); tr.position.set(TX, 0, TZ); yCyl(tr, 0.38, 0.62, H, 0x5f4330, 0, H / 2, 0, 10);
+    for (let k = 0; k < 11; k++) { const a = k * 2.3, r = 2.1 + (k % 3) * 0.5; yBlob(tr, r, [0x3f7a32, 0x4f8a3a, 0x5c9a42, 0x467e34][k % 4], Math.cos(a) * 2.6, H + 0.4 + (k % 4) * 0.6, Math.sin(a) * 2.4, 0.8); }
+    bakeYard(tr); shadow(TX, TZ, 4.2, 3.6); block(TX - 0.8, TX + 0.8, TZ - 0.8, TZ + 0.8); }
   // -- a stone birdbath
-  { const bb = grp('Birdbath', true); bb.position.set(-3.8, 0, VD + 19.5);
+  { const bx = -8.6, bz = VD + 13.5, bb = grp('Birdbath', true); bb.position.set(bx, 0, bz);
     yCyl(bb, 0.34, 0.42, 0.14, 0xb9b3a8, 0, 0.07, 0); yCyl(bb, 0.13, 0.2, 1.05, 0xc2bcb1, 0, 0.66, 0); yCyl(bb, 0.68, 0.36, 0.2, 0xc2bcb1, 0, 1.25, 0, 18); yCyl(bb, 0.56, 0.56, 0.02, 0x8fc5e8, 0, 1.34, 0, 18);
-    bakeYard(bb); shadow(-3.8, VD + 19.5, 0.8, 0.8); block(-4.6, -3.0, VD + 18.7, VD + 20.3); }
-  // -- a raised vegetable bed along the right fence: lettuces and staked tomatoes
-  { const vb = grp('Vegetable bed', true), VX = SXW - 1.1, VZ = VD + 12; vb.position.set(VX, 0, VZ);
+    bakeYard(bb); shadow(bx, bz, 0.8, 0.8); block(bx - 0.8, bx + 0.8, bz - 0.8, bz + 0.8); }
+  // -- a raised vegetable bed along the middle fence: lettuces and staked tomatoes
+  { const vb = grp('Vegetable bed', true), VX = XR - 1.1, VZ = VD + 12; vb.position.set(VX, 0, VZ);
     yBox(vb, 1.45, 0.58, 6.3, 0x8a6a45, 0, 0.29, 0); yBox(vb, 1.25, 0.05, 6.1, 0x4a3526, 0, 0.59, 0);
     for (let k = 0; k < 6; k++) yBlob(vb, 0.26, k % 2 ? 0x7cc152 : 0x5fae3f, -0.3, 0.72, -2.6 + k * 0.62, 0.7);
     for (let k = 0; k < 3; k++) { const z = -2.2 + k * 2.2; yCyl(vb, 0.025, 0.025, 1.4, 0xb89a6a, 0.32, 1.3, z, 5); yBlob(vb, 0.34, 0x4d8f3a, 0.32, 1.2, z, 1.3); for (let t = 0; t < 4; t++) yBlob(vb, 0.09, 0xd9392b, 0.32 + Math.cos(t * 1.7) * 0.28, 1.0 + t * 0.14, z + Math.sin(t * 1.7) * 0.28); }
     bakeYard(vb); block(VX - 0.8, VX + 0.8, VZ - 3.2, VZ + 3.2); }
-  // -- a little bistro set on the grass by the patio, and potted plants either side of the door
   { const bs = grp('Bistro set', true), BXp = DX - 4.6, BZ = VD + 3.6; bs.position.set(BXp, 0, BZ);
     yCyl(bs, 0.28, 0.34, 0.06, 0x2b2d30, 0, 0.03, 0); yCyl(bs, 0.05, 0.05, 1.5, 0x2b2d30, 0, 0.8, 0, 8); yCyl(bs, 0.72, 0.72, 0.06, 0x2b2d30, 0, 1.56, 0, 20); yCyl(bs, 0.66, 0.66, 0.02, 0x3a7fa0, 0, 1.6, 0, 20);
     for (const sx of [-1, 1]) { const ch = new THREE.Group(); ch.position.set(sx * 1.05, 0, 0.1); ch.rotation.y = sx * Math.PI / 2; bs.add(ch);
@@ -4340,46 +4372,57 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
       for (let k = 0; k < 6; k++) { const a = k * 1.1; yBlob(pots, 0.28, 0x3f8a45, px + Math.cos(a) * 0.22, 1.05 + (k % 2) * 0.25, pz + Math.sin(a) * 0.22); }
       for (let k = 0; k < 4; k++) yBlob(pots, 0.1, [0xff6fae, 0xffffff, 0xffd23a, 0xff6fae][k], px + Math.cos(k * 1.6) * 0.3, 1.4, pz + Math.sin(k * 1.6) * 0.3); }
     bakeYard(pots); }
-  // -- stepping stones from the patio out to the shed, and garden gates between the house and the side fences
-  { const st = grp('Stepping stones');
-    for (let k = 0; k < 11; k++) { const t = (k + 0.5) / 11, x = DX - 2.6 + (-SXW + 4.2 - (DX - 2.6)) * t + Math.sin(t * Math.PI) * -2.2, z = VD + 5.2 + (FZ - 5.2 - (VD + 5.2)) * t;
+  // -- stepping stones from the patio out to the shed door
+  { const st = grp('Stepping stones'), x0 = DX - 2.6, z0 = VD + 5.2, x1 = SX + 2.6, z1 = SZ;
+    for (let k = 0; k < 12; k++) { const t = (k + 0.5) / 12, x = x0 + (x1 - x0) * t + Math.sin(t * Math.PI) * 1.8, z = z0 + (z1 - z0) * t;
       const m = yCyl(st, 0.46 + (k % 3) * 0.05, 0.5, 0.06, [0x9c9890, 0xa6a29a, 0x928e86][k % 3], x, 0.03, z, 9); m.rotation.y = k * 0.7; m.scale.z = 0.8; }
-    bakeYard(st);
-    const gt = grp('Garden gates', true);
-    for (const sx of [-1, 1]) { const x = sx * SXW, z0 = VD + IN(5), z1 = VD + FT(3), zc = (z0 + z1) / 2, L = z1 - z0;
-      yBox(gt, 0.14, FH * 0.92, L - 0.1, 0x8a7458, x, FH * 0.46, zc); for (let k = 0; k < 7; k++) yBox(gt, 0.06, FH * 0.9, 0.04, 0x735f46, x - sx * 0.08, FH * 0.46, z0 + 0.15 + k * (L - 0.3) / 6);
-      for (const y of [0.9, FH * 0.8]) yBox(gt, 0.08, 0.2, L - 0.2, 0x735f46, x - sx * 0.1, y, zc); const d = yBox(gt, 0.08, 0.16, Math.hypot(L - 0.3, FH * 0.8 - 0.9), 0x735f46, x - sx * 0.1, (0.9 + FH * 0.8) / 2, zc); d.rotation.x = Math.atan2(FH * 0.8 - 0.9, L - 0.3);
-      yBox(gt, 0.1, 0.1, 0.25, 0x2a2a2a, x - sx * 0.14, 2.6, z1 - 0.35); }
-    bakeYard(gt); }
-  // -- flower beds along the side fences, and daisies in the lawn
+    bakeYard(st); }
+  // -- round the side of the house, past the gate: the bins
+  { const bn = grp('Bins'); for (const [z, c] of [[VD - 2.6, 0x2f5d3a], [VD - 3.8, 0x232528], [VD - 5.0, 0x232528]]) { const x = Y.HL - 1.0; yBox(bn, 0.95, 1.45, 0.95, c, x, 0.78, z); yBox(bn, 1.02, 0.1, 1.04, c, x - 0.02, 1.54, z); for (const sz of [-1, 1]) yCyl(bn, 0.14, 0.14, 0.08, 0x111111, x - 0.35, 0.14, z + sz * 0.4, 10).rotation.z = Math.PI / 2; }
+    bakeYard(bn); }
+  // -- over the middle fence: the other half's yard (Porter's): a concrete patio, a plastic table and chairs, his bowl and ball, a clothesline
+  { const nd = grp('Next door'), px = XR + 5.4;
+    yBox(nd, 10, 0.08, 8.5, 0xb9b5ad, px, 0.04, VD + 4.4);
+    yCyl(nd, 0.75, 0.75, 0.06, 0xf4f4f0, px + 1.4, 1.35, VD + 5.2, 20); yCyl(nd, 0.06, 0.06, 1.3, 0xf4f4f0, px + 1.4, 0.68, VD + 5.2, 8);
+    for (const a of [0, 2.2, 4.2]) { const cx = px + 1.4 + Math.cos(a) * 1.25, cz = VD + 5.2 + Math.sin(a) * 1.25; yBox(nd, 0.8, 0.08, 0.8, 0xf4f4f0, cx, 0.85, cz); yBox(nd, 0.8, 0.9, 0.08, 0xf4f4f0, cx - Math.cos(a) * 0.36, 1.3, cz - Math.sin(a) * 0.36, -a + Math.PI / 2); for (const [lx, lz] of [[-0.32, -0.32], [0.32, -0.32], [-0.32, 0.32], [0.32, 0.32]]) yCyl(nd, 0.03, 0.03, 0.85, 0xe8e8e2, cx + lx, 0.42, cz + lz, 6); }
+    yCyl(nd, 0.36, 0.3, 0.16, 0xb8bec6, XR + 1.3, 0.08, VD + 9.5, 16); yCyl(nd, 0.3, 0.3, 0.02, 0x8fc5e8, XR + 1.3, 0.15, VD + 9.5, 16);   // Porter's water bowl
+    { const m = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), yMat(0xd4e84a)); m.position.set(XR + 2.6, 0.12, VD + 12); nd.add(m); }   // and his tennis ball
+    for (const z of [VD + 14, VD + 24]) { yCyl(nd, 0.06, 0.06, 2.6, 0x8c8f93, px, 1.3, z, 8); yBox(nd, 1.6, 0.06, 0.06, 0x8c8f93, px, 2.55, z); }   // the clothesline
+    for (const sx of [-0.7, 0.7]) { const pts = []; for (let t = 0; t <= 1.0001; t += 1 / 16) pts.push(new THREE.Vector3(px + sx, 2.55 - 0.35 * (1 - (2 * t - 1) ** 2), VD + 14 + 10 * t)); const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xdedede, fog: false })); l.userData.noWalk = true; nd.add(l); }
+    for (const [z, c] of [[VD + 16.5, 0xff8fb8], [VD + 18.2, 0x7fb6ff], [VD + 20, 0xfff2a8]]) yBox(nd, 0.04, 0.95, 0.8, c, px - 0.7, 2.0, z);   // towels on the line
+    bakeYard(nd); }
+  // -- flower beds along our fences, and daisies in the lawn
   { const mounds = [], blooms = [], cols = [0xff6fae, 0xffd23a, 0xffffff, 0xb07aff, 0xff5a4e, 0xff9a3c];
     let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    for (const sx of [-1, 1]) for (let z = VD + 3.2; z < FZ - 1.5; z += 1.25 + rnd() * 0.5) {
-      if (sx > 0 && z > VD + 8.4 && z < VD + 15.6) continue;                                         // (the vegetable bed's there)
-      if (z > FZ - 5 && (sx < 0 || sx > 0)) continue;                                                 // (shed / doghouse corners)
-      const x = sx * (SXW - 0.75 - rnd() * 0.3), r = 0.45 + rnd() * 0.25; mounds.push([x, r * 0.55, z, r, [0x3f7a36, 0x467f3a, 0x3a6f31][rnd() * 3 | 0]]);
+    for (const side of [0, 1]) for (let z = VD + 3.2; z < FZ - 1.5; z += 1.25 + rnd() * 0.5) {
+      if (side && z > VD + 8.4 && z < VD + 15.6) continue;                                          // (the vegetable bed's there)
+      if (!side && Math.abs(z - SZ) < 3.2) continue;                                                // (and the shed)
+      if (z > FZ - 7) continue;                                                                     // (the back corners are under the trees)
+      const x = side ? XR - 0.75 - rnd() * 0.3 : yardXL(z) + 0.75 + rnd() * 0.3, r = 0.45 + rnd() * 0.25; mounds.push([x, r * 0.55, z, r, [0x3f7a36, 0x467f3a, 0x3a6f31][rnd() * 3 | 0]]);
       const nb = 3 + (rnd() * 4 | 0), c = cols[rnd() * cols.length | 0]; for (let k = 0; k < nb; k++) { const a = rnd() * 6.28; blooms.push([x + Math.cos(a) * r * 0.6, r * 0.95 + rnd() * 0.15, z + Math.sin(a) * r * 0.6, 0.11 + rnd() * 0.06, rnd() < 0.8 ? c : cols[rnd() * cols.length | 0]]); }
     }
-    for (let x = -FT(30) + 6; x < FT(30) - 6; x += 1.6 + rnd()) { const c = cols[rnd() * cols.length | 0]; for (let k = 0; k < 3; k++) blooms.push([x + (rnd() - 0.5) * 1.2, 0.9 + rnd() * 0.7, FZ - 2.25 + (rnd() - 0.5) * 0.5, 0.12 + rnd() * 0.05, c]); }   // colour in front of the back bushes
     const inst = (list, geo, name) => { const im = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), list.length); im.userData.name = name; im.userData.noWalk = true;
       const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), CC = new THREE.Color(), E = new THREE.Euler();
       list.forEach(([x, y, z, r, c], i) => { Q.setFromEuler(E.set(0, rnd() * 6, 0)); M.compose(P.set(x, y, z), Q, S.set(r, r * 0.8, r)); im.setMatrixAt(i, M); im.setColorAt(i, CC.setHex(c)); }); povEndWall.add(im); };
     const shaded = () => { const g = new THREE.IcosahedronGeometry(1, 1), P = g.attributes.position, sh = []; for (let i = 0; i < P.count; i++) { const k = 0.6 + 0.4 * (P.getY(i) * 0.5 + 0.5); sh.push(k, k, k); } g.setAttribute('color', new THREE.Float32BufferAttribute(sh, 3)); return g; };
     inst(mounds, shaded(), 'Flower bed'); inst(blooms, shaded(), 'Flowers');
-    const dais = []; for (let i = 0; i < 420; i++) { const x = (rnd() - 0.5) * (SXW * 2 - 3), z = VD + 2 + rnd() * (FZ - VD - 4); if (Math.abs(x - DX) < 3.2 && z < VD + 5.5) continue; dais.push([x, 0.02, z, 0.05 + rnd() * 0.03, rnd() < 0.7 ? 0xffffff : 0xffe36a]); }
+    const dais = []; for (let i = 0; i < 480; i++) { const z = VD + 2 + rnd() * (FZ - VD - 5), x0 = yardXL(z) + 1, x = x0 + rnd() * (XR - 1 - x0); if (Math.abs(x - DX) < 3.2 && z < VD + 5.5) continue; dais.push([x, 0.02, z, 0.05 + rnd() * 0.03, rnd() < 0.7 ? 0xffffff : 0xffe36a]); }
     const dg = new THREE.CircleGeometry(1, 6); dg.rotateX(-Math.PI / 2); { const sh = []; for (let i = 0; i < dg.attributes.position.count; i++) sh.push(1, 1, 1); dg.setAttribute('color', new THREE.Float32BufferAttribute(sh, 3)); }
     inst(dais, dg, 'Daisies'); }
-  // -- over the fence: the neighbours' houses, and a line of utility poles with sagging wires
+  // -- the neighbours' houses: the grey-roofed one beside us (over the side fence), one past next door, and the houses behind the trees,
+  // with a line of utility poles and sagging wires
   { const nb = grp('Neighbourhood');
     const house = (x, z, w, d, h, wall, roof, ry) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry || 0; nb.add(g);
       yBox(g, w, h, d, wall, 0, h / 2, 0); const rh = h * 0.5, tri = new THREE.Shape([new THREE.Vector2(-w / 2 - 0.4, 0), new THREE.Vector2(w / 2 + 0.4, 0), new THREE.Vector2(0, rh)]);
       const rg = new THREE.ExtrudeGeometry(tri, { depth: d + 0.8, bevelEnabled: false }); rg.translate(0, 0, -(d + 0.8) / 2); const rm = new THREE.Mesh(rg, yMat(roof)); rm.position.y = h; g.add(rm);
       yBox(g, 0.9, rh + 0.8, 0.9, 0x8a5a48, w * 0.25, h + rh * 0.55, d * 0.1);
       for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) { const wx = (c - 1) * w * 0.3, wy = h * (0.3 + r * 0.42); yBox(g, 1.5, 1.3, 0.08, 0xf7f5f0, wx, wy, -d / 2 - 0.02); yBox(g, 1.25, 1.05, 0.08, 0x3a4a5a, wx, wy, -d / 2 - 0.05); }
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) { const wz = (c - 1) * d * 0.28, wy = h * (0.3 + r * 0.42); yBox(g, 0.08, 1.3, 1.5, 0xf7f5f0, w / 2 + 0.02, wy, wz); yBox(g, 0.08, 1.05, 1.25, 0x3a4a5a, w / 2 + 0.05, wy, wz); }
     };
-    house(-26, FZ + 18, 11, 8, 6.2, 0xd9e4ec, 0x5b4a44); house(-6, FZ + 21, 12, 8, 6.6, 0xf1e3b8, 0x3f4650); house(15, FZ + 18, 10, 8, 6.0, 0xcfdcc2, 0x6a4c3c); house(34, FZ + 16, 11, 8, 6.4, 0xead2c4, 0x4a4f57);
-    house(-37, VD + 15, 12, 9, 6.4, 0xe8e0cf, 0x51555c, Math.PI / 2); house(37, VD + 15, 12, 9, 6.2, 0xd6dfe8, 0x5b4a44, -Math.PI / 2);
-    const poles = [-36, -13, 10, 33].map(x => [x, FZ + 7]);
+    house(Y.XL0 - 14.5, VD - 2, 16, 24, 6.8, 0xcdbba6, 0x5b5d62, -Math.PI / 2);                           // beside us, over the side fence (windows looking over at our yard)
+    house(Y.HR + 15, VD - 2, 14, 22, 6.6, 0xd9d2c4, 0x4f5358, Math.PI / 2);                                // past next door
+    house(-24, FZ + 14, 11, 8, 6.2, 0xd9e4ec, 0x5b4a44); house(-4, FZ + 15, 12, 8, 6.6, 0xf1e3b8, 0x3f4650); house(16, FZ + 14, 10, 8, 6.0, 0xcfdcc2, 0x6a4c3c); house(34, FZ + 13, 11, 8, 6.4, 0xead2c4, 0x4a4f57);
+    const poles = [-34, -11, 12, 35].map(x => [x, FZ + 7.5]);
     for (const [x, z] of poles) { yCyl(nb, 0.17, 0.22, 10.5, 0x5b4636, x, 5.25, z, 7); yBox(nb, 2.6, 0.18, 0.18, 0x5b4636, x, 9.6, z); for (const dx of [-1.1, 0, 1.1]) yCyl(nb, 0.06, 0.08, 0.25, 0x6f8a9a, x + dx, 9.8, z, 6); }
     bakeYard(nb);
     const wire = new THREE.LineBasicMaterial({ color: 0x2c2c30, fog: false });
@@ -4388,7 +4431,7 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
       const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), wire); l.userData.noWalk = true; nb.add(l); } }
   // -- life: butterflies round the flower beds, a few birds wheeling overhead
   yardLife = { butterflies: [], birds: [], chirpT: 3 };
-  for (let i = 0; i < 5; i++) { const b = makeButterfly(); b.scale.setScalar(0.75); b.userData.noWalk = true; povEndWall.add(b); const sx = i % 2 ? 1 : -1; yardLife.butterflies.push({ g: b, ax: sx * (SXW - 2.5), az: VD + 4 + i * 4.2, r: 1.5 + (i % 3) * 0.6, sp: 0.5 + i * 0.13, ph: i * 1.7 }); }
+  for (let i = 0; i < 5; i++) { const b = makeButterfly(); b.scale.setScalar(0.75); b.userData.noWalk = true; povEndWall.add(b); const az = VD + 4 + i * 5.2; yardLife.butterflies.push({ g: b, ax: i % 2 ? YARD.XR - 2.2 : yardXL(az) + 2.2, az, r: 1.5 + (i % 3) * 0.6, sp: 0.5 + i * 0.13, ph: i * 1.7 }); }
   for (let i = 0; i < 4; i++) { const g = new THREE.Group(); g.userData.noWalk = true; povEndWall.add(g); const wings = [];
     for (const sx of [-1, 1]) { const w = new THREE.Group(); g.add(w); const m = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.03, 0.16), yMat(0x2a2a2e)); m.position.x = sx * 0.27; w.add(m); wings.push([w, sx]); }
     yardLife.birds.push({ g, wings, ph: i * 0.35, off: new THREE.Vector3((i % 2) * 1.2 - 0.6, (i % 3) * 0.5, i * 0.9) }); }
@@ -5389,8 +5432,8 @@ const ACHIEVEMENTS = [
     ['copsCalled', '🚨', 'Someone called the cops', 'Stick around until the sirens show up after the raccoon incident'],
     ['laundryMess', '🧺', 'Laundry day', 'In Free roam, swipe the folded laundry off the armchair'],
     ['tvTop', '📺', 'King of the TV', 'In Free roam, stand on top of the TV'],
-    ['dogMeet', '🐕', 'Who let the dog in?', 'In Free roam, get out into the backyard and go up to the back fence'],
-    ['dogTag', '🏃', 'Gotcha, Porter!', 'In Free roam, chase Porter round the backyard and catch up'],
+    ['dogMeet', '🐕', 'Who let the dog in?', 'In Free roam, go out into the backyard and over toward Porter\'s fence'],
+    ['dogTag', '🏃', 'Gotcha, Porter!', 'In Free roam, catch Porter 3 times'],
     ['chippy', '🐰', 'Wind-up warrior', 'Swipe Chippy the wind-up bunny off the credenza and let it loose on the mice'],
     ['chippyNo', '💥', 'Rest in fluff', 'Find out what happens when Chippy gets carried away'],
     ['blanketGhost', '👻', 'Blanket ghost', 'In Free roam, get caught under a blanket, then swipe it off'],
@@ -5409,11 +5452,12 @@ const ACHIEVEMENTS = [
     ['mouseDodge', '🦘', 'Hop to it', 'Jump clear of 10 paws in one Mouse mode run'],
     ['mouseHigh', '🔥', 'Mantel thief', 'In Mouse mode, snatch a mushroom off the fireplace mantel'],
     ['mouseNap', '🧶', 'Lights out', 'In Mouse mode, throw the blanket over the cat'],
+    ['mouseBoss', '🏅', 'Boss dodger', 'In Mouse mode, get through a boss moment (Laser eyes or Chippy)'],
   ]],
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-27 19:40';                                              // stamped when the site is published
+const BUILD = '2026-09-27 21:41';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5486,7 +5530,7 @@ const PUPS = [
   { id: 'double', ic: '💰', name: 'Double Stash', max: 5, say: L => `${15 * L}% chance a mushroom counts twice` },
   { id: 'nap', ic: '😴', name: 'Sleepy Cat', max: 5, say: L => `The cat swipes ${8 * L}% less often` },
   { id: 'shadow', ic: '👻', name: 'Shadow Step', max: 5, say: L => `After a jump the cat loses you for ${(0.3 * L).toFixed(1)}s` },
-  { id: 'blanket', ic: '🧶', name: 'Blanket Toss', max: 5, say: L => `The blanket goes over the cat: ${25 + 5 * L}s of free reign` },
+  { id: 'blanket', ic: '🧶', name: 'Blanket Toss', max: 5, say: L => `The blanket goes over the cat: ${15 + 5 * L}s of free reign` },
 ];
 const PUP_BY_ID = Object.fromEntries(PUPS.map(u => [u.id, u]));
 const pupL = id => heist.pw[id] || 0;                                 // a power-up's level (0 = not picked yet)
@@ -5498,7 +5542,8 @@ function startHeist() {
   const p = heist.player, hole = HOLES.find(h => h.kind === 'fire') || HOLES[0];
   p.spawn(hole, false, D, {}); p.pop = 1; p.setState('player'); p.root.position.copy(hole.mouthOut); p.root.rotation.y = Math.atan2(hole.normal.x, hole.normal.z);
   Object.assign(heist, { hold: null, strike: null, strikeT: 3.0, invuln: 0, bag: [], stolen: 0, strikes: [], respawnT: 0, vy: 0, air: false, jumpCD: 0, jumpQ: -1, nowHits: 0,
-    lvl: 1, xp: 0, pw: {}, picks: 0, lvlT: 0, furUp: false, furT: 0, ghostT: 0, blanketT: 0, blanketMax: 1, reignShown: -1, tier: 0, hits: 0, dodges: 0, mantel: false });
+    lvl: 1, xp: 0, pw: {}, picks: 0, lvlT: 0, furUp: false, furT: 0, ghostT: 0, blanketT: 0, blanketMax: 1, reignShown: -1, tier: 0, hits: 0, dodges: 0, mantel: false,
+    boss: null, nextBoss: 5, chipsHtml: '', jumpCDmax: 1.6, stuckT: 0 });
   heist.vel.set(0, 0, 0); heist.ghostAt = new THREE.Vector3();
   if (!heist.rings) { heist.rings = [heist.ring]; for (let i = 0; i < 5; i++) { const r = heist.ring.clone(true); r.children.forEach(c => c.material = c.material.clone()); r.visible = false; scene.add(r); heist.rings.push(r); } }
   heist.rings.forEach(r => r.visible = false);
@@ -5511,7 +5556,7 @@ function startHeist() {
 }
 function heistCam(snap) {                                             // Follow: the room view, trailing her. Chase: low behind her, turning as she turns
   const p = heist.player.root, chase = heist.cam === 'chase', want = chase && !snap ? p.rotation.y + Math.PI : heist.f0.yaw;   // (a new run starts from the room view's angle: she comes out of a hole with her back to the wall)
-  Object.assign(fc, chase ? { dist0: 3.4, el0: 19, zoom: 1, tilt: 0 } : { dist0: heist.f0.dist0, el0: heist.f0.el0, zoom: 0.55, tilt: 0 });
+  Object.assign(fc, chase ? { dist0: 3.4, el0: 19, zoom: 1, tilt: 0 } : { dist0: heist.f0.dist0, el0: heist.f0.el0, zoom: 0.75, tilt: 0 });
   fc.yaw = snap ? want : fc.s.yaw + Math.atan2(Math.sin(want - fc.s.yaw), Math.cos(want - fc.s.yaw));   // (the short way round)
   fc.focus.set(p.position.x, p.position.y + 0.2, p.position.z);
   if (snap) { fc.s.focus.copy(fc.focus); Object.assign(fc.s, { yaw: fc.yaw, zoom: fc.zoom, tilt: fc.tilt }); }
@@ -5523,9 +5568,12 @@ function heistBodyHits(x, z, face, lim, top) {                        // how muc
   for (const f of [0.2, 0, -0.16]) n += Math.min(1, Math.max(0, surfaceTop(x + fx * f, z + fz * f, top) - lim));
   return n;
 }
+function heistOut(x, z) { return Math.max(0, Math.abs(x) - (ROOM.halfW - 0.26)) + Math.max(0, 0.3 - z) + Math.max(0, z - (ROOM.visDepth - 0.45)); }   // how far past the room's edges
+function heistInCondo(x, z, y) { const b = catCondo && catCondo.box; return !!b && y < b.max.y && x > b.min.x - 0.14 && x < b.max.x + 0.14 && z > b.min.z - 0.14 && z < b.max.z + 0.14; }
 function heistBlocked(nx, nz, ox, oz) {
-  const y = heist.player.root.position.y, lim = y + (heist.air ? 0.04 : MJ.step), top = y + MJ.mh;
-  if (Math.abs(nx) > ROOM.halfW - 0.26 || nz < 0.3 || nz > ROOM.visDepth - 0.45) return true;
+  const y = heist.player.root.position.y, lim = y + (heist.air ? 0.04 : MJ.step), top = y + MJ.mh, out = heistOut(nx, nz);
+  if (out > 0.0001 && out >= heistOut(ox, oz) - 0.0001) return true;  // the room's edges (past one somehow: only moves back in)
+  if (heistInCondo(nx, nz, y) && !heistInCondo(ox, oz, y)) return true;   // the cat tree's condo: a snug little mouse trap, so it's not a way in
   const inBox = (x, z) => Math.abs(x - CAT_POS.x) < BOX.w / 2 + 0.2 && Math.abs(z - CAT_POS.z) < BOX.d / 2 + 0.2;
   if (inBox(nx, nz) && !inBox(ox, oz)) return true;                  // the cat's box: she's sitting in it (never a way in, even jumping off the credenza)
   if (y < CAB_H - 0.15 && nz < DEPTH + 0.08 && nx > LEFT_X0 - 0.15 && nx < MAIN_X0 + MAIN_W + 0.15) return true;   // the credenza (open or shut, the cupboards aren't a way in)
@@ -5534,6 +5582,17 @@ function heistBlocked(nx, nz, ox, oz) {
   if (sideBlocked(ox, oz, y, mx, mz, 0.42)) return true;               // walls, sofa fronts, table legs: feelers at her height
   const now = heist.nowHits, next = heistBodyHits(nx, nz, face, lim, top);
   return now > 0.001 ? next > now - 0.0005 && next > 0.001 : next > 0.001;   // tangled: only moves that ease her out
+}
+function heistUnstick() {                                             // wedged in somewhere with no way out in any direction: she wriggles free onto open floor nearby
+  const p = heist.player.root.position, y = p.y;
+  heist.nowHits = heistBodyHits(p.x, p.z, heist.player.root.rotation.y, y + MJ.step, y + MJ.mh);
+  for (let a = 0; a < 8; a++) if (!heistBlocked(p.x + Math.sin(a * Math.PI / 4) * 0.06, p.z + Math.cos(a * Math.PI / 4) * 0.06, p.x, p.z)) return;   // (just pushing into a wall: that's fine)
+  for (const r of [0.45, 0.8, 1.2, 1.7, 2.3]) for (let a = 0; a < 16; a++) {
+    const x = p.x + Math.sin(a * Math.PI / 8) * r, z = p.z + Math.cos(a * Math.PI / 8) * r;
+    if (heistOut(x, z) > 0 || heistInCondo(x, z, 0) || (Math.abs(x - CAT_POS.x) < BOX.w / 2 + 0.2 && Math.abs(z - CAT_POS.z) < BOX.d / 2 + 0.2)) continue;
+    const g = surfaceTop(x, z, y + 0.4); if (g > y + 0.35 || heistBodyHits(x, z, 0, g + MJ.step, g + MJ.mh) > 0.001) continue;
+    p.set(x, g, z); heist.air = true; heist.vy = 3.5; floatText(p.clone().setY(g + 0.9), 'Wriggle!', ''); sfx.squeak(2); return;
+  }
 }
 function queueStrike(at, tele, size) {
   const ring = heist.rings.find(r => !heist.strikes.some(s2 => s2.ring === r)); if (!ring) return;
@@ -5546,7 +5605,7 @@ function heistJump() {                                                // the Jum
 function heistLaunch() {                                              // up she goes: clear of the paw, and high enough for a sofa seat
   const p = heist.player, pos = p.root.position;
   heist.vy = Math.sqrt(2 * MJ.grav * MJ.h * (1 + 0.12 * pupL('spring'))); heist.air = true; heist.jumpQ = -1;
-  heist.jumpCD = 1.6 * (1 - 0.1 * pupL('spring')); heist.ghostAt.copy(pos);
+  heist.jumpCD = heist.jumpCDmax = 1.6 * (1 - 0.1 * pupL('spring')); heist.ghostAt.copy(pos);
   p.sqY = 1.3; p.sqXZ = 0.8; tone(620, 1250, 0.1, 'triangle', 0.035); sfx.squeak(1);
   burst(pos.clone().setY(pos.y + 0.1), 0xb08a64, 5, 1.2, 1, 0.5);
 }
@@ -5563,6 +5622,15 @@ function heistRespawn() {                                            // back out
   pos.copy(h.mouthOut); pos.y = surfaceTop(pos.x, pos.z, 0.5); heist.air = false; heist.vy = 0; p.root.rotation.y = Math.atan2(h.normal.x, h.normal.z); p.sqY = 1; p.sqXZ = 1; heist.vel.set(0, 0, 0);
   burst(pos.clone().setY(0.3), 0xff6fae, 10, 1.8, 2.4, 0.6); sfx.squeak(2); floatText(pos.clone().setY(1), 'Respawned!', '');
   heist.invuln = 1.4;
+}
+function heistStruck(kind) {
+  const pos = heist.player.root.position;
+  if (heist.respawnT > 0 || state !== 'playing') return;
+  if (heist.air) { heist.dodges++; floatText(pos.clone().setY(pos.y + 0.9), kind === 'laser' ? 'Jumped it!' : 'Dodged!', ''); if (heist.dodges >= 10) unlock('mouseDodge'); sfx.miss(); }   // over it!
+  else if (heist.invuln > 0) sfx.miss();
+  else if (heist.furUp) { heist.furUp = false; heist.furT = FUR_CD[pupL('fur')]; heist.invuln = 0.6; floatText(pos.clone().setY(pos.y + 0.9), 'Blocked!', 'clutch'); sfx.clink(); burst(pos.clone().setY(pos.y + 0.3), 0x7fd8ff, 10, 1.8, 2, 0.6); }
+  else if (Math.random() < 0.08 * pupL('lucky')) { heist.invuln = 0.6; floatText(pos.clone().setY(pos.y + 0.9), 'Lucky!', 'clutch'); sfx.miss(); }
+  else heistHurt();
 }
 function heistHurt() {
   const p = heist.player, pos = p.root.position, gy = heistFloorY(pos);
@@ -5654,7 +5722,7 @@ function pickPup(id) {
   if (id === 'heart') lives = Math.min(heistMaxLives(), lives + 1);
   if (id === 'fur') { heist.furUp = true; heist.furT = 0; }
   $('levelScreen').hidden = true; state = 'playing'; heist.invuln = Math.max(heist.invuln, 1.0);
-  if (id === 'blanket') heistBlanket(25 + 5 * L);
+  if (id === 'blanket') heistBlanket(15 + 5 * L);
   if (L >= u.max) unlock('mouseMax');
   floatText(pos.clone().setY(pos.y + 1.1), `${u.ic} ${u.name}${L > 1 ? ' ' + L : ''}!`, 'clutch');
   heistHud();
@@ -5708,12 +5776,15 @@ function updateHeist(dt) {
       if (!heistBlocked(nx, nz, pos.x, pos.z)) { pos.x = nx; pos.z = nz; return true; }
       if (!heist.air || heist.vy > 3) return false;
       const mx = nx - pos.x, mz = nz - pos.z, ml = Math.hypot(mx, mz) || 1, lx = nx + mx / ml * 0.18, lz = nz + mz / ml * 0.18;   // mid-air, just short of a ledge: she scrabbles up over the edge
-      if (Math.abs(lx) > ROOM.halfW - 0.26 || (Math.abs(lx - CAT_POS.x) < BOX.w / 2 + 0.2 && Math.abs(lz - CAT_POS.z) < BOX.d / 2 + 0.2)) return false;
+      if (heistOut(lx, lz) > 0 || (Math.abs(lx - CAT_POS.x) < BOX.w / 2 + 0.2 && Math.abs(lz - CAT_POS.z) < BOX.d / 2 + 0.2)) return false;
       const top = surfaceTop(lx, lz, pos.y + 0.36);
       if (!(top > pos.y - 0.05 && top - pos.y < 0.36) || surfaceTop(lx, lz, top + MJ.mh) > top + MJ.step) return false;
       pos.set(lx, top, lz); heistLand(); return true;
     };
+    const ox0 = pos.x, oz0 = pos.z;
     tryMove(pos.x + _hD.x, pos.z + _hD.z) || tryMove(pos.x + _hD.x, pos.z) || tryMove(pos.x, pos.z + _hD.z);
+    heist.stuckT = !heist.air && Math.hypot(pos.x - ox0, pos.z - oz0) < 0.002 ? (heist.stuckT || 0) + dt : 0;
+    if (heist.stuckT > 1) { heist.stuckT = 0; heistUnstick(); }       // (pushing and going nowhere for a second: is she boxed in?)
     p.faceToward(pos.x + _hD.x * 10, pos.z + _hD.z * 10, dt);
     heist.vel.copy(_hD).divideScalar(Math.max(dt, 1e-3)); p.playerRun = !heist.air;
   } else { heist.vel.multiplyScalar(0.8); p.playerRun = false; }
@@ -5771,7 +5842,8 @@ function updateHeist(dt) {
   if (cheeses.filter(c => c.alive && c.state !== 'carried').length <= 1) heistNewMushroom();
   // ---- the cat hunts you: red rings show where her paw will land, then it strikes. She gets meaner as the heist goes on:
   // a second paw, then pounce sweeps (a row of three), then big slams you have to jump or outrun
-  $('heistDash').classList.toggle('cool', heist.jumpCD > 0 || heist.air);
+  { const jb = $('heistDash'), ready = heist.jumpCD <= 0 && !heist.air, cd = heist.air ? 0 : 1 - heist.jumpCD / heist.jumpCDmax;   // the ring round Jump fills as it recharges
+    jb.classList.toggle('cool', !ready); jb.classList.toggle('ready', ready); if (Math.abs(cd - (heist.cdShown || 0)) > 0.02 || ready !== heist.readyShown) { heist.cdShown = cd; heist.readyShown = ready; jb.style.setProperty('--cd', cd.toFixed(2)); } }
   if (heist.respawnT > 0) { heist.respawnT -= dt; if (heist.respawnT <= 0) heistRespawn(); }
   const tier = Math.floor(elapsed / 50 + heist.stolen * 0.12);
   if (tier > heist.tier) {
@@ -5779,6 +5851,11 @@ function updateHeist(dt) {
     if (tier < say.length) showBanner(say[tier]);
   }
   const tele = Math.max(0.34, 0.72 - 0.045 * tier - elapsed * 0.001) * (1 + 0.15 * pupL('whisker'));
+  if (!heist.boss && heist.lvl >= heist.nextBoss && heist.picks === 0 && heist.lvlT <= 0 && heist.respawnT <= 0) {   // every fifth level: a boss moment
+    const kind = (heist.nextBoss / 5) % 2 ? 'laser' : 'chippy';
+    if (kind === 'chippy' || !catBlind()) { heist.nextBoss += 5; heistBossStart(kind); }
+  }
+  if (heist.boss) { updateHeistBoss(dt, pos, gy); heist.strikeT = Math.max(heist.strikeT, 0.9); if (state !== 'playing') return; }
   if (catBlind()) heist.strikeT = Math.max(heist.strikeT, 0.8);       // (under the blanket: she can't see a thing)
   heist.strikeT -= dt;
   if (heist.strikeT <= 0 && heist.respawnT <= 0) {
@@ -5805,11 +5882,7 @@ function updateHeist(dt) {
       st.done = true; st.ring.visible = false; burst(st.at.clone().setY(st.at.y + 0.15), 0xb08a64, 5, 1.4, 1.5, 0.7);
       const under = Math.hypot(pos.x - st.at.x, pos.z - st.at.z) < 0.6 * st.size && Math.abs(gy - st.at.y) < 0.35;
       if (!under || heist.respawnT > 0 || state !== 'playing') { sfx.miss(); continue; }
-      if (heist.air) { heist.dodges++; floatText(pos.clone().setY(pos.y + 0.9), 'Dodged!', ''); if (heist.dodges >= 10) unlock('mouseDodge'); sfx.miss(); }   // over the paw!
-      else if (heist.invuln > 0) sfx.miss();
-      else if (heist.furUp) { heist.furUp = false; heist.furT = FUR_CD[pupL('fur')]; heist.invuln = 0.6; floatText(pos.clone().setY(pos.y + 0.9), 'Blocked!', 'clutch'); sfx.clink(); burst(pos.clone().setY(pos.y + 0.3), 0x7fd8ff, 10, 1.8, 2, 0.6); }
-      else if (Math.random() < 0.08 * pupL('lucky')) { heist.invuln = 0.6; floatText(pos.clone().setY(pos.y + 0.9), 'Lucky!', 'clutch'); sfx.miss(); }
-      else heistHurt();
+      heistStruck('paw');
     }
   }
   heist.strikes = heist.strikes.filter(s2 => !s2.done);
@@ -5841,6 +5914,117 @@ function updateHeist(dt) {
     if (Math.abs(d) < 2.3) fc.yaw += d * Math.min(1, dt * 2.4);
   }
   fc.focus.set(pos.x, gy + 0.2 + (pos.y - gy) * 0.4, pos.z);
+  heistChips();
+}
+function heistChips() {                                               // the power-up chips under the HUD: each one's level, the shield lit while it's up, timers counting down
+  let html = '';
+  if (heist.boss) html += `<span class="pup-chip boss"><b>⚠️</b>${heist.boss.kind === 'laser' ? 'Laser eyes' : 'Chippy'} ${Math.max(0, Math.ceil(heist.boss.dur - heist.boss.t))}s</span>`;
+  for (const u of PUPS) {
+    const L = pupL(u.id); if (!L) continue; let cls = '', extra = '';
+    if (u.id === 'fur') { cls = heist.furUp ? ' on' : ' off'; if (!heist.furUp) extra = ` ${Math.max(1, Math.ceil(heist.furT))}s`; }
+    if (u.id === 'blanket' && heist.blanketT > 0) { cls = ' on'; extra = ` ${Math.ceil(heist.blanketT)}s`; }
+    html += `<span class="pup-chip${cls}" title="${u.name}"><b>${u.ic}</b>${L}${extra}</span>`;
+  }
+  if (html !== heist.chipsHtml) { heist.chipsHtml = html; const el = $('pupBar'); el.innerHTML = html; el.hidden = !html; }
+}
+/* ---------- boss moments, every fifth level. LASER EYES (levels 5, 15, 25...): the cat's eyes burn a beam across the floor, a red line
+   showing where it'll sweep first: jump it as it passes. CHIPPY (10, 20...): the wind-up bunny comes hopping after her, up onto the
+   sofas too: keep away, or jump it. Get through it and there's an extra life in it. Stealing carries on the whole time. ---------- */
+const HB = { tele: null, bar: null, beams: null };
+function heistBossStart(kind) {
+  heist.boss = { kind, t: 0, dur: kind === 'laser' ? 12 : 15, n: 0, sweep: null, next: 1.4, st: null, cool: 0 };
+  heist.strikes.forEach(st => st.ring.visible = false); heist.strikes = [];
+  showBanner(kind === 'laser' ? '⚠️ LASER EYES!' : '⚠️ CHIPPY IS COMING!');
+  camToast(kind === 'laser' ? 'Jump the beam as it sweeps past!' : 'Keep away from Chippy, or jump it!', 2800);
+  if (sfx.angryMeow) sfx.angryMeow();
+}
+function heistBossClear() {                                           // (game over, restart: tidy the boss's bits away)
+  heist.boss = null;
+  if (HB.tele) { HB.tele.visible = false; HB.spot.visible = false; HB.beams.forEach(b => b.g.visible = false); }
+}
+function heistBossEnd() {
+  const B = heist.boss, pos = heist.player.root.position; heistBossClear();
+  if (B.kind === 'chippy') { chippy.state = 'bossDone'; }
+  let prize = '+1 ❤️';
+  if (lives < heistMaxLives()) lives++; else { heist.xp += 2; prize = '+2 XP'; while (heist.xp >= heistNeed(heist.lvl)) { heist.xp -= heistNeed(heist.lvl); heist.lvl++; heist.picks++; } if (heist.picks && heist.lvlT <= 0) heist.lvlT = 0.8; }
+  showBanner('Boss survived!'); floatText(pos.clone().setY(pos.y + 1.2), `Boss survived! ${prize}`, 'clutch'); unlock('mouseBoss');
+  [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.14, 'triangle', 0.045, i * 0.09));
+  heist.strikeT = Math.max(heist.strikeT, 1.6); heistHud();
+}
+function updateHeistBoss(dt, pos, gy) {
+  const B = heist.boss; B.t += dt; B.cool = Math.max(0, B.cool - dt);
+  if (B.kind === 'laser') laserBoss(B, dt, pos, gy); else chippyBoss(B, dt, pos, gy);
+  if (heist.boss === B && (B.kind === 'laser' ? B.t >= B.dur && !B.sweep : B.st === 'down' && B.downT > 1)) heistBossEnd();
+}
+function laserBoss(B, dt, pos, gy) {
+  if (!HB.tele) {                                                     // a flashing red line on the floor: where the beam's about to sweep
+    HB.tele = new THREE.Group(); HB.tele.visible = false; scene.add(HB.tele);
+    HB.bar = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), basic(0xff2a3a, { transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide })); HB.bar.rotation.x = -Math.PI / 2; HB.bar.renderOrder = 3; HB.tele.add(HB.bar);
+    HB.beams = [makeBeam(), makeBeam()]; HB.beams.forEach(b => { b.outer.scale.set(0.11, 1, 0.11); b.core.scale.set(0.03, 1, 0.03); });
+    HB.spot = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xff3a2a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); HB.spot.scale.setScalar(1.1); HB.spot.visible = false; scene.add(HB.spot);   // the burning spot where it hits
+  }
+  if (catBlind()) { HB.tele.visible = false; HB.spot.visible = false; HB.beams.forEach(b => b.g.visible = false); B.sweep = null; B.next = 0.8; return; }   // (a blanket over her head: no laser)
+  laser.eyeT = Math.max(laser.eyeT, 0.25);                             // her eyes glow red the whole time
+  const S = B.sweep, hw = ROOM.halfW - 0.35;
+  if (!S) {
+    B.next -= dt; if (B.next > 0 || B.t > B.dur - 1.2) return;
+    const lead = 0.45, cx = pos.x + heist.vel.x * lead, cz = pos.z + heist.vel.z * lead, a = Math.random() * Math.PI, L = 6 + Math.random() * 2.5, dx = Math.sin(a), dz = Math.cos(a);   // a line through where she's heading
+    const A = new THREE.Vector3(THREE.MathUtils.clamp(cx - dx * L / 2, -hw, hw), gy + 0.03, THREE.MathUtils.clamp(cz - dz * L / 2, 0.6, ROOM.visDepth - 0.6));
+    const Bp = new THREE.Vector3(THREE.MathUtils.clamp(cx + dx * L / 2, -hw, hw), gy + 0.03, THREE.MathUtils.clamp(cz + dz * L / 2, 0.6, ROOM.visDepth - 0.6));
+    if (Math.random() < 0.5) { const t = A.clone(); A.copy(Bp); Bp.copy(t); }
+    B.sweep = { a: A, b: Bp, t: 0, tele: (0.95 - Math.min(0.3, B.n * 0.035)) * (1 + 0.15 * pupL('whisker')), dur: 0.55, hit: false, fired: false }; B.n++;
+    const len = A.distanceTo(Bp); HB.tele.position.set((A.x + Bp.x) / 2, A.y, (A.z + Bp.z) / 2); HB.tele.rotation.y = Math.atan2(Bp.x - A.x, Bp.z - A.z); HB.bar.scale.set(0.16, len, 1); HB.tele.visible = true;
+    tone(300, 900, 0.5, 'sawtooth', 0.02);                             // charging up...
+    return;
+  }
+  S.t += dt;
+  if (S.t < S.tele) { HB.bar.material.opacity = 0.3 + 0.45 * Math.abs(Math.sin(S.t * 18)); return; }
+  const k = Math.min(1, (S.t - S.tele) / S.dur), e = new THREE.Vector3().lerpVectors(S.a, S.b, k);
+  if (!S.fired) { S.fired = true; noise(0.5, 0.12, 5200); tone(1400, 600, 0.5, 'sawtooth', 0.03); }   // ZZZAP
+  HB.bar.material.opacity = 0.7 * (1 - k); laser.eyeT = 1;
+  const eyes = eyeOrigins(); HB.beams.forEach((b, i) => { aimBeam(b, eyes[i] || eyes[0], e); b.g.visible = true; b.outer.material.opacity = 0.55; b.core.material.opacity = 0.9; });
+  HB.spot.position.set(e.x, e.y + 0.08, e.z); HB.spot.visible = true; HB.spot.scale.setScalar(0.9 + Math.random() * 0.4);
+  if (Math.random() < 0.6) burst(e.clone().setY(e.y + 0.05), Math.random() < 0.5 ? 0xff4030 : 0xffd060, 2, 1.2, 1.4, 0.25);   // sparks where it burns across
+  if (!S.hit && Math.hypot(pos.x - e.x, pos.z - e.z) < 0.5 && Math.abs(gy + 0.03 - S.a.y) < 0.45) { S.hit = true; heistStruck('laser'); }
+  if (k >= 1) { HB.beams.forEach(b => b.g.visible = false); HB.tele.visible = false; HB.spot.visible = false; B.sweep = null; B.next = 0.3 + Math.random() * 0.4; }
+}
+function chippyBoss(B, dt, pos, gy) {
+  const C = chippy, g = C.g, p = g.position;
+  if (!B.st) {                                                        // down off the credenza (or up off the floor where it wound down last time), in front of the cat's box
+    B.st = 'leap'; B.k = 0; B.from = p.clone(); B.to = new THREE.Vector3(CAT_POS.x + 1.3, 0, CAT_POS.z + 1.2); C.state = 'boss'; g.visible = true; C.rig.rotation.set(0, 0, 0); C.rig.position.set(0, 0, 0); C.tag.visible = false; sfx.whoosh();
+  }
+  if (B.st === 'leap') {
+    B.k = Math.min(1, B.k + dt / 0.8); const e = B.k * (2 - B.k);
+    p.lerpVectors(B.from, B.to, e); p.y += Math.sin(B.k * Math.PI) * 0.9; C.rig.rotation.x = -B.k * Math.PI * 2; g.scale.setScalar(Math.max(g.scale.x, 1 + 1.1 * B.k)); g.rotation.y = Math.atan2(B.to.x - B.from.x, B.to.z - B.from.z); chippyKick(Math.min(0.5, B.k));   // (and it grows to a boss-sized bunny)
+    if (B.k >= 1) { C.rig.rotation.x = 0; p.copy(B.to); B.st = 'wind'; B.k = 0; chippyClick(); windUpSound(); }
+    return;
+  }
+  if (B.st === 'wind') { C.key.rotation.x -= dt * 22; C.rig.position.y = Math.abs(Math.sin(B.t * 30)) * 0.015; B.k += dt; if (B.k > 0.8) { C.rig.position.y = 0; B.st = 'hunt'; B.hop = 1; B.dur = B.t + 15; } return; }
+  if (B.st === 'down') { B.downT += dt; const k = Math.min(1, B.downT / 0.5); C.rig.rotation.z = 1.45 * k * k; p.y = B.ht ? B.ht.y : p.y; chippyKick(0); return; }   // over it topples
+  if (B.t >= B.dur) {                                                 // wound down: a last few clicks, and over it goes
+    B.st = 'down'; B.downT = 0; [1400, 1100, 800].forEach((f, i) => tone(f, f * 0.7, 0.05, 'square', 0.02, i * 0.18));
+    floatText(p.clone().setY(p.y + 0.9), 'Chippy wound down!', 'clutch'); return;
+  }
+  const hopT = Math.max(0.24, 0.31 - (B.t / B.dur) * 0.07);           // (it hops a little quicker as the chase goes on)
+  if (B.cool > 0.6) { C.rig.rotation.x = 0; chippyKick(0); return; }  // just got her: a moment to gloat
+  B.hop += dt / hopT;
+  if (B.hop >= 1) {                                                   // the next hop: toward her, up onto the sofa if she's gone up there, round anything too tall
+    B.hop = 0; B.hf = p.clone(); B.ht = null; chippyClick();
+    const dx = pos.x - p.x, dz = pos.z - p.z, d = Math.hypot(dx, dz) || 1, stepL = Math.min(d, 0.72), hw = ROOM.halfW - 0.3;
+    for (const a of [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9]) {
+      const ca = Math.cos(a), sa = Math.sin(a), ux = (dx * ca + dz * sa) / d, uz = (dz * ca - dx * sa) / d, tx = p.x + ux * stepL, tz = p.z + uz * stepL;
+      if (Math.abs(tx) > hw || tz < 0.5 || tz > ROOM.visDepth - 0.5 || (Math.abs(tx - CAT_POS.x) < BOX.w / 2 + 0.15 && Math.abs(tz - CAT_POS.z) < BOX.d / 2 + 0.15)) continue;
+      const reach = p.y + 1.25; if (surfaceTop(tx, tz, 4.2) > reach + 0.05) continue;   // (too tall to hop up: go round)
+      B.ht = new THREE.Vector3(tx, surfaceTop(tx, tz, reach), tz); break;
+    }
+    if (!B.ht) B.ht = p.clone();
+  }
+  const k = B.hop; p.lerpVectors(B.hf, B.ht, k); p.y += Math.sin(k * Math.PI) * 0.35;
+  if (B.ht.distanceToSquared(B.hf) > 1e-4) g.rotation.y = Math.atan2(B.ht.x - B.hf.x, B.ht.z - B.hf.z);
+  C.rig.rotation.x = 0.22 * Math.sin(k * Math.PI); chippyKick(k); C.key.rotation.x += dt * 9;
+  if (B.cool <= 0 && Math.hypot(pos.x - p.x, pos.z - p.z) < 0.62 && Math.abs(gy - (B.hf.y + (B.ht.y - B.hf.y) * k)) < 0.5) {   // bonk
+    B.cool = 1.3; const was = lives; heistStruck('chippy'); if (lives < was) floatText(p.clone().setY(p.y + 0.9), 'Chippy got you!', 'bad');
+  }
 }
 
 /* =====================================================================
@@ -6836,9 +7020,9 @@ function updateLaser(dt) {
   if (laser.state === 'floor') { const k = 1 + Math.sin(laser.t * 5) * 0.12; laser.ring.scale.setScalar(k); laser.ring.material.opacity = 0.5 + 0.35 * Math.abs(Math.sin(laser.t * 5)); }
   // her eyes: a steady red glow while armed, a flare with every shot
   laser.eyeT = Math.max(0, laser.eyeT - dt * 5);
-  const armed = laser.state === 'cat';
+  const armed = laser.state === 'cat' || (gameMode === 'mouse' && !!heist.boss && heist.boss.kind === 'laser');   // (Mouse mode's laser-eyes boss)
   for (const e of laser.eyes) { e.visible = armed; const k = 0.16 + laser.eyeT * 0.28 + Math.sin(laser.t * 8) * 0.015; e.scale.set(k, k / (catCard.scale.y || 1), 1); e.material.opacity = 0.75 + laser.eyeT * 0.25; }   // (undo the card's upright stretch so the glow stays round)
-  if (armed && gunRig.state !== 'cat') { const gr = gunRig; ammoPop = Math.max(0, ammoPop - dt * 4); ammoTag.position.set(gr.hand.x + 0.75, gr.hand.y + 0.55 + Math.sin(clock * 3) * 0.05, gr.hand.z + 0.1); ammoTag.scale.setScalar(0.85 * (1 + ammoPop * 0.35)); }
+  if (armed && laser.state === 'cat' && gunRig.state !== 'cat') { const gr = gunRig; ammoPop = Math.max(0, ammoPop - dt * 4); ammoTag.position.set(gr.hand.x + 0.75, gr.hand.y + 0.55 + Math.sin(clock * 3) * 0.05, gr.hand.z + 0.1); ammoTag.scale.setScalar(0.85 * (1 + ammoPop * 0.35)); }
 }
 function resetLaser() {
   if (typeof ammoTag !== 'undefined') ammoTag.visible = false;
@@ -7019,7 +7203,7 @@ function updateChippy(dt) {
   if (C.tag.visible) { chippyTag(); C.tag.position.set(p.x, p.y + 0.75 + Math.sin(clock * 3) * 0.03, p.z); }
 }
 function resetChippy() {
-  const C = chippy; C.state = 'shelf'; C.uses = 0; C.kills = 0; C.target = null; C.rest = 0; C.skip = null; C.path = null; C.t = 0; C.shown = -1; C.g.visible = true;
+  const C = chippy; C.g.scale.setScalar(1); C.state = 'shelf'; C.uses = 0; C.kills = 0; C.target = null; C.rest = 0; C.skip = null; C.path = null; C.t = 0; C.shown = -1; C.g.visible = true;
   C.g.position.copy(C.home); C.g.rotation.set(0, -0.35, 0); C.rig.rotation.set(0, 0, 0); C.rig.position.set(0, 0, 0); C.tag.visible = false; chippyKick(0);
 }
 
@@ -7314,7 +7498,7 @@ function endGame(reason) {
   if (reason === 'chaos') unlock('chaos');
   if (reason === 'heist') { unlock('heist'); if (lives >= HEIST_LIVES) unlock('ghost'); }
   state = 'ending'; endReason = reason; endTimer = 1.2;
-  (heist.rings || [heist.ring]).forEach(r => r.visible = false); heist.strikes = []; heist.strike = null; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true; if (heist.bubble) heist.bubble.visible = false;
+  (heist.rings || [heist.ring]).forEach(r => r.visible = false); heist.strikes = []; heist.strike = null; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true; if (heist.bubble) heist.bubble.visible = false; heistBossClear(); if (chippy.state === 'boss') resetChippy();
   sfx.over();
 }
 
@@ -7392,11 +7576,11 @@ function showBestOnStart() { const b = getBest(); $('bestStart').textContent = b
 showBestOnStart();
 
 /* ---------- screens ---------- */
-function clearField() { if (typeof cine !== 'undefined' && cine) { cine = null; document.querySelectorAll('.cine').forEach(e => e.remove()); } if (state === 'tvgame' || tvCine) { tvCine = null; if (tvPad) tvPad.visible = false; $('tvPlay').hidden = true; $('tvFade').classList.remove('on'); game.player = false; } for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.player.shadow.position.y = 0.012; if (heist.bubble) heist.bubble.visible = false; heist.blanketT = 0; heist.strike = null; (heist.rings || [heist.ring]).forEach(r => r.visible = false); heist.strikes = []; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true; } }
+function clearField() { if (typeof cine !== 'undefined' && cine) { cine = null; document.querySelectorAll('.cine').forEach(e => e.remove()); } if (state === 'tvgame' || tvCine) { tvCine = null; if (tvPad) tvPad.visible = false; $('tvPlay').hidden = true; $('tvFade').classList.remove('on'); game.player = false; } for (const m of mice) m.release(); if (heist.player) { heist.player.release(); heist.player.shadow.position.y = 0.012; if (heist.bubble) heist.bubble.visible = false; heist.blanketT = 0; heistBossClear(); heist.strike = null; (heist.rings || [heist.ring]).forEach(r => r.visible = false); heist.strikes = []; heist.hold = null; heistGoal.g.visible = false; heistGoal.edge.hidden = true; } }
 function resetGame() {
   clearField(); endWalk();
   while (cheeses.length > CHEESE_SPOTS.length) { const c = cheeses.pop(); c.lose(); c.fall = null; c.slot = 0; spareCheeses.push(c); }   // (Mouse mode's extra mushrooms: put away)
-  $('levelScreen').hidden = true; $('scoreLbl').textContent = 'Score'; $('heatLbl').textContent = 'Heat'; ui.heat.classList.remove('reign'); buildPrizeIcons();
+  $('levelScreen').hidden = true; $('pupBar').hidden = true; heist.chipsHtml = ''; $('scoreLbl').textContent = 'Score'; $('heatLbl').textContent = 'Heat'; ui.heat.classList.remove('reign'); buildPrizeIcons();
   cheeses.forEach(c => { c.reset(); c.slot = 0; });
   if (gameMode === 'chaos') cheeses.forEach(c => c.lose());
   document.querySelector('.c-cheese').style.visibility = gameMode === 'chaos' ? 'hidden' : '';
@@ -8571,7 +8755,7 @@ function walkCam(S) {                                                // keep the
       if (c.z > VD - 0.12 && c.z < VD + 0.35) {                        // in the thickness of the wall: only inside the doorway itself
         if (c.x > ox0 && c.x < ox1) c.y = Math.min(c.y, oh); else c.z = f.z > VD ? VD + 0.35 : VD - 0.12;
       }
-      if (c.z >= VD + 0.35) { c.x = THREE.MathUtils.clamp(c.x, -FT(30) + 0.3, FT(30) - 0.3); c.z = Math.min(c.z, VD + FT(34) - 0.3); c.y = THREE.MathUtils.clamp(c.y, 0.2, 9); }
+      if (c.z >= VD + 0.35) { c.z = Math.min(c.z, YARD.FZ - 0.3); c.x = THREE.MathUtils.clamp(c.x, yardXL(c.z) + 0.3, YARD.XR - 0.3); c.y = THREE.MathUtils.clamp(c.y, 0.2, 9); }
       else if (c.z <= VD - 0.12) { c.x = THREE.MathUtils.clamp(c.x, -ROOM.halfW + 0.12, ROOM.halfW - 0.12); c.z = Math.max(c.z, 0.12); c.y = THREE.MathUtils.clamp(c.y, 0.2, CEIL_H - 0.12); }
     } else {
       camera.position.x = THREE.MathUtils.clamp(camera.position.x, -ROOM.halfW + 0.12, ROOM.halfW - 0.12);
@@ -9133,32 +9317,31 @@ function porterBolt(grace) {                                          // a playf
   dog.hopV.set(dx / d * 3.2, 4.2, dz / d * 3.2); dogSet('hop'); dog.after = 'run'; dog.grace = grace; bark(2); tone(1200, 1700, 0.08, 'triangle', 0.04);
 }
 function caughtPorter() {                                             // got Porter! a roll onto the back, tail going like mad, then off again
-  dog.you++; dogSet('caught'); unlock('dogTag'); bark(1);
+  dog.you++; dogSet('caught'); if (dog.you >= 3) unlock('dogTag'); bark(1);
   [659, 784, 1047].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.04, i * 0.08));
   burst(dog.rig.g.position.clone().setY(1.2), 0xff6fae, 10, 2, 3, 0.5); walk.puff = 0.3;
-  showWalkName(dog.you > 1 ? `🐾 Caught Porter! (${dog.you})` : '🐾 Caught Porter!');
+  showWalkName(dog.you < 3 ? `🐾 Caught Porter! (${dog.you}/3)` : dog.you === 3 ? '🐾 Caught Porter 3 times! Gotcha!' : `🐾 Caught Porter! (${dog.you})`);
 }
 function tagHud() {                                                   // the little prompt up top
   const el = document.getElementById('tagHud'); if (!el) return;
-  const on = gameMode === 'walk' && walk.on && !mirrorWorld && dog.rig && dog.rig.g.visible && dog.state !== 'leap' && dog.state !== 'hidden';
+  const on = gameMode === 'walk' && walk.on && !mirrorWorld && dog.rig && dog.rig.g.visible && dog.state !== 'leap' && dog.state !== 'hidden' && dog.state !== 'yard';
   let html = '';
   if (on) {
     const inside = walk.pos.z < SLIDER.VD + 0.4;
     if (!dog.match) html = `<div class="sub">🐕 Swipe Porter to play!</div>`;
-    else html = `<div class="row"><span>🐕 ${inside ? 'Porter\'s waiting outside...' : dog.state === 'caught' ? 'Caught Porter! 🐾' : 'Catch Porter!'}</span>${dog.you ? `<span class="to">caught <b>${dog.you}</b></span>` : ''}</div>`;
+    else html = `<div class="row"><span>🐕 ${inside ? 'Porter\'s waiting outside...' : dog.state === 'caught' ? 'Caught Porter! 🐾' : 'Catch Porter!'}</span>${dog.you ? `<span class="to">caught <b>${dog.you}${dog.you < 3 ? '/3' : ''}</b></span>` : ''}</div>`;
   }
   if (html !== dog.hud) { dog.hud = html; el.innerHTML = html; el.hidden = !html; }
 }
 function updateDog(dt) {
   if (gameMode !== 'walk' || !walk.on || !SLIDER || mirrorWorld) { if (dog.rig && dog.rig.g.visible) dog.rig.g.visible = false; dog.state = 'hidden'; dog.match = false; tagHud(); return; }
   if (state !== 'playing') return;                                   // (paused: it holds still)
-  const VD = SLIDER.VD, FZ = VD + FT(34), SX = FT(30) - 1.2, Z0 = VD + 1.2, Z1 = FZ - 1;
-  if (dog.state === 'hidden') {
-    if (walk.pos.z < FZ - 7) { tagHud(); return; }                    // she's wandered out near the back fence...
+  const VD = SLIDER.VD, Y = YARD, FZ = Y.FZ, Z0 = VD + 1.2, Z1 = FZ - 1.2, xl = z => yardXL(z) + 1.2, xr = Y.XR - 1.2;   // (our half of the yard)
+  if (dog.state === 'hidden') {                                       // she's stepped outside: Porter's in his own yard, over the middle fence
+    if (walk.pos.z < VD + 0.4) { tagHud(); return; }
     if (!dog.rig) dog.rig = makeDog();
-    const x = THREE.MathUtils.clamp(walk.pos.x + (Math.random() - 0.5) * 3, -SX, SX);
-    dog.from.set(x, 0, FZ + 1.8); dog.to.set(x, 0, FZ - 2.6); dog.rig.g.position.copy(dog.from); dog.rig.g.rotation.y = Math.PI; dog.rig.g.visible = true;
-    dogSet('leap'); dog.match = false; bark(3); showWalkName('🐕 WOOF! Porter the Doberman just jumped the fence!'); unlock('dogMeet');
+    dog.rig.g.position.set(Y.XR + 2.3, 0, THREE.MathUtils.clamp(walk.pos.z + 4, VD + 3, FZ - 3)); dog.rig.g.rotation.y = -Math.PI / 2; dog.rig.g.visible = true;
+    dogSet('yard'); dog.match = false; dog.barkAt = clock + 0.8;
   }
   const R = dog.rig, g = R.g, pos = g.position, t = dog.t; dog.t += dt;
   R.body.rotation.set(0, 0, 0); R.body.position.set(0, 0, 0); R.head.rotation.set(0, 0, 0); R.legs.forEach(l => l.rotation.set(0, 0, 0)); R.tongue.visible = false;
@@ -9167,18 +9350,27 @@ function updateDog(dt) {
   const gait = speed => { dog.ph += dt * (4 + speed * 2.2); const w = Math.sin(dog.ph), a = Math.min(0.9, 0.35 + speed * 0.08); R.legs[0].rotation.x = R.legs[3].rotation.x = w * a; R.legs[1].rotation.x = R.legs[2].rotation.x = -w * a; R.body.position.y = Math.abs(Math.cos(dog.ph)) * 0.06; R.body.rotation.x = speed > 4 ? 0.08 : 0; };
   const moveTo = (tx, tz, sp) => { const dx = tx - pos.x, dz = tz - pos.z, d = Math.hypot(dx, dz); if (d < 0.02) return 0; const st = Math.min(d, sp * dt); pos.x += dx / d * st; pos.z += dz / d * st; face(tx, tz); gait(sp); return d; };
   const bow = k => { R.body.rotation.x = 0.38 * k; R.body.position.y = -0.18 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = -0.9 * k; R.head.rotation.x = -0.25 * k; };
-  const clampYard = () => { pos.x = THREE.MathUtils.clamp(pos.x, -SX, SX); pos.z = THREE.MathUtils.clamp(pos.z, Z0, Z1);
-    for (const [x0, x1, z0, z1] of YARD_BLOCKS) {                     // (round the shed, the doghouse, the tree... not through them)
+  const clampYard = () => { pos.z = THREE.MathUtils.clamp(pos.z, Z0, Z1); pos.x = THREE.MathUtils.clamp(pos.x, xl(pos.z), xr);
+    for (const [x0, x1, z0, z1] of YARD_BLOCKS) {                     // (round the shed, the trees, the vegetable bed... not through them)
       const a = x0 - 0.7, b = x1 + 0.7, c = z0 - 0.7, d = z1 + 0.7; if (pos.x <= a || pos.x >= b || pos.z <= c || pos.z >= d) continue;
       const px = Math.min(pos.x - a, b - pos.x), pz = Math.min(pos.z - c, d - pos.z);
       if (px < pz) pos.x = pos.x - a < b - pos.x ? a : b; else pos.z = pos.z - c < d - pos.z ? c : d;
     } };
   const inside = walk.pos.z < VD + 0.4;                                // she's gone back indoors
-  const waitAtSlider = () => { const tx = THREE.MathUtils.clamp(SLIDER.DX, -SX, SX), tz = VD + 1.6; if (!moveTo(tx, tz, 4) || Math.hypot(tx - pos.x, tz - pos.z) < 0.1) { face(walk.pos.x, walk.pos.z); R.head.rotation.z = Math.sin(clock * 2.3) * 0.18; } pos.y = 0; };
+  const waitAtSlider = () => { const tx = THREE.MathUtils.clamp(SLIDER.DX, xl(VD + 1.6), xr), tz = VD + 1.6; if (!moveTo(tx, tz, 4) || Math.hypot(tx - pos.x, tz - pos.z) < 0.1) { face(walk.pos.x, walk.pos.z); R.head.rotation.z = Math.sin(clock * 2.3) * 0.18; } pos.y = 0; };
   const cdx = walk.pos.x - pos.x, cdz = walk.pos.z - pos.z, cd = Math.hypot(cdx, cdz);
-  if (dog.state === 'leap') {                                         // clean over the six-foot fence
-    const k = Math.min(1, t / 1.15);
-    pos.lerpVectors(dog.from, dog.to, k); pos.y = Math.sin(k * Math.PI) * 5.2;
+  if (dog.state === 'yard') {                                          // on his own side of the middle fence: trotting along it level with her, barking to come and play
+    const tz = THREE.MathUtils.clamp(walk.pos.z, VD + 3, FZ - 3);
+    if (Math.abs(tz - pos.z) > 0.4) moveTo(Y.XR + 2.3, tz, Math.min(6, Math.abs(tz - pos.z) * 2 + 2)); else { face(walk.pos.x, walk.pos.z); R.head.rotation.z = Math.sin(clock * 2.3) * 0.18; }
+    pos.y = 0;
+    if (clock > dog.barkAt) { dog.barkAt = clock + 2.2 + Math.random() * 3; bark(1 + (Math.random() * 2 | 0)); R.head.rotation.x = -0.2; }
+    if (walk.pos.z > VD + 0.6 && (walk.pos.x > Y.XR - 6.5 || walk.pos.z > VD + 13)) {   // she's come over toward his fence (or right out into the yard): over it he comes
+      dog.from.copy(pos); dog.to.set(Y.XR - 2.8, 0, pos.z); g.rotation.y = -Math.PI / 2;
+      dogSet('leap'); dog.match = false; bark(3); showWalkName('🐕 WOOF! Porter the Doberman just jumped the fence!'); unlock('dogMeet');
+    }
+  } else if (dog.state === 'leap') {                                  // clean over the chain-link
+    const k = Math.min(1, t / 1.0);
+    pos.lerpVectors(dog.from, dog.to, k); pos.y = Math.sin(k * Math.PI) * 3.9;
     R.body.rotation.x = -0.55 * (1 - 2 * k);                          // nose up on take-off, down to land
     R.legs[0].rotation.x = R.legs[1].rotation.x = -1.1 + k * 0.6; R.legs[2].rotation.x = R.legs[3].rotation.x = 0.9 - k * 0.5;   // stretched out, front and back
     if (k >= 1) { pos.y = 0; dogSet('play'); shake = Math.max(shake, reduceMotion ? 0.03 : 0.2); noise(0.18, 0.2, 400); burst(pos.clone().setY(0.1), 0x6a8a3a, 8, 2, 2, 0.6); dog.barkAt = clock + 1.2; dog.bowAt = clock + 0.4; setTimeout(() => { if (dog.state === 'play') showWalkName('🐕 Swipe Porter to play!'); }, 1600); }
@@ -9204,12 +9396,12 @@ function updateDog(dt) {
       dog.jukeCD -= dt;
       let ax = -cdx / (cd || 1), az = -cdz / (cd || 1);               // straight away from her...
       const wall = (d, n) => d < 3 ? (3 - d) / 3 * 1.8 * n : 0;       // ...pushed off the fences so it doesn't get pinned in a corner
-      ax += wall(pos.x + SX, 1) + wall(SX - pos.x, -1); az += wall(pos.z - Z0, 1) + wall(Z1 - pos.z, -1);
-      { const mx = -pos.x, mz = (Z0 + Z1) / 2 - pos.z, ml = Math.hypot(mx, mz) || 1; ax += mx / ml * 0.45; az += mz / ml * 0.45; }   // ...and it heads for open lawn, not along the fences where it'd get cornered
+      ax += wall(pos.x - xl(pos.z), 1) + wall(xr - pos.x, -1); az += wall(pos.z - Z0, 1) + wall(Z1 - pos.z, -1);
+      { const mx = (xl(pos.z) + xr) / 2 - pos.x, mz = (Z0 + Z1) / 2 - pos.z, ml = Math.hypot(mx, mz) || 1; ax += mx / ml * 0.45; az += mz / ml * 0.45; }   // ...and it heads for open lawn, not along the fences where it'd get cornered
       if (dog.juke > 0 && dog.grace <= 0) { dog.juke -= dt; ax = -cdz / (cd || 1) * dog.jukeDir; az = cdx / (cd || 1) * dog.jukeDir; }
       else if (cd < 2.2 && dog.jukeCD <= 0 && dog.grace <= 0) {       // she's closing in: a sudden sidestep (not while Porter's still bolting off)
         dog.juke = 0.4; dog.jukeCD = 1.8;
-        const px = -cdz / (cd || 1), pz = cdx / (cd || 1); dog.jukeDir = Math.abs(pos.x + px * 3) < SX && pos.z + pz * 3 > Z0 && pos.z + pz * 3 < Z1 ? 1 : -1;   // (the side with room to run)
+        const px = -cdz / (cd || 1), pz = cdx / (cd || 1), jx = pos.x + px * 3, jz = pos.z + pz * 3; dog.jukeDir = jx > xl(jz) && jx < xr && jz > Z0 && jz < Z1 ? 1 : -1;   // (the side with room to run)
       }
       const al = Math.hypot(ax, az) || 1, tired = Math.min(1.2, dog.t * 0.05);
       const sp = dog.grace > 0 ? 8.2 : dog.juke > 0 ? 7.5 : cd < 6 ? 6.25 - tired : cd < 9 ? 3 : 0;   // (a head start first; then nearly her sprint speed, tiring as the chase drags on)
@@ -9231,7 +9423,7 @@ function walkZoneOK(nx, nz) {                                         // where s
   const lx = ROOM.halfW - 0.3, VD = ROOM.visDepth, S = SLIDER;
   if (nx >= -lx && nx <= lx && nz >= 0.3 && nz <= VD - 0.45) return true;
   if (S && nx > S.DX - S.DW / 2 + 0.22 && nx < S.DX + S.DW / 2 - 0.22 && nz > VD - 0.5 && nz < VD + 0.65) return true;
-  return nz >= VD + 0.5 && nz <= VD + FT(34) - 0.6 && Math.abs(nx) <= FT(30) - 0.6;
+  return nz >= VD + 0.5 && nz <= YARD.FZ - 0.6 && nx >= yardXL(nz) + 0.6 && nx <= YARD.XR - 0.6;   // (our half of the yard, inside the chain-link)
 }
 function coonInSights() {
   const R = coon.rig; if (!R || !R.g.visible || coon.dead || !['arrive', 'taunt', 'mock', 'laugh', 'startle', 'flinch', 'leave'].includes(coon.state)) return false;
@@ -9311,9 +9503,16 @@ function coonShot(at) {
 }
 function coonDying(R, t, b) {                                        // a long, hammy, theatrical death
   const g = R.g; g.rotation.y = Math.PI;
-  if (coon.dieFrom) {                                                 // it staggers off to the side of the doorway before it drops, so the way out stays clear
-    const S = SLIDER, k = THREE.MathUtils.smoothstep(t, 0.3, 2.6), tx = S.DX + S.DW / 2 + 0.95, tz = S.VD + 0.75, f = coon.dieFrom;
-    g.position.set(f.x + (tx - f.x) * k, f.y * (1 - k), f.z + (tz - f.z) * k);
+  if (coon.dieFrom) {                                                 // it staggers back across the pads to the BBQ, and goes down over it (the pads by the door stay clear)
+    const S = SLIDER, bq = bbqRig ? bbqRig.home : new THREE.Vector3(S.DX + 1.45, 0, S.VD + 3.3), k = THREE.MathUtils.smoothstep(t, 0.3, 2.4), tx = bq.x - 0.1, tz = bq.z - 0.95, f = coon.dieFrom;
+    g.position.set(f.x + (tx - f.x) * k, f.y + (IN(1.2) - f.y) * k, f.z + (tz - f.z) * k);
+    if (bbqRig) {                                                     // ...CLANG: over goes the kettle BBQ, lid bowling off across the grass, a puff of ash
+      const B = bbqRig, bt = THREE.MathUtils.clamp((t - 2.85) / 0.45, 0, 1);
+      B.g.rotation.x = 1.38 * bt * bt; B.g.position.set(B.home.x, B.home.y + 0.17 * bt, B.home.z + 0.25 * bt);   // (lying on its side on the grass, not sunk into it)
+      const f = THREE.MathUtils.smoothstep(bt, 0, 1), s0 = B.home.clone().add(B.lidHome), w = new THREE.Vector3(s0.x + 0.9 * f, s0.y * (1 - f) + 0.56 * f + Math.sin(f * Math.PI) * 0.5, s0.z + 2.3 * f);   // the lid's flight, in the yard's own space...
+      B.g.updateMatrixWorld(); B.lid.position.copy(B.g.worldToLocal(w)); B.lid.rotation.set(1.6 * bt - B.g.rotation.x, 0, -2.2 * bt);   // ...(the kettle it came off is tipping under it), landing on its rim
+      if (bt > 0.6 && !B.crashed) { B.crashed = true; noise(0.35, 0.3, 1800); tone(620, 180, 0.4, 'square', 0.05); tone(1240, 900, 0.6, 'sine', 0.03, 0.05); burst(new THREE.Vector3(B.home.x, 0.6, B.home.z + 0.9), 0x8d8a86, 14, 1.4, 1.6, 1.0); shake = Math.max(shake, reduceMotion ? 0.03 : 0.18); }
+    }
   }
   if (t < 0.3) {                                                     // BLAM: jolted back, arms flung up
     const k = t / 0.3; b.position.z = -0.25 * k; R.arms.forEach((a, i) => a.rotation.set(0, 0, (i ? 1 : -1) * (Math.PI - 0.6) * k)); R.eyes.forEach(e => e.scale.setScalar(1.6));
@@ -9346,7 +9545,7 @@ function updateCops(dt) {
   if (!cops.rig) {                                                    // red and blue lights flashing up from the street beyond the back fence
     const g = new THREE.Group(); g.userData.noWalk = true; povEndWall.add(g); cops.rig = g; cops.lights = [];
     const beam = canvasTex(64, 64, (c, w, h) => { const gr = c.createRadialGradient(32, 32, 1, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.18, 'rgba(255,255,255,.9)'); gr.addColorStop(0.5, 'rgba(255,255,255,.3)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); }, 1, 1);   // (bright enough to read against a daytime sky)
-    const z = SLIDER.VD + FT(34) + 2.2;                                // just over the fence, in front of the neighbours' trees
+    const z = YARD.FZ + 2.2;                                           // just over the back fence, in front of the trees
     for (const [x, c] of [[-6, 0xff2a2a], [-4.4, 0x2a5bff], [3.6, 0xff2a2a], [5.2, 0x2a5bff], [-5.2, 0xffffff]]) {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: beam, color: c, depthWrite: false, transparent: true, opacity: 0, fog: false }));
       sp.position.set(x, 4.9, z); sp.scale.setScalar(c === 0xffffff ? 3 : 7.5); g.add(sp); cops.lights.push({ sp, c });
@@ -9368,6 +9567,7 @@ function resetSliderScene() {                                         // a fresh
   dog.state = 'hidden'; dog.match = false; if (dog.rig) dog.rig.g.visible = false;     // (and the Doberman's back over its own fence)
   sliderGlass.forEach(g => { g.visible = true; }); shards.forEach(s2 => freeMesh(s2.m)); shards.length = 0;
   if (mosaicArt) { const MA = mosaicArt; MA.bits.forEach(b => freeMesh(b.m)); MA.bits = []; MA.state = 'wall'; MA.g.visible = true; MA.g.position.copy(MA.home); MA.g.rotation.set(0, Math.PI, 0); }
+  if (bbqRig) { const B = bbqRig; B.g.rotation.set(0, 0, 0); B.g.position.copy(B.home); B.lid.position.copy(B.lidHome); B.lid.rotation.set(0, 0, 0); B.crashed = false; }   // (the BBQ back on its feet)
   coon.dead = false; if (coon.rig && coon.rig.halo) coon.rig.halo.visible = false; if (coon.pool) { freeMesh(coon.pool); coon.pool = null; } cops.at = 0; cops.t = -1; if (cops.rig) cops.rig.visible = false;
 }
 function duckSqueak(pitch) { const f = pitch || 1300 + Math.random() * 500; tone(f, f * 0.72, 0.09, 'square', 0.028); tone(f * 1.5, f * 1.1, 0.06, 'sine', 0.02, 0.02); }
