@@ -3457,9 +3457,9 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           yBox(hd, w + 0.5, 0.12, 0.3, 0xf7f5f0, x, y - h / 2 - 0.2, WZ + 0.2);
         };
         for (const wx of upWins) winAt(wx, winY, winW, winH);
-        winAt(DX + 5.8, 3.2, 2.8, 2.0);                                                                             // our kitchen window, with a flower box
-        yBox(hd, 3.1, 0.4, 0.45, 0x5a3a26, DX + 5.8, 1.9, WZ + 0.3);
-        for (let k = 0; k < 9; k++) { const c = [0xff6fae, 0xffd23a, 0xffffff, 0xb07aff, 0xff5a4e][k % 5]; yBlob(hd, 0.2, 0x3f7a36, DX + 4.6 + k * 0.3, 2.2, WZ + 0.32); yBlob(hd, 0.12, c, DX + 4.65 + k * 0.3, 2.35, WZ + 0.38); }
+        winAt(DX + 8.6, 3.2, 2.8, 2.0);                                                                             // our kitchen window, with a flower box (past the living room's side wall)
+        yBox(hd, 3.1, 0.4, 0.45, 0x5a3a26, DX + 8.6, 1.9, WZ + 0.3);
+        for (let k = 0; k < 9; k++) { const c = [0xff6fae, 0xffd23a, 0xffffff, 0xb07aff, 0xff5a4e][k % 5]; yBlob(hd, 0.2, 0x3f7a36, DX + 7.4 + k * 0.3, 2.2, WZ + 0.32); yBlob(hd, 0.12, c, DX + 7.45 + k * 0.3, 2.35, WZ + 0.38); }
         { const px = XR + 5.2;                                                                                      // next door's patio door and window
           yBox(hd, 4.9, DH + 0.3, 0.06, 0xf7f5f0, px, (DH + 0.3) / 2, WZ + 0.08); yBox(hd, 4.5, DH, 0.05, 0x2f3a45, px, DH / 2, WZ + 0.12); yBox(hd, 0.1, DH, 0.04, 0xf7f5f0, px, DH / 2, WZ + 0.15);
           winAt(XR + 12.6, 3.2, 2.6, 2.0); }
@@ -3480,8 +3480,13 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         for (const [x, sd] of [[HL - 0.04, -1], [HR + 0.04, 1]]) for (let k = 0; k < 6; k++) {                  // windows all down both sides: the rest of the house (kitchen, bedrooms...) we never go in
           const z = WZ - 6.4 - k * 7.6;
           yBox(hd, 0.06, 2.1, 2.3, 0xf7f5f0, x, winY, z); yBox(hd, 0.05, 1.85, 2.05, 0x34414f, x + sd * 0.03, winY, z);
-          if (k % 2) { yBox(hd, 0.06, 1.9, 2.3, 0xf7f5f0, x, 3.3, z); yBox(hd, 0.05, 1.65, 2.05, 0x34414f, x + sd * 0.03, 3.3, z); }
+          if (k % 2 && !(sd < 0 && z > 0 && z < VD)) { yBox(hd, 0.06, 1.9, 2.3, 0xf7f5f0, x, 3.3, z); yBox(hd, 0.05, 1.65, 2.05, 0x34414f, x + sd * 0.03, 3.3, z); }   // (downstairs: none along the living room but its own)
         }
+        { const sx = HL - 0.04, sz = DOOR_Z0 + WIN_W / 2, sy = WIN_SILL + WIN_H / 2;                            // the living room's window, seen from the side yard: right where it is inside
+          yBox(hd, 0.06, WIN_H + 0.3, WIN_W + 0.3, 0xf7f5f0, sx, sy, sz); yBox(hd, 0.05, WIN_H, WIN_W, 0x34414f, sx - 0.03, sy, sz);
+          yBox(hd, 0.05, WIN_H * 0.75, WIN_W - 0.06, 0xe6e0d2, sx - 0.05, sy + WIN_H * 0.125, sz);                 // its blinds, three-quarters down, as they are inside
+          for (let k = 1; k < 9; k++) yBox(hd, 0.04, 0.02, WIN_W - 0.08, 0xc9c2b2, sx - 0.07, sy + WIN_H / 2 - k * WIN_H * 0.75 / 9, sz);   // (slats)
+          yBox(hd, 0.05, WIN_H, 0.08, 0xf7f5f0, sx - 0.09, sy, sz); yBox(hd, 0.34, 0.12, WIN_W + 0.5, 0xf7f5f0, sx - 0.15, sy - WIN_H / 2 - 0.2, sz); }
         { // the front of the house, from the photo (only seen if she ever gets round there): each half has its garage by the middle,
           // a side door, and the front door up a short flight of steps under a little gable; a big window over the garage under a
           // front gable of its own. Brick below, stucco and dark timber above, the red roof over it all
@@ -5769,7 +5774,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-28 11:48';                                              // stamped when the site is published
+const BUILD = '2026-09-28 12:21';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -9294,10 +9299,10 @@ function updateMirrorWorld(dt) {
     into = !MW.trans && mirrorPortals().some(b => b.containsPoint(ahead) || b.containsPoint(push));
     if (into && MW.beaten && !mirrorWorld) { into = false; if (clock > (MW.sealNote || 0)) { MW.sealNote = clock + 4; showWalkName('🪞 Just a mirror now... the dark kitty is gone'); tone(660, 440, 0.4, 'sine', 0.02); } }
   }
-  const was = MW.pushT || 0; MW.pushT = into ? was + dt : Math.max(0, was - dt * 3);   // ...and keep pushing for two seconds before it lets her through
+  const was = MW.pushT || 0, PUSH = 1.35; MW.pushT = into ? was + dt : Math.max(0, was - dt * 3);   // ...and keep pushing a moment: with the shimmer, she's through in two seconds
   if (into && was === 0) tone(880, 1320, 0.3, 'sine', 0.02);
-  if (!MW.trans) { const rp = document.getElementById('mirrorRipple'); if (rp) rp.style.opacity = (Math.min(1, MW.pushT / 2) * 0.35).toFixed(3); }   // the glass starts to ripple as she presses in
-  if (MW.pushT >= 2) { MW.pushT = 0; startMirrorTrans(mirrorWorld ? 'out' : 'in', MW.done ? null : 'You escaped the mirror world'); }
+  if (!MW.trans) { const rp = document.getElementById('mirrorRipple'); if (rp) rp.style.opacity = (Math.min(1, MW.pushT / PUSH) * 0.35).toFixed(3); }   // the glass starts to ripple as she presses in
+  if (MW.pushT >= PUSH) { MW.pushT = 0; startMirrorTrans(mirrorWorld ? 'out' : 'in', MW.done ? null : 'You escaped the mirror world'); }
   if (MW.trans) updateMirrorTrans(dt);
   if (!mirrorWorld) return;
   if (!MW.trans) updateDarkKitty(dt);
