@@ -174,6 +174,9 @@
                background:rgba(58,20,52,.88);color:#fff;border:2px solid rgba(255,244,248,.45);border-radius:22px;padding:7px 18px;font:800 17px var(--body)}
   @media (max-width:560px){#walkCaption{white-space:normal;text-align:center;font-size:15px}}
   #walkCaption.show{animation:caption 2.4s ease forwards}
+  body.tag-on #walkCaption{top:calc(env(safe-area-inset-top,0px) + 64px)}
+  body.walking .ach-toast{top:calc(env(safe-area-inset-top,0px) + 108px)}
+  @media (max-width:560px){body.tag-on #walkCaption{top:calc(env(safe-area-inset-top,0px) + 104px)}body.walking .ach-toast{top:calc(env(safe-area-inset-top,0px) + 172px)}}
   @keyframes caption{0%{opacity:0;transform:translate(-50%,-6px) scale(.9)}8%,78%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0}}
   .float.name{font-family:var(--body);font-weight:800;font-size:15px;color:#fff;background:rgba(58,20,52,.82);border:1.5px solid rgba(255,244,248,.35);
               padding:4px 12px;border-radius:999px;-webkit-text-stroke:0;animation-duration:1.9s}
@@ -657,14 +660,14 @@ let _softShTex = null, _softRectTex = null;
 function softShadowMat(opacity, rect) {                                // a soft contact shadow: black, fading out at the edges (a disc, or a rounded rectangle for furniture)
   if (!_softShTex) {
     _softShTex = canvasTex(64, 64, (c, w, h) => { const g = c.createRadialGradient(32, 32, 1, 32, 32, 32); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.45, 'rgba(0,0,0,.72)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h); }, 1, 1);
-    _softRectTex = canvasTex(128, 128, (c, w, h) => { c.clearRect(0, 0, w, h); c.shadowColor = 'rgba(0,0,0,1)'; c.shadowBlur = 20; c.fillStyle = '#000'; c.fillRect(25, 25, 78, 78); c.fillRect(25, 25, 78, 78); }, 1, 1);
+    _softRectTex = canvasTex(128, 128, (c, w, h) => { c.clearRect(0, 0, w, h); c.shadowColor = 'rgba(0,0,0,1)'; c.shadowBlur = 26; c.shadowOffsetX = 1000; c.fillStyle = '#000'; c.fillRect(30 - 1000, 30, 68, 68); }, 1, 1);   // (only the blurred shadow of a square drawn off the canvas: no hard edge anywhere)
     for (const t of [_softShTex, _softRectTex]) t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   }
   const m = new THREE.MeshBasicMaterial({ map: rect ? _softRectTex : _softShTex, color: 0x000000, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   m.userData.shadow = true; return m;
 }
 function softShadow(parent, opacity, rect) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), softShadowMat(opacity, rect)); m.rotation.x = -Math.PI / 2; m.renderOrder = 1; m.userData.noWalk = true; parent.add(m); return m; }
-function rectShadow(parent, x, z, w, d, ry, opacity, y) { const m = softShadow(parent, opacity, true); m.position.set(x, (y || 0) + 0.006, z); m.rotation.z = ry || 0; m.scale.set(w / 0.62, d / 0.62, 1); return m; }   // (the texture's solid core is ~62% of it)
+function rectShadow(parent, x, z, w, d, ry, opacity, y) { const m = softShadow(parent, opacity, true); m.position.set(x, (y || 0) + 0.006, z); m.rotation.z = ry || 0; m.scale.set(w / 0.53, d / 0.53, 1); return m; }   // (the square's edge, half dark, is 53% of the way across)
 // beige carpet
 const floorTex = canvasTex(128, 128, (g, w, h) => {
   g.fillStyle = '#a08a74'; g.fillRect(0, 0, w, h);
@@ -2528,6 +2531,7 @@ const DOOR2_Z = ROOM.visDepth - 1.5 - FT(4), DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DO
     const RD = FT(8), RW = FT(4.6), rz = DOOR2_Z;
     const denWall = basic(0x5a4636), denFloor = basic(0x3a2c22);
     const df = new THREE.Mesh(new THREE.PlaneGeometry(RD, RW), denFloor); df.rotation.x = -Math.PI / 2; df.position.set(hx + RD / 2, 0.005, rz); scene.add(df);
+    for (const z of [DOOR_Z, DOOR2_Z]) { const th = new THREE.Mesh(new THREE.PlaneGeometry(WALL_T + 0.06, DOOR_W), basic(0x6e5a48)); th.rotation.x = -Math.PI / 2; th.position.set(ROOM.halfW + WALL_T / 2, 0.004, z); scene.add(th); }   // wooden thresholds in both doorways
     const rug = new THREE.Mesh(new THREE.PlaneGeometry(FT(3), FT(2)), basic(0x7a3b3b)); rug.rotation.x = -Math.PI / 2; rug.position.set(hx + RD * 0.45, 0.01, rz); scene.add(rug);
     const fw = new THREE.Mesh(new THREE.PlaneGeometry(RW, ROOM.wallH), basic(0x4e3c2e)); fw.rotation.y = -Math.PI / 2; fw.position.set(hx + RD, ROOM.wallH / 2, rz); scene.add(fw); addBack(fw);
     for (const z of [rz - RW / 2, rz + RW / 2]) { const sw = new THREE.Mesh(new THREE.PlaneGeometry(RD, ROOM.wallH), denWall); sw.rotation.y = z < rz ? 0 : Math.PI; sw.position.set(hx + RD / 2, ROOM.wallH / 2, z); scene.add(sw); addBack(sw); }
@@ -2638,12 +2642,12 @@ const DOOR2_Z = ROOM.visDepth - 1.5 - FT(4), DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DO
     // one continuous sweep of colour across the whole top (and across each leg), no repeat seam down the middle
     const span = (tex, w) => { const t = tex.clone(); t.needsUpdate = true; t.wrapS = THREE.ClampToEdgeWrapping; t.repeat.set(1 / w, 1); t.offset.x = 0.5; return t; };
     const acrylicTop = acrylic.clone(); acrylicTop.map = span(irid, T_L);
-    const topMesh = new THREE.Mesh(topGeo, acrylicTop); topMesh.position.y = T_H; table.add(topMesh);
+    const topMesh = new THREE.Mesh(topGeo, acrylicTop); topMesh.position.y = T_H; topMesh.renderOrder = 3; table.add(topMesh);   // (drawn after the legs, so they show through it, never over it)
     const legW = IN(8), legR = legW / 2, leg = new THREE.Shape();            // arched panel, rounded end on the floor
     leg.moveTo(-legR, T_H); leg.lineTo(-legR, legR); leg.absarc(0, legR, legR, Math.PI, Math.PI * 2, false); leg.lineTo(legR, T_H); leg.lineTo(-legR, T_H);
     const legGeo = new THREE.ExtrudeGeometry(leg, { depth: IN(0.4), bevelEnabled: false, curveSegments: 12 }); legGeo.rotateY(Math.PI / 2);
     acrylic.map = span(irid, legW);
-    for (const lx of [-T_L * 0.24, T_L * 0.24]) for (const lz of [-T_W * 0.26, T_W * 0.26]) { const m = new THREE.Mesh(legGeo, acrylic); m.position.set(lx, 0, lz); m.rotation.y = -Math.sign(lx) * Math.sign(lz) * 0.42; table.add(m); }   // each panel angled out toward its corner
+    for (const lx of [-T_L * 0.24, T_L * 0.24]) for (const lz of [-T_W * 0.26, T_W * 0.26]) { const m = new THREE.Mesh(legGeo, acrylic); m.position.set(lx, 0, lz); m.rotation.y = -Math.sign(lx) * Math.sign(lz) * 0.42; m.renderOrder = 2; table.add(m); }   // each panel angled out toward its corner
     // shatter rig: the top and legs tumble to the carpet, plus a spray of little rainbow shards
     const shardGeo = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(IN(2.2), IN(0.4)), new THREE.Vector2(IN(0.8), IN(1.9))]));
     const shards = [];
@@ -2689,7 +2693,9 @@ const DOOR2_Z = ROOM.visDepth - 1.5 - FT(4), DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DO
 SECT = 'Cream corduroy sofa';
 /* ---------- cream corduroy modular sofas along both side walls ---------- */
 // whiter cream sofa; base a hair darker so the cushion edges read
-const cordMat = lam(0xf2eee7, { map: cordTexH }), couchBaseMat = lam(0xe4dfd6, { map: cordTexH }), couchGapMat = basic(0x1a1512);
+const gapTex = canvasTex(4, 64, (c, w, h) => { const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1a1511'); g.addColorStop(0.45, '#3e332b'); g.addColorStop(1, '#7a6755'); c.fillStyle = g; c.fillRect(0, 0, w, h); }, 1, 1);   // (the dark under a sofa fades out toward the carpet: no hard line)
+gapTex.wrapS = gapTex.wrapT = THREE.ClampToEdgeWrapping;
+const cordMat = lam(0xf2eee7, { map: cordTexH }), couchBaseMat = lam(0xe4dfd6, { map: cordTexH }), couchGapMat = lam(0xffffff, { map: gapTex });
 // pillow = a squashed "superellipsoid": square-ish outline with rounded corners, fat in the middle, thin at the seams
 const PILLOW_GEO = (() => {
   const w = IN(18), h = IN(18), t = IN(7), g = new THREE.SphereGeometry(1, 24, 18), p = g.attributes.position;
@@ -2840,8 +2846,11 @@ const blanketBlackMat = lam(0xffffff, { map: blanketBlackTex }), blanketFuzzMat 
   let top = 0; for (let i = 0; i < q.count; i++) if (!hang[i]) { top = i; break; }
   const upFacing = g.attributes.normal.getY(Math.floor(NZ / 2) * NX + Math.floor(NX / 2)) > 0;
   const drape = new THREE.Group(); drape.position.set(cx, 0, cz); scene.add(drape);
-  drape.add(new THREE.Mesh(g, lam(0xffffff, { map: blanketBlackTex, side: upFacing ? THREE.FrontSide : THREE.BackSide })));
-  drape.add(new THREE.Mesh(g, lam(0xffffff, { map: blanketFuzzTex, side: upFacing ? THREE.BackSide : THREE.FrontSide })));
+  drape.add(new THREE.Mesh(g, lam(0xffffff, { map: blanketBlackTex, side: THREE.DoubleSide })));   // (both sides black: where the cloth folds round the arm's corner, a flipped sliver shows black, not the fleece)
+  { const gu = g.clone(), P = gu.attributes.position, N = gu.attributes.normal, k = upFacing ? -0.008 : 0.008;   // the white fleece: its own layer a hair underneath, so it only shows from below
+    for (let i = 0; i < P.count; i++) P.setXYZ(i, P.getX(i) + N.getX(i) * k, P.getY(i) + N.getY(i) * k, P.getZ(i) + N.getZ(i) * k);
+    { const ix = gu.index.array, keep = []; for (let t = 0; t < ix.length; t += 3) if (!hang[ix[t]] && !hang[ix[t + 1]] && !hang[ix[t + 2]]) keep.push(ix[t], ix[t + 1], ix[t + 2]); gu.setIndex(keep); }   // (only under the part lying on the seat: the hanging folds are black through and through)
+    drape.add(new THREE.Mesh(gu, lam(0xffffff, { map: blanketFuzzTex, side: upFacing ? THREE.BackSide : THREE.FrontSide }))); }
   drape.position.y = 0; drape.userData.seat = SEAT;
   blanketDrape = drape;
   drape.traverse(o => { if (o.isMesh) { o.userData.blanket = true; tapTargets.push(o); } });
@@ -3388,7 +3397,8 @@ let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null, laund
 const YARD = { HL: -6.5, XR: 13.5, HR: 33.8, XL0: -15, XL1: -19, FZ: ROOM.visDepth + 36, FH: FT(4), HD: 50.5 };
 function hillY(z) { const t = THREE.MathUtils.clamp((z - YARD.FZ - 1.4) / 18, 0, 1); return 8.5 * t * t * (3 - 2 * t); }   // the bank behind the back fence, climbing up to the off-ramp
 function yardXL(z) { const k = THREE.MathUtils.clamp((z - ROOM.visDepth) / (YARD.FZ - ROOM.visDepth), 0, 1); return YARD.XL0 + (YARD.XL1 - YARD.XL0) * k; }   // the neighbours'-side fence: the lot widens toward the back
-let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [], bbqRig = null, yardWeeds = [];     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
+let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [], bbqRig = null, yardWeeds = [], yardGate = null;     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
+const YARD_FENCES = [], YARD_POSTS = [], YARD_BUSHES = [];   // the chain-link runs (solid both ways, unless she's sailing over the top), tree trunks and cedars (solid), bushes and cedar foliage (she pushes through)
 const sliderGlass = [];
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
@@ -3493,14 +3503,17 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
               wallMesh(new THREE.Shape([new THREE.Vector2(-gw / 2, 0), new THREE.Vector2(gw / 2, 0), new THREE.Vector2(0, gh)]), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.set(ex, gy0, zF - 0.9);
               for (const sd of [-1, 1]) { yBox(hd, sl + 0.3, 0.2, 0.12, T, ex + sd * gw / 4, gy0 + gh / 2, zF - 0.95).rotation.z = -sd * ang; yBox(hd, sl + 0.4, 0.14, 1.2, 0x8a3934, ex + sd * gw / 4, gy0 + gh / 2 + 0.14, zF - 0.45).rotation.z = -sd * ang; }
               yBox(hd, 0.14, gh - 0.3, 0.1, T, ex, gy0 + (gh - 0.3) / 2, zF - 0.95); yBox(hd, gw, 0.18, 0.12, T, ex, gy0, zF - 0.95);
-              for (const sd of [-1, 1]) yBox(hd, 0.16, gy0 - LH, 0.16, 0xf2f0ea, ex + sd * (gw / 2 - 0.1), LH + (gy0 - LH) / 2, zF - 0.9);   // two white posts holding it up
+              for (const sd of [-1, 1]) yBox(steps, 0.16, gy0 - LH, 0.16, 0xf2f0ea, ex + sd * (gw / 2 - 0.2), LH + (gy0 - LH) / 2, zF - 1.3);   // two white posts holding it up, at the front corners of the landing
               const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.31), new THREE.MeshBasicMaterial({ map: plaque(half ? '26' : '28'), fog: false })); pl.rotation.y = Math.PI; pl.position.set(ex, gy0 + 0.55, zF - 0.97); pl.userData.noWalk = true; povEndWall.add(pl); }
-            yBox(steps, 2.6, LH, 1.5, 0x9c9890, ex, LH / 2, zF - 0.75);                                                          // the landing, and seven shallow steps down to the walk (each one a cat can walk up)
+            yBox(steps, 3.6, LH, 1.5, 0x9c9890, ex, LH / 2, zF - 0.75);                                                          // the landing, and seven shallow steps down to the walk (each one a cat can walk up)
             for (let k = 0; k < 7; k++) { const h = LH - (k + 1) * LH / 8; yBox(steps, 2.2, h, 0.62, 0xa6a29a, ex, h / 2, zF - 1.81 - k * 0.62); }
             for (const sd of [-1, 1]) {                                                                                           // white railings either side
-              const rx = ex + sd * 1.2, run = 4.34, rl = yBox(hd, 0.07, 0.07, Math.hypot(run, LH), 0xf4f4f0, rx, LH / 2 + 0.9, zF - 1.5 - run / 2); rl.rotation.x = -Math.atan2(LH, run);
-              for (let k = 0; k < 7; k += 2) { const h = LH - (k + 1) * LH / 8; yBox(hd, 0.05, 0.9, 0.05, 0xf4f4f0, rx, h + 0.45, zF - 1.81 - k * 0.62); }
+              const rx = ex + sd * 1.2, run = 4.34, rl = yBox(steps, 0.07, 0.07, Math.hypot(run, LH), 0xf4f4f0, rx, LH / 2 + 0.9, zF - 1.5 - run / 2); rl.rotation.x = -Math.atan2(LH, run);
+              for (let k = 0; k < 7; k += 2) { const h = LH - (k + 1) * LH / 8; yBox(steps, 0.05, 0.9, 0.05, 0xf4f4f0, rx, h + 0.45, zF - 1.81 - k * 0.62); }
             }
+            { const lx = (ex + dx) / 2, ly = LH + 1.55;                                                                        // the front room's window, beside the door...
+              yBox(hd, 3.4, 2.3, 0.08, 0xf7f5f0, lx, ly, FZ0); yBox(hd, 3.0, 1.95, 0.08, 0x34414f, lx, ly, FZ0 - 0.03); yBox(hd, 0.08, 1.95, 0.05, 0xf7f5f0, lx, ly, FZ0 - 0.08); yBox(hd, 3.6, 0.14, 0.3, 0xf2f0ea, lx, ly - 1.2, FZ0 - 0.12);
+              yBox(hd, 2.6, 2.3, 0.08, 0xf7f5f0, ex, BH + 2.9, FZ0); yBox(hd, 2.2, 1.95, 0.08, 0x34414f, ex, BH + 2.9, FZ0 - 0.03); yBox(hd, 0.08, 1.95, 0.05, 0xf7f5f0, ex, BH + 2.9, FZ0 - 0.08); }   // ...and a bedroom window over the porch
             const wy = BH + 2.6;                                                                                                  // the big window over the garage...
             yBox(hd, 4.6, 2.7, 0.08, 0xf7f5f0, gx, wy, FZ0); yBox(hd, 4.2, 2.35, 0.08, 0x34414f, gx, wy, FZ0 - 0.03); yBox(hd, 0.1, 2.35, 0.05, 0xf7f5f0, gx, wy, FZ0 - 0.08); yBox(hd, 4.2, 0.08, 0.05, 0xf7f5f0, gx, wy - 0.55, FZ0 - 0.08);
             for (const x of [gx - 3.1, gx + 3.1, ex - 2.3, ex + 2.3]) yBox(hd, 0.2, XH - BH, 0.1, T, x, (BH + XH) / 2, FZ0);    // timber posts
@@ -3586,7 +3599,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         }
         const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); par.add(o); return o;
       };
-      BX(g, CW - IN(2), IN(1.2), CD - IN(4), lam(0x1a100a), 0, IN(0.6), -IN(0.5));                                 // a dark shadow line where it meets the carpet
+      BX(g, CW - IN(2), IN(1.2), CD - IN(4), couchGapMat, 0, IN(0.6), -IN(0.5));                                    // a soft dark line where it meets the carpet
       for (const sx of [-1, 1]) {
         PB(g, AW, IN(20), CD - IN(2), IN(1.6), IN(0.3), deep, sx * (CW / 2 - AW / 2), IN(11), -IN(0.5));            // flat side panel, down to the floor
         PB(g, AW + IN(1.8), IN(7), CD - IN(0.5), IN(3.2), IN(0.5), leather, sx * (CW / 2 - AW / 2 + IN(0.6)), IN(23), IN(0.2));   // the thick rolled arm pad on top
@@ -3938,7 +3951,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       beam.position.set(SX, SY - IN(3), VD + SD - IN(3.5)); beam.userData.name = 'Balcony beam'; yard.add(beam);
       for (const px of [SX - SW / 2 + IN(5), SX + SW / 2 - IN(5)]) {
         const ph = SY - IN(6), col = new THREE.Mesh(new THREE.BoxGeometry(IN(8), ph, IN(8)), [OB(0xdcd8d0), OB(0xe4e0d8), OB(0xf4f1ec), OB(0xf4f1ec), OB(0xe8e4dc), OB(0xf3f0ea)]);
-        col.position.set(px, ph / 2, VD + SD - IN(3.5)); col.userData.name = 'Patio post'; yard.add(col);
+        col.position.set(px, ph / 2, VD + SD - IN(3.5)); col.userData.name = 'Patio post'; povEndWall.add(col);   // (solid)
       }
       for (const [lx, lz] of [[DX, VD + SD * 0.5]]) {                                                              // a jelly-jar porch light
         const f = new THREE.Group(); f.position.set(lx, SY, lz); f.userData.name = 'Porch light'; yard.add(f);
@@ -3954,18 +3967,30 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const Y = YARD, FH = Y.FH, FZ = Y.FZ, posts = new THREE.Group(); posts.userData.name = 'Fence posts'; yard.add(posts);
       const linkTex = canvasTex(64, 64, (c, w, h) => { c.clearRect(0, 0, w, h); c.strokeStyle = 'rgba(178,184,190,1)'; c.lineWidth = 3.4;
         for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(k * 32, 0); c.lineTo(k * 32 + 64, 64); c.stroke(); c.beginPath(); c.moveTo(k * 32 + 64, 0); c.lineTo(k * 32, 64); c.stroke(); } }, 1, 1);
-      const run = (x0, z0, x1, z1, gate) => {                                                               // one straight stretch: mesh, posts every 8 ft, a top rail
-        const L = Math.hypot(x1 - x0, z1 - z0), t = linkTex.clone(); t.needsUpdate = true; t.repeat.set(L / 0.31, (FH - 0.1) / 0.31);
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(L, FH - 0.1), new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.06, side: THREE.DoubleSide, depthWrite: false, fog: false }));
-        m.position.set((x0 + x1) / 2, (FH - 0.1) / 2 + 0.05, (z0 + z1) / 2); m.rotation.y = Math.atan2(-(z1 - z0), x1 - x0); m.userData.name = 'Chain-link fence'; yard.add(m);
-        const n = Math.max(1, Math.round(L / FT(8)));
-        for (let i = 0; i <= n; i++) { const k = i / n; yCyl(posts, 0.06, 0.06, FH + 0.12, 0x9ea4aa, x0 + (x1 - x0) * k, (FH + 0.12) / 2, z0 + (z1 - z0) * k, 8); }
-        yBox(posts, 0.07, 0.07, L, 0xa9afb5, (x0 + x1) / 2, FH, (z0 + z1) / 2, Math.atan2(x1 - x0, z1 - z0));
-        if (gate) { const gx = (x0 + x1) / 2, gz = (z0 + z1) / 2, ry = Math.atan2(x1 - x0, z1 - z0), gw = Math.min(L - 0.4, FT(4));   // a gate in the middle of it: a pipe frame, a brace, a latch
-          const gg = new THREE.Group(); gg.position.set(gx, 0, gz); gg.rotation.y = ry; posts.add(gg);
-          for (const sx of [-1, 1]) yCyl(gg, 0.05, 0.05, FH - 0.2, 0xb4babf, 0, (FH - 0.2) / 2 + 0.1, sx * gw / 2, 8);
-          for (const y of [0.15, FH - 0.12, FH / 2]) yBox(gg, 0.05, 0.05, gw, 0xb4babf, 0, y, 0);
-          yBox(gg, 0.08, 0.18, 0.12, 0x2a2a2a, 0.06, FH * 0.62, gw / 2 - 0.08); }
+      const run = (x0, z0, x1, z1, gate) => {                                                               // one straight stretch: mesh, posts every 8 ft, a top rail (solid from either side: YARD_FENCES)
+        const L = Math.hypot(x1 - x0, z1 - z0), ux = (x1 - x0) / L, uz = (z1 - z0) / L, ry = Math.atan2(-uz, ux);
+        const panel = (par, a, b, px, pz, rot) => { const t = linkTex.clone(); t.needsUpdate = true; t.repeat.set((b - a) / 0.31, (FH - 0.1) / 0.31);
+          const m = new THREE.Mesh(new THREE.PlaneGeometry(b - a, FH - 0.1), new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.06, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+          m.position.set(px, (FH - 0.1) / 2 + 0.05, pz); m.rotation.y = rot; m.userData.name = 'Chain-link fence'; par.add(m); };
+        const stretch = (a, b) => {                                           // mesh, posts and top rail from a to b along the run
+          panel(yard, a, b, x0 + ux * (a + b) / 2, z0 + uz * (a + b) / 2, ry);
+          const n = Math.max(1, Math.round((b - a) / FT(8)));
+          for (let i = 0; i <= n; i++) { const d = a + (b - a) * i / n; yCyl(posts, 0.06, 0.06, FH + 0.12, 0x9ea4aa, x0 + ux * d, (FH + 0.12) / 2, z0 + uz * d, 8); }
+          yBox(posts, 0.07, 0.07, b - a, 0xa9afb5, x0 + ux * (a + b) / 2, FH, z0 + uz * (a + b) / 2, Math.atan2(ux, uz));
+          YARD_FENCES.push({ x0: x0 + ux * a, z0: z0 + uz * a, x1: x0 + ux * b, z1: z0 + uz * b });
+        };
+        if (!gate) { stretch(0, L); return; }
+        { // a gate in the middle of it: a pipe frame with its own mesh, hinged, swinging into the yard (she can nose it open from the side yard, never from inside)
+          const gw = Math.min(L - 0.4, FT(4)), g0 = (L - gw) / 2, g1 = g0 + gw;
+          stretch(0, g0 - 0.04); stretch(g1 + 0.04, L);
+          const hinge = new THREE.Group(); hinge.position.set(x0 + ux * g0, 0, z0 + uz * g0); hinge.rotation.y = ry; hinge.userData.name = 'Side gate'; yard.add(hinge);
+          for (const x of [0.05, gw - 0.05]) yCyl(hinge, 0.05, 0.05, FH - 0.2, 0xb4babf, x, (FH - 0.2) / 2 + 0.1, 0, 8);
+          for (const y of [0.15, FH - 0.12, FH / 2]) yBox(hinge, gw, 0.05, 0.05, 0xb4babf, gw / 2, y, 0);
+          yBox(hinge, 0.12, 0.18, 0.08, 0x2a2a2a, gw - 0.08, FH * 0.62, 0.06);                                // the latch
+          panel(hinge, 0, gw - 0.1, gw / 2, 0, 0);
+          const F = { x0: x0 + ux * g0, z0: z0 + uz * g0, x1: x0 + ux * g1, z1: z0 + uz * g1 }; YARD_FENCES.push(F);
+          yardGate = F.gate = { seg: F, hinge, base: ry, open: 0, want: 0, stay: 0, said: false, hint: false };   // (the yard is on the left of the run, going x0 to x1)
+        }
       };
       run(Y.XR, VD + IN(6), Y.XR, FZ);                                                                          // down the middle
       run(Y.XL0, VD - 26, Y.XL0, VD + 0.2); run(Y.XL0, VD + 0.2, Y.XL1, FZ);                                    // down the neighbours' side
@@ -3980,14 +4005,13 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       blob.setAttribute('color', new THREE.Float32BufferAttribute(shade, 3));
       let seed = 23; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
       const leaves = [], trunks = [], BUSH = [0x3c7431, 0x4a8638, 0x57963f, 0x335f2a, 0x42803a], LEAF = [0x7fae4c, 0x6a9a40, 0x94bf5a, 0x5c8a38, 0x4f8a3a], DARK = [0x2f5a28, 0x3a6a2e, 0x2a4f24, 0x44753a, 0x4a7a36];
-      const bush = (x, z, r0, b, pal) => { const n = 2 + (rnd() * 2 | 0); for (let k = 0; k < n; k++) { const r = r0 * (0.7 + rnd() * 0.5); leaves.push([x + (rnd() - 0.5) * 1.4, (b || 0) + r * 0.72, z + (rnd() - 0.5) * 1.0, r, (pal || BUSH)[rnd() * (pal || BUSH).length | 0]]); } };
+      const bush = (x, z, r0, b, pal) => { YARD_BUSHES.push([x, z, r0 * 1.1, (b || 0) + r0 * 1.6]); const n = 2 + (rnd() * 2 | 0); for (let k = 0; k < n; k++) { const r = r0 * (0.7 + rnd() * 0.5); leaves.push([x + (rnd() - 0.5) * 1.4, (b || 0) + r * 0.72, z + (rnd() - 0.5) * 1.0, r, (pal || BUSH)[rnd() * (pal || BUSH).length | 0]]); } };
       const tree = (x, z, h, b) => { b = b || 0; trunks.push([x, z, h, b]); for (let k = 0; k < 7; k++) { const r = 2 + rnd() * 1.7; leaves.push([x + (rnd() - 0.5) * 4.6, b + h + (rnd() - 0.3) * 3.2, z + (rnd() - 0.5) * 4.6, r, LEAF[rnd() * LEAF.length | 0]]); } };
       for (let x = -52; x < 52; x += 2.1 + rnd() * 1.3) bush(x, FZ + 1.0, 1.1 + rnd() * 0.55);               // a hedge of bushes right behind the back fence...
       for (let z = FZ + 2.6; z < FZ + 15.5; z += 2.3 + rnd()) for (let x = -56; x < 56; x += 2.6 + rnd() * 2) bush(x, z, 0.9 + rnd() * 0.65, hillY(z) - 0.25, DARK);   // ...undergrowth all the way up the bank...
       for (const zo of [3.4, 6.8, 10.4, 14, 18]) for (let x = -56 + rnd() * 4; x < 56; x += 4.6 + rnd() * 3.4) { const z = FZ + zo + (rnd() - 0.5) * 1.6; tree(x, z, 7 + rnd() * 5, hillY(z)); }   // ...and trees crowding the slope
       for (let z = VD - 24; z < FZ - 0.5; z += 2.1 + rnd() * 1.1) bush(yardXL(z) - 1.15, z, 0.95 + rnd() * 0.5);   // bushes all down the north side (between us and 30 & 32)
       for (let z = VD + 16; z < FZ - 2; z += 6.5 + rnd() * 4) tree(yardXL(z) - 4 - rnd() * 3, z, 8.5 + rnd() * 4);   // (their trees, behind their house)
-      for (let z = VD + 17; z < FZ - 0.5; z += 2.3 + rnd()) bush(Y.XR + 1.15, z, 0.85 + rnd() * 0.4);         // over the middle fence toward the back of next door's
       for (const [x, z, h] of [[Y.XR + 7, FZ - 6, 10.5], [Y.XR + 14, FZ - 13, 9], [Y.HR + 7, VD + 14, 10], [Y.HR + 9, FZ - 4, 11]]) tree(x, z, h);
       for (let z = VD + 15; z < FZ - 2; z += 4.2 + rnd() * 2.5) tree(yardXL(z) - 6.5 - rnd() * 4, z, 8 + rnd() * 4);   // more trees in 30 & 32's yard...
       for (let z = VD - 4; z < FZ - 2; z += 4.8 + rnd() * 2.5) tree(Y.HR + 6 + rnd() * 7, z, 8 + rnd() * 4);          // ...and in 24's
@@ -4006,14 +4030,16 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         const ced = [], CED = [0x2f5d2e, 0x355f30, 0x3b6a34, 0x2c5229];
         for (let z = VD - 22; z < FZ - 1; z += 1.7 + rnd() * 0.5) { ced.push([yardXL(z) - 2.0, z, 1.05 + rnd() * 0.25, 6 + rnd() * 2.6]); ced.push([z < VD + 13.6 ? Math.max(yardXL(z) - 3.4, -18.6) : yardXL(z) - 3.7, z + 0.85, 1.1 + rnd() * 0.3, 7 + rnd() * 3]); }   // north: two staggered rows between us and 30 & 32
         for (let z = VD - 6; z < FZ - 1; z += 1.8 + rnd() * 0.5) { ced.push([Y.HR + 2.5, z, 1.05 + rnd() * 0.25, 6 + rnd() * 2.6]); ced.push([Y.HR + 4.2, z + 0.9, 1.1 + rnd() * 0.3, 7 + rnd() * 3]); }   // south: next door and 24
-        for (let z = VD + 4.5; z < FZ - 1; z += 1.9 + rnd() * 0.5) ced.push([Y.XR + 2.7, z, 1.0 + rnd() * 0.25, 5.5 + rnd() * 2.5]);   // and down next door's side of the middle fence (Porter trots along in front of it)
+        for (let z = VD + 9.8; z < FZ - 1; z += 1.9 + rnd() * 0.5) ced.push([Y.XR + 5.1, z, 1.0 + rnd() * 0.25, 5.5 + rnd() * 2.5]);   // and down next door's side of the middle fence (Porter trots along in front of it)
         const cm = new THREE.InstancedMesh(cg, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), ced.length); cm.userData.name = 'Cedars';
         const M2 = new THREE.Matrix4(), Q2 = new THREE.Quaternion(), S2 = new THREE.Vector3(), P2 = new THREE.Vector3(), C2 = new THREE.Color(), E2 = new THREE.Euler();
+        ced.forEach(([x, z, r, h]) => { YARD_POSTS.push([x, z, 0.3, h]); YARD_BUSHES.push([x, z, r * 0.9, h]); });   // (a solid trunk; the foliage she can push through)
         ced.forEach(([x, z, r, h], i) => { Q2.setFromEuler(E2.set(0, rnd() * 6, 0)); M2.compose(P2.set(x, 0, z), Q2, S2.set(r, h, r)); cm.setMatrixAt(i, M2); cm.setColorAt(i, C2.setHex(CED[rnd() * CED.length | 0])); });
         yard.add(cm);
       }
       const tg = new THREE.CylinderGeometry(0.28, 0.42, 1, 8); tg.translate(0, 0.5, 0);                         // all the trunks in one go
       const tm = new THREE.InstancedMesh(tg, new THREE.MeshBasicMaterial({ color: 0x5b4a3a, fog: false }), trunks.length); tm.userData.name = 'Tree';
+      trunks.forEach(([x, z, h, b]) => YARD_POSTS.push([x, z, 0.45, b + h]));
       trunks.forEach(([x, z, h, b], i) => { Q.identity(); M.compose(P.set(x, b, z), Q, S.set(1, h, 1)); tm.setMatrixAt(i, M); }); yard.add(tm);
       { // the bank behind the back fence, climbing steeply to the off-ramp, and the grey sound wall along the top (the trees all but hide it)
         const hg = new THREE.PlaneGeometry(170, 72, 1, 60); hg.rotateX(-Math.PI / 2); const HP = hg.attributes.position, hc = [];
@@ -4036,15 +4062,15 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           const lines = new THREE.Group(); rd.add(lines);
           const line = (z, dash, col) => { for (let x = -85; x < 85; x += dash ? 4 : 170) { const m = new THREE.Mesh(new THREE.PlaneGeometry(dash ? 2.2 : 170, 0.14), new THREE.MeshBasicMaterial({ color: col, fog: false })); m.rotation.x = -Math.PI / 2; m.position.set(dash ? x + 1.1 : 0, RY + 0.03, z); lines.add(m); } };
           line(z0 + 0.35, false, 0xf2f2ee); line(z1 - 0.35, false, 0xf2f2ee); line((z0 + z1) / 2, true, 0xf4c430); bakeYard(lines);
-          const gb = new THREE.Group(); rd.add(gb); yBox(gb, 170, 0.32, 0.12, 0xb8bcc0, 0, RY + 0.75, z1 + 0.6); for (let x = -84; x < 85; x += 3) yBox(gb, 0.12, 0.8, 0.12, 0x8e9296, x, RY + 0.4, z1 + 0.66); bakeYard(gb);
+          const gb = new THREE.Group(); gb.userData.name = 'Highway barrier'; povEndWall.add(gb); yBox(gb, 170, 0.32, 0.12, 0xb8bcc0, 0, RY + 0.75, z1 + 0.6); for (let x = -84; x < 85; x += 3) yBox(gb, 0.12, 0.8, 0.12, 0x8e9296, x, RY + 0.4, z1 + 0.66); bakeYard(gb);   // (the barrier's solid)
           yardLife = yardLife || {}; yardLife.cars = [];
           for (const [lane, col, x0, sp] of [[z0 + 2.3, 0xc0392b, -60, 13], [z1 - 2.3, 0x2e6fb0, 40, -15]]) {
             const car = new THREE.Group(); car.userData.name = 'A car on the off-ramp'; car.userData.noWalk = true; povEndWall.add(car);
-            yBox(car, 4.2, 1.0, 1.8, col, 0, RY + 0.75, 0); yBox(car, 2.3, 0.8, 1.6, col, -0.2, RY + 1.6, 0); yBox(car, 2.1, 0.62, 1.64, 0x2a3440, -0.2, RY + 1.62, 0);
-            for (const [wx, wz] of [[-1.3, -0.9], [1.3, -0.9], [-1.3, 0.9], [1.3, 0.9]]) { const w = yCyl(car, 0.38, 0.38, 0.28, 0x1b1b1d, wx, RY + 0.38, wz, 14); w.rotation.x = Math.PI / 2; }
-            yBox(car, 0.08, 0.2, 0.4, 0xfff2b0, sp > 0 ? 2.12 : -2.12, RY + 0.9, 0.55); yBox(car, 0.08, 0.2, 0.4, 0xfff2b0, sp > 0 ? 2.12 : -2.12, RY + 0.9, -0.55);
-            bakeYard(car); car.position.set(x0, 0, lane); if (sp < 0) car.rotation.y = Math.PI;
-            yardLife.cars.push({ g: car, sp, v: sp, lane, honkT: 0 });
+            yBox(car, 4.2, 1.0, 1.8, col, 0, 0.75, 0); yBox(car, 2.3, 0.8, 1.6, col, -0.2, 1.6, 0); yBox(car, 2.1, 0.62, 1.64, 0x2a3440, -0.2, 1.62, 0);
+            for (const [wx, wz] of [[-1.3, -0.9], [1.3, -0.9], [-1.3, 0.9], [1.3, 0.9]]) { const w = yCyl(car, 0.38, 0.38, 0.28, 0x1b1b1d, wx, 0.38, wz, 14); w.rotation.x = Math.PI / 2; }
+            yBox(car, 0.08, 0.2, 0.4, 0xfff2b0, 2.12, 0.9, 0.55); yBox(car, 0.08, 0.2, 0.4, 0xfff2b0, 2.12, 0.9, -0.55);
+            bakeYard(car); car.children[0].position.y = -0.95; car.position.set(x0, RY + 0.95, lane); if (sp < 0) car.rotation.y = Math.PI;   // (its middle is the pivot)
+            yardLife.cars.push({ g: car, sp, v: sp, lane, honkT: 0, hx: 2.1, hz: 0.9, home: car.position.clone(), ry: car.rotation.y });
           }
         }
       }
@@ -4457,7 +4483,16 @@ function bakeYard(root) {
 function buildYardLife(VD, DX, DW) {                                  // the backyard, lived in (only ever seen from Free roam / the cat's eyes)
   const Y = YARD, FZ = Y.FZ, XR = Y.XR, grp = (name, walk) => { const g = new THREE.Group(); g.userData.name = name; if (!walk) g.userData.noWalk = true; povEndWall.add(g); return g; };
   const block = (x0, x1, z0, z1) => YARD_BLOCKS.push([x0, x1, z0, z1]);
-  const shadow = (x, z, rx, rz) => { const m = new THREE.Mesh(new THREE.CircleGeometry(1, 24), yardShadowMat()); m.rotation.x = -Math.PI / 2; m.scale.set(rx, rz, 1); m.position.set(x, 0.006, z); m.userData.noWalk = true; povEndWall.add(m); };
+  const shadow = (x, z, rx, rz) => { const m = new THREE.Mesh(new THREE.CircleGeometry(1, 24), yardShadowMat()); m.rotation.x = -Math.PI / 2; m.scale.set(rx, rz, 1); m.position.set(x, 0.006, z); m.userData.noWalk = true; povEndWall.add(m); return m; };
+  const parkedCar = (x, z, ry, col) => {                              // a car parked in a driveway (touch it and... well)
+    const car = grp('Parked car');
+    yBox(car, 1.8, 1.0, 4.2, col, 0, 0.75, 0); yBox(car, 1.6, 0.8, 2.3, col, 0, 1.6, 0.2); yBox(car, 1.64, 0.62, 2.1, 0x2a3440, 0, 1.62, 0.2);
+    for (const [wx, wz] of [[-0.9, -1.3], [0.9, -1.3], [-0.9, 1.3], [0.9, 1.3]]) yCyl(car, 0.38, 0.38, 0.28, 0x1b1b1d, wx, 0.38, wz, 14).rotation.z = Math.PI / 2;
+    for (const sx of [-0.55, 0.55]) yBox(car, 0.36, 0.2, 0.06, 0xfff2b0, sx, 0.95, 2.11);
+    bakeYard(car); car.children[0].position.y = -0.95; car.position.set(x, 0.95, z); car.rotation.y = ry;   // (its middle is the pivot)
+    const sh = Math.abs(Math.sin(ry)) > 0.7 ? shadow(x, z, 2.6, 1.3) : shadow(x, z, 1.3, 2.6);
+    yardLife.cars.push({ g: car, parked: true, hx: 0.9, hz: 2.1, home: car.position.clone(), ry, sh });
+  };
   // -- the garden shed, backed up to the neighbours' fence toward the back, doors facing the yard: sage boards, white trim, a Z-brace, a window box
   const SZ = FZ - 11, SX = yardXL(SZ) + 2.3;
   { const st = grp('Rain barrel and compost bin', true), bz = SZ + 3.3, bx = yardXL(bz) + 1.0;          // (handy steps up onto the shed roof)
@@ -4510,18 +4545,18 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
       const m = yCyl(st, 0.46 + (k % 3) * 0.05, 0.5, 0.06, [0x9c9890, 0xa6a29a, 0x928e86][k % 3], x, 0.03, z, 9); m.rotation.y = k * 0.7; m.scale.z = 0.8; }
     bakeYard(st); }
   // -- round the side of the house, past the gate: the bins
-  { const bn = grp('Bins'); for (const [z, c] of [[VD - 2.6, 0x2f5d3a], [VD - 3.8, 0x232528], [VD - 5.0, 0x232528]]) { const x = Y.HL - 1.0; yBox(bn, 0.95, 1.45, 0.95, c, x, 0.78, z); yBox(bn, 1.02, 0.1, 1.04, c, x - 0.02, 1.54, z); for (const sz of [-1, 1]) yCyl(bn, 0.14, 0.14, 0.08, 0x111111, x - 0.35, 0.14, z + sz * 0.4, 10).rotation.z = Math.PI / 2; }
+  { const bn = grp('Bins', true); for (const [z, c] of [[VD - 2.6, 0x2f5d3a], [VD - 3.8, 0x232528], [VD - 5.0, 0x232528]]) { const x = Y.HL - 1.0; yBox(bn, 0.95, 1.45, 0.95, c, x, 0.78, z); yBox(bn, 1.02, 0.1, 1.04, c, x - 0.02, 1.54, z); for (const sz of [-1, 1]) yCyl(bn, 0.14, 0.14, 0.08, 0x111111, x - 0.35, 0.14, z + sz * 0.4, 10).rotation.z = Math.PI / 2; }
     bakeYard(bn); }
   // -- over the middle fence: the other half's yard (Porter's): a concrete patio, a plastic table and chairs, his bowl and ball, a clothesline
-  { const nd = grp('Next door'), px = XR + 5.4;
+  { const nd = grp('Next door', true), px = XR + 5.4, cx = XR + 7.9;   // (the clothesline's out past the cedars)
     yBox(nd, 10, 0.08, 8.5, 0xb9b5ad, px, 0.04, VD + 4.4);
     yCyl(nd, 0.75, 0.75, 0.06, 0xf4f4f0, px + 1.4, 1.35, VD + 5.2, 20); yCyl(nd, 0.06, 0.06, 1.3, 0xf4f4f0, px + 1.4, 0.68, VD + 5.2, 8);
     for (const a of [0, 2.2, 4.2]) { const cx = px + 1.4 + Math.cos(a) * 1.25, cz = VD + 5.2 + Math.sin(a) * 1.25; yBox(nd, 0.8, 0.08, 0.8, 0xf4f4f0, cx, 0.85, cz); yBox(nd, 0.8, 0.9, 0.08, 0xf4f4f0, cx - Math.cos(a) * 0.36, 1.3, cz - Math.sin(a) * 0.36, -a + Math.PI / 2); for (const [lx, lz] of [[-0.32, -0.32], [0.32, -0.32], [-0.32, 0.32], [0.32, 0.32]]) yCyl(nd, 0.03, 0.03, 0.85, 0xe8e8e2, cx + lx, 0.42, cz + lz, 6); }
-    yCyl(nd, 0.36, 0.3, 0.16, 0xb8bec6, XR + 1.3, 0.08, VD + 9.5, 16); yCyl(nd, 0.3, 0.3, 0.02, 0x8fc5e8, XR + 1.3, 0.15, VD + 9.5, 16);   // Porter's water bowl
-    { const m = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), yMat(0xd4e84a)); m.position.set(XR + 1.0, 0.12, VD + 13); nd.add(m); }   // and his tennis ball
-    for (const z of [VD + 14, VD + 24]) { yCyl(nd, 0.06, 0.06, 2.6, 0x8c8f93, px, 1.3, z, 8); yBox(nd, 1.6, 0.06, 0.06, 0x8c8f93, px, 2.55, z); }   // the clothesline
-    for (const sx of [-0.7, 0.7]) { const pts = []; for (let t = 0; t <= 1.0001; t += 1 / 16) pts.push(new THREE.Vector3(px + sx, 2.55 - 0.35 * (1 - (2 * t - 1) ** 2), VD + 14 + 10 * t)); const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xdedede, fog: false })); l.userData.noWalk = true; nd.add(l); }
-    for (const [z, c] of [[VD + 16.5, 0xff8fb8], [VD + 18.2, 0x7fb6ff], [VD + 20, 0xfff2a8]]) yBox(nd, 0.04, 0.95, 0.8, c, px - 0.7, 2.0, z);   // towels on the line
+    yCyl(nd, 0.36, 0.3, 0.16, 0xb8bec6, XR + 2.9, 0.12, VD + 7.9, 16); yCyl(nd, 0.3, 0.3, 0.02, 0x8fc5e8, XR + 2.9, 0.19, VD + 7.9, 16);   // Porter's water bowl
+    { const m = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), yMat(0xd4e84a)); m.position.set(XR + 3.0, 0.12, VD + 12.4); nd.add(m); }   // and his tennis ball
+    for (const z of [VD + 14, VD + 24]) { yCyl(nd, 0.06, 0.06, 2.6, 0x8c8f93, cx, 1.3, z, 8); yBox(nd, 1.6, 0.06, 0.06, 0x8c8f93, cx, 2.55, z); }   // the clothesline
+    for (const sx of [-0.7, 0.7]) { const pts = []; for (let t = 0; t <= 1.0001; t += 1 / 16) pts.push(new THREE.Vector3(cx + sx, 2.55 - 0.35 * (1 - (2 * t - 1) ** 2), VD + 14 + 10 * t)); const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xdedede, fog: false })); l.userData.noWalk = true; nd.add(l); }
+    for (const [z, c] of [[VD + 16.5, 0xff8fb8], [VD + 18.2, 0x7fb6ff], [VD + 20, 0xfff2a8]]) yBox(nd, 0.04, 0.95, 0.8, c, cx - 0.7, 2.0, z);   // towels on the line
     bakeYard(nd); }
   // -- flower beds along our fences, and daisies in the lawn
   { const mounds = [], blooms = [], cols = [0xff6fae, 0xffd23a, 0xffffff, 0xb07aff, 0xff5a4e, 0xff9a3c];
@@ -4559,7 +4594,8 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
   { const zF = VD + IN(5) - Y.HD, fr = grp('Out front', true), cb = new THREE.Group(); fr.add(cb);
     const tex = (base, spk, rx, ry) => canvasTex(128, 128, (c, w, h) => { c.fillStyle = base; c.fillRect(0, 0, w, h); for (let i = 0; i < 1300; i++) { c.fillStyle = spk[i % spk.length]; c.fillRect(Math.random() * w, Math.random() * h, 1.5 + Math.random() * 1.5, 1.5); } }, rx, ry);
     const flat = (w, d, x, z, y, map, name) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map, fog: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.userData.name = name; m.userData.noWalk = true; povEndWall.add(m); return m; };
-    flat(190, 125, 0, VD - 62.5, -0.016, tex('#5c9c3c', ['rgba(38,86,28,.45)', 'rgba(150,204,96,.4)'], 64, 42), 'Front lawn');   // (under the house too: you never see that bit)
+    { const lawn = (x0, x1, z0, z1) => flat(x1 - x0, z1 - z0, (x0 + x1) / 2, (z0 + z1) / 2, -0.016, tex('#5c9c3c', ['rgba(38,86,28,.45)', 'rgba(150,204,96,.4)'], (x1 - x0) / 2.97, (z1 - z0) / 2.97), 'Front lawn');
+      lawn(-95, 95, VD - 150, zF); lawn(-95, Y.HL, zF, VD); lawn(Y.HR, 95, zF, VD); }   // (round the house, never under it: it showed through the doorways)   // (under the house too: you never see that bit)
     const asph = tex('#4b4b4d', ['rgba(30,30,32,.5)', 'rgba(110,110,112,.5)'], 8, 10), conc = tex('#c3c0b8', ['rgba(150,146,138,.5)', 'rgba(220,218,212,.5)'], 4, 12);
     flat(15.4, 22, XR, zF - 11, 0.006, asph, 'Driveway');                                                     // one wide driveway in front of both garages
     for (const ex of [Y.HL + 4.2, 2 * XR - Y.HL - 4.2]) flat(1.5, 17.8, ex, zF - 13.2, 0.008, conc, 'Front walk');   // the front walks, from the steps to the sidewalk
@@ -4571,37 +4607,54 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
       yCyl(mp, 0.32, 0.5, 5, 0x5a4034, 0, 2.5, 0, 9);
       for (let k = 0; k < 12; k++) { const a = k * 2.3, r = 1.5 + (k % 3) * 0.4; yBlob(mp, r, [0x8b3a2e, 0x9c4632, 0x7a2e26, 0xa85a3a][k % 4], Math.cos(a) * 1.9, 5.6 + (k % 4) * 0.55, Math.sin(a) * 1.7, 0.85); }
       bakeYard(mp); shadow(TX, TZ, 3.2, 2.8); }
-    { const car = grp('Parked car'), cx = XR + 3.9, cz = zF - 7;                                               // next door's car on the driveway
-      yBox(car, 1.8, 1.0, 4.2, 0x7d8a96, cx, 0.75, cz); yBox(car, 1.6, 0.8, 2.3, 0x7d8a96, cx, 1.6, cz + 0.2); yBox(car, 1.64, 0.62, 2.1, 0x2a3440, cx, 1.62, cz + 0.2);
-      for (const [wx, wz] of [[-0.9, -1.3], [0.9, -1.3], [-0.9, 1.3], [0.9, 1.3]]) yCyl(car, 0.38, 0.38, 0.28, 0x1b1b1d, cx + wx, 0.38, cz + wz, 14).rotation.z = Math.PI / 2;
-      bakeYard(car); shadow(cx, cz, 1.3, 2.6); }
-    const across = (x, w, d, wall, roof) => {                                                                   // across the street: two storeys, a hipped roof, windows, a garage door and a driveway
-      const z1 = zF - 56, z0 = z1 - d, g = new THREE.Group(), H = FT(17); fr.add(g);
-      yBox(g, w, H, d, wall, x, H / 2, (z0 + z1) / 2);
-      for (let c = 0; c < 3; c++) for (const y of [H * 0.28, H * 0.7]) { const wx = x - w * 0.3 + c * w * 0.3; if (c === 2 && y < H / 2) continue; yBox(g, 2.1, 1.8, 0.08, 0xf7f5f0, wx, y, z1 + 0.04); yBox(g, 1.85, 1.55, 0.08, 0x3a4a5a, wx, y, z1 + 0.07); }
-      yBox(g, 4.8, 4.2, 0.08, 0xe8e4dc, x + w * 0.3, 2.1, z1 + 0.05);
-      hipRoof(g, x - w / 2 - 0.5, x + w / 2 + 0.5, z0 - 0.5, z1 + 0.5, H + 0.05, 0.45, roof, 0x4a4e52);
-      const dw = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 9.4), new THREE.MeshBasicMaterial({ map: asph, fog: false })); dw.rotation.x = -Math.PI / 2; dw.position.set(x + w * 0.3, 0.006, z1 + 4.7); dw.userData.noWalk = true; povEndWall.add(dw);
+    parkedCar(XR + 3.9, zF - 7, 0, 0x7d8a96);                                                              // next door's car on the driveway
+    bakeYard(cb); }
+  // -- the neighbours: semis like ours (two houses joined down the middle, mirror images of each other), to scale from the satellite view:
+  // 30 & 32 to the north (grey roof, white siding over brick, set further back than us), 22 & 24 to the south past next door, and four
+  // more pairs across Chipwood Crescent. Each half: its garage by the middle, a front door up a little stoop at the outer end, a front room
+  // window between them, bedrooms over; windows round the back and sides, a hipped roof over the pair, a chimney on the party wall
+  { const hood = grp('Neighbourhood', true), H1 = FT(9), H = FT(18), zF = VD + IN(5) - Y.HD;
+    const semi = (x0, x1, z0, z1, face, C) => {                       // face -1: the front's at z0, facing our street; +1: at z1 (across the street)
+      const g = new THREE.Group(); hood.add(g);                          // (each pair baked on its own)
+      const W = x1 - x0, D = z1 - z0, mx = (x0 + x1) / 2, zc = (z0 + z1) / 2, fz = face < 0 ? z0 : z1, bz = face < 0 ? z1 : z0, o = face;
+      yBox(g, W, H1, D, C.lo, mx, H1 / 2, zc); yBox(g, W, H - H1, D, C.hi, mx, H1 + (H - H1) / 2, zc);            // brick below, siding above
+      yBox(g, W + 0.14, 0.24, D + 0.14, C.trim, mx, H1, zc);                                                  // the band between the storeys
+      const F = (x, y, w, h, c, d) => yBox(g, w, h, 0.08, c, x, y, fz + o * (d || 0.04));                      // flat on the front...
+      const B = (x, y, w, h, c, d) => yBox(g, w, h, 0.08, c, x, y, bz - o * (d || 0.04));                      // ...or the back
+      const win = (put, x, y, w, h) => { put(x, y, w + 0.34, h + 0.34, C.trim); put(x, y, w, h, 0x34414f, 0.08); put(x, y, 0.08, h, C.trim, 0.11); };
+      const side = (sd, z, y, w, h) => { const x = sd < 0 ? x0 - 0.04 : x1 + 0.04; yBox(g, 0.08, h + 0.34, w + 0.34, C.trim, x, y, z); yBox(g, 0.08, h, w, 0x34414f, x + sd * 0.04, y, z); };
+      F(mx, H / 2, 0.14, H, 0x6a6a66, 0.07); B(mx, H / 2, 0.14, H, 0x6a6a66, 0.07);                            // the downpipes down the party wall
+      const toWalk = face < 0 ? fz - (zF - 22) : (zF - 46.3) - fz;                                              // front wall to the sidewalk
+      yBox(g, 15.2, 0.02, toWalk, 0x4b4b4d, mx, 0.012, fz + o * toWalk / 2);                                    // one driveway for both garages
+      for (const sd of [-1, 1]) {                                                                               // the two halves
+        const gx = mx + sd * 4.1, ex = mx + sd * (W / 2 - 4.2), lx = (mx + sd * 7.4 + ex - sd * 1.3) / 2, SH = 1.2;
+        F(gx, 2.675, 6.7, 5.35, C.trim); F(gx, 2.55, 6.3, 5.1, C.garage, 0.07); for (let k = 1; k < 5; k++) F(gx, k * 1.02, 6.3, 0.05, 0x2a2a2a, 0.1);   // the garage door
+        F(ex, SH + 1.45, 1.5, 3.0, C.trim); F(ex, SH + 1.38, 1.05, 2.75, C.door[sd < 0 ? 0 : 1], 0.07);             // the front door...
+        yBox(g, 2.6, SH, 1.6, 0x9c9890, ex, SH / 2, fz + o * 0.8);                                               // ...up its stoop and three shallow steps
+        for (let k = 0; k < 3; k++) { const h = SH - (k + 1) * SH / 4; yBox(g, 2.0, h, 0.62, 0xa6a29a, ex, h / 2, fz + o * (1.6 + 0.31 + k * 0.62)); }
+        { const aw = yBox(g, 2.8, 0.12, 1.5, C.roof, ex, SH + 3.35, fz + o * 0.7); aw.rotation.x = o * 0.3; }   // a little awning over it
+        yBox(g, 1.3, 0.02, toWalk - 3.4, 0xc3c0b8, ex, 0.014, fz + o * (3.4 + (toWalk - 3.4) / 2));             // the front walk
+        win(F, lx, SH + 1.6, 3.2, 2.0);                                                                          // the front room
+        win(F, gx, H1 + 2.7, 3.0, 2.0); win(F, ex, H1 + 2.7, 2.4, 2.0);                                         // bedrooms over the garage and the door
+        win(B, gx, H1 + 2.7, 2.6, 2.0); win(B, ex, H1 + 2.7, 2.6, 2.0); win(B, ex, 1.9, 2.4, 1.8);              // round the back...
+        B(mx + sd * 8.5, 1.5, 2.9, 3.0, C.trim); B(mx + sd * 8.5, 1.45, 2.6, 2.8, 0x34414f, 0.08);              // ...and a patio door
+        side(sd, zc - D * 0.22, H1 + 2.7, 2.2, 2.0); side(sd, zc + D * 0.22, H1 + 2.7, 2.2, 2.0); side(sd, zc, 2.2, 2.2, 1.8);   // the end walls
+      }
+      hipRoof(g, x0 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.5, H + 0.05, 0.45, C.roof, C.cap);
+      { const top = H + 0.05 + (Math.min(W, D) / 2 + 0.5) * 0.45; yBox(g, 1.4, 3.4, 1.4, C.chim, mx, top + 0.2, zc); yBox(g, 1.6, 0.2, 1.6, 0x6a6a66, mx, top + 1.9, zc); }   // the chimney
       bakeYard(g);
     };
-    across(-44, 17, 14, 0xe7e2d6, 0x5d6166); across(-19, 18, 15, 0xd6c1a8, 0x8a3934); across(7, 16, 14, 0xdfe5e8, 0x4f5358); across(33, 19, 15, 0xe9d9c3, 0x5d6166);
-    bakeYard(cb); }
-  // -- the neighbours, to scale from the satellite view: 30 & 32 (a grey-roofed semi) to the north, set 5 m further back than us, with
-  // white siding; 22 & 24 to the south, past next door. Two storeys, white-trimmed windows all round, hipped roofs
-  { const hood = grp('Neighbourhood', true), H = FT(18);
-    const home = (x0, x1, z0, z1, wall, roof, cap) => {
-      const nb = new THREE.Group(); hood.add(nb);                          // (each house baked on its own)
-      yBox(nb, x1 - x0, H, z1 - z0, wall, (x0 + x1) / 2, H / 2, (z0 + z1) / 2);
-      const win = (x, y, z, nx, nz) => { yBox(nb, nx ? 0.08 : 2.3, 2.0, nz ? 0.08 : 2.3, 0xf7f5f0, x + nx * 0.02, y, z + nz * 0.02); yBox(nb, nx ? 0.08 : 2.0, 1.72, nz ? 0.08 : 2.0, 0x3a4a5a, x + nx * 0.05, y, z + nz * 0.05); };
-      for (const y of [H * 0.28, H * 0.7]) {
-        for (let z = z0 + 3.5; z < z1 - 2; z += 7) { win(x0, y, z, -1, 0); win(x1, y, z, 1, 0); }
-        for (let x = x0 + 3.5; x < x1 - 2; x += 7) { win(x, y, z1, 0, 1); win(x, y, z0, 0, -1); }
-      }
-      hipRoof(nb, x0 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.5, H + 0.05, 0.4, roof, cap); bakeYard(nb);
-    };
-    home(-61, -19.9, VD - 21.5, VD + 13.4, 0xe4e4df, 0x5d6166, 0x4a4e52);                              // 30 & 32
-    home(Y.HR + 2.6, Y.HR + 46, VD - 56, VD - 8, 0xd2c2ab, 0x5d6166, 0x4a4e52);                         // 22 & 24 (its back wall a little nearer the street than ours)
+    const pal = (lo, hi, roof, garage, door0, door1) => ({ lo, hi, roof, cap: 0x4a4e52, trim: 0xf6f4ee, garage, door: [door0, door1], chim: 0x8a5a44 });
+    semi(-61, -19.9, VD - 21.5, VD + 13.4, -1, pal(0x9a6a50, 0xe4e4df, 0x5d6166, 0xe8e4dc, 0x2f4a6a, 0x7a2a2a));        // 30 & 32
+    semi(Y.HR + 2.6, Y.HR + 46, VD - 56, VD - 8, -1, pal(0xa8744f, 0xd2c2ab, 0x5d6166, 0x5a3a2a, 0x2d2d2d, 0x3f5f3a));    // 22 & 24 (its back wall a little nearer the street than ours)
     { const lt = new THREE.Group(); hood.add(lt); yBox(lt, 2.8, 2.6, 4.4, 0xf2f2ee, Y.HR + 4.4, 1.3, VD - 5.2); bakeYard(lt); }   // (and the little white lean-to off the back of 24)
+    const z1 = zF - 56;                                                                                           // across the street
+    semi(-85, -47, z1 - 28, z1, 1, pal(0x8f5a44, 0xefe9dc, 0x5d6166, 0xe8e4dc, 0x3a3a3a, 0x8a2f2f));
+    semi(-41, -3, z1 - 28, z1, 1, pal(0xb08560, 0xd6c1a8, 0x8a3934, 0x6a4a36, 0x2f4a3a, 0x2d3f66));
+    semi(3, 41, z1 - 28, z1, 1, pal(0x7f5646, 0xdfe5e8, 0x4f5358, 0xf0ede6, 0x6a2a4a, 0x2a2a2a));
+    semi(47, 85, z1 - 28, z1, 1, pal(0x9c6e52, 0xe9d9c3, 0x6b4a3a, 0xe8e4dc, 0x3a5a6a, 0x5a3a2a));
+    parkedCar(Y.HR + 24.3 + 3.9, zF - 13, 0, 0xb03a2e);                                                          // 22 & 24's red car
+    parkedCar(22 - 3.9, z1 + 4.9, Math.PI, 0xf2f2ee);                                                             // and a white one across the street
   }
   // -- life: butterflies round the flower beds, a few birds wheeling overhead
   yardLife = Object.assign(yardLife || {}, { butterflies: [], birds: [], chirpT: 3 });
@@ -4616,6 +4669,49 @@ function yardShadowMat() {                                            // a soft 
   yardShadowMat.m = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1 }); yardShadowMat.m.userData.shadow = true;
   return yardShadowMat.m;
 }
+function carTouched(c) {                                              // is she touching this car (any side, or the roof)?
+  const g = c.g, p = walk.pos, dx = p.x - g.position.x, dz = p.z - g.position.z, cs = Math.cos(g.rotation.y), sn = Math.sin(g.rotation.y);
+  const lx = dx * cs - dz * sn, lz = dx * sn + dz * cs;
+  return Math.abs(lx) < c.hx + 0.45 && Math.abs(lz) < c.hz + 0.45 && p.y < g.position.y + 1.25 && p.y > g.position.y - 1.6;
+}
+const booms = [], boomTex = {};                                       // (the fire and smoke puff textures, made on the first bang)
+function carBoom(c) {                                                 // she touched a car. The car loses: she's indestructible
+  const g = c.g, at = g.position.clone(), dx = at.x - walk.pos.x, dz = at.z - walk.pos.z, d = Math.hypot(dx, dz) || 1;
+  c.boom = { t: 0, v: new THREE.Vector3(dx / d * 8, 17 + Math.random() * 4, dz / d * 8), w: new THREE.Vector3((Math.random() - 0.5) * 7, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 7) };
+  if (c.sh) c.sh.visible = false;
+  if (!boomTex.fire) { const T = (a, b) => canvasTex(64, 64, (cx, w, h) => { const gr = cx.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, a); gr.addColorStop(0.45, b); gr.addColorStop(1, 'rgba(0,0,0,0)'); cx.fillStyle = gr; cx.fillRect(0, 0, w, h); }, 1, 1);
+    boomTex.fire = T('rgba(255,250,215,1)', 'rgba(255,140,40,.8)'); boomTex.smoke = T('rgba(58,54,50,.95)', 'rgba(72,68,64,.55)'); }
+  for (let k = 0; k < 7; k++) {                                        // a billow of soft fire and smoke puffs (sprites: no hard edges)
+    const fire = new THREE.Sprite(new THREE.SpriteMaterial({ map: boomTex.fire, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true, fog: false })); fire.renderOrder = 6;   // (a glow: never clipped flat by the ground)
+    const smoke = new THREE.Sprite(new THREE.SpriteMaterial({ map: boomTex.smoke, depthWrite: false, transparent: true, fog: false, opacity: 0 }));
+    const off = new THREE.Vector3((Math.random() - 0.5) * 2.2, Math.random() * 1.4, (Math.random() - 0.5) * 2.2);
+    fire.position.copy(at).add(off); smoke.position.copy(fire.position); povEndWall.add(fire, smoke); booms.push({ fire, smoke, t: -k * 0.05, big: k ? 0.6 + Math.random() * 0.5 : 1.3, y0: fire.position.y });
+  }
+  burst(at.clone().setY(at.y + 0.6), 0xffa020, 20, 8, 9, 0.9); burst(at, 0xff4a1a, 14, 6, 7, 0.8); burst(at, 0x2a2a2a, 12, 5, 6, 0.7);
+  noise(0.9, 0.5, 160); noise(0.35, 0.35, 900); tone(110, 32, 0.9, 'sawtooth', 0.09); tone(70, 28, 1.2, 'sine', 0.12);
+  shake = Math.max(shake, reduceMotion ? 0.08 : 0.7); walk.puff = 0.4;
+  const lines = ['💥 KABOOM! Kitty: 1, car: 0', '💥 She didn\'t even flinch.', '💥 Another one for the scrapyard!', '💥 Indestructible. Obviously.'];
+  showWalkName(achDone.indestructible ? lines[(walk.booms = (walk.booms || 0) + 1) % lines.length] : '💥 KABOOM!'); unlock('indestructible');
+}
+function flyCar(c, dt) {                                              // up, over and away, tumbling, till it's a twinkle over the rooftops
+  const b = c.boom, g = c.g; b.t += dt;
+  if (g.visible) {
+    b.v.y -= 9 * dt; g.position.addScaledVector(b.v, dt); g.rotation.x += b.w.x * dt; g.rotation.y += b.w.y * dt; g.rotation.z += b.w.z * dt;
+    if (b.t > 3.2) { g.visible = false; burst(g.position.clone(), 0xffffff, 6, 1.5, 1.5, 0.5); tone(1800, 2600, 0.18, 'triangle', 0.03); }   // ✨ ding
+  } else if (!c.parked && b.t > 8) { c.boom = null; g.visible = true; g.rotation.set(0, c.ry, 0); g.position.copy(c.home); g.position.x = c.sp > 0 ? -95 : 95; c.v = c.sp; }   // (a fresh one comes down the ramp)
+}
+function updateBooms(dt) {
+  for (let i = booms.length - 1; i >= 0; i--) {
+    const B = booms[i], k = (B.t += dt); if (k < 0) { B.fire.visible = false; continue; } B.fire.visible = true;
+    B.fire.scale.setScalar(B.big * (1.5 + Math.min(1, k / 0.3) * 6)); B.fire.material.opacity = Math.max(0, 1 - k / 0.7); B.fire.material.color.setHSL(Math.max(0.02, 0.1 - k * 0.1), 1, 0.6); B.fire.position.y += dt * 1.5;
+    B.smoke.scale.setScalar(B.big * (2 + k * 4)); B.smoke.position.y = B.y0 + k * 2.4 + B.big * (2 + k * 4) * 0.35;   // (lifted by half its size: its soft bottom edge clears the ground) B.smoke.material.opacity = Math.max(0, Math.min(1, (k - 0.15) * 4) * 0.75 * (1 - k / 2.6));
+    if (k > 2.6) { povEndWall.remove(B.fire, B.smoke); B.fire.material.dispose(); B.smoke.material.dispose(); booms.splice(i, 1); }
+  }
+}
+function resetCars() {                                                // a fresh Free roam: every car back where it was (and no fire still hanging about)
+  for (const B of booms) { povEndWall.remove(B.fire, B.smoke); B.fire.material.dispose(); B.smoke.material.dispose(); } booms.length = 0;
+  for (const c of (yardLife && yardLife.cars) || []) { c.boom = null; c.g.visible = true; c.g.position.copy(c.home); c.g.rotation.set(0, c.ry, 0); if (c.sh) c.sh.visible = true; if (!c.parked) c.v = c.sp; }
+}
 function updateYardLife(dt) {                                         // the sky rides with the camera; clouds drift; butterflies flit; birds circle; birdsong outside
   if (!skyRig || !povEndWall || !povEndWall.visible) return;
   skyRig.position.copy(camera.position); cloudDome.rotation.y += dt * 0.006;
@@ -4625,17 +4721,21 @@ function updateYardLife(dt) {                                         // the sky
   }
   const L = yardLife; if (!L) return;
   for (const c of L.cars || []) {                                     // the off-ramp's traffic: loops round; brakes and leans on the horn if there's a cat in the road
+    if (c.boom) { flyCar(c, dt); continue; }                          // (one she's already touched: on its way to the moon)
+    if (walk.on && c.g.visible && carTouched(c)) { carBoom(c); continue; }
+    if (c.parked) continue;
     const p = c.g.position, ahead = walk.on && Math.abs(walk.pos.z - c.lane) < 1.6 && (walk.pos.x - p.x) * Math.sign(c.sp) > 0 && Math.abs(walk.pos.x - p.x) < 9;
     c.v += ((ahead ? 0 : c.sp) - c.v) * Math.min(1, dt * (ahead ? 4 : 1.2)); p.x += c.v * dt;
     if (ahead && (c.honkT -= dt) <= 0) { c.honkT = 1.1; tone(392, 392, 0.35, 'square', 0.03); tone(494, 494, 0.35, 'square', 0.025); if (!walk.honked) { walk.honked = true; showWalkName('🚗 HONK! Get out of the road!'); } }
     if (p.x > 95) p.x = -95; if (p.x < -95) p.x = 95;
   }
+  updateBooms(dt);
   for (const b of L.butterflies) { const t = clock * b.sp + b.ph; b.g.position.set(b.ax + Math.cos(t) * b.r * 0.6, 0.35 + Math.abs(Math.sin(t * 1.7)) * 0.9, b.az + Math.sin(t * 1.3) * b.r); b.g.rotation.y = Math.atan2(-Math.sin(t) * b.r * 0.6, Math.cos(t * 1.3) * b.r * 1.3); b.g.userData.anim(clock, b.ph * 3); }
   const VD = ROOM.visDepth, a = clock * 0.09;
   for (const b of L.birds) { const aa = a + b.ph * 0.12, cx = Math.cos(aa) * 22, cz = VD + 16 + Math.sin(aa) * 16;
     b.g.position.set(cx + b.off.x, 13 + b.off.y + Math.sin(clock * 0.7 + b.ph) * 0.8, cz + b.off.z); b.g.rotation.y = Math.atan2(-Math.sin(aa), Math.cos(aa)) + Math.PI / 2;
     const f = Math.sin(clock * 9 + b.ph * 6) * 0.55; b.wings.forEach(([w, sx]) => { w.rotation.z = sx * f; }); }
-  if (walk.on && state === 'playing' && walk.pos.z > VD + 0.4 && (L.chirpT -= dt) <= 0) {        // birdsong, now and then, while she's outside
+  if (walk.on && state === 'playing' && !inRoomXZ(walk.pos.x, walk.pos.z) && (L.chirpT -= dt) <= 0) {        // birdsong, now and then, while she's outside
     L.chirpT = 2.5 + Math.random() * 4; const n = 2 + (Math.random() * 3 | 0), f0 = 2900 + Math.random() * 1400;
     for (let i = 0; i < n; i++) tone(f0 + (i % 2) * 500, f0 + 700 + (i % 2) * 300, 0.055, 'sine', 0.012, i * 0.09);
   }
@@ -4681,7 +4781,7 @@ const contactSh = {};                                                 // soft co
   rectShadow(scene, ARMCHAIR.x, ARMCHAIR.z, ARMCHAIR.half * 2 + 0.1, ARMCHAIR.half * 2 + 0.1, ARMCHAIR.rot || 0, 0.34);
   rectShadow(scene, WTABLE.x, WTABLE.z, WTABLE.dep + 0.2, WTABLE.len + 0.3, 0, 0.4);
   for (const sz of [-1, 1]) { const sh = softShadow(scene, 0.26); sh.position.set(WTABLE.x + WTABLE.dep / 2 + 0.55, 0.006, WTABLE.z + sz * WTABLE.len * 0.25); sh.scale.setScalar(1.3); sh.material.opacity = 0.36; }   // under its two chairs
-  if (tableRig) contactSh.table = rectShadow(scene, tableRig.center.x, tableRig.center.z, tableRig.hx * 2 + 0.15, tableRig.hz * 2 + 0.15, 0, 0.3);
+  if (tableRig) { contactSh.table = softShadow(scene, 0.24); contactSh.table.position.set(tableRig.center.x, 0.006, tableRig.center.z); contactSh.table.scale.set(tableRig.hx * 2.9, tableRig.hz * 3.1, 1); }   // (an oval, like the table top)
   if (fanRig) { contactSh.fan = softShadow(scene, 0.34); contactSh.fan.position.set(fanRig.tip.position.x - IN(5.5), 0.006, fanRig.tip.position.z); contactSh.fan.scale.setScalar(0.95); }
 }
 function updateContactShadows() { if (contactSh.table) contactSh.table.visible = !tableRig.broken; if (contactSh.fan) contactSh.fan.visible = fanRig.state !== 'falling' && fanRig.state !== 'broken'; }
@@ -5133,7 +5233,7 @@ const MG = {
   whiskers: (() => { const pts = []; for (const sx of [-1, 1]) for (const [dy, dz] of [[0.03, 0.02], [0, 0], [-0.03, -0.015]]) pts.push(new THREE.Vector3(sx * 0.07, 0, 0), new THREE.Vector3(sx * 0.3, dy * 3, dz * 3 - 0.04)); return new THREE.BufferGeometry().setFromPoints(pts); })(),
   tail: new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -0.02, -0.22), new THREE.Vector3(0.06, 0.04, -0.45), new THREE.Vector3(0.16, 0.16, -0.62), new THREE.Vector3(0.2, 0.3, -0.66)]), 24, 0.02, 6, false),
   ring: new THREE.RingGeometry(0.44, 0.58, 24),
-  shadow: new THREE.CircleGeometry(0.42, 16),
+  shadow: new THREE.PlaneGeometry(1.15, 1.15),
   bomb: new THREE.SphereGeometry(0.21, 10, 8),
   fuse: new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.02, 0.08, 0), new THREE.Vector3(0.07, 0.15, 0.02), new THREE.Vector3(0.09, 0.22, 0.05)]), 12, 0.018, 5, false),   // curly wick
   spark: new THREE.SphereGeometry(0.07, 6, 4),
@@ -5147,7 +5247,7 @@ const MM = {
   bossFur: lam(0x4f443d), bossBelly: lam(0x6d625a), bossTail: lam(0x8a6664), fang: lam(0xfffbef), scar: basic(0xd98a8a), brow: lam(0x241d19),
   bombFur: lam(0x7a7069), bombTail: lam(0xb07c7c), bombEar: lam(0xbc8583, { side: THREE.DoubleSide }), bombEye: new THREE.MeshBasicMaterial({ color: 0xff3a24 }),
   bomb: lam(0x1b1a1c), fuse: lam(0x8a6a45), band: lam(0xd8402b),
-  shadow: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }),
+  shadow: softShadowMat(0.4),
   xEye: new THREE.MeshBasicMaterial({ color: 0x141010 }),
 };
 const RING_FAR = new THREE.Color(0xf6d56a), RING_NEAR = new THREE.Color(0xff3320);
@@ -5645,6 +5745,7 @@ const ACHIEVEMENTS = [
     ['dogTag', '🏃', 'Gotcha, Porter!', 'In Free roam, catch Porter 3 times'],
     ['greenThumb', '🌿', 'Green thumb', 'In Free roam, pull 5 weeds out of the backyard lawn'],
     ['notAGlitch', '👾', 'This is not a glitch', 'In Free roam, climb high enough in the backyard to hop the fence... and wander off'],
+    ['indestructible', '💥', 'Indestructible', 'In Free roam, touch a car. The car loses'],
     ['chippy', '🐰', 'Wind-up warrior', 'Swipe Chippy the wind-up bunny off the credenza and let it loose on the mice'],
     ['chippyNo', '💥', 'Rest in fluff', 'Find out what happens when Chippy gets carried away'],
     ['blanketGhost', '👻', 'Blanket ghost', 'In Free roam, get caught under a blanket, then swipe it off'],
@@ -5668,7 +5769,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-27 23:16';                                              // stamped when the site is published
+const BUILD = '2026-09-28 11:48';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -8482,7 +8583,7 @@ window.addEventListener('resize', fitCamera);
 fitCamera();
 function camToast(text, ms) { document.querySelectorAll('.cam-toast').forEach(e => e.remove()); const el = document.createElement('div'); el.className = 'cam-toast'; el.textContent = text; if (ms) el.style.animationDuration = (ms - 100) / 1000 + 's'; document.body.appendChild(el); setTimeout(() => el.remove(), ms || 1500); }
 $('camBtn').addEventListener('click', e => {                          // cycle views; switching view also clears any pinch/tilt
-  if (gameMode === 'walk') { walk.fp = !walk.fp; camToast(walk.fp ? 'Her eyes' : 'Behind her'); e.currentTarget.blur(); return; }   // free walk: follow cam ↔ first person
+  if (gameMode === 'walk') { setWalkView(walk.view === 'follow' ? 'chase' : walk.view === 'chase' ? 'fp' : 'follow'); camToast(walk.view === 'chase' ? 'Chase cam: turns as she turns' : walk.fp ? 'Her eyes' : 'Behind her'); e.currentTarget.blur(); return; }   // free walk: behind her → chase cam → her eyes
   if (gameMode === 'mouse') { heist.cam = heist.cam === 'chase' ? 'follow' : 'chase'; try { localStorage.setItem('catguard.mouseCam', heist.cam); } catch (err) {} if (fc.on && heist.f0) heistCam(false); camToast(heist.cam === 'chase' ? 'Chase cam: turns as you turn' : 'Follow cam'); e.currentTarget.blur(); return; }
   camView = (camView + 1) % CAM_VIEWS.length; camZoom = 1; camTilt = 0; fc.on = false; saveCam(); fitCamera(); camToast(CAM_VIEWS[camView].name); e.currentTarget.blur();
 });
@@ -8752,16 +8853,21 @@ function walkBlocked(nx, nz, ox, oz) {
   const next = Math.max(bodyHits(nx, nz, face, lim, top), bodyHits(nx, nz, walk.face, lim, top));   // both the way she's heading and the way she's still facing mid-turn
   return now > 0.001 ? next > now - 0.0005 && next > 0.001 : next > 0.001;   // tangled: only steps that ease her out are allowed (so she can wriggle free, but never slide deeper)
 }
+function setWalkView(v) {                                             // Free roam's three views: behind her (you steer the camera), chase (it swings round behind her), her eyes
+  walk.view = v; walk.fp = v === 'fp'; try { localStorage.setItem('catguard.walkCam', v); } catch (e) {}
+  if (fc.on && walk.on) Object.assign(fc, v === 'chase' ? { dist0: 3.7, el0: 15 } : { dist0: 3.3, el0: 20 });
+}
 function startWalk() {
   if (!walk.rig) walk.rig = makeWalker();
   walk.meshes = standMeshes();
-  Object.assign(walk, { on: true, vy: 0, grounded: true, face: Math.PI, phase: 0, batT: 0, squash: 0, fp: false, jumpQ: -1, burnCD: 0, look: null, tableHops: 0, meowRun: 0, lastMeow: -9, meowT: 0, puff: 0, inBox: false, free: false, farSaid: false, honked: false });
+  Object.assign(walk, { on: true, vy: 0, grounded: true, face: Math.PI, phase: 0, batT: 0, squash: 0, fp: false, jumpQ: -1, burnCD: 0, look: null, tableHops: 0, meowRun: 0, lastMeow: -9, meowT: 0, puff: 0, inBox: false, free: false, farSaid: false, honked: false, launchH: 0, fenceHint: false });
   catTail.visible = false;
   walk.vel.set(0, 0, 0); walk.stick.x = walk.stick.y = 0;
   resetLaundry(); resetSliderScene(); resetDucks();
   walk.pos.set(0.9, 0, 4.4); walk.pos.y = surfaceTop(walk.pos.x, walk.pos.z, 0.9);
   walk.rig.g.visible = true; walk.rig.shadow.visible = true; cat.visible = false;
   fcStart(); Object.assign(fc, { dist0: 3.3, el0: 20, zoom: 1, tilt: 0, yaw: 0 });
+  { let v = 'follow'; try { v = localStorage.getItem('catguard.walkCam') || 'follow'; } catch (e) {} setWalkView(['follow', 'chase', 'fp'].includes(v) ? v : 'follow'); }
   fc.focus.set(walk.pos.x, walk.pos.y + 0.55, walk.pos.z); fc.s.focus.copy(fc.focus); Object.assign(fc.s, { yaw: 0, zoom: 1, tilt: 0 });
   document.body.classList.add('walking'); $('walkUI').hidden = false;
   fitCamera();
@@ -8807,13 +8913,14 @@ function updateWalk(dt) {
   if ((kx || ky) && !walk.frozen) { const l = Math.hypot(kx, ky); sx = kx / l; sy = ky / l; }
   if (mirrorWorld) sx = -sx;                                          // the picture is flipped, so left/right are too
   const yaw = fc.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);   // stick up = away from the camera
-  _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * nipK().walk * (p.z > ROOM.visDepth + 0.3 ? 1.9 : 1));   // (out in the yard she tears about)   // catnip: zoomies / a floaty drift / a slow zen amble
+  _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * nipK().walk * (!inRoomXZ(p.x, p.z) ? 1.9 : 1));   // (outdoors, back or front, she tears about)   // catnip: zoomies / a floaty drift / a slow zen amble
+  if (yardOpen() && inBush(p.x, p.z, p.y)) { _wv.multiplyScalar(0.6); if (_wv.lengthSq() > 1 && clock > (walk.rustleT || 0)) { walk.rustleT = clock + 0.32; noise(0.16, 0.05, 1300 + Math.random() * 600); } }   // (pushing through a bush: slower, and rustling)
   walk.vel.lerp(_wv, 1 - Math.exp(-dt * (walk.grounded ? 12 : 8)));
   if (walk.jumpQ > 0 && clock - walk.jumpQ < 0.2 && walk.grounded) {   // (a press just before landing still counts)
     walk.vy = WALK.jumpV * nipK().jump; walk.grounded = false; walk.jumpQ = -1; tone(520, 940, 0.11, 'triangle', 0.035);
   }
   // across: blocked by anything taller than a step (or, mid-air, anything at her height)
-  const dx = walk.vel.x * dt, dz = walk.vel.z * dt;
+  const dx = walk.vel.x * dt, dz = walk.vel.z * dt, ox0 = p.x, oz0 = p.z;
   walk.nowHits = bodyHits(p.x, p.z, walk.face, p.y + (walk.grounded ? WALK.step : 0.05), p.y + WALK.height);   // (how tangled she is right now: worked out once a frame)
   if (dx || dz) {
     const lx = ROOM.halfW - 0.3, tryMove = (nx, nz) => {
@@ -8831,6 +8938,7 @@ function updateWalk(dt) {
       p.x = nx; p.z = nz; return true;
     };
     tryMove(p.x + dx, p.z + dz) || tryMove(p.x + dx, p.z) || tryMove(p.x, p.z + dz);
+    if (yardOpen()) fenceCrossed(ox0, oz0);
   }
   // up and down: stand on whatever is under her; step up small ledges, fall off big ones
   if (walk.grounded) {
@@ -8845,6 +8953,10 @@ function updateWalk(dt) {
       const g = surfaceTop(p.x, p.z, p.y + 0.02);
       if (ny <= g) { p.y = g; walk.vy = 0; walk.grounded = true; walk.squash = 1; sfx.padThud(0.35); walkLanded(); } else p.y = ny;
     } else p.y = ny;
+  }
+  if (walk.grounded) walk.launchH = p.y - hillY(p.z);                 // (how high above the grass she'd be jumping from)
+  if (walk.view === 'chase' && fc.on && Math.hypot(walk.vel.x, walk.vel.z) > 0.7 && !walkPtr) {   // the chase cam swings round behind her as she turns
+    let d = walk.face + Math.PI - fc.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < 2.3) fc.yaw += d * Math.min(1, dt * 2.4);
   }
   // which way she faces: where she's going (or toward the last thing tapped)
   const spd = Math.hypot(walk.vel.x, walk.vel.z);
@@ -8960,29 +9072,31 @@ function walkCam(S) {                                                // keep the
     camera.lookAt(camera.position.x + fx * Math.cos(pitch), camera.position.y + Math.sin(pitch), camera.position.z + fz * Math.cos(pitch));
   } else {
     const c = camera.position, f = S.focus, VD = ROOM.visDepth, SD = SLIDER;
-    if (walk.free && f.z < VD - 0.12 && !inRoomXZ(f.x, f.z)) {         // she's got out round the side or the front: an ordinary outdoor camera, just kept out of walls and off the ground
-      const h = camHit(f, c); if (h) c.copy(f).addScaledVector(_camV, Math.max(0.3, h.distance - 0.25));
+    const byHouse = x => x > YARD.HL - 0.35 && x < YARD.HR + 0.35;    // (in line with the house: its back wall and the slider matter)
+    if (walk.free && !inRoomXZ(f.x, f.z) && (f.z < VD - 0.12 || !byHouse(f.x))) {   // she's got out round the side or the front: an ordinary outdoor camera, just kept out of walls and off the ground
+      if (walk.view !== 'chase') { const h = camHit(f, c); if (h) c.copy(f).addScaledVector(_camV, Math.max(0.3, h.distance - 0.25)); }   // (the chase cam does its own, below)
       c.y = Math.max(c.y, 0.25);
     } else if (yardOpen() && SD) {                                            // the slider's open: the camera can follow her out into the yard (and back), but only through the doorway
       const ox0 = SD.DX - SD.DW / 2 + 0.12, ox1 = SD.DX + SD.DW / 2 - 0.12, oh = SD.DH - 0.08;
       if ((c.z - VD) * (f.z - VD) < 0) {                              // on the other side of the back wall from her...
         const t = (VD - f.z) / (c.z - f.z), ix = f.x + (c.x - f.x) * t, iy = f.y + (c.y - f.y) * t;
-        if (!(ix > ox0 && ix < ox1 && iy < oh)) {                      // ...and not looking through the doorway: pull it in to her side
+        if (byHouse(ix) && !(ix > ox0 && ix < ox1 && iy < oh)) {       // ...and not looking through the doorway: pull it in to her side
           const len = Math.hypot(c.x - f.x, c.y - f.y, c.z - f.z) || 1, k = Math.max(0, t - 0.15 / len);
           if (k * len >= 0.9) c.set(f.x + (c.x - f.x) * k, f.y + (c.y - f.y) * k, f.z + (c.z - f.z) * k);
           else c.z = f.z > VD ? VD + 0.35 : VD - 0.12;                // (she's right by the wall: don't end up in her fur, just keep it on her side)
         }
       }
-      if (c.z > VD - 0.12 && c.z < VD + 0.35) {                        // in the thickness of the wall: only inside the doorway itself
+      if (c.z > VD - 0.12 && c.z < VD + 0.35 && byHouse(c.x)) {        // in the thickness of the wall: only inside the doorway itself
         if (c.x > ox0 && c.x < ox1) c.y = Math.min(c.y, oh); else c.z = f.z > VD ? VD + 0.35 : VD - 0.12;
       }
       if (c.z >= VD + 0.35) { if (!walk.free) { c.z = Math.min(c.z, YARD.FZ - 0.3); c.x = THREE.MathUtils.clamp(c.x, yardXL(c.z) + 0.3, YARD.XR - 0.3); } c.y = THREE.MathUtils.clamp(c.y, hillY(c.z) + 0.25, walk.free ? 40 : 9); }
-      else if (c.z <= VD - 0.12) { c.x = THREE.MathUtils.clamp(c.x, -ROOM.halfW + 0.12, ROOM.halfW - 0.12); c.z = Math.max(c.z, 0.12); c.y = THREE.MathUtils.clamp(c.y, 0.2, CEIL_H - 0.12); }
+      else if (c.z <= VD - 0.12 && byHouse(c.x)) { c.x = THREE.MathUtils.clamp(c.x, -ROOM.halfW + 0.12, ROOM.halfW - 0.12); c.z = Math.max(c.z, 0.12); c.y = THREE.MathUtils.clamp(c.y, 0.2, CEIL_H - 0.12); }
     } else {
       camera.position.x = THREE.MathUtils.clamp(camera.position.x, -ROOM.halfW + 0.12, ROOM.halfW - 0.12);
       camera.position.z = THREE.MathUtils.clamp(camera.position.z, 0.12, ROOM.visDepth - 0.12);
       camera.position.y = THREE.MathUtils.clamp(camera.position.y, 0.2, CEIL_H - 0.12);
     }
+    if (walk.view === 'chase') { const h = camHit(f, c); if (h) c.copy(f).addScaledVector(_camV, Math.max(0.3, h.distance - 0.25)); }   // (the chase cam slips in front of anything between them)
     camera.lookAt(S.focus);
   }
   camera.updateMatrixWorld();
@@ -9458,7 +9572,7 @@ function weedSwipe(paw) {                                             // a weed 
   w.pull = 0.001; walk.weeds = (walk.weeds || 0) + 1; const n = walk.weeds;
   burst(new THREE.Vector3(w.x, 0.35, w.z), 0x5f9a3a, 10, 1.8, 2.4, 0.5); burst(new THREE.Vector3(w.x, 0.1, w.z), 0x6b4a2e, 6, 1.2, 1.6, 0.4);   // leaves flying, a spray of soil
   noise(0.18, 0.08, 900); tone(420, 720, 0.12, 'triangle', 0.03);
-  if (n === 5) { unlock('greenThumb'); showWalkName('🌿 Green thumb! Five weeds pulled'); } else showWalkName(n < 5 ? `🌿 Weed pulled! (${n}/5)` : '🌿 Weed pulled!');
+  if (n === 5) { unlock('greenThumb'); showWalkName('🌿 Five weeds pulled!'); } else showWalkName(n < 5 ? `🌿 Weed pulled! (${n}/5)` : '🌿 Weed pulled!');
   return true;
 }
 function laundrySwipe(paw) {
@@ -9551,10 +9665,18 @@ function makeDog() {
 }
 function bark(n) { for (let i = 0; i < (n || 1); i++) setTimeout(() => { noise(0.09, 0.16, 650); tone(420, 190, 0.12, 'sawtooth', 0.05); tone(240, 140, 0.14, 'square', 0.03); }, i * 230); }
 function dogSet(st) { dog.state = st; dog.t = 0; }
+function dogTouch() {                                                 // she runs into Porter: that starts the chase, or (mid-chase) tags him
+  const R = dog.rig; if (!R || !R.g.visible || (dog.state !== 'play' && dog.state !== 'run')) return;
+  const g = R.g, fx = Math.sin(g.rotation.y), fz = Math.cos(g.rotation.y), p = walk.pos;
+  const k = THREE.MathUtils.clamp((p.x - g.position.x) * fx + (p.z - g.position.z) * fz, -1.0, 1.1);   // (nearest point along his body, tail to nose)
+  if (Math.hypot(p.x - g.position.x - fx * k, p.z - g.position.z - fz * k) > 0.95 || p.y > 2.2) return;
+  if (dog.state === 'play') { dog.match = true; porterBolt(1.2); }
+  else if (dog.grace <= 0) caughtPorter();
+}
 function dogSwipe(paw) {                                              // she bats at Porter: that starts the chase, or (mid-chase) catches Porter
   const R = dog.rig; if (!R || !R.g.visible) return false;
   const q = R.g.position, d = Math.hypot(q.x - paw.x, q.z - paw.z); if (d > 1.5 || paw.y > 2.4) return false;
-  if (dog.state === 'play') { dog.match = true; porterBolt(1.2); showWalkName('🐕 Catch Porter!'); return true; }
+  if (dog.state === 'play') { dog.match = true; porterBolt(1.2); return true; }   // (the tag bar up top says what's going on)
   if (dog.state === 'run' && dog.grace <= 0 && d < 1.2) { caughtPorter(); return true; }
   return false;
 }
@@ -9566,7 +9688,6 @@ function caughtPorter() {                                             // got Por
   dog.you++; dogSet('caught'); if (dog.you >= 3) unlock('dogTag'); bark(1);
   [659, 784, 1047].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.04, i * 0.08));
   burst(dog.rig.g.position.clone().setY(1.2), 0xff6fae, 10, 2, 3, 0.5); walk.puff = 0.3;
-  showWalkName(dog.you < 3 ? `🐾 Caught Porter! (${dog.you}/3)` : dog.you === 3 ? '🐾 Caught Porter 3 times! Gotcha!' : `🐾 Caught Porter! (${dog.you})`);
 }
 function tagHud() {                                                   // the little prompt up top
   const el = document.getElementById('tagHud'); if (!el) return;
@@ -9574,11 +9695,11 @@ function tagHud() {                                                   // the lit
   let html = '';
   if (on) {
     const inside = walk.pos.z < SLIDER.VD + 0.4;
-    if (!dog.match) html = `<div class="sub">🐕 Swipe Porter to play!</div>`;
-    else html = `<div class="row"><span>🐕 ${inside ? 'Porter\'s waiting outside...' : dog.state === 'caught' ? 'Caught Porter! 🐾' : 'Catch Porter!'}</span>${dog.you ? `<span class="to">caught <b>${dog.you}${dog.you < 3 ? '/3' : ''}</b></span>` : ''}</div>`;
+    if (!dog.match) html = `<div class="sub">🐕 Touch Porter to play tag!</div>`;
+    else html = `<div class="row"><span>🐕 ${inside ? 'Porter\'s waiting in the backyard...' : dog.state === 'caught' ? 'Caught Porter! 🐾' : 'Tag Porter: touch him!'}</span>${dog.you ? `<span class="to">caught <b>${dog.you}${dog.you < 3 ? '/3' : ''}</b></span>` : ''}</div>`;
   }
   if (gameMode === 'walk' && walk.on && !mirrorWorld && dog.rig && dog.rig.g.visible && dog.state === 'yard' && walk.pos.z > SLIDER.VD + 0.6 && walk.pos.x > YARD.XR - 6.5) html = `<div class="sub">🐕 Porter wants to play: meow at him!</div>`;
-  if (html !== dog.hud) { dog.hud = html; el.innerHTML = html; el.hidden = !html; }
+  if (html !== dog.hud) { dog.hud = html; el.innerHTML = html; el.hidden = !html; document.body.classList.toggle('tag-on', !!html); }
 }
 function updateDog(dt) {
   if (gameMode !== 'walk' || !walk.on || !SLIDER || mirrorWorld) { if (dog.rig) dog.rig.shadow.visible = false; if (dog.rig && dog.rig.g.visible) dog.rig.g.visible = false; dog.state = 'hidden'; dog.match = false; tagHud(); return; }
@@ -9587,7 +9708,7 @@ function updateDog(dt) {
   if (dog.state === 'hidden') {                                       // she's stepped outside: Porter's in his own yard, over the middle fence
     if (walk.pos.z < VD + 0.4) { tagHud(); return; }
     if (!dog.rig) dog.rig = makeDog();
-    dog.rig.g.position.set(Y.XR + 0.85, 0, THREE.MathUtils.clamp(walk.pos.z + 4, VD + 3, FZ - 3)); dog.rig.g.rotation.y = -Math.PI / 2; dog.rig.g.visible = true;
+    dog.rig.g.position.set(Y.XR + 2.4, 0, THREE.MathUtils.clamp(walk.pos.z + 4, VD + 3, FZ - 3)); dog.rig.g.rotation.y = -Math.PI / 2; dog.rig.g.visible = true;
     dogSet('yard'); dog.match = false; dog.barkAt = clock + 0.8;
   }
   const R = dog.rig, g = R.g, pos = g.position, t = dog.t; dog.t += dt;
@@ -9607,12 +9728,11 @@ function updateDog(dt) {
   const waitAtSlider = () => { const tx = THREE.MathUtils.clamp(SLIDER.DX, xl(VD + 1.6), xr), tz = VD + 1.6; if (!moveTo(tx, tz, 4) || Math.hypot(tx - pos.x, tz - pos.z) < 0.1) { face(walk.pos.x, walk.pos.z); R.head.rotation.z = Math.sin(clock * 2.3) * 0.18; } pos.y = 0; };
   const cdx = walk.pos.x - pos.x, cdz = walk.pos.z - pos.z, cd = Math.hypot(cdx, cdz);
   if (dog.state === 'yard') {                                          // on his own side of the middle fence, level with her. She comes up to it: he barks at her. She meows back: over he comes
-    const out = walk.pos.z > VD + 0.6, near = out && walk.pos.x > Y.XR - 6.5, tz = THREE.MathUtils.clamp(walk.pos.z, VD + 3, FZ - 3), tx = Y.XR + 0.85, dd = Math.hypot(tx - pos.x, tz - pos.z);
+    const out = walk.pos.z > VD + 0.6, near = out && walk.pos.x > Y.XR - 6.5, tz = THREE.MathUtils.clamp(walk.pos.z, VD + 3, FZ - 3), tx = Y.XR + 2.4, dd = Math.hypot(tx - pos.x, tz - pos.z);
     if (dd > 0.4) moveTo(tx, tz, Math.min(6, dd * 2 + 2));
     else { face(walk.pos.x, walk.pos.z); if (near) bow(0.35 + 0.35 * Math.sin(clock * 3)); else R.head.rotation.z = Math.sin(clock * 2.3) * 0.18; }   // (at the fence: play bows)
     pos.y = 0;
     if (clock > dog.barkAt) { dog.barkAt = clock + (near ? 0.8 + Math.random() * 0.6 : 2.4 + Math.random() * 3); bark(near ? 2 : 1); R.head.rotation.x = -0.3; }
-    if (near && !dog.hinted) { dog.hinted = true; showWalkName("🐕 Porter's barking at you over the fence... meow back!"); }
     if (dog.meowAt && clock > dog.meowAt + 0.55) {                    // she meowed at him (a beat to hear it): up and over
       dog.meowAt = 0;
       if (out) { dog.from.copy(pos); dog.to.set(Y.XR - 2.8, 0, pos.z); g.rotation.y = -Math.PI / 2; dogSet('leap'); dog.match = false; bark(3); showWalkName('🐕 WOOF! Porter the Doberman just jumped the fence!'); unlock('dogMeet'); }
@@ -9622,7 +9742,7 @@ function updateDog(dt) {
     pos.lerpVectors(dog.from, dog.to, k); pos.y = Math.sin(k * Math.PI) * 3.9;
     R.body.rotation.x = -0.55 * (1 - 2 * k);                          // nose up on take-off, down to land
     R.legs[0].rotation.x = R.legs[1].rotation.x = -1.1 + k * 0.6; R.legs[2].rotation.x = R.legs[3].rotation.x = 0.9 - k * 0.5;   // stretched out, front and back
-    if (k >= 1) { pos.y = 0; dogSet('play'); shake = Math.max(shake, reduceMotion ? 0.03 : 0.2); noise(0.18, 0.2, 400); burst(pos.clone().setY(0.1), 0x6a8a3a, 8, 2, 2, 0.6); dog.barkAt = clock + 1.2; dog.bowAt = clock + 0.4; setTimeout(() => { if (dog.state === 'play') showWalkName('🐕 Swipe Porter to play!'); }, 1600); }
+    if (k >= 1) { pos.y = 0; dogSet('play'); shake = Math.max(shake, reduceMotion ? 0.03 : 0.2); noise(0.18, 0.2, 400); burst(pos.clone().setY(0.1), 0x6a8a3a, 8, 2, 2, 0.6); dog.barkAt = clock + 1.2; dog.bowAt = clock + 0.4; }
   } else if (dog.state === 'hop') {                                   // a happy bounce away
     dog.hopV.y -= 22 * dt; pos.addScaledVector(dog.hopV, dt); clampYard();
     face(walk.pos.x, walk.pos.z); R.body.rotation.x = -0.25; R.legs.forEach((l, i) => l.rotation.x = i < 2 ? -0.7 : 0.6);
@@ -9653,7 +9773,7 @@ function updateDog(dt) {
         const px = -cdz / (cd || 1), pz = cdx / (cd || 1), jx = pos.x + px * 3, jz = pos.z + pz * 3; dog.jukeDir = jx > xl(jz) && jx < xr && jz > Z0 && jz < Z1 ? 1 : -1;   // (the side with room to run)
       }
       const al = Math.hypot(ax, az) || 1, tired = Math.min(1.2, dog.t * 0.05);
-      const sp = dog.grace > 0 ? 8.2 : dog.juke > 0 ? 7.5 : cd < 6 ? 6.25 - tired : cd < 9 ? 3 : 0;   // (a head start first; then nearly her sprint speed, tiring as the chase drags on)
+      const sp = dog.grace > 0 ? 8.2 : dog.juke > 0 ? 7.2 : cd < 6 ? 5.9 - tired : cd < 9 ? 3 : 0;   // (a head start first; then nearly her sprint speed, tiring as the chase drags on)
       if (sp > 0) { moveTo(pos.x + ax / al, pos.z + az / al, sp); R.tongue.visible = true; }
       else { face(walk.pos.x, walk.pos.z); bow(0.5 + 0.5 * Math.sin(clock * 5)); if (clock > dog.barkAt) { dog.barkAt = clock + 1.5; bark(1); } }   // too far off: a teasing bow ("come get me!")
       clampYard(); pos.y = 0;
@@ -9665,6 +9785,7 @@ function updateDog(dt) {
     R.legs.forEach((l, i) => { l.rotation.x = Math.sin(clock * 14 + i * 1.7) * 0.5 * k; });
     if (t > 1.8) porterBolt(1.6);                                     // ...and up and away for another go
   }
+  dogTouch();
   { const sh = R.shadow, h = Math.max(0, pos.y); sh.visible = g.visible; sh.position.set(pos.x, 0.015, pos.z); sh.rotation.z = g.rotation.y; sh.scale.set(1.15, 2.5, 1).multiplyScalar(1 / (1 + h * 0.45)); sh.material.opacity = 0.44 / (1 + h * 0.5); }   // his shadow: long and soft, fading as he leaps
   tagHud();
 }
@@ -9675,16 +9796,65 @@ function walkZoneOK(nx, nz) {                                         // where s
   if (S && nx > S.DX - S.DW / 2 + 0.22 && nx < S.DX + S.DW / 2 - 0.22 && nz > VD - 0.5 && nz < VD + 0.65) return true;
   return nz >= VD + 0.5 && nz <= YARD.FZ - 0.6 && nx >= yardXL(nz) + 0.6 && nx <= YARD.XR - 0.6;   // (our half of the yard, inside the chain-link)
 }
-function walkRoamOK(nx, nz) {                                        // the yard (walkZoneOK) and, once she's got out, the whole neighbourhood
-  if (walkZoneOK(nx, nz)) return true;
-  const VD = ROOM.visDepth, inHouse = nx > YARD.HL - 0.35 && nx < YARD.HR + 0.35 && nz < VD + 0.45 && nz > VD - YARD.HD - 0.4;
-  const FZ = YARD.FZ, off = nz < VD ? Math.abs(nx) > 94 || nz < VD - 124 : nz < FZ ? Math.hypot(nx, nz - VD) > 71 : Math.abs(nx) > 83 || nz > FZ + 70;
-  if (inHouse || off) return false;
-  if (walk.free) return true;
-  if (walk.pos.y > 4.8 && nz > VD + 0.5) {                           // high enough (off the shed roof, say) to clear the fence: out she goes
-    walk.free = true; unlock('notAGlitch'); showWalkName('🐾 Over the fence and away... this is NOT a glitch.'); tone(523, 1047, 0.3, 'triangle', 0.04); return true;
+const FENCE_TOP = YARD.FH + 0.1;
+function segDist(x, z, F) { const dx = F.x1 - F.x0, dz = F.z1 - F.z0, t = THREE.MathUtils.clamp(((x - F.x0) * dx + (z - F.z0) * dz) / (dx * dx + dz * dz), 0, 1); return Math.hypot(x - F.x0 - dx * t, z - F.z0 - dz * t); }
+function segSide(x, z, F) { return (F.x1 - F.x0) * (z - F.z0) - (F.z1 - F.z0) * (x - F.x0); }   // > 0: the left of the run (the yard side, for the gate)
+function segCross(ox, oz, nx, nz, F) { const a = segSide(ox, oz, F), b = segSide(nx, nz, F); if ((a > 0) === (b > 0)) return false; const G = { x0: ox, z0: oz, x1: nx, z1: nz }; return (segSide(F.x0, F.z0, G) > 0) !== (segSide(F.x1, F.z1, G) > 0); }
+function launchedHigh() { const p = walk.pos; return (walk.grounded ? p.y - hillY(p.z) : walk.launchH || 0) >= 0.8; }   // did she jump from something (not just the grass)?
+function outBlocks(ox, oz, nx, nz) {                                  // outdoors: the chain-link (from either side), the tree trunks and cedar hedges
+  const p = walk.pos, over = p.y > FENCE_TOP + 0.12 && launchedHigh();   // (clear over the top of the fence: only off something tall enough, never a standing jump from the grass)
+  for (const F of YARD_FENCES) {
+    if (over || (F.gate && F.gate.open > 0.7)) continue;
+    const dn = segDist(nx, nz, F);
+    if ((dn < 0.32 && dn < segDist(ox, oz, F) - 1e-4) || segCross(ox, oz, nx, nz, F)) { fenceBump(F, ox, oz); return true; }
   }
-  return false;
+  let pn = 0, po = 0;                                                 // trunks and cedars: how far into them she'd be, all told (so she can always wriggle out of a tangle)
+  for (const [x, z, r, top] of YARD_POSTS) {
+    const rr = r + 0.3, dx = nx - x, dz = nz - z; if (p.y > top || dx > rr + 0.5 || dx < -rr - 0.5 || dz > rr + 0.5 || dz < -rr - 0.5) continue;
+    pn += Math.max(0, rr - Math.hypot(dx, dz)); po += Math.max(0, rr - Math.hypot(ox - x, oz - z));
+  }
+  return pn > 1e-4 && pn > po - 1e-4;
+}
+function fenceBump(F, ox, oz) {                                       // she's run into the chain-link: a rattle, the gate, or a hint
+  const G = F.gate;
+  if (G && segSide(ox, oz, F) < 0) {                                  // from the side yard, the gate swings open for her
+    if (G.want < 1) { tone(300, 210, 0.35, 'sawtooth', 0.018); noise(0.12, 0.04, 700); }
+    G.want = 1; G.stay = clock + 2.5; if (!G.said) { G.said = true; showWalkName('🚪 She noses the gate open...'); }
+    return;
+  }
+  if (G && !G.hint) { G.hint = true; showWalkName('🚪 The gate only opens from the side yard'); return; }
+  if (clock > (walk.rattleT || 0)) { walk.rattleT = clock + 0.45; noise(0.08, 0.035, 2400); }
+  if (!walk.grounded && !launchedHigh() && !walk.fenceHint && walk.pos.y > 1.2) { walk.fenceHint = true; showWalkName('🐾 Too high from the grass... climb something first!'); }
+}
+function updateYardGate(dt) {                                         // the side gate swings in when she noses it, and shuts behind her
+  const G = yardGate; if (!G) return;
+  const F = G.seg;
+  if (walk.on && Math.hypot(walk.pos.x - (F.x0 + F.x1) / 2, walk.pos.z - (F.z0 + F.z1) / 2) < 2.2 && G.want > 0) G.stay = clock + 1.2;   // (not while she's in the way)
+  if (G.want > 0 && clock > G.stay) { G.want = 0; }
+  const was = G.open; G.open += (G.want - G.open) * Math.min(1, dt * (G.want ? 5 : 3.5));
+  if (was > 0.05 && G.open <= 0.05 && !G.want) { G.open = 0; noise(0.06, 0.05, 1500); tone(900, 700, 0.05, 'square', 0.02); }   // clack
+  G.hinge.rotation.y = G.base - G.open * 1.45;
+}
+function inBush(x, z, y) { for (const [bx, bz, r, top] of YARD_BUSHES) { const dx = x - bx, dz = z - bz; if (dx < r && dx > -r && dz < r && dz > -r && dx * dx + dz * dz < r * r && y < top) return true; } return false; }
+function roamOff(x, z) {                                              // how far out of bounds a spot is (0 = fine): into the house itself, or off the edge of the world
+  const VD = ROOM.visDepth, Y = YARD, FZ = Y.FZ;
+  let o = z < VD ? Math.max(0, Math.abs(x) - 94) + Math.max(0, VD - 124 - z) : z < FZ ? Math.max(0, Math.hypot(x, z - VD) - 71) : Math.max(0, Math.abs(x) - 83) + Math.max(0, z - FZ - 70);
+  const a = x - (Y.HL - 0.35), b = Y.HR + 0.35 - x, c = z - (VD - Y.HD - 0.4), d = VD + 0.45 - z;
+  if (a > 0 && b > 0 && c > 0 && d > 0) o += Math.min(a, b, c, d);
+  return o;
+}
+function walkRoamOK(nx, nz) {                                        // the yard (walkZoneOK) and, once she's got out, the whole neighbourhood
+  const p = walk.pos;
+  if (outBlocks(p.x, p.z, nx, nz)) return false;
+  if (walkZoneOK(nx, nz)) return true;
+  const o = roamOff(nx, nz);
+  if (o > 0) return !walkZoneOK(p.x, p.z) && o < roamOff(p.x, p.z) - 1e-6;   // into the house itself or off the edge of the world: only ever heading back (she can never get stuck out there)
+  return true;                                                        // anywhere else outdoors (the solid chain-link keeps her in the yard till she climbs over it)
+}
+function fenceCrossed(ox, oz) {                                       // she's just gone over a fence for the first time: out she goes
+  const p = walk.pos; if (walk.free || !YARD_FENCES.some(F => segCross(ox, oz, p.x, p.z, F))) return;
+  walk.free = true; const fresh = !achDone.notAGlitch; unlock('notAGlitch');
+  showWalkName(fresh ? '🐾 Over the fence and away!' : '🐾 Over the fence and away... this is NOT a glitch.'); tone(523, 1047, 0.3, 'triangle', 0.04);
 }
 function coonInSights() {
   const R = coon.rig; if (!R || !R.g.visible || coon.dead || !['arrive', 'taunt', 'mock', 'laugh', 'startle', 'flinch', 'leave', 'gun'].includes(coon.state)) return false;
@@ -9827,7 +9997,9 @@ function freeMesh(m) {                                               // take a o
   m.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(x => x.dispose()); });
 }
 function resetSliderScene() {                                         // a fresh Free walk: new glass, no mess, the raccoon's back to its old tricks
-  dog.state = 'hidden'; dog.match = false; dog.meowAt = 0; dog.hinted = false; if (dog.rig) dog.rig.g.visible = false;     // (and the Doberman's back over its own fence)
+  dog.state = 'hidden'; dog.match = false; dog.meowAt = 0; if (dog.rig) dog.rig.g.visible = false;     // (and the Doberman's back over its own fence)
+  resetCars();
+  if (yardGate) { Object.assign(yardGate, { open: 0, want: 0, stay: 0, said: false, hint: false }); yardGate.hinge.rotation.y = yardGate.base; }   // (the side gate, shut)
   sliderGlass.forEach(g => { g.visible = true; }); shards.forEach(s2 => freeMesh(s2.m)); shards.length = 0;
   if (mosaicArt) { const MA = mosaicArt; MA.bits.forEach(b => freeMesh(b.m)); MA.bits = []; MA.state = 'wall'; MA.g.visible = true; MA.g.position.copy(MA.home); MA.g.rotation.set(0, Math.PI, 0); }
   for (const w of yardWeeds) { w.g.visible = true; w.pull = 0; w.g.position.y = 0; w.g.rotation.z = 0; w.g.scale.setScalar(1); } walk.weeds = 0;   // (the weeds grow back for a fresh Free roam)
@@ -10025,7 +10197,7 @@ function frame(now) {
   candleLight.intensity = (0.32 + flick / flames.length * 0.1) * lit / flames.length;
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
   if (sliderDisco) updateSliderDisco(dt);
-  updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
+  updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateYardGate(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
 
   if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && (camera.position.z >= ROOM.visDepth - 0.05 || !inRoomXZ(camera.position.x, camera.position.z)));   // (or out in the yard, or round the front)   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
