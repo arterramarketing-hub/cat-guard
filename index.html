@@ -3367,11 +3367,14 @@ SECT = 'Dome light';
    the room only, so from the usual camera up above they're see-through: you only see them looking from inside. ---------- */
 let ducks = [];
 let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null, laundry = null, mosaicGlints = [], mosaicArt = null;
-// the backyard, from the drone photo: a long, narrow lot behind our half of the house. A chain-link fence runs down the middle from the
-// house (the other half's yard, where Porter lives, is over it: on the left as you look out of the slider), another runs down the
-// neighbours' side (the side yard beside the house, through a gate, leads round to the front), and one across the back; bushes and
-// tall trees crowd in behind them all. HL..XR is our half of the back wall, XR..HR the other half's.
-const YARD = { HL: -5.8, XR: 12.8, HR: 31.4, XL0: -14.3, XL1: -22.7, FZ: ROOM.visDepth + FT(52), FH: FT(4) };
+// the backyard, from the satellite photos (the yard faces west): our house is the north half of a red-roofed semi, 20 m from the street
+// to the back wall (the living room is just the back of it) and 16 m across. A chain-link fence runs down the middle of the backyard from
+// the house (number 26, the other half, where Porter lives, is over it: on the left as you look out of the slider), another along the
+// north side (the grey-roofed semi, 30 & 32, sits beside it, set further back than us; the side yard runs round to the front through a
+// gate) and one across the back. Behind that there are no houses: a steep bank climbs to the highway off-ramp, thick with trees and
+// bushes that all but hide the sound wall at the top. HL..XR is our half of the back wall, XR..HR the other half's; HD the house's depth.
+const YARD = { HL: -6.5, XR: 13.5, HR: 33.8, XL0: -15, XL1: -19, FZ: ROOM.visDepth + 36, FH: FT(4), HD: 50.5 };
+function hillY(z) { const t = THREE.MathUtils.clamp((z - YARD.FZ - 1.4) / 14, 0, 1); return 8.5 * t * t * (3 - 2 * t); }   // the bank behind the back fence, climbing up to the off-ramp
 function yardXL(z) { const k = THREE.MathUtils.clamp((z - ROOM.visDepth) / (YARD.FZ - ROOM.visDepth), 0, 1); return YARD.XL0 + (YARD.XL1 - YARD.XL0) * k; }   // the neighbours'-side fence: the lot widens toward the back
 let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [], bbqRig = null;     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
 const sliderGlass = [];
@@ -3388,9 +3391,9 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (ps.getX(i) + hw) / (2 * hw), ps.getY(i) / WH);   // same paneling as the other walls
     const wall = new THREE.Mesh(wg, lam(0xf2efe8, { map: panelTex })); wall.rotation.y = Math.PI; wall.position.z = VD; wall.userData.name = 'Wall'; povEndWall.add(wall);
     { // the outside of the house (only seen from the yard), after the photo of the front: brown brick below, white stucco with dark Tudor
-      // half-timbering above, white-framed windows, a hipped roof of grey-brown shingles. Our half runs from the side yard to the fence
+      // half-timbering above, white-framed windows, and (from the satellite view) a hipped roof of red shingles. Our half runs from the side yard to the fence
       // down the middle of the backyard; the other half of the house carries on past it
-      const HL = YARD.HL, HR = YARD.HR, XR = YARD.XR, XH = FT(18), BH = FT(9), WZ = VD + IN(5), W = HR - HL, MX = (HL + HR) / 2, HD = VD + 2;
+      const HL = YARD.HL, HR = YARD.HR, XR = YARD.XR, XH = FT(18), BH = FT(9), WZ = VD + IN(5), W = HR - HL, MX = (HL + HR) / 2, HD = YARD.HD;
       const brickTex = canvasTex(128, 128, (c, w, h) => {
         c.fillStyle = '#b3a38f'; c.fillRect(0, 0, w, h);                                                          // mortar
         for (let r = 0; r < 8; r++) for (let k = -1; k < 4; k++) {                                                // eight courses of running bond
@@ -3441,15 +3444,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         for (const x of [HL + 0.25, XR - 0.18, XR + 0.18, HR - 0.25]) { yBox(hd, 0.16, XH - 0.3, 0.16, 0x3a2a20, x, (XH - 0.3) / 2, WZ + 0.16); yBox(hd, 0.16, 0.16, 0.5, 0x3a2a20, x, 0.12, WZ + 0.38); }   // downspouts
         yBox(hd, W + 1.2, 0.34, 0.12, 0x3a2a20, MX, XH - 0.06, WZ + 1.15); yBox(hd, W + 1.2, 0.08, 1.1, 0xe9e2d4, MX, XH - 0.22, WZ + 0.58);   // fascia and soffit
         yBox(hd, W + 1.2, 0.2, 0.2, 0x2c2622, MX, XH + 0.02, WZ + 1.26);                                          // gutter
-        { // the hipped roof: four slopes of grey-brown shingle
-          const RH = 4.6, x0 = HL - 0.6, x1 = HR + 0.6, zF = WZ + 1.15, zB = WZ - HD - 1.15, zm = (zF + zB) / 2, run = (zF - zB) / 2, r0 = Math.min(x0 + run, (x0 + x1) / 2), r1 = Math.max(x1 - run, (x0 + x1) / 2), y0 = XH + 0.1, y1 = y0 + RH;
-          const A = [x0, y0, zF], B = [x1, y0, zF], C = [x1, y0, zB], D = [x0, y0, zB], R1 = [r0, y1, zm], R2 = [r1, y1, zm];
-          const tris = [A, B, R2, A, R2, R1, C, D, R1, C, R1, R2, D, A, R1, B, C, R2], g = new THREE.BufferGeometry();
-          g.setAttribute('position', new THREE.Float32BufferAttribute(tris.flat(), 3)); g.computeVertexNormals();
-          const roof = new THREE.Mesh(g, yMat(0x5a524b)); hd.add(roof);
-          for (const [sy, a, b] of [[0, A, R1], [0, B, R2]]) { const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz), hip = yBox(hd, 0.2, 0.14, L, 0x4a433d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 0.06, (a[2] + b[2]) / 2); hip.lookAt(new THREE.Vector3(b[0], b[1] + 0.06, b[2]).add(povEndWall.position)); }   // hip caps
-          yBox(hd, r1 - r0 + 0.2, 0.16, 0.24, 0x4a433d, (r0 + r1) / 2, y1 + 0.05, zm);                              // the ridge cap
-        }
+        hipRoof(hd, HL - 0.6, HR + 0.6, WZ - HD - 0.6, WZ + 1.15, XH + 0.1, 0.55, 0x8a3934, 0x6a2a27);   // the red roof, as seen from above: hipped, the ridge running front to back
         { const ax = XR - 1.9, az = WZ + 1.2;                                                                       // our AC condenser on its pad, by the middle fence
           yBox(hd, 2.1, 0.12, 2.1, 0xbdb9b1, ax, 0.06, az); yBox(hd, 1.6, 1.35, 1.6, 0xd2d5d7, ax, 0.8, az); yBox(hd, 1.25, 0.05, 1.25, 0x4a4d52, ax, 1.5, az);
           for (let k = -3; k <= 3; k++) yBox(hd, 1.62, 0.04, 0.05, 0xa9adb1, ax, 0.8 + k * 0.16, az + 0.81);
@@ -3459,7 +3454,12 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           const coil = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.14, 8, 18), yMat(0x3b9a4c)); coil.rotation.y = Math.PI / 2; coil.position.set(rx, 0.6, rz); hd.add(coil); }
         { const sx = HL - 0.04, sz = WZ - 3.2;                                                                      // a little window in the end wall, over the side yard
           yBox(hd, 0.06, 1.7, 1.9, 0xf7f5f0, sx, winY, sz); yBox(hd, 0.05, 1.45, 1.65, 0x34414f, sx - 0.03, winY, sz);
-          yBox(hd, 0.1, 0.34, HD + 0.1, T, HL - 0.05, BH + 0.05, WZ - HD / 2); yBox(hd, 0.1, 0.28, HD, T, HL - 0.05, XH - 0.2, WZ - HD / 2); }
+          for (const x of [HL - 0.05, HR + 0.05]) { yBox(hd, 0.1, 0.34, HD + 0.1, T, x, BH + 0.05, WZ - HD / 2); yBox(hd, 0.1, 0.28, HD, T, x, XH - 0.2, WZ - HD / 2); } }
+        for (const [x, sd] of [[HL - 0.04, -1], [HR + 0.04, 1]]) for (let k = 0; k < 6; k++) {                  // windows all down both sides: the rest of the house (kitchen, bedrooms...) we never go in
+          const z = WZ - 6.4 - k * 7.6;
+          yBox(hd, 0.06, 2.1, 2.3, 0xf7f5f0, x, winY, z); yBox(hd, 0.05, 1.85, 2.05, 0x34414f, x + sd * 0.03, winY, z);
+          if (k % 2) { yBox(hd, 0.06, 1.9, 2.3, 0xf7f5f0, x, 3.3, z); yBox(hd, 0.05, 1.65, 2.05, 0x34414f, x + sd * 0.03, 3.3, z); }
+        }
         bakeYard(hd);
       }
     }
@@ -3906,10 +3906,10 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           yBox(gg, 0.08, 0.18, 0.12, 0x2a2a2a, 0.06, FH * 0.62, gw / 2 - 0.08); }
       };
       run(Y.XR, VD + IN(6), Y.XR, FZ);                                                                          // down the middle
-      run(Y.XL0, VD - 12, Y.XL0, VD + 0.2); run(Y.XL0, VD + 0.2, Y.XL1, FZ);                                    // down the neighbours' side
+      run(Y.XL0, VD - 26, Y.XL0, VD + 0.2); run(Y.XL0, VD + 0.2, Y.XL1, FZ);                                    // down the neighbours' side
       run(Y.XL0, VD + 0.2, Y.HL, VD + 0.2, true);                                                               // across the side yard, with the gate
       run(-44, FZ, 44, FZ);                                                                                      // across the back (the lots behind share it)
-      run(Y.HR + 2.6, VD + IN(6), Y.HR + 2.6, FZ);                                                              // the far side of next door's yard
+      run(Y.HR + 1.3, VD + IN(6), Y.HR + 1.3, FZ);                                                              // the far side of next door's yard (number 24's right beside it)
       bakeYard(posts);
       // bushes along the fences and tall leafy trees behind them: lumpy blobs, lighter on top, in one instanced mesh
       const blob = new THREE.IcosahedronGeometry(1, 1), bp = blob.attributes.position, shade = [];
@@ -3917,21 +3917,32 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       for (let i = 0; i < bp.count; i++) { const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i), k = 0.55 + 0.45 * (y * 0.5 + 0.5) + (hsh(x, y, z, 4) - 0.5) * 0.12; bp.setXYZ(i, x * (0.92 + hsh(x, y, z, 1) * 0.16), y * (0.92 + hsh(x, y, z, 2) * 0.16), z * (0.92 + hsh(x, y, z, 3) * 0.16)); shade.push(k, k, k); }
       blob.setAttribute('color', new THREE.Float32BufferAttribute(shade, 3));
       let seed = 23; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-      const leaves = [], trunks = [], BUSH = [0x3c7431, 0x4a8638, 0x57963f, 0x335f2a, 0x42803a], LEAF = [0x7fae4c, 0x6a9a40, 0x94bf5a, 0x5c8a38, 0x4f8a3a];
-      const bush = (x, z, r0) => { const n = 2 + (rnd() * 2 | 0); for (let k = 0; k < n; k++) { const r = r0 * (0.7 + rnd() * 0.5); leaves.push([x + (rnd() - 0.5) * 1.4, r * 0.72, z + (rnd() - 0.5) * 1.0, r, BUSH[rnd() * BUSH.length | 0]]); } };
-      const tree = (x, z, h) => { trunks.push([x, z, h]); for (let k = 0; k < 7; k++) { const r = 2 + rnd() * 1.7; leaves.push([x + (rnd() - 0.5) * 4.6, h + (rnd() - 0.3) * 3.2, z + (rnd() - 0.5) * 4.6, r, LEAF[rnd() * LEAF.length | 0]]); } };
-      for (let x = -44; x < 44; x += 2.1 + rnd() * 1.3) bush(x, FZ + 1.0, 1.1 + rnd() * 0.55);               // a hedge of bushes behind the back fence...
-      for (let x = -38; x < 40; x += 6 + rnd() * 4.5) tree(x, FZ + 3.5 + rnd() * 5.5, 9 + rnd() * 4.5);         // ...and a wall of trees behind that (their branches reach over)
-      for (let z = VD - 10; z < FZ - 0.5; z += 2.1 + rnd() * 1.1) bush(yardXL(z) - 1.15, z, 0.95 + rnd() * 0.5);   // bushes all down the neighbours' side
-      for (let z = VD + 13; z < FZ - 2; z += 6.5 + rnd() * 4) tree(yardXL(z) - 4 - rnd() * 3, z, 8.5 + rnd() * 4);
+      const leaves = [], trunks = [], BUSH = [0x3c7431, 0x4a8638, 0x57963f, 0x335f2a, 0x42803a], LEAF = [0x7fae4c, 0x6a9a40, 0x94bf5a, 0x5c8a38, 0x4f8a3a], DARK = [0x2f5a28, 0x3a6a2e, 0x2a4f24, 0x44753a, 0x4a7a36];
+      const bush = (x, z, r0, b, pal) => { const n = 2 + (rnd() * 2 | 0); for (let k = 0; k < n; k++) { const r = r0 * (0.7 + rnd() * 0.5); leaves.push([x + (rnd() - 0.5) * 1.4, (b || 0) + r * 0.72, z + (rnd() - 0.5) * 1.0, r, (pal || BUSH)[rnd() * (pal || BUSH).length | 0]]); } };
+      const tree = (x, z, h, b) => { b = b || 0; trunks.push([x, z, h, b]); for (let k = 0; k < 7; k++) { const r = 2 + rnd() * 1.7; leaves.push([x + (rnd() - 0.5) * 4.6, b + h + (rnd() - 0.3) * 3.2, z + (rnd() - 0.5) * 4.6, r, LEAF[rnd() * LEAF.length | 0]]); } };
+      for (let x = -52; x < 52; x += 2.1 + rnd() * 1.3) bush(x, FZ + 1.0, 1.1 + rnd() * 0.55);               // a hedge of bushes right behind the back fence...
+      for (let z = FZ + 2.6; z < FZ + 15.5; z += 2.3 + rnd()) for (let x = -56; x < 56; x += 2.6 + rnd() * 2) bush(x, z, 0.9 + rnd() * 0.65, hillY(z) - 0.25, DARK);   // ...undergrowth all the way up the bank...
+      for (const zo of [3.4, 6.8, 10.4, 14, 18]) for (let x = -56 + rnd() * 4; x < 56; x += 4.6 + rnd() * 3.4) { const z = FZ + zo + (rnd() - 0.5) * 1.6; tree(x, z, 7 + rnd() * 5, hillY(z)); }   // ...and trees crowding the slope
+      for (let z = VD - 24; z < FZ - 0.5; z += 2.1 + rnd() * 1.1) bush(yardXL(z) - 1.15, z, 0.95 + rnd() * 0.5);   // bushes all down the north side (between us and 30 & 32)
+      for (let z = VD + 16; z < FZ - 2; z += 6.5 + rnd() * 4) tree(yardXL(z) - 4 - rnd() * 3, z, 8.5 + rnd() * 4);   // (their trees, behind their house)
       for (let z = VD + 17; z < FZ - 0.5; z += 2.3 + rnd()) bush(Y.XR + 1.15, z, 0.85 + rnd() * 0.4);         // over the middle fence toward the back of next door's
-      for (const [x, z, h] of [[Y.XR + 7, FZ - 6, 10.5], [Y.XR + 14, FZ - 13, 9], [Y.HR + 6, VD + 16, 10], [Y.HR + 8, FZ - 4, 11]]) tree(x, z, h);
+      for (const [x, z, h] of [[Y.XR + 7, FZ - 6, 10.5], [Y.XR + 14, FZ - 13, 9], [Y.HR + 7, VD + 14, 10], [Y.HR + 9, FZ - 4, 11]]) tree(x, z, h);
       const lm = new THREE.InstancedMesh(blob, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), leaves.length); lm.userData.name = 'Bushes';
       const M = new THREE.Matrix4(), C = new THREE.Color(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), E = new THREE.Euler();
       leaves.forEach(([lx, ly, lz, r, c], i) => { Q.setFromEuler(E.set(0, rnd() * 6, 0)); M.compose(P.set(lx, ly, lz), Q, S.set(r, r * 0.85, r)); lm.setMatrixAt(i, M); lm.setColorAt(i, C.setHex(c)); });
       yard.add(lm);
-      const bark = new THREE.MeshBasicMaterial({ color: 0x5b4a3a, fog: false });
-      for (const [tx, tz, th] of trunks) { const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.42, th, 8), bark); tr.position.set(tx, th / 2, tz); tr.userData.name = 'Tree'; yard.add(tr); }
+      const tg = new THREE.CylinderGeometry(0.28, 0.42, 1, 8); tg.translate(0, 0.5, 0);                         // all the trunks in one go
+      const tm = new THREE.InstancedMesh(tg, new THREE.MeshBasicMaterial({ color: 0x5b4a3a, fog: false }), trunks.length); tm.userData.name = 'Tree';
+      trunks.forEach(([x, z, h, b], i) => { Q.identity(); M.compose(P.set(x, b, z), Q, S.set(1, h, 1)); tm.setMatrixAt(i, M); }); yard.add(tm);
+      { // the bank behind the back fence, climbing steeply to the off-ramp, and the grey sound wall along the top (the trees all but hide it)
+        const hg = new THREE.PlaneGeometry(160, 36, 1, 36); hg.rotateX(-Math.PI / 2); const HP = hg.attributes.position, hc = [];
+        for (let i = 0; i < HP.count; i++) { const z = FZ + 0.6 + (HP.getZ(i) + 18), sl = hillY(z + 0.5) - hillY(z - 0.5), k = 0.97 - Math.min(0.32, sl * 0.4); HP.setXYZ(i, HP.getX(i), hillY(z) - 0.02, z); hc.push(k, k, k * 0.95); }
+        hg.setAttribute('color', new THREE.Float32BufferAttribute(hc, 3)); hg.computeBoundingSphere();
+        const bankTex = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#4c7a34'; c.fillRect(0, 0, w, h); for (let i = 0; i < 900; i++) { const r = Math.random(); c.fillStyle = r < 0.35 ? 'rgba(92,70,40,.55)' : r < 0.7 ? 'rgba(34,70,26,.55)' : 'rgba(120,160,70,.45)'; c.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 1.5 + Math.random() * 2); } }, 40, 9);
+        const bank = new THREE.Mesh(hg, new THREE.MeshBasicMaterial({ map: bankTex, vertexColors: true, fog: false })); bank.userData.name = 'The bank up to the off-ramp'; yard.add(bank);
+        const wallTex = canvasTex(128, 64, (c, w, h) => { c.fillStyle = '#9a9a94'; c.fillRect(0, 0, w, h); for (let x = 0; x < w; x += 32) { c.fillStyle = 'rgba(60,60,58,.6)'; c.fillRect(x, 0, 2, h); } for (let i = 0; i < 300; i++) { c.fillStyle = Math.random() < 0.5 ? 'rgba(70,70,68,.3)' : 'rgba(170,170,164,.3)'; c.fillRect(Math.random() * w, Math.random() * h, 2, 2); } }, 40, 1);
+        const sw = new THREE.Mesh(new THREE.PlaneGeometry(160, 4.2), new THREE.MeshBasicMaterial({ map: wallTex, fog: false })); sw.rotation.y = Math.PI; sw.position.set(0, hillY(FZ + 20) + 2.1, FZ + 20.5); sw.userData.name = 'Sound wall'; yard.add(sw);
+      }
     }
     // the backyard: a freshly mown lawn out to the horizon under a clear sky
     const grassTex = canvasTex(256, 256, (g, w, h) => {
@@ -4296,6 +4307,19 @@ function yBlob(par, r, hex, x, y, z, sy) {                               // a lu
   for (let i = 0; i < P.count; i++) { const a = P.getX(i), b = P.getY(i), c = P.getZ(i), v = Math.sin(a * 91.7 + b * 37.3 + c * 53.1) * 0.5 + 0.5; P.setXYZ(i, a * (0.9 + 0.2 * v), b * (0.9 + 0.2 * v) * (sy || 1), c * (0.9 + 0.2 * v)); }
   geo.computeVertexNormals(); const m = new THREE.Mesh(geo, yMat(hex)); m.position.set(x, y, z); par.add(m); return m;
 }
+function hipRoof(par, x0, x1, z0, z1, y0, pitch, col, capCol) {      // four slopes and the hip / ridge caps, the ridge along the longer side (z1 = the yard side)
+  const W = x1 - x0, L = z1 - z0, xm = (x0 + x1) / 2, zm = (z0 + z1) / 2, alongZ = L >= W, half = (alongZ ? W : L) / 2, y1 = y0 + half * pitch;
+  const A = [x0, y0, z1], B = [x1, y0, z1], C = [x1, y0, z0], D = [x0, y0, z0];
+  let R1, R2, tris;
+  if (alongZ) { R1 = [xm, y1, z1 - half]; R2 = [xm, y1, z0 + half]; tris = [A, B, R1, C, D, R2, D, A, R1, D, R1, R2, B, C, R2, B, R2, R1]; }
+  else { R1 = [x0 + half, y1, zm]; R2 = [x1 - half, y1, zm]; tris = [A, B, R2, A, R2, R1, C, D, R1, C, R1, R2, D, A, R1, B, C, R2]; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(tris.flat(), 3)); g.computeVertexNormals(); par.add(new THREE.Mesh(g, yMat(col)));
+  par.updateMatrixWorld(true);
+  for (const [a, b] of [[A, R1], [B, alongZ ? R1 : R2], [C, R2], [D, alongZ ? R2 : R1], [R1, R2]]) {
+    const Lc = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]); if (Lc < 0.05) continue;
+    const m = yBox(par, 0.22, 0.14, Lc, capCol, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 0.06, (a[2] + b[2]) / 2); m.lookAt(par.localToWorld(new THREE.Vector3(b[0], b[1] + 0.06, b[2])));
+  }
+}
 var YARD_SUN, _yardMat;
 function bakeYard(root) {
   root.updateMatrixWorld(true); YARD_SUN = YARD_SUN || new THREE.Vector3(-0.45, 0.78, -0.43).normalize();   // (the afternoon sun)
@@ -4409,26 +4433,22 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     const dais = []; for (let i = 0; i < 480; i++) { const z = VD + 2 + rnd() * (FZ - VD - 5), x0 = yardXL(z) + 1, x = x0 + rnd() * (XR - 1 - x0); if (Math.abs(x - DX) < 3.2 && z < VD + 5.5) continue; dais.push([x, 0.02, z, 0.05 + rnd() * 0.03, rnd() < 0.7 ? 0xffffff : 0xffe36a]); }
     const dg = new THREE.CircleGeometry(1, 6); dg.rotateX(-Math.PI / 2); { const sh = []; for (let i = 0; i < dg.attributes.position.count; i++) sh.push(1, 1, 1); dg.setAttribute('color', new THREE.Float32BufferAttribute(sh, 3)); }
     inst(dais, dg, 'Daisies'); }
-  // -- the neighbours' houses: the grey-roofed one beside us (over the side fence), one past next door, and the houses behind the trees,
-  // with a line of utility poles and sagging wires
-  { const nb = grp('Neighbourhood');
-    const house = (x, z, w, d, h, wall, roof, ry) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry || 0; nb.add(g);
-      yBox(g, w, h, d, wall, 0, h / 2, 0); const rh = h * 0.5, tri = new THREE.Shape([new THREE.Vector2(-w / 2 - 0.4, 0), new THREE.Vector2(w / 2 + 0.4, 0), new THREE.Vector2(0, rh)]);
-      const rg = new THREE.ExtrudeGeometry(tri, { depth: d + 0.8, bevelEnabled: false }); rg.translate(0, 0, -(d + 0.8) / 2); const rm = new THREE.Mesh(rg, yMat(roof)); rm.position.y = h; g.add(rm);
-      yBox(g, 0.9, rh + 0.8, 0.9, 0x8a5a48, w * 0.25, h + rh * 0.55, d * 0.1);
-      for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) { const wx = (c - 1) * w * 0.3, wy = h * (0.3 + r * 0.42); yBox(g, 1.5, 1.3, 0.08, 0xf7f5f0, wx, wy, -d / 2 - 0.02); yBox(g, 1.25, 1.05, 0.08, 0x3a4a5a, wx, wy, -d / 2 - 0.05); }
-      for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) { const wz = (c - 1) * d * 0.28, wy = h * (0.3 + r * 0.42); yBox(g, 0.08, 1.3, 1.5, 0xf7f5f0, w / 2 + 0.02, wy, wz); yBox(g, 0.08, 1.05, 1.25, 0x3a4a5a, w / 2 + 0.05, wy, wz); }
+  // -- the neighbours, to scale from the satellite view: 30 & 32 (a grey-roofed semi) to the north, set 5 m further back than us, with
+  // white siding; 22 & 24 to the south, past next door. Two storeys, white-trimmed windows all round, hipped roofs
+  { const nb = grp('Neighbourhood'), H = FT(18);
+    const home = (x0, x1, z0, z1, wall, roof, cap) => {
+      yBox(nb, x1 - x0, H, z1 - z0, wall, (x0 + x1) / 2, H / 2, (z0 + z1) / 2);
+      const win = (x, y, z, nx, nz) => { yBox(nb, nx ? 0.08 : 2.3, 2.0, nz ? 0.08 : 2.3, 0xf7f5f0, x + nx * 0.02, y, z + nz * 0.02); yBox(nb, nx ? 0.08 : 2.0, 1.72, nz ? 0.08 : 2.0, 0x3a4a5a, x + nx * 0.05, y, z + nz * 0.05); };
+      for (const y of [H * 0.28, H * 0.7]) {
+        for (let z = z0 + 3.5; z < z1 - 2; z += 7) { win(x0, y, z, -1, 0); win(x1, y, z, 1, 0); }
+        for (let x = x0 + 3.5; x < x1 - 2; x += 7) { win(x, y, z1, 0, 1); win(x, y, z0, 0, -1); }
+      }
+      hipRoof(nb, x0 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.5, H + 0.05, 0.4, roof, cap);
     };
-    house(Y.XL0 - 14.5, VD - 2, 16, 24, 6.8, 0xcdbba6, 0x5b5d62, -Math.PI / 2);                           // beside us, over the side fence (windows looking over at our yard)
-    house(Y.HR + 15, VD - 2, 14, 22, 6.6, 0xd9d2c4, 0x4f5358, Math.PI / 2);                                // past next door
-    house(-24, FZ + 14, 11, 8, 6.2, 0xd9e4ec, 0x5b4a44); house(-4, FZ + 15, 12, 8, 6.6, 0xf1e3b8, 0x3f4650); house(16, FZ + 14, 10, 8, 6.0, 0xcfdcc2, 0x6a4c3c); house(34, FZ + 13, 11, 8, 6.4, 0xead2c4, 0x4a4f57);
-    const poles = [-34, -11, 12, 35].map(x => [x, FZ + 7.5]);
-    for (const [x, z] of poles) { yCyl(nb, 0.17, 0.22, 10.5, 0x5b4636, x, 5.25, z, 7); yBox(nb, 2.6, 0.18, 0.18, 0x5b4636, x, 9.6, z); for (const dx of [-1.1, 0, 1.1]) yCyl(nb, 0.06, 0.08, 0.25, 0x6f8a9a, x + dx, 9.8, z, 6); }
-    bakeYard(nb);
-    const wire = new THREE.LineBasicMaterial({ color: 0x2c2c30, fog: false });
-    for (let i = 0; i + 1 < poles.length; i++) for (const dx of [-1.1, 0, 1.1]) { const [x0, z0] = poles[i], [x1, z1] = poles[i + 1], pts = [];
-      for (let t = 0; t <= 1.0001; t += 1 / 20) pts.push(new THREE.Vector3(x0 + dx + (x1 - x0) * t, 9.92 - 1.1 * (1 - (2 * t - 1) ** 2), z0 + (z1 - z0) * t));
-      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), wire); l.userData.noWalk = true; nb.add(l); } }
+    home(-61, -19.9, VD - 21.5, VD + 13.4, 0xe4e4df, 0x5d6166, 0x4a4e52);                              // 30 & 32
+    home(Y.HR + 2.6, Y.HR + 46, VD - 56, VD - 8, 0xd2c2ab, 0x5d6166, 0x4a4e52);                         // 22 & 24 (its back wall a little nearer the street than ours)
+    yBox(nb, 2.8, 2.6, 4.4, 0xf2f2ee, Y.HR + 4.4, 1.3, VD - 5.2);                                         // (and the little white lean-to off the back of 24)
+    bakeYard(nb); }
   // -- life: butterflies round the flower beds, a few birds wheeling overhead
   yardLife = { butterflies: [], birds: [], chirpT: 3 };
   for (let i = 0; i < 5; i++) { const b = makeButterfly(); b.scale.setScalar(0.75); b.userData.noWalk = true; povEndWall.add(b); const az = VD + 4 + i * 5.2; yardLife.butterflies.push({ g: b, ax: i % 2 ? YARD.XR - 2.2 : yardXL(az) + 2.2, az, r: 1.5 + (i % 3) * 0.6, sp: 0.5 + i * 0.13, ph: i * 1.7 }); }
@@ -5457,7 +5477,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-27 21:41';                                              // stamped when the site is published
+const BUILD = '2026-09-27 21:55';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -9545,13 +9565,13 @@ function updateCops(dt) {
   if (!cops.rig) {                                                    // red and blue lights flashing up from the street beyond the back fence
     const g = new THREE.Group(); g.userData.noWalk = true; povEndWall.add(g); cops.rig = g; cops.lights = [];
     const beam = canvasTex(64, 64, (c, w, h) => { const gr = c.createRadialGradient(32, 32, 1, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.18, 'rgba(255,255,255,.9)'); gr.addColorStop(0.5, 'rgba(255,255,255,.3)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); }, 1, 1);   // (bright enough to read against a daytime sky)
-    const z = YARD.FZ + 2.2;                                           // just over the back fence, in front of the trees
+    const z = YARD.FZ + 18;                                            // up on the off-ramp, over the top of the bank and through the trees
     for (const [x, c] of [[-6, 0xff2a2a], [-4.4, 0x2a5bff], [3.6, 0xff2a2a], [5.2, 0x2a5bff], [-5.2, 0xffffff]]) {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: beam, color: c, depthWrite: false, transparent: true, opacity: 0, fog: false }));
-      sp.position.set(x, 4.9, z); sp.scale.setScalar(c === 0xffffff ? 3 : 7.5); g.add(sp); cops.lights.push({ sp, c });
+      sp.position.set(x, 11.5, z); sp.scale.setScalar(c === 0xffffff ? 3 : 7.5); g.add(sp); cops.lights.push({ sp, c });
     }
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: beam, color: 0xffffff, depthWrite: false, transparent: true, opacity: 0, fog: false }));
-    glow.material.depthTest = false; glow.renderOrder = 2; glow.position.set(0, 7, z + 4); glow.scale.set(46, 16, 1); g.add(glow); cops.glow = glow;   // the flashing wash over the sky and treetops
+    glow.material.depthTest = false; glow.renderOrder = 2; glow.position.set(0, 13, z + 3); glow.scale.set(46, 16, 1); g.add(glow); cops.glow = glow;   // the flashing wash over the sky and treetops
   }
   cops.rig.visible = true;
   const fade = Math.min(1, cops.t / 2) * Math.max(0, Math.min(1, (40 - cops.t) / 4)), ph = Math.floor(clock * 7) % 2;
