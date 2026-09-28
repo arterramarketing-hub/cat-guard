@@ -727,10 +727,11 @@ const candleGlowTex = canvasTex(64, 64, (g, w, h) => {
   gr.addColorStop(0, 'rgba(255,214,140,.95)'); gr.addColorStop(0.35, 'rgba(255,170,80,.35)'); gr.addColorStop(1, 'rgba(255,150,60,0)');
   g.fillStyle = gr; g.fillRect(0, 0, w, h);
 }, 1, 1);
-const blindsTex = canvasTex(32, 64, (g, w, h) => {
-  g.fillStyle = '#f4f2ee'; g.fillRect(0, 0, w, h);
-  g.fillStyle = 'rgba(0,0,0,.12)'; for (let y = 0; y < h; y += 8) g.fillRect(0, y, w, 1);
-}, 1, 3);
+const blindsTex = canvasTex(32, 16, (g, w, h) => {                  // one slat per tile (the same beige slats you see from outside)
+  g.fillStyle = '#e6e0d2'; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(0, 1, w, 1);    // (a highlight along the top of each slat...)
+  g.fillStyle = 'rgba(150,138,116,.7)'; g.fillRect(0, h - 2, w, 2);   // (...and the gap under it)
+}, 1, 3), BLIND_SLATS = 32 / 3;                                     // slats down the whole window (8 when it's three-quarters down)
 const cordTex = canvasTex(64, 32, (g, w, h) => {          // cream corduroy
   g.fillStyle = '#e9e1d2'; g.fillRect(0, 0, w, h);
   g.fillStyle = 'rgba(110,90,62,.3)'; for (let x = 0; x < w; x += 6) g.fillRect(x, 0, 2, h);
@@ -967,7 +968,7 @@ function updateBlinds(dt) {
   r.c += (r.target - r.c) * Math.min(1, dt * 3);
   const cover = r.WIN_H * r.c;
   r.bl.scale.y = cover / r.blindH; r.bl.position.y = r.WIN_H / 2 - cover / 2;
-  r.bt.repeat.set(1, 4 * r.c);                                     // keep the slats the same size as it rolls
+  r.bt.repeat.set(1, BLIND_SLATS * r.c);                           // keep the slats the same size as it rolls
   r.rail.position.y = r.WIN_H / 2 - cover;
   const open = (1 - r.c) / (1 - r.base);                             // 1 = today's 25% gap, ~3.8 = fully up
   const dim = 1 + (1 - lightF) * 0.55;                               // lights off: the window light stands out, without blowing everything out
@@ -2554,7 +2555,8 @@ const DOOR2_Z = ROOM.visDepth - 1.5 - FT(4), DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DO
   box(WIN_W + CASING * 2, WIN_H + CASING * 2, IN(1), trimMat, 0, 0, 0, w);
   const OPEN = 0.25, blindH = WIN_H * (1 - OPEN), openH = WIN_H * OPEN;
   const sky = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W, WIN_H), basic(0xfdf7e8)); sky.position.z = IN(0.55); w.add(sky);          // bright daylight
-  const bt = blindsTex.clone(); bt.needsUpdate = true; bt.repeat.set(1, 3 * (1 - OPEN));
+  const bt = blindsTex.clone(); bt.needsUpdate = true; bt.repeat.set(1, BLIND_SLATS * (1 - OPEN));
+  box(IN(1.2), WIN_H, IN(0.12), trimMat, 0, 0, IN(0.6), w);                                   // the mullion between the two panes (as from outside), just behind the blind
   const bl = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W, blindH), lam(0xffffff, { map: bt })); bl.position.set(0, WIN_H / 2 - blindH / 2, IN(0.7)); w.add(bl);
   const rail = box(WIN_W, IN(1.2), IN(1), lam(0xe8e5df), 0, WIN_H / 2 - blindH, IN(0.9), w);                                   // bottom rail
   box(WIN_W + CASING * 2 + IN(2), IN(1.5), IN(3), trimMat, 0, -WIN_H / 2 - CASING, IN(1.5), w);                              // sill
@@ -5774,7 +5776,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-28 12:21';                                              // stamped when the site is published
+const BUILD = '2026-09-28 13:58';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -9805,9 +9807,10 @@ const FENCE_TOP = YARD.FH + 0.1;
 function segDist(x, z, F) { const dx = F.x1 - F.x0, dz = F.z1 - F.z0, t = THREE.MathUtils.clamp(((x - F.x0) * dx + (z - F.z0) * dz) / (dx * dx + dz * dz), 0, 1); return Math.hypot(x - F.x0 - dx * t, z - F.z0 - dz * t); }
 function segSide(x, z, F) { return (F.x1 - F.x0) * (z - F.z0) - (F.z1 - F.z0) * (x - F.x0); }   // > 0: the left of the run (the yard side, for the gate)
 function segCross(ox, oz, nx, nz, F) { const a = segSide(ox, oz, F), b = segSide(nx, nz, F); if ((a > 0) === (b > 0)) return false; const G = { x0: ox, z0: oz, x1: nx, z1: nz }; return (segSide(F.x0, F.z0, G) > 0) !== (segSide(F.x1, F.z1, G) > 0); }
+function inOurYard(x, z) { return z > ROOM.visDepth + 0.2 && z <= YARD.FZ && x >= yardXL(z) && x <= YARD.XR; }   // (our half of the backyard, inside the chain-link: the side yard's gate fence is at VD + 0.2)
 function launchedHigh() { const p = walk.pos; return (walk.grounded ? p.y - hillY(p.z) : walk.launchH || 0) >= 0.8; }   // did she jump from something (not just the grass)?
 function outBlocks(ox, oz, nx, nz) {                                  // outdoors: the chain-link (from either side), the tree trunks and cedar hedges
-  const p = walk.pos, over = p.y > FENCE_TOP + 0.12 && launchedHigh();   // (clear over the top of the fence: only off something tall enough, never a standing jump from the grass)
+  const p = walk.pos, over = p.y > FENCE_TOP + 0.12 && (launchedHigh() || !inOurYard(ox, oz));   // (clear over the top: from inside our yard only off something tall enough; from anywhere else, an ordinary jump does it)
   for (const F of YARD_FENCES) {
     if (over || (F.gate && F.gate.open > 0.7)) continue;
     const dn = segDist(nx, nz, F);
@@ -9829,7 +9832,7 @@ function fenceBump(F, ox, oz) {                                       // she's r
   }
   if (G && !G.hint) { G.hint = true; showWalkName('🚪 The gate only opens from the side yard'); return; }
   if (clock > (walk.rattleT || 0)) { walk.rattleT = clock + 0.45; noise(0.08, 0.035, 2400); }
-  if (!walk.grounded && !launchedHigh() && !walk.fenceHint && walk.pos.y > 1.2) { walk.fenceHint = true; showWalkName('🐾 Too high from the grass... climb something first!'); }
+  if (!walk.grounded && !launchedHigh() && !walk.fenceHint && walk.pos.y > 1.2 && inOurYard(ox, oz)) { walk.fenceHint = true; showWalkName('🐾 Too high from the grass... climb something first!'); }
 }
 function updateYardGate(dt) {                                         // the side gate swings in when she noses it, and shuts behind her
   const G = yardGate; if (!G) return;
