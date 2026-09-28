@@ -3399,7 +3399,9 @@ let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null, laund
 const YARD = { HL: -6.5, XR: 13.5, HR: 33.8, XL0: -15, XL1: -19, FZ: ROOM.visDepth + 36, FH: FT(4), HD: 50.5 };
 function hillY(z) { const t = THREE.MathUtils.clamp((z - YARD.FZ - 1.4) / 18, 0, 1); return 8.5 * t * t * (3 - 2 * t); }   // the bank behind the back fence, climbing up to the off-ramp
 function yardXL(z) { const k = THREE.MathUtils.clamp((z - ROOM.visDepth) / (YARD.FZ - ROOM.visDepth), 0, 1); return YARD.XL0 + (YARD.XL1 - YARD.XL0) * k; }   // the neighbours'-side fence: the lot widens toward the back
-let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [], bbqRig = null, yardWeeds = [], yardGate = null;     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
+const UPPER = { LH: 2.5, UF: 5.5, CH: 11.3, zB: -0.5, zF: ROOM.visDepth + IN(5) - YARD.HD, dx: YARD.HL + 3.5, dw: 2.2, dh: 5.1 };   // our front door (landing height, centre, size) and the second level behind it (floor, ceiling, back wall)
+function inUpper(x, z) { return x > YARD.HL && x < YARD.XR && z > UPPER.zF && z < UPPER.zB; }   // (inside the front half of our house: the foyer and the second level over the garage)
+let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [], bbqRig = null, yardWeeds = [], yardGate = null, frontDoor = null;     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
 const YARD_FENCES = [], YARD_POSTS = [], YARD_BUSHES = [];   // the chain-link runs (solid both ways, unless she's sailing over the top), tree trunks and cedars (solid), bushes and cedar foliage (she pushes through)
 const sliderGlass = [];
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
@@ -3417,7 +3419,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
     { // the outside of the house (only seen from the yard), after the photo of the front: brown brick below, white stucco with dark Tudor
       // half-timbering above, white-framed windows, and (from the satellite view) a hipped roof of red shingles. Our half runs from the side yard to the fence
       // down the middle of the backyard; the other half of the house carries on past it
-      const HL = YARD.HL, HR = YARD.HR, XR = YARD.XR, XH = FT(18), BH = FT(9), WZ = VD + IN(5), W = HR - HL, MX = (HL + HR) / 2, HD = YARD.HD;
+      const HL = YARD.HL, HR = YARD.HR, XR = YARD.XR, XH = FT(15.6), BH = FT(7.4), WZ = VD + IN(5), W = HR - HL, MX = (HL + HR) / 2, HD = YARD.HD;
       const brickTex = canvasTex(128, 128, (c, w, h) => {
         c.fillStyle = '#b3a38f'; c.fillRect(0, 0, w, h);                                                          // mortar
         for (let r = 0; r < 8; r++) for (let k = -1; k < 4; k++) {                                                // eight courses of running bond
@@ -3489,45 +3491,58 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           yBox(hd, 0.05, WIN_H * 0.75, WIN_W - 0.06, 0xe6e0d2, sx - 0.05, sy + WIN_H * 0.125, sz);                 // its blinds, three-quarters down, as they are inside
           for (let k = 1; k < 9; k++) yBox(hd, 0.04, 0.02, WIN_W - 0.08, 0xc9c2b2, sx - 0.07, sy + WIN_H / 2 - k * WIN_H * 0.75 / 9, sz);   // (slats)
           yBox(hd, 0.05, WIN_H, 0.08, 0xf7f5f0, sx - 0.09, sy, sz); yBox(hd, 0.34, 0.12, WIN_W + 0.5, 0xf7f5f0, sx - 0.15, sy - WIN_H / 2 - 0.2, sz); }
-        { // the front of the house, from the photo (only seen if she ever gets round there): each half has its garage by the middle,
-          // a side door, and the front door up a short flight of steps under a little gable; a big window over the garage under a
-          // front gable of its own. Brick below, stucco and dark timber above, the red roof over it all
-          const zF = WZ - HD, FZ0 = zF - 0.06;
-          wallMesh(new THREE.Shape([new THREE.Vector2(HL, 0), new THREE.Vector2(HR, 0), new THREE.Vector2(HR, BH), new THREE.Vector2(HL, BH)]), brickTex, 2.05, 1.37, THREE.DoubleSide).position.z = zF;
-          wallMesh(new THREE.Shape([new THREE.Vector2(HL, BH), new THREE.Vector2(HR, BH), new THREE.Vector2(HR, XH), new THREE.Vector2(HL, XH)]), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.z = zF;
-          yBox(hd, W + 0.12, 0.34, 0.16, T, MX, BH + 0.05, FZ0); yBox(hd, W, 0.28, 0.12, T, MX, XH - 0.2, FZ0);   // the timber beams
+        { // the front of the house, from the photo of number 28 (only seen if she ever gets round there). Each half (ours, then next door's,
+          // its mirror image): the garage by the middle, the white side door beside it, then the front door with its sidelights up a short
+          // stoop with curly white railings, under a little gable of its own; a big picture window over the garage under the front gable.
+          // Brick below, white stucco and dark timber above. Our front door really opens (knock on it): the stairs up to the second level
+          const zF = WZ - HD, FZ0 = zF - 0.06, U = UPPER, LH = U.LH, dL = U.dx - U.dw / 2, dR = U.dx + U.dw / 2, dT = LH + U.dh;
+          const rect = (x0, y0, x1, y1, tex, tu, tv) => { wallMesh(new THREE.Shape([new THREE.Vector2(x0, y0), new THREE.Vector2(x1, y0), new THREE.Vector2(x1, y1), new THREE.Vector2(x0, y1)]), tex, tu, tv, THREE.DoubleSide).position.z = zF; };
+          rect(HL, 0, dL, BH, brickTex, 2.05, 1.37); rect(dR, 0, HR, BH, brickTex, 2.05, 1.37); rect(dL, 0, dR, LH, brickTex, 2.05, 1.37);   // brick (our doorway left open)...
+          rect(HL, BH, dL, XH, stuccoTex, 1.6, 1.6); rect(dR, BH, HR, XH, stuccoTex, 1.6, 1.6); rect(dL, dT, dR, XH, stuccoTex, 1.6, 1.6);    // ...and stucco above
+          const tri = (w, h) => new THREE.Shape([new THREE.Vector2(-w / 2, 0), new THREE.Vector2(w / 2, 0), new THREE.Vector2(0, h)]);
+          yBox(hd, W + 0.12, 0.32, 0.16, T, MX, BH + 0.02, FZ0); yBox(hd, W, 0.26, 0.12, T, MX, XH - 0.2, FZ0);   // the timber bands
           yBox(hd, W + 1.2, 0.34, 0.12, 0x3a2a20, MX, XH - 0.06, zF - 1.15); yBox(hd, W + 1.2, 0.08, 1.1, 0xe9e2d4, MX, XH - 0.22, zF - 0.58);   // fascia and soffit
+          for (const s of [-1, 1]) yBox(hd, 0.14, U.dh + 0.1, 0.4, 0xf2f0ea, U.dx + s * (U.dw / 2 + 0.07), LH + (U.dh + 0.1) / 2, zF + 0.05);   // the jambs of our doorway (the wall's thickness)
+          yBox(hd, U.dw + 0.28, 0.14, 0.4, 0xf2f0ea, U.dx, dT + 0.05, zF + 0.05);
           const steps = new THREE.Group(); steps.userData.name = 'Front steps'; povEndWall.add(steps);           // (solid: she can climb them)
-          const plaque = n => canvasTex(64, 32, (c, w, h) => { c.fillStyle = '#f4efe4'; c.fillRect(0, 0, w, h); c.fillStyle = '#3a2a20'; c.font = 'bold 22px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(n, w / 2, h / 2 + 1); }, 1, 1);
           for (const half of [0, 1]) {
-            const mx = x => half ? 2 * XR - x : x, gx = mx(XR - 4.1), dx = mx(XR - 8.3), ex = mx(HL + 4.2), LH = 2.3;
-            yBox(hd, 6.7, 5.35, 0.08, 0xf2f0ea, gx, 2.675, FZ0); yBox(hd, 6.3, 5.1, 0.1, 0x4a2c20, gx, 2.55, FZ0 - 0.03);   // the garage door: dark brown panels in a white frame
-            for (let k = 1; k < 5; k++) yBox(hd, 6.3, 0.05, 0.04, 0x3a2218, gx, k * 1.02, FZ0 - 0.09);
-            yBox(hd, 1.3, 2.95, 0.08, 0xf2f0ea, dx, 1.475, FZ0); yBox(hd, 1.1, 2.8, 0.1, 0xf4f2ee, dx, 1.4, FZ0 - 0.03); yBox(hd, 0.7, 0.9, 0.04, 0x5a6b78, dx, 2.2, FZ0 - 0.09);   // the side door
-            yBox(hd, 2.2, 3.0, 0.08, 0xf2f0ea, ex, LH + 1.5, FZ0); yBox(hd, 1.0, 2.75, 0.1, 0x3a2a20, ex, LH + 1.375, FZ0 - 0.03); yBox(hd, 0.5, 1.1, 0.04, 0x8fa3ad, ex, LH + 1.9, FZ0 - 0.09);   // the front door...
-            for (const sd of [-1, 1]) yBox(hd, 0.32, 2.6, 0.04, 0x8fa3ad, ex + sd * 0.72, LH + 1.35, FZ0 - 0.06);                // ...and its sidelights
-            { const gw = 3.6, gy0 = LH + 3.2, gh = 1.9, ang = Math.atan2(gh, gw / 2), sl = Math.hypot(gw / 2, gh);                // the porch gable over it, with the house number
-              wallMesh(new THREE.Shape([new THREE.Vector2(-gw / 2, 0), new THREE.Vector2(gw / 2, 0), new THREE.Vector2(0, gh)]), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.set(ex, gy0, zF - 0.9);
-              for (const sd of [-1, 1]) { yBox(hd, sl + 0.3, 0.2, 0.12, T, ex + sd * gw / 4, gy0 + gh / 2, zF - 0.95).rotation.z = -sd * ang; yBox(hd, sl + 0.4, 0.14, 1.2, 0x8a3934, ex + sd * gw / 4, gy0 + gh / 2 + 0.14, zF - 0.45).rotation.z = -sd * ang; }
+            const mx = x => half ? 2 * XR - x : x, gx = mx(XR - 5.8), sx = mx(XR - 12.1), ex = mx(U.dx), out = half ? 1 : -1;   // (out: toward this half's own end of the house)
+            yBox(hd, 7.3, 5.45, 0.08, 0xf2f0ea, gx, 2.72, FZ0); yBox(hd, 6.9, 5.2, 0.1, 0x4a2c20, gx, 2.6, FZ0 - 0.03);   // the garage door: dark brown panels in a white frame
+            for (let k = 1; k < 6; k++) yBox(hd, 6.9, 0.05, 0.04, 0x3a2218, gx, k * 0.87, FZ0 - 0.09);
+            yBox(hd, 2.45, 5.28, 0.08, 0xf2f0ea, sx, 2.64, FZ0); yBox(hd, 2.1, 5.1, 0.1, 0xf7f6f2, sx, 2.55, FZ0 - 0.03);   // the side door: a white storm door...
+            yBox(hd, 1.55, 2.3, 0.05, 0xb9c6ce, sx, 3.8, FZ0 - 0.09); yBox(hd, 0.14, 0.14, 0.12, 0xc9a227, sx - out * 0.75, 2.5, FZ0 - 0.1);   // ...its glass, its handle
+            yBox(hd, 0.26, 0.38, 0.22, 0x2a2a2a, sx, 5.75, FZ0 - 0.1); yBox(hd, 0.16, 0.2, 0.1, 0xfff2b0, sx, 5.7, FZ0 - 0.2);   // and a little lamp over it
+            for (const s of [-1, 1]) yBox(hd, 0.2, U.dh + 0.2, 0.14, 0xf2f0ea, ex + s * (U.dw / 2 + 0.1), LH + (U.dh + 0.2) / 2, FZ0);   // the front door's frame...
+            yBox(hd, U.dw + 0.4, 0.2, 0.14, 0xf2f0ea, ex, dT + 0.1, FZ0);
+            for (const s of [-1, 1]) { const lx = ex + s * (U.dw / 2 + 0.55);                                   // ...and a tall narrow sidelight either side
+              yBox(hd, 0.7, U.dh, 0.08, 0xf2f0ea, lx, LH + U.dh / 2, FZ0); yBox(hd, 0.46, U.dh - 0.3, 0.05, 0xc8d3da, lx, LH + U.dh / 2, FZ0 - 0.05); }
+            if (half) { yBox(hd, U.dw, U.dh, 0.1, 0x2a2420, ex, LH + U.dh / 2, FZ0 - 0.02); yBox(hd, U.dw - 0.5, U.dh * 0.55, 0.04, 0x5d6b73, ex, LH + U.dh * 0.62, FZ0 - 0.08); }   // (next door's, shut)
+            { const gw = 5.8, gy0 = dT + 0.35, gh = 2.4, ang = Math.atan2(gh, gw / 2), sl = Math.hypot(gw / 2, gh);   // the porch gable over it (no posts: it sits on the wall)
+              wallMesh(tri(gw, gh), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.set(ex, gy0, zF - 0.9);
+              for (const s of [-1, 1]) { yBox(hd, sl + 0.3, 0.2, 0.12, T, ex + s * gw / 4, gy0 + gh / 2, zF - 0.95).rotation.z = -s * ang; yBox(hd, sl + 0.4, 0.14, 1.2, 0x8a3934, ex + s * gw / 4, gy0 + gh / 2 + 0.14, zF - 0.45).rotation.z = -s * ang; }
               yBox(hd, 0.14, gh - 0.3, 0.1, T, ex, gy0 + (gh - 0.3) / 2, zF - 0.95); yBox(hd, gw, 0.18, 0.12, T, ex, gy0, zF - 0.95);
-              for (const sd of [-1, 1]) yBox(steps, 0.16, gy0 - LH, 0.16, 0xf2f0ea, ex + sd * (gw / 2 - 0.2), LH + (gy0 - LH) / 2, zF - 1.3);   // two white posts holding it up, at the front corners of the landing
-              const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.31), new THREE.MeshBasicMaterial({ map: plaque(half ? '26' : '28'), fog: false })); pl.rotation.y = Math.PI; pl.position.set(ex, gy0 + 0.55, zF - 0.97); pl.userData.noWalk = true; povEndWall.add(pl); }
-            yBox(steps, 3.6, LH, 1.5, 0x9c9890, ex, LH / 2, zF - 0.75);                                                          // the landing, and seven shallow steps down to the walk (each one a cat can walk up)
-            for (let k = 0; k < 7; k++) { const h = LH - (k + 1) * LH / 8; yBox(steps, 2.2, h, 0.62, 0xa6a29a, ex, h / 2, zF - 1.81 - k * 0.62); }
-            for (const sd of [-1, 1]) {                                                                                           // white railings either side
-              const rx = ex + sd * 1.2, run = 4.34, rl = yBox(steps, 0.07, 0.07, Math.hypot(run, LH), 0xf4f4f0, rx, LH / 2 + 0.9, zF - 1.5 - run / 2); rl.rotation.x = -Math.atan2(LH, run);
-              for (let k = 0; k < 7; k += 2) { const h = LH - (k + 1) * LH / 8; yBox(steps, 0.05, 0.9, 0.05, 0xf4f4f0, rx, h + 0.45, zF - 1.81 - k * 0.62); }
+              for (const s of [-1, 1]) yBox(hd, 0.1, 0.9, 0.9, T, ex + s * (gw / 2 - 0.15), gy0 - 0.35, zF - 0.5);   // (little brackets under it)
+              yBox(hd, 0.22, 0.34, 0.22, 0x2a2a2a, ex, gy0 + 0.75, zF - 1.0); yBox(hd, 0.14, 0.2, 0.12, 0xfff2b0, ex, gy0 + 0.7, zF - 1.08); }   // the porch light
+            { const ww = 6.9, wy0 = 7.0, wh = 4.1, split = wy0 + wh * 0.3;                                         // the big picture window over the garage...
+              yBox(hd, ww + 0.4, wh + 0.4, 0.08, 0xf7f5f0, gx, wy0 + wh / 2, FZ0); yBox(hd, ww, wh, 0.05, 0x46535e, gx, wy0 + wh / 2, FZ0 - 0.03);
+              for (const s of [-1, 1]) yBox(hd, ww * 0.2, wh * 0.66, 0.04, 0xe9e4da, gx + s * ww * 0.39, split + wh * 0.35, FZ0 - 0.045);   // (net curtains inside)
+              yBox(hd, ww, 0.12, 0.05, 0xf7f5f0, gx, split, FZ0 - 0.08); yBox(hd, 0.12, wh * 0.7, 0.05, 0xf7f5f0, gx, (split + wy0 + wh) / 2, FZ0 - 0.08);   // two big panes over a row of four small ones
+              for (const k of [-1, 0, 1]) yBox(hd, 0.1, wh * 0.3, 0.05, 0xf7f5f0, gx + k * ww / 4, (wy0 + split) / 2, FZ0 - 0.08);
+              yBox(hd, ww + 0.6, 0.14, 0.3, 0xf7f5f0, gx, wy0 - 0.2, FZ0 - 0.12); }
+            { const gw = 9.4, gh = 3.4, ang = Math.atan2(gh, gw / 2), sl = Math.hypot(gw / 2, gh);                 // ...under its own front gable, timbered
+              wallMesh(tri(gw, gh), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.set(gx, XH - 0.1, zF - 0.4);
+              for (const s of [-1, 1]) { yBox(hd, sl + 0.4, 0.26, 0.14, T, gx + s * gw / 4, XH - 0.1 + gh / 2, zF - 0.46).rotation.z = -s * ang; yBox(hd, sl + 0.6, 0.16, 3.2, 0x8a3934, gx + s * gw / 4 * 1.02, XH - 0.1 + gh / 2 + 0.2, zF + 0.9).rotation.z = -s * ang; }
+              yBox(hd, 0.18, gh - 0.4, 0.12, T, gx, XH - 0.1 + (gh - 0.4) / 2, zF - 0.46); for (const s of [-1, 1]) yBox(hd, 0.16, 2.0, 0.1, T, gx + s * 1.25, XH + 0.8, zF - 0.46).rotation.z = s * 0.7; }
+            for (const x of [mx(XR - 0.5), gx + 3.85, gx - 3.85, mx(XR - 11.7), mx(XR - 13.6), mx(HL + 0.35)]) yBox(hd, 0.2, XH - BH, 0.1, T, x, (BH + XH) / 2, FZ0);   // timber posts
+            yBox(hd, 13.1, 0.2, 0.1, T, mx(XR - 7.05), 6.65, FZ0);                                                 // and a rail under the window
+            yBox(steps, 4.6, LH, 1.6, 0x9c9890, ex, LH / 2, zF - 0.8);                                             // the landing, and seven shallow steps down to the driveway
+            for (let k = 0; k < 7; k++) { const h = LH - (k + 1) * LH / 8; yBox(steps, 2.4, h, 0.62, 0xa6a29a, ex, h / 2, zF - 1.91 - k * 0.62); }
+            for (const s of [-1, 1]) {                                                                             // curly white railings either side
+              const rx = ex + s * 1.3, run = 4.34, rl = yBox(steps, 0.07, 0.07, Math.hypot(run, LH), 0xf4f4f0, rx, LH / 2 + 0.95, zF - 1.6 - run / 2); rl.rotation.x = -Math.atan2(LH, run);
+              for (let k = 0; k < 7; k += 2) { const h = LH - (k + 1) * LH / 8; yBox(steps, 0.05, 0.95, 0.05, 0xf4f4f0, rx, h + 0.47, zF - 1.91 - k * 0.62); }
+              yBox(steps, 0.05, 0.95, 0.05, 0xf4f4f0, rx, LH + 0.47, zF - 1.6);
+              const sc = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 6, 14, Math.PI * 1.5), yMat(0xf4f4f0)); sc.rotation.z = s > 0 ? -Math.PI / 2 : Math.PI; sc.position.set(rx + s * 0.2, 0.75, zF - 1.6 - run + 0.05); steps.add(sc);   // the scroll at the foot, curling out
             }
-            { const lx = (ex + dx) / 2, ly = LH + 1.55;                                                                        // the front room's window, beside the door...
-              yBox(hd, 3.4, 2.3, 0.08, 0xf7f5f0, lx, ly, FZ0); yBox(hd, 3.0, 1.95, 0.08, 0x34414f, lx, ly, FZ0 - 0.03); yBox(hd, 0.08, 1.95, 0.05, 0xf7f5f0, lx, ly, FZ0 - 0.08); yBox(hd, 3.6, 0.14, 0.3, 0xf2f0ea, lx, ly - 1.2, FZ0 - 0.12);
-              yBox(hd, 2.6, 2.3, 0.08, 0xf7f5f0, ex, BH + 2.9, FZ0); yBox(hd, 2.2, 1.95, 0.08, 0x34414f, ex, BH + 2.9, FZ0 - 0.03); yBox(hd, 0.08, 1.95, 0.05, 0xf7f5f0, ex, BH + 2.9, FZ0 - 0.08); }   // ...and a bedroom window over the porch
-            const wy = BH + 2.6;                                                                                                  // the big window over the garage...
-            yBox(hd, 4.6, 2.7, 0.08, 0xf7f5f0, gx, wy, FZ0); yBox(hd, 4.2, 2.35, 0.08, 0x34414f, gx, wy, FZ0 - 0.03); yBox(hd, 0.1, 2.35, 0.05, 0xf7f5f0, gx, wy, FZ0 - 0.08); yBox(hd, 4.2, 0.08, 0.05, 0xf7f5f0, gx, wy - 0.55, FZ0 - 0.08);
-            for (const x of [gx - 3.1, gx + 3.1, ex - 2.3, ex + 2.3]) yBox(hd, 0.2, XH - BH, 0.1, T, x, (BH + XH) / 2, FZ0);    // timber posts
-            { const gw = 8.2, gh = 3.6, ang = Math.atan2(gh, gw / 2), sl = Math.hypot(gw / 2, gh);                                // ...under its own front gable, timbered
-              wallMesh(new THREE.Shape([new THREE.Vector2(-gw / 2, 0), new THREE.Vector2(gw / 2, 0), new THREE.Vector2(0, gh)]), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.set(gx, XH - 0.1, zF - 0.4);
-              for (const sd of [-1, 1]) { yBox(hd, sl + 0.4, 0.26, 0.14, T, gx + sd * gw / 4, XH - 0.1 + gh / 2, zF - 0.46).rotation.z = -sd * ang; yBox(hd, sl + 0.6, 0.16, 3.2, 0x8a3934, gx + sd * gw / 4 * 1.02, XH - 0.1 + gh / 2 + 0.2, zF + 0.9).rotation.z = -sd * ang; }
-              yBox(hd, 0.18, gh - 0.4, 0.12, T, gx, XH - 0.1 + (gh - 0.4) / 2, zF - 0.46); for (const sd of [-1, 1]) yBox(hd, 0.16, 2.2, 0.1, T, gx + sd * 1.3, XH + 0.9, zF - 0.46).rotation.z = sd * 0.7; }
           }
           bakeYard(steps);
         }
@@ -4551,8 +4566,8 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     for (let k = 0; k < 12; k++) { const t = (k + 0.5) / 12, x = x0 + (x1 - x0) * t + Math.sin(t * Math.PI) * 1.8, z = z0 + (z1 - z0) * t;
       const m = yCyl(st, 0.46 + (k % 3) * 0.05, 0.5, 0.06, [0x9c9890, 0xa6a29a, 0x928e86][k % 3], x, 0.03, z, 9); m.rotation.y = k * 0.7; m.scale.z = 0.8; }
     bakeYard(st); }
-  // -- round the side of the house, past the gate: the bins
-  { const bn = grp('Bins', true); for (const [z, c] of [[VD - 2.6, 0x2f5d3a], [VD - 3.8, 0x232528], [VD - 5.0, 0x232528]]) { const x = Y.HL - 1.0; yBox(bn, 0.95, 1.45, 0.95, c, x, 0.78, z); yBox(bn, 1.02, 0.1, 1.04, c, x - 0.02, 1.54, z); for (const sz of [-1, 1]) yCyl(bn, 0.14, 0.14, 0.08, 0x111111, x - 0.35, 0.14, z + sz * 0.4, 10).rotation.z = Math.PI / 2; }
+  // -- out front beside the stoop: the bins
+  { const bn = grp('Bins', true); for (const [z, c] of [[UPPER.zF - 2.4, 0x2f5d3a], [UPPER.zF - 3.6, 0x232528], [UPPER.zF - 4.8, 0x232528]]) { const x = Y.HL + 1.1; yBox(bn, 0.95, 1.45, 0.95, c, x, 0.78, z); yBox(bn, 1.02, 0.1, 1.04, c, x - 0.02, 1.54, z); for (const sz of [-1, 1]) yCyl(bn, 0.14, 0.14, 0.08, 0x111111, x - 0.35, 0.14, z + sz * 0.4, 10).rotation.z = Math.PI / 2; }
     bakeYard(bn); }
   // -- over the middle fence: the other half's yard (Porter's): a concrete patio, a plastic table and chairs, his bowl and ball, a clothesline
   { const nd = grp('Next door', true), px = XR + 5.4, cx = XR + 7.9;   // (the clothesline's out past the cedars)
@@ -4604,8 +4619,7 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     { const lawn = (x0, x1, z0, z1) => flat(x1 - x0, z1 - z0, (x0 + x1) / 2, (z0 + z1) / 2, -0.016, tex('#5c9c3c', ['rgba(38,86,28,.45)', 'rgba(150,204,96,.4)'], (x1 - x0) / 2.97, (z1 - z0) / 2.97), 'Front lawn');
       lawn(-95, 95, VD - 150, zF); lawn(-95, Y.HL, zF, VD); lawn(Y.HR, 95, zF, VD); }   // (round the house, never under it: it showed through the doorways)   // (under the house too: you never see that bit)
     const asph = tex('#4b4b4d', ['rgba(30,30,32,.5)', 'rgba(110,110,112,.5)'], 8, 10), conc = tex('#c3c0b8', ['rgba(150,146,138,.5)', 'rgba(220,218,212,.5)'], 4, 12);
-    flat(15.4, 22, XR, zF - 11, 0.006, asph, 'Driveway');                                                     // one wide driveway in front of both garages
-    for (const ex of [Y.HL + 4.2, 2 * XR - Y.HL - 4.2]) flat(1.5, 17.8, ex, zF - 13.2, 0.008, conc, 'Front walk');   // the front walks, from the steps to the sidewalk
+    flat(Y.HR - Y.HL + 1.2, 22, (Y.HL + Y.HR) / 2, zF - 11, 0.006, tex('#4b4b4d', ['rgba(30,30,32,.5)', 'rgba(110,110,112,.5)'], 21, 11), 'Driveway');   // the driveway right across the front (the stoops step down onto it)
     flat(190, 2.4, 0, zF - 23.2, 0.01, tex('#c9c6be', ['rgba(150,146,138,.45)'], 70, 1), 'Sidewalk');
     yBox(cb, 190, 0.16, 0.25, 0xb9b6ae, 0, 0.08, zF - 24.5);                                                   // the curb
     flat(190, 19, 0, zF - 34.1, 0.004, tex('#3f3f42', ['rgba(25,25,27,.5)', 'rgba(95,95,98,.45)'], 60, 6), 'Chipwood Crescent');
@@ -4669,6 +4683,206 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
   for (let i = 0; i < 4; i++) { const g = new THREE.Group(); g.userData.noWalk = true; povEndWall.add(g); const wings = [];
     for (const sx of [-1, 1]) { const w = new THREE.Group(); g.add(w); const m = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.03, 0.16), yMat(0x2a2a2e)); m.position.x = sx * 0.27; w.add(m); wings.push([w, sx]); }
     yardLife.birds.push({ g, wings, ph: i * 0.35, off: new THREE.Vector3((i % 2) * 1.2 - 0.6, (i % 3) * 0.5, i * 0.9) }); }
+  buildUpperFloor();
+}
+function mandalaTex() {                                               // a big red rug with a gold-and-teal mandala in the middle
+  return canvasTex(256, 196, (c, w, h) => {
+    c.fillStyle = '#8c1d2c'; c.fillRect(0, 0, w, h);
+    c.strokeStyle = '#e8b04a'; c.lineWidth = 7; c.strokeRect(8, 8, w - 16, h - 16); c.strokeStyle = '#1f6f78'; c.lineWidth = 3; c.strokeRect(19, 19, w - 38, h - 38);
+    const cx = w / 2, cy = h / 2;
+    for (const [r, col] of [[78, '#e8b04a'], [64, '#1f6f78'], [50, '#f2e6c9'], [34, '#c2410c'], [18, '#e8b04a'], [8, '#1f6f78']]) { c.fillStyle = col; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.fill(); }
+    for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; c.fillStyle = k % 2 ? '#f2e6c9' : '#c2410c'; c.beginPath(); c.ellipse(cx + Math.cos(a) * 57, cy + Math.sin(a) * 57, 11, 5, a, 0, 7); c.fill(); }
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2 + 0.2; c.fillStyle = '#e8b04a'; c.beginPath(); c.ellipse(cx + Math.cos(a) * 26, cy + Math.sin(a) * 26, 7, 3, a, 0, 7); c.fill(); }
+    for (const [x, y] of [[42, 38], [w - 42, 38], [42, h - 38], [w - 42, h - 38]]) { c.fillStyle = '#e8b04a'; c.beginPath(); c.arc(x, y, 13, 0, 7); c.fill(); c.fillStyle = '#1f6f78'; c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); }
+  }, 1, 1);
+}
+function buildUpperFloor() {                                          // behind our front door: a tiled foyer, nine stairs up, and the second level over the garage, done up Indian style
+  const Y = YARD, U = UPPER, HL = Y.HL, XR = Y.XR, zF = U.zF, zB = U.zB, UF = U.UF, CH = U.CH, LH = U.LH, VD = ROOM.visDepth;
+  const up = new THREE.Group(); up.userData.name = 'Upstairs'; povEndWall.add(up);                   // (solid: floors, walls, stairs, furniture: baked into one mesh)
+  const deco = new THREE.Group(); deco.userData.name = 'Upstairs'; deco.userData.noWalk = true; povEndWall.add(deco);   // (the flat, painted bits)
+  const dec = new THREE.Group(); dec.userData.name = 'Upstairs'; dec.userData.noWalk = true; povEndWall.add(dec);   // (the little things: garlands, glasses, plates, flames... drawn, but nothing to bump into)
+  const B = (x0, x1, y0, y1, z0, z1, c, par) => yBox(par || (Math.max(x1 - x0, y1 - y0, z1 - z0) < 0.2 ? dec : up), x1 - x0, y1 - y0, z1 - z0, c, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  const C = (r0, r1, h, c, x, y, z, seg, par) => yCyl(par || (Math.max(r0, r1) < 0.3 || h < 0.06 ? dec : up), r0, r1, h, c, x, y + h / 2, z, seg || 14);   // (y: what it stands on)
+  const O = (r, c, x, y, z, sy) => { if (r > 0.15) return yBlob(dec, r, c, x, y, z, sy); const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), yMat(c)); m.position.set(x, y, z); if (sy) m.scale.y = sy; dec.add(m); return m; };
+  const flatTex = (w, h, tex, x, y, z, ry, rx) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, fog: false })); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, 0, 'YXZ'); deco.add(m); return m; };
+  const garland = (x0, z0, x1, z1, y, sag, n) => { for (let i = 0; i <= n; i++) { const t = i / n; O(0.08, i % 2 ? 0xffa21f : 0xffd23a, x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * sag, z0 + (z1 - z0) * t); } };   // a marigold toran
+  const PLASTER = 0xf1e3c8, FLOOR = 0xb98a5a, WOOD = 0x5c3a22, TEAK = 0x8a5a2e, BRASS = 0xc9a227, STEEL = 0xc4c9ce, GLASS = 0xe6f1f8, WHITE = 0xfaf8f2;
+  const SW = zF + 2 + 9 * 0.62, dL = U.dx - U.dw / 2, dR = U.dx + U.dw / 2, dT = LH + U.dh, gx = XR - 5.8, winY = FT(12.5);
+  // -- the shell: the foyer and its stairs, the upstairs floor, plaster inside the brick, a ceiling
+  B(dL, dR, 0, LH, zF - 0.12, zF + 0.1, 0x9c9890);                                                        // the stone sill in the doorway
+  B(HL, -0.3, 0, LH, zF + 0.05, SW, 0xa89478);                                                            // the foyer floor, level with the landing outside
+  for (let i = 0; i < 6; i++) B(HL + 0.1 + i * 1.03, HL + 1.1 + i * 1.03, LH, LH + 0.01, zF + 0.15, zF + 1.9, i % 2 ? 0xbca98a : 0x9c8a6e);   // (a checked mat of tiles inside the door)
+  for (let k = 0; k < 9; k++) B(HL + 0.1, HL + 2.9, LH, LH + (k + 1) * 0.3, zF + 2 + k * 0.62, zF + 2.62 + k * 0.62, k % 2 ? 0x8a5a36 : 0x7e5230);   // nine stairs up (each one she can walk)
+  for (let k = 0; k < 9; k += 2) C(0.05, 0.05, 1.0, BRASS, HL + 2.95, LH + (k + 1) * 0.3, zF + 2.31 + k * 0.62, 6);   // a brass banister
+  { const run = 9 * 0.62, rise = 2.7, rl = B(0, 0.1, 0, 0.08, 0, Math.hypot(run, rise), BRASS); rl.position.set(HL + 2.95, LH + 1.3 + rise / 2, zF + 2 + run / 2); rl.rotation.x = -Math.atan2(rise, run); }
+  B(-0.3, XR, UF - 0.3, UF, zF + 0.05, zB, FLOOR); B(HL, -0.3, UF - 0.3, UF, SW, zB, FLOOR);            // the upstairs floor
+  B(-3.5, -0.3, UF, UF + 1.1, SW - 0.12, SW, TEAK);                                                       // a low wall along the top of the stairwell
+  const wall = (x0, x1, z0, z1, y0, y1) => B(x0, x1, y0, y1, z0, z1, PLASTER);
+  wall(HL, dL, zF + 0.02, zF + 0.12, LH, CH); wall(dR, -0.3, zF + 0.02, zF + 0.12, LH, CH); wall(dL, dR, zF + 0.02, zF + 0.12, dT, CH);   // plaster inside the front wall (round the doorway)...
+  wall(-0.3, XR, zF + 0.02, zF + 0.12, UF, CH);
+  wall(HL + 0.02, HL + 0.12, zF, zB, LH, CH); wall(XR - 0.12, XR - 0.02, zF, zB, UF, CH); wall(HL, XR, zB - 0.12, zB, UF, CH);   // ...the north wall, the party wall, the back
+  wall(-0.42, -0.3, zF, SW, 0, CH);                                                                       // the foyer's own wall (the living room's the other side)
+  wall(HL, -0.3, SW - 0.02, SW + 0.1, 0, UF - 0.3);                                                       // and its back wall, under the edge of the upstairs floor
+  B(HL, XR, CH, CH + 0.15, zF, zB, 0xf7f1e4);                                                             // the ceiling
+  // -- the windows, from inside: bright panes where they are outside
+  const frontPane = (cx, w, y0, y1) => { B(cx - w / 2 - 0.12, cx + w / 2 + 0.12, y0 - 0.12, y1 + 0.12, zF + 0.12, zF + 0.15, WHITE); B(cx - w / 2, cx + w / 2, y0, y1, zF + 0.15, zF + 0.17, GLASS); };
+  const sidePane = (cz, w, y0, y1) => { B(HL + 0.12, HL + 0.15, y0 - 0.12, y1 + 0.12, cz - w / 2 - 0.12, cz + w / 2 + 0.12, WHITE); B(HL + 0.15, HL + 0.17, y0, y1, cz - w / 2, cz + w / 2, GLASS); };
+  frontPane(gx, 6.9, 7.0, 11.1); B(gx - 0.06, gx + 0.06, 8.23, 11.1, zF + 0.17, zF + 0.19, WHITE); B(gx - 3.45, gx + 3.45, 8.17, 8.29, zF + 0.17, zF + 0.19, WHITE);   // the picture window: two big panes...
+  for (const k of [-1, 0, 1]) B(gx + k * 1.725 - 0.05, gx + k * 1.725 + 0.05, 7.0, 8.23, zF + 0.17, zF + 0.19, WHITE);                                           // ...over four small ones
+  for (const s of [-1, 1]) B(gx + s * 3.35 - 0.6, gx + s * 3.35 + 0.6, UF + 1.2, CH - 0.25, zF + 0.22, zF + 0.36, 0xd9731f);          // saffron curtains, drawn back
+  B(gx - 4.3, gx + 4.3, CH - 0.34, CH - 0.24, zF + 0.26, zF + 0.32, BRASS);                                                          // (on a brass rod)
+  for (const s of [-1, 1]) frontPane(U.dx + s * (U.dw / 2 + 0.55), 0.46, LH + 0.15, dT - 0.15);                                    // the sidelights, from the foyer
+  for (let k = 0; k < 6; k++) { const z = VD + IN(5) - 6.4 - k * 7.6; if (z < zF + 0.5 || z > zB - 0.5) continue;                   // the side windows down the north wall
+    sidePane(z, 2.05, winY - 0.93, winY + 0.93); if (k % 2 && z < SW) sidePane(z, 2.05, 3.3 - 0.83, 3.3 + 0.83); }
+  // -- the living room, over the garage: a low maroon sofa, a mandala rug, a carved coffee table with chai, poufs, a jhoola by the window, a little mandir
+  flatTex(9.2, 7, mandalaTex(), 6.2, UF + 0.012, zF + 6.2, 0, -Math.PI / 2);
+  { const x0 = XR - 2.3, x1 = XR - 0.14, z0 = zF + 1.8, z1 = zF + 9.8, RED = 0x7a1f2b;
+    B(x0, x1, UF, UF + 1.05, z0, z1, RED); B(XR - 0.85, x1, UF + 1.05, UF + 2.7, z0, z1, RED);
+    for (const z of [z0 - 0.4, z1]) B(x0, x1, UF, UF + 1.8, z, z + 0.4, 0x6a1a24);
+    for (let i = 0; i < 3; i++) B(x0 + 0.05, XR - 0.9, UF + 1.05, UF + 1.4, z0 + 0.05 + i * 2.65, z0 + 2.6 + i * 2.65, 0x8c2433);
+    [0xe8b04a, 0x1fa4a0, 0xd63384, 0xe8b04a, 0x7b3fa0].forEach((c, i) => { B(XR - 1.1, XR - 0.8, UF + 1.4, UF + 2.3, z0 + 0.7 + i * 1.6, z0 + 1.5 + i * 1.6, c).rotation.z = 0.25; });   // bright cushions
+    for (const z of [z0 + 0.2, z1 - 0.2]) yCyl(up, 0.3, 0.3, 1.8, 0xc9302c, XR - 1.2, UF + 1.75, z, 12).rotation.z = Math.PI / 2; }   // and bolsters against the arms
+  flatTex(3.4, 2.3, canvasTex(128, 88, (c, w, h) => { c.fillStyle = '#1f3f8a'; c.fillRect(0, 0, w, h); c.fillStyle = '#e8b04a'; c.fillRect(5, 5, w - 10, h - 10); c.fillStyle = '#b3203a'; c.fillRect(11, 11, w - 22, h - 22);
+    for (let y = 26; y < h - 12; y += 20) for (let x = 24; x < w - 12; x += 20) { c.fillStyle = '#f2e6c9'; c.beginPath(); c.moveTo(x, y - 7); c.lineTo(x + 7, y); c.lineTo(x, y + 7); c.lineTo(x - 7, y); c.fill(); c.fillStyle = '#1f6f78'; c.beginPath(); c.arc(x, y, 2.5, 0, 7); c.fill(); } }, 1, 1),
+    XR - 0.14, UF + 4.3, zF + 5.8, -Math.PI / 2);                                                         // a tapestry over the sofa
+  B(-0.3, 1.0, UF, UF + 1.5, zF + 3.4, zF + 8.6, WOOD); for (let i = 0; i < 3; i++) B(1.0, 1.04, UF + 0.25, UF + 1.25, zF + 3.6 + i * 1.7, zF + 4.9 + i * 1.7, TEAK);   // a carved teak console...
+  B(-0.3, -0.15, UF + 2.2, UF + 4.9, zF + 4.1, zF + 7.9, 0x121212);                                         // ...and the TV over it
+  O(0.2, 0x2e8b3a, 0.5, UF + 1.75, zF + 8.2, 1.2);
+  { const cx = 6.2, cz = zF + 6.2; B(cx - 1.6, cx + 1.6, UF + 0.95, UF + 1.15, cz - 1.0, cz + 1.0, WOOD);   // the coffee table...
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(cx + sx * 1.45 - 0.12, cx + sx * 1.45 + 0.12, UF, UF + 0.95, cz + sz * 0.85 - 0.12, cz + sz * 0.85 + 0.12, TEAK);
+    C(0.75, 0.75, 0.05, BRASS, cx, UF + 1.15, cz, 22);                                                     // ...a brass tray on it: four glasses of chai round the kettle
+    for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.4; C(0.09, 0.075, 0.26, 0x8b5a2b, cx + Math.cos(a) * 0.45, UF + 1.2, cz + Math.sin(a) * 0.45, 10); }
+    C(0.18, 0.14, 0.34, BRASS, cx, UF + 1.2, cz, 12); C(0.05, 0.05, 0.14, BRASS, cx, UF + 1.54, cz, 6); }
+  [[3.3, zF + 4.3, 0xd63384], [3.3, zF + 8.1, 0x1fa4a0], [9.6, zF + 9.6, 0xe8b04a]].forEach(([x, z, c]) => { C(0.6, 0.62, 0.95, c, x, UF, z, 16);   // embroidered poufs, little mirrors sewn round them
+    for (let k = 0; k < 8; k++) { const a = k * 0.785; B(x + Math.cos(a) * 0.61 - 0.05, x + Math.cos(a) * 0.61 + 0.05, UF + 0.4, UF + 0.52, z + Math.sin(a) * 0.61 - 0.05, z + Math.sin(a) * 0.61 + 0.05, 0xf4f4f4); } });
+  { const mx = 0.6, mz = zF + 1.0;                                                                        // the mandir in the corner: a carved shrine under a golden dome...
+    B(mx - 0.8, mx + 0.8, UF, UF + 2.1, mz - 0.7, mz + 0.7, TEAK); B(mx - 0.75, mx + 0.75, UF + 2.1, UF + 3.6, mz - 0.7, mz - 0.58, TEAK);
+    for (const sx of [-1, 1]) B(mx + sx * 0.7 - 0.07, mx + sx * 0.7 + 0.07, UF + 2.1, UF + 3.6, mz - 0.6, mz + 0.6, TEAK);
+    B(mx - 0.85, mx + 0.85, UF + 3.6, UF + 3.75, mz - 0.72, mz + 0.72, TEAK); C(0.04, 0.85, 1.1, BRASS, mx, UF + 3.75, mz, 8);
+    O(0.22, 0xe86a1c, mx, UF + 2.45, mz - 0.25);                                                            // ...a little idol in orange...
+    for (const sx of [-1, 1]) { C(0.1, 0.07, 0.08, 0xb5552b, mx + sx * 0.4, UF + 2.1, mz + 0.3, 8); O(0.05, 0xffd23a, mx + sx * 0.4, UF + 2.24, mz + 0.3, 1.8); }   // ...two lit diyas...
+    garland(mx - 0.72, mz + 0.64, mx + 0.72, mz + 0.64, UF + 3.55, 0.35, 10);                               // ...and marigolds
+    C(0.35, 0.4, 0.12, BRASS, 2.2, UF, zF + 0.8, 12); C(0.06, 0.06, 1.7, BRASS, 2.2, UF + 0.12, zF + 0.8, 6); C(0.3, 0.18, 0.12, BRASS, 2.2, UF + 1.82, zF + 0.8, 12);   // a tall brass oil lamp beside it
+    for (let k = 0; k < 4; k++) O(0.05, 0xffd23a, 2.2 + Math.cos(k * 1.57) * 0.24, UF + 2.0, zF + 0.8 + Math.sin(k * 1.57) * 0.24, 1.8);
+    C(0.02, 0.1, 0.3, BRASS, 2.2, UF + 1.94, zF + 0.8, 8); }
+  C(0.45, 0.35, 1.0, 0xb5552b, 12.6, UF, zF + 1.0, 12); O(0.6, 0x3f8a45, 12.6, UF + 1.6, zF + 1.0, 1.1); O(0.45, 0x4f9a50, 12.4, UF + 2.2, zF + 1.2);   // a big potted plant by the window
+  { const z = zF + 12;                                                                                    // a carved jaali screen between the living room and the dining
+    B(-0.3, 3.4, UF, UF + 0.3, z - 0.1, z + 0.1, WOOD); B(-0.3, 3.4, UF + 4.6, UF + 4.9, z - 0.1, z + 0.1, WOOD);
+    for (let x = -0.3; x <= 3.41; x += 0.46) B(x - 0.05, x + 0.05, UF + 0.3, UF + 4.6, z - 0.08, z + 0.08, WOOD);
+    for (let y = UF + 0.76; y < UF + 4.6; y += 0.46) B(-0.3, 3.4, y - 0.04, y + 0.04, z - 0.06, z + 0.06, TEAK);
+    for (let x = -0.07; x < 3.3; x += 0.46) for (let y = UF + 0.53; y < UF + 4.5; y += 0.46) B(x + 0.16, x + 0.3, y - 0.07, y + 0.07, z - 0.05, z + 0.05, BRASS).rotation.z = Math.PI / 4; }
+  garland(HL + 0.2, SW + 0.05, -3.6, SW + 0.05, UF + 4.9, 0.45, 14);                                     // a toran over the top of the stairs
+  // -- the dining table, set with steel thalis: dal, sabzi, raita, rice and rotis
+  { const tx = -1.2, tz = zF + 14.6, TOP = UF + 1.85;
+    B(tx - 2.6, tx + 2.6, TOP - 0.14, TOP, tz - 1.2, tz + 1.2, 0x6b3f22);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(tx + sx * 2.35 - 0.12, tx + sx * 2.35 + 0.12, UF, TOP - 0.14, tz + sz * 0.95 - 0.12, tz + sz * 0.95 + 0.12, 0x5a3520);
+    for (const sz of [-1, 1]) for (const i of [-1, 0, 1]) { const cx = tx + i * 1.7, cz = tz + sz * 1.75;
+      B(cx - 0.55, cx + 0.55, UF + 1.05, UF + 1.18, cz - 0.5, cz + 0.5, 0xc9a66b); B(cx - 0.55, cx + 0.55, UF + 1.18, UF + 2.9, cz + sz * 0.45 - 0.06, cz + sz * 0.45 + 0.06, 0x5a3520);
+      for (const lx of [-0.45, 0.45]) for (const lz of [-0.4, 0.4]) B(cx + lx - 0.06, cx + lx + 0.06, UF, UF + 1.05, cz + lz - 0.06, cz + lz + 0.06, 0x5a3520);
+      const pz = tz + sz * 0.62; C(0.42, 0.42, 0.04, STEEL, cx, TOP, pz, 20);
+      [[0xe8b31c, -0.2, -0.12], [0x4f8a2a, 0.2, -0.12], [0xf4f1e6, 0, 0.2]].forEach(([c, ox, oz]) => { C(0.11, 0.09, 0.09, STEEL, cx + ox, TOP + 0.04, pz + oz * sz, 10); C(0.1, 0.1, 0.01, c, cx + ox, TOP + 0.12, pz + oz * sz, 10); });
+      O(0.12, 0xfaf6ee, cx - 0.15, TOP + 0.07, pz + 0.05 * sz, 0.6); C(0.2, 0.2, 0.03, 0xc9a06a, cx + 0.18, TOP + 0.05, pz + 0.12 * sz, 14); }
+    C(0.2, 0.16, 0.5, STEEL, tx, TOP, tz, 12); C(0.08, 0.08, 0.08, STEEL, tx, TOP + 0.5, tz, 8);
+    for (const i of [-1, 0, 1]) { C(0.015, 0.015, CH - TOP - 2.6, 0x333333, tx + i * 1.7, TOP + 2.6, tz, 4); C(0.22, 0.32, 0.45, BRASS, tx + i * 1.7, TOP + 2.15, tz, 12); O(0.12, 0xfff0b0, tx + i * 1.7, TOP + 2.1, tz); } }   // brass pendant lamps
+  // -- the kitchen: a gas stove with the pressure cooker going, a kadai of curry, the masala dabba, rotis on the tawa, achaar, copper pots
+  { const K0 = zF + 12.3, K1 = zF + 19.9, CT = UF + 2.3, T2 = CT + 0.12;
+    B(XR - 1.3, XR - 0.12, UF, CT, K0, K1, 0xe7ddc9); B(XR - 1.36, XR - 0.12, CT, T2, K0 - 0.05, K1 + 0.05, 0x2b2b30);
+    B(6.2, XR - 1.3, UF, CT, zF + 19.2, zF + 20.4, 0xe7ddc9); B(6.2, XR - 1.3, CT, T2, zF + 19.15, zF + 20.4, 0x2b2b30);
+    B(XR - 0.8, XR - 0.12, UF + 4.1, UF + 5.5, K0, K1, 0xd9ccb2); for (let i = 0; i < 5; i++) B(XR - 1.34, XR - 1.3, UF + 0.3, CT - 0.2, K0 + 0.15 + i * 1.5, K0 + 1.45 + i * 1.5, 0xd4c8b0);
+    B(XR - 1.2, XR - 0.3, T2, T2 + 0.1, zF + 13.2, zF + 15.2, 0x1a1a1a); for (const z of [zF + 13.7, zF + 14.7]) C(0.2, 0.2, 0.04, 0x444444, XR - 0.75, T2 + 0.1, z, 12);
+    C(0.3, 0.3, 0.5, STEEL, XR - 0.75, T2 + 0.14, zF + 13.7, 16); B(XR - 0.77, XR - 0.73, T2 + 0.64, T2 + 0.7, zF + 13.2, zF + 14.35, 0x222222); C(0.05, 0.03, 0.2, 0x222222, XR - 0.75, T2 + 0.64, zF + 13.7, 6);
+    C(0.5, 0.26, 0.28, 0x3a3a3a, XR - 0.75, T2 + 0.14, zF + 14.7, 18); C(0.44, 0.44, 0.02, 0xc85a1e, XR - 0.75, T2 + 0.36, zF + 14.7, 18);
+    { const mx = XR - 0.8, mz = zF + 16.4; C(0.5, 0.5, 0.14, STEEL, mx, T2, mz, 20);
+      [0xe8b31c, 0xc2261f, 0x7a5a36, 0x2d2520, 0x9a8a4a, 0x6e3b1f, 0xc7a23a].forEach((c, i) => { const a = i * 1.05, r = i ? 0.3 : 0; C(0.12, 0.12, 0.03, c, mx + Math.cos(a) * r, T2 + 0.13, mz + Math.sin(a) * r, 10); }); }
+    B(XR - 1.15, XR - 0.3, T2 - 0.35, T2 + 0.01, zF + 17.4, zF + 18.9, STEEL); C(0.04, 0.04, 0.6, STEEL, XR - 0.3, T2, zF + 18.15, 6);
+    for (let i = 0; i < 3; i++) { C(0.17, 0.17, 0.42, 0xf2ead8, 7 + i * 0.5, T2, zF + 19.8, 12); C(0.18, 0.18, 0.08, [0xd9480f, 0xc2261f, 0x8a9a2a][i], 7 + i * 0.5, T2 + 0.42, zF + 19.8, 12); }
+    C(0.42, 0.42, 0.04, 0x2a2a2a, 9.2, T2, zF + 19.8, 18); for (let i = 0; i < 4; i++) C(0.32, 0.32, 0.03, 0xc9a06a, 9.2, T2 + 0.04 + i * 0.03, zF + 19.8, 16);
+    B(4.3, 6.1, UF, UF + 5.2, zF + 18.6, zF + 20.4, 0xe9ecef); B(5.95, 6.05, UF + 2.4, UF + 3.6, zF + 18.55, zF + 18.62, 0x9aa2a8);   // the fridge
+    B(XR - 1.0, XR - 0.95, UF + 3.95, UF + 4.01, zF + 13.0, zF + 16.0, BRASS);
+    for (let i = 0; i < 3; i++) { C(0.01, 0.01, 0.3, 0x333333, XR - 0.98, UF + 3.7, zF + 13.5 + i * 1.0, 4); C(0.3, 0.22, 0.3, 0xb87333, XR - 0.98, UF + 3.4, zF + 13.5 + i * 1.0, 12); } }
+  // -- the bazaar corner: a drinks cart like the ones in the Indian food markets. Big steel buckets of lassi, rose sharbat, mango,
+  //    jaljeera, nimbu pani and chai, rows of glasses, a clay matka, sacks of spices, crates of fruit, marigolds and fairy lights
+  { const cx = -1.6, cz = zF + 22.4, CT = UF + 2.3, T2 = CT + 0.12;
+    B(cx - 2.6, cx + 2.6, UF + 1.0, CT, cz - 0.95, cz + 0.95, 0x2f7d6d); B(cx - 2.75, cx + 2.75, CT, T2, cz - 1.1, cz + 1.1, TEAK);
+    for (let i = 0; i < 5; i++) B(cx - 2.3 + i * 1.15, cx - 2.1 + i * 1.15, UF + 1.1, CT - 0.1, cz - 0.97, cz - 0.95, 0xf2c14e);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const wx = cx + sx * 1.4, wz = cz + sz * 1.05, tyre = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.07, 6, 24), yMat(0x2a2a2a)); tyre.position.set(wx, UF + 0.9, wz); dec.add(tyre);   // spoked wheels (just for show: the cart itself is solid)
+      C(0.12, 0.12, 0.1, 0x8a8a8a, wx, UF + 0.85, wz, 8).rotation.x = Math.PI / 2; for (let k = 0; k < 4; k++) B(wx - 0.03, wx + 0.03, UF + 0.1, UF + 1.7, wz - 0.03, wz + 0.03, 0x9a9a9a, dec).rotation.z = k * Math.PI / 4; C(0.05, 0.05, 2.5, WOOD, cx + sx * 2.6, T2, cz + sz * 1.0, 6); }
+    for (let i = 0; i < 10; i++) B(cx - 2.9 + i * 0.58, cx - 2.9 + (i + 1) * 0.58, T2 + 2.45, T2 + 2.55, cz - 1.5, cz + 1.3, i % 2 ? 0xf7efe0 : 0xd62828).rotation.x = -0.12;   // a striped awning
+    flatTex(4.6, 0.82, canvasTex(512, 92, (c, w, h) => { c.fillStyle = '#ffd23a'; c.fillRect(0, 0, w, h); c.fillStyle = '#c41e3a'; c.fillRect(0, 0, w, 9); c.fillRect(0, h - 9, w, 9);
+      c.fillStyle = '#1b3a8a'; c.font = 'bold 34px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('LASSI • SHARBAT • CHAI', w / 2, h / 2 + 2); }, 1, 1),
+      cx, T2 + 2.1, cz - 1.52, Math.PI);                                                                    // its hand-painted sign
+    const DR = [0xf5f0e1, 0xef6f9c, 0xffa928, 0x6fa83a, 0xf1e56b, 0x9a6b3f];                                 // lassi, rose sharbat, mango, jaljeera, nimbu pani, masala chai
+    DR.forEach((c, i) => { const x = cx - 2.2 + i * 0.88, z = cz + 0.3; C(0.38, 0.3, 0.56, STEEL, x, T2, z, 12); C(0.36, 0.36, 0.03, c, x, T2 + 0.55, z, 12);   // big steel buckets, brim-full...
+      const ld = yCyl(up, 0.025, 0.025, 1.0, STEEL, x + 0.14, T2 + 0.95, z + 0.05, 6); ld.rotation.z = -0.35; O(0.08, STEEL, x - 0.02, T2 + 0.55, z + 0.05, 0.5); });   // ...each with its ladle
+    for (let r = 0; r < 2; r++) for (let i = 0; i < 8; i++) { const x = cx - 2.3 + i * 0.64, z = cz - 0.5 - r * 0.33, c = DR[(i + r * 3) % 6];   // rows of glasses, most of them poured
+      if ((i + r) % 3) { C(0.1, 0.085, 0.32, c, x, T2, z, 10); C(0.105, 0.1, 0.07, 0xe6f0f4, x, T2 + 0.32, z, 10); } else C(0.105, 0.09, 0.4, 0xd5e4ea, x, T2, z, 10); }
+    { const mx = cx + 3.6, mz = cz - 0.4; C(0.3, 0.35, 0.9, WOOD, mx, UF, mz, 8);                             // a clay matka of cool water, a red cloth round it
+      const mk = new THREE.Mesh(new THREE.SphereGeometry(0.62, 14, 10), yMat(0xb5552b)); mk.position.set(mx, UF + 1.45, mz); dec.add(mk);
+      C(0.3, 0.26, 0.25, 0xa84a24, mx, UF + 1.95, mz, 12); C(0.64, 0.64, 0.14, 0xc41e3a, mx, UF + 1.33, mz, 16, dec); }
+    [0xe8b31c, 0xc2261f, 0x7a5a36, 0x9a8a3a, 0xd9480f].forEach((c, i) => { const x = HL + 0.9 + i * 1.2, z = zB - 0.9;   // jute sacks of spices along the back wall, heaped in cones
+      C(0.5, 0.55, 1.0, 0xc9a66b, x, UF, z, 12); C(0.56, 0.56, 0.12, 0xb8955a, x, UF + 1.0, z, 12); C(0.02, 0.45, 0.5, c, x, UF + 1.08, z, 12, dec); });
+    [[zF + 18.4, 'mango'], [zF + 19.8, 'banana'], [zF + 21.2, 'coconut']].forEach(([z, fruit]) => { const x = HL + 0.8;   // crates of fruit along the north wall
+      B(x - 0.6, x + 0.6, UF, UF + 0.7, z - 0.5, z + 0.5, 0xa87a4a); for (let k = 0; k < 3; k++) B(x - 0.61, x + 0.61, UF + 0.15 + k * 0.22, UF + 0.2 + k * 0.22, z - 0.51, z + 0.51, 0x8a5e36);
+      for (let k = 0; k < 9; k++) { const fx = x - 0.4 + (k % 3) * 0.4, fz = z - 0.3 + (k / 3 | 0) * 0.3;
+        if (fruit === 'mango') O(0.17, k % 2 ? 0xffb52e : 0xf2c53d, fx, UF + 0.82, fz, 0.8); else if (fruit === 'banana') B(fx - 0.25, fx + 0.25, UF + 0.72, UF + 0.84, fz - 0.07, fz + 0.07, 0xf2d43d); else O(0.2, 0x6b4a2a, fx, UF + 0.86, fz); } });
+    C(0.38, 0.42, 1.0, 0xe63946, cx - 1.2, UF, cz - 2.3, 12); C(0.38, 0.42, 1.0, 0x1d7fd6, cx + 1.0, UF, cz - 2.5, 12);   // plastic stools
+    for (let k = 0; k < 6; k++) for (let j = 0; j < 7; j++) O(0.07, j % 2 ? 0xffa21f : 0xffd23a, cx - 2.4 + k * 0.96, T2 + 2.35 - j * 0.15, cz - 1.47);   // marigolds hanging off the awning
+    [0xffd23a, 0xff6fae, 0x7fd8ff, 0x9cf03a, 0xff9a3c].forEach((c, ci) => { for (let i = ci; i < 30; i += 5) { const t = i / 29; O(0.07, c, HL + 0.4 + (2.6 - HL) * t, CH - 0.25 - Math.sin(t * Math.PI) * 0.8, zF + 17.4 + (zB - 0.4 - zF - 17.4) * t); } }); }   // fairy lights across the ceiling
+  // -- the bedroom at the back: a carved bed with an indigo block-print spread, bolster and pillows, a steel almirah, a dressing table
+  { const bx0 = 3.0, bz0 = zF + 20.5, bx = 8.6;
+    B(bx0, XR, UF, CH, bz0 - 0.06, bz0 + 0.06, PLASTER);
+    B(bx0 - 0.06, bx0 + 0.06, UF, CH, zF + 23.2, zB, PLASTER); B(bx0 - 0.06, bx0 + 0.06, UF + 5.0, CH, zF + 21.0, zF + 23.2, PLASTER); B(bx0 - 0.06, bx0 + 0.06, UF, CH, bz0, zF + 21.0, PLASTER);
+    garland(bx0 - 0.12, zF + 21.0, bx0 - 0.12, zF + 23.2, UF + 4.9, 0.35, 10);                              // (a toran over its doorway)
+    B(bx - 2.3, bx + 2.3, UF, UF + 1.0, zB - 5.5, zB - 0.15, WOOD); B(bx - 2.4, bx + 2.4, UF, UF + 3.2, zB - 0.42, zB - 0.13, WOOD);
+    for (const sx of [-1, 1]) C(0.12, 0.12, 3.6, TEAK, bx + sx * 2.4, UF, zB - 0.3, 8);
+    B(bx - 2.15, bx + 2.15, UF + 1.0, UF + 1.5, zB - 5.4, zB - 0.45, 0xf4efe6);
+    B(bx - 2.2, bx + 2.2, UF + 1.5, UF + 1.58, zB - 5.45, zB - 1.8, 0x2c3e87); B(bx - 2.2, bx + 2.2, UF + 1.51, UF + 1.59, zB - 5.45, zB - 5.1, 0xc0392b);
+    for (let i = 0; i < 6; i++) B(bx - 2.0 + i * 0.75, bx - 1.75 + i * 0.75, UF + 1.58, UF + 1.6, zB - 4.9, zB - 2.0, 0xf2c14e);
+    for (const sx of [-1, 1]) B(bx + sx * 1.05 - 0.9, bx + sx * 1.05 + 0.9, UF + 1.5, UF + 1.85, zB - 1.4, zB - 0.6, 0xfbf8f1);
+    yCyl(up, 0.22, 0.22, 3.8, 0xd4a017, bx, UF + 1.75, zB - 1.65, 12).rotation.z = Math.PI / 2;
+    B(XR - 1.9, XR - 0.15, UF, UF + 5.0, bz0 + 0.3, bz0 + 2.9, 0x7d8f9b); B(XR - 1.92, XR - 1.9, UF + 0.3, UF + 4.7, bz0 + 1.58, bz0 + 1.62, 0x5d6f7b); B(XR - 1.97, XR - 1.9, UF + 2.3, UF + 2.9, bz0 + 1.4, bz0 + 1.5, 0xd0d4d8);   // the steel almirah
+    B(bx0 + 0.1, bx0 + 1.3, UF, UF + 2.4, zB - 2.6, zB - 0.8, WOOD); B(bx0 + 0.07, bx0 + 0.12, UF + 2.8, UF + 4.7, zB - 2.3, zB - 1.1, 0xcfe3ea);   // a dressing table and its mirror
+    B(4.8, 12.2, UF + 0.005, UF + 0.02, zB - 5.9, zB - 0.6, 0xa8323a); }
+  { const parts = {};                                                    // bake the solid things room by room: each chunk's box stays small, so her feelers only test what's near her
+    const key = o => { o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox, sx = (b.max.x - b.min.x) * o.scale.x, sz = (b.max.z - b.min.z) * o.scale.z;
+      if (sx > 6 || sz > 6) return 'shell'; const x = o.position.x, z = o.position.z;
+      return x < -0.3 && z < SW ? 'foyer' : z < zF + 12 ? (x > -0.3 ? 'living' : 'hall') : z < zF + 17 ? (x < 4 ? 'dining' : 'kitchen') : x < 3 ? 'bazaar' : z < zF + 20.5 ? 'kitchen' : 'bedroom'; };
+    for (const o of up.children.slice()) { if (!o.isMesh) continue; const k = key(o); (parts[k] = parts[k] || new THREE.Group()).add(o); }
+    for (const k in parts) { parts[k].userData.name = 'Upstairs'; up.add(parts[k]); bakeYard(parts[k]); } }
+  bakeYard(dec);
+  // -- things that move: the jhoola sways, the fan turns, the front door opens
+  { const jh = new THREE.Group(); jh.position.set(gx, CH, zF + 2.8); jh.userData.name = 'Jhoola'; povEndWall.add(jh); const drop = CH - (UF + 1.55);   // a jhoola: a carved swing seat on chains, by the big window
+    yBox(jh, 3.2, 0.16, 1.3, WOOD, 0, -drop, 0); yBox(jh, 3.0, 0.14, 1.1, 0xe8b04a, 0, -drop + 0.15, 0.05);
+    yBox(jh, 3.2, 1.1, 0.12, WOOD, 0, -drop + 0.65, -0.6); yBox(jh, 3.4, 0.16, 0.18, TEAK, 0, -drop + 1.25, -0.6);
+    for (const sx of [-1.5, 1.5]) for (const sz of [-0.55, 0.55]) yCyl(jh, 0.025, 0.025, drop, 0x9a9a9a, sx, -drop / 2, sz, 5);
+    bakeYard(jh); U.jhoola = jh; }
+  { const fan = new THREE.Group(); fan.position.set(6.2, CH - 0.45, zF + 6.2); fan.userData.noWalk = true; povEndWall.add(fan);   // a ceiling fan
+    yCyl(fan, 0.03, 0.03, 0.45, 0x5a3a22, 0, 0.22, 0, 6); yCyl(fan, 0.3, 0.24, 0.22, BRASS, 0, 0, 0, 14);
+    for (let k = 0; k < 3; k++) { const a = k * 2.094; yBox(fan, 2.3, 0.04, 0.42, 0x6b4428, Math.cos(a) * 1.3, -0.04, Math.sin(a) * 1.3).rotation.y = -a; }
+    U.fan = fan; }
+  { const g = new THREE.Group(); g.position.set(dR, LH, zF + 0.06); g.userData.name = 'Front door'; povEndWall.add(g);   // our front door: dark, the storm door's glass on it, hinged on the right so it swings in
+    yBox(g, U.dw - 0.06, U.dh - 0.04, 0.1, 0x2a2420, -U.dw / 2, U.dh / 2, 0); yBox(g, U.dw - 0.55, U.dh * 0.55, 0.04, 0x5d6b73, -U.dw / 2, U.dh * 0.62, -0.07);
+    for (const sz of [-1, 1]) yBox(g, 0.13, 0.13, 0.13, BRASS, -U.dw + 0.32, U.dh * 0.46, sz * 0.1);
+    frontDoor = { g, open: 0, want: 0, openAt: 0, said: false, inside: false }; }
+}
+function knockDoor(paw) {                                             // she swipes at our front door: knock knock... and it creaks open
+  const D = frontDoor, U = UPPER; if (!D || D.want) return false;
+  if (Math.abs(paw.x - U.dx) > 1.6 || paw.z < U.zF - 1.3 || paw.z > U.zF + 0.4 || paw.y < U.LH - 0.3 || paw.y > U.LH + 3) return false;
+  for (let i = 0; i < 3; i++) setTimeout(() => { noise(0.06, 0.16, 500); tone(150, 105, 0.09, 'triangle', 0.07); }, i * 230);
+  showWalkName('🚪 Knock knock...'); D.want = 1; D.openAt = clock + 1.1; return true;
+}
+function updateFrontDoor(dt) {                                        // the door swings in once she's knocked; the jhoola sways; the fan turns
+  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 2.2;
+  const D = frontDoor; if (!D) return;
+  const go = D.want && clock > D.openAt;
+  if (go && !D.said) { D.said = true; tone(260, 185, 0.55, 'sawtooth', 0.02); noise(0.35, 0.03, 500); showWalkName('🚪 ...the door creaks open. Come on in!'); }
+  D.open += ((go ? 1 : 0) - D.open) * Math.min(1, dt * 2.2); D.g.rotation.y = D.open * 1.5;
+  if (walk.on && !D.inside && inUpper(walk.pos.x, walk.pos.z) && walk.pos.y > U.UF - 0.2) {
+    D.inside = true; const fresh = !achDone.knockKnock; unlock('knockKnock'); showWalkName(fresh ? '🏠 Welcome upstairs!' : '🏠 Welcome upstairs! Something smells amazing...');
+  }
+}
+function indoorsOK(x, z) {                                            // inside our front door (the foyer, the stairs, the second level: their walls are solid) or in the doorway itself
+  const U = UPPER; return (x > YARD.HL + 0.15 && x < YARD.XR - 0.15 && z > U.zF + 0.1 && z < U.zB - 0.1) || (Math.abs(x - U.dx) < U.dw / 2 - 0.1 && z > U.zF - 0.9 && z <= U.zF + 0.1);
 }
 function yardShadowMat() {                                            // a soft round contact shadow on the grass
   if (yardShadowMat.m) return yardShadowMat.m;
@@ -4736,13 +4950,13 @@ function updateYardLife(dt) {                                         // the sky
     if (ahead && (c.honkT -= dt) <= 0) { c.honkT = 1.1; tone(392, 392, 0.35, 'square', 0.03); tone(494, 494, 0.35, 'square', 0.025); if (!walk.honked) { walk.honked = true; showWalkName('🚗 HONK! Get out of the road!'); } }
     if (p.x > 95) p.x = -95; if (p.x < -95) p.x = 95;
   }
-  updateBooms(dt);
+  updateBooms(dt); updateFrontDoor(dt);
   for (const b of L.butterflies) { const t = clock * b.sp + b.ph; b.g.position.set(b.ax + Math.cos(t) * b.r * 0.6, 0.35 + Math.abs(Math.sin(t * 1.7)) * 0.9, b.az + Math.sin(t * 1.3) * b.r); b.g.rotation.y = Math.atan2(-Math.sin(t) * b.r * 0.6, Math.cos(t * 1.3) * b.r * 1.3); b.g.userData.anim(clock, b.ph * 3); }
   const VD = ROOM.visDepth, a = clock * 0.09;
   for (const b of L.birds) { const aa = a + b.ph * 0.12, cx = Math.cos(aa) * 22, cz = VD + 16 + Math.sin(aa) * 16;
     b.g.position.set(cx + b.off.x, 13 + b.off.y + Math.sin(clock * 0.7 + b.ph) * 0.8, cz + b.off.z); b.g.rotation.y = Math.atan2(-Math.sin(aa), Math.cos(aa)) + Math.PI / 2;
     const f = Math.sin(clock * 9 + b.ph * 6) * 0.55; b.wings.forEach(([w, sx]) => { w.rotation.z = sx * f; }); }
-  if (walk.on && state === 'playing' && !inRoomXZ(walk.pos.x, walk.pos.z) && (L.chirpT -= dt) <= 0) {        // birdsong, now and then, while she's outside
+  if (walk.on && state === 'playing' && !inRoomXZ(walk.pos.x, walk.pos.z) && !inUpper(walk.pos.x, walk.pos.z) && (L.chirpT -= dt) <= 0) {        // birdsong, now and then, while she's outside
     L.chirpT = 2.5 + Math.random() * 4; const n = 2 + (Math.random() * 3 | 0), f0 = 2900 + Math.random() * 1400;
     for (let i = 0; i < n; i++) tone(f0 + (i % 2) * 500, f0 + 700 + (i % 2) * 300, 0.055, 'sine', 0.012, i * 0.09);
   }
@@ -5753,6 +5967,7 @@ const ACHIEVEMENTS = [
     ['greenThumb', '🌿', 'Green thumb', 'In Free roam, pull 5 weeds out of the backyard lawn'],
     ['notAGlitch', '👾', 'This is not a glitch', 'In Free roam, climb high enough in the backyard to hop the fence... and wander off'],
     ['indestructible', '💥', 'Indestructible', 'In Free roam, touch a car. The car loses'],
+    ['knockKnock', '🚪', 'Knock knock', 'In Free roam, knock on the front door and head upstairs'],
     ['chippy', '🐰', 'Wind-up warrior', 'Swipe Chippy the wind-up bunny off the credenza and let it loose on the mice'],
     ['chippyNo', '💥', 'Rest in fluff', 'Find out what happens when Chippy gets carried away'],
     ['blanketGhost', '👻', 'Blanket ghost', 'In Free roam, get caught under a blanket, then swipe it off'],
@@ -5776,7 +5991,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-28 13:58';                                              // stamped when the site is published
+const BUILD = '2026-09-28 14:26';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -8953,7 +9168,7 @@ function updateWalk(dt) {
     if (g >= p.y - WALK.step) p.y = g; else { walk.grounded = false; walk.vy = 0; }
   } else {
     walk.vy -= WALK.grav * nipK().grav * dt;                          // (slow-mo catnip: moon gravity)
-    const cap = inRoomXZ(p.x, p.z) ? CEIL_H - WALK.height - 0.05 : walk.free ? 60 : 9;   // (no ceiling out in the yard, or anywhere once she's out)
+    const cap = inRoomXZ(p.x, p.z) ? CEIL_H - WALK.height - 0.05 : inUpper(p.x, p.z) && p.y > UPPER.LH - 0.5 ? UPPER.CH - WALK.height - 0.05 : walk.free ? 60 : 9;   // (no ceiling out in the yard, or anywhere once she's out)
     let ny = p.y + walk.vy * dt; if (ny > cap) { ny = cap; walk.vy = Math.min(walk.vy, 0); }
     if (walk.vy <= 0 && discoCatch(ny)) walk.vy = 0;
     else if (walk.vy <= 0) {
@@ -9331,6 +9546,7 @@ function walkSwipe() {                                               // swipe at
   if (gunRig.state === 'cat') { fireGun(); return; }                 // armed: the swipe pulls the trigger
   if (coonSwipe(paw)) return;                                        // the raccoon at the slider: whack the glass right in front of it
   if (dogSwipe(paw)) return;                                         // the Doberman out in the yard
+  if (knockDoor(paw)) return;                                        // our front door: knock knock
   if (laundrySwipe(paw)) return;
   if (weedSwipe(paw)) return;                                        // a weed in the lawn
   if (duckSwipe(paw)) return;                                        // the rubber ducks on the table                                     // the folded laundry on the armchair: all over the floor
@@ -9848,7 +10064,7 @@ function roamOff(x, z) {                                              // how far
   const VD = ROOM.visDepth, Y = YARD, FZ = Y.FZ;
   let o = z < VD ? Math.max(0, Math.abs(x) - 94) + Math.max(0, VD - 124 - z) : z < FZ ? Math.max(0, Math.hypot(x, z - VD) - 71) : Math.max(0, Math.abs(x) - 83) + Math.max(0, z - FZ - 70);
   const a = x - (Y.HL - 0.35), b = Y.HR + 0.35 - x, c = z - (VD - Y.HD - 0.4), d = VD + 0.45 - z;
-  if (a > 0 && b > 0 && c > 0 && d > 0) o += Math.min(a, b, c, d);
+  if (a > 0 && b > 0 && c > 0 && d > 0 && !indoorsOK(x, z)) o += Math.min(a, b, c, d);
   return o;
 }
 function walkRoamOK(nx, nz) {                                        // the yard (walkZoneOK) and, once she's got out, the whole neighbourhood
@@ -10007,6 +10223,7 @@ function freeMesh(m) {                                               // take a o
 function resetSliderScene() {                                         // a fresh Free walk: new glass, no mess, the raccoon's back to its old tricks
   dog.state = 'hidden'; dog.match = false; dog.meowAt = 0; if (dog.rig) dog.rig.g.visible = false;     // (and the Doberman's back over its own fence)
   resetCars();
+  if (frontDoor) { Object.assign(frontDoor, { open: 0, want: 0, openAt: 0, said: false, inside: false }); frontDoor.g.rotation.y = 0; }   // (the front door, shut)
   if (yardGate) { Object.assign(yardGate, { open: 0, want: 0, stay: 0, said: false, hint: false }); yardGate.hinge.rotation.y = yardGate.base; }   // (the side gate, shut)
   sliderGlass.forEach(g => { g.visible = true; }); shards.forEach(s2 => freeMesh(s2.m)); shards.length = 0;
   if (mosaicArt) { const MA = mosaicArt; MA.bits.forEach(b => freeMesh(b.m)); MA.bits = []; MA.state = 'wall'; MA.g.visible = true; MA.g.position.copy(MA.home); MA.g.rotation.set(0, Math.PI, 0); }
