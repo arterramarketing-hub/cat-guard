@@ -3399,8 +3399,8 @@ let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null, laund
 const YARD = { HL: -6.5, XR: 13.5, HR: 33.8, XL0: -15, XL1: -19, FZ: ROOM.visDepth + 36, FH: FT(4), HD: 50.5 };
 function hillY(z) { const t = THREE.MathUtils.clamp((z - YARD.FZ - 1.4) / 18, 0, 1); return 8.5 * t * t * (3 - 2 * t); }   // the bank behind the back fence, climbing up to the off-ramp
 function yardXL(z) { const k = THREE.MathUtils.clamp((z - ROOM.visDepth) / (YARD.FZ - ROOM.visDepth), 0, 1); return YARD.XL0 + (YARD.XL1 - YARD.XL0) * k; }   // the neighbours'-side fence: the lot widens toward the back
-const UPPER = { LH: 2.5, UF: 5.5, CH: 11.3, zB: -0.5, zF: ROOM.visDepth + IN(5) - YARD.HD, dx: YARD.HL + 3.5, dw: 2.2, dh: 5.1 };   // our front door (landing height, centre, size) and the second level behind it (floor, ceiling, back wall)
-function inUpper(x, z) { return x > YARD.HL && x < YARD.XR && z > UPPER.zF && z < UPPER.zB; }   // (inside the front half of our house: the foyer and the second level over the garage)
+const UPPER = { LH: 2.5, UF: 6.45, CH: 11.75, zB: ROOM.visDepth + IN(5) - 0.02, zF: ROOM.visDepth + IN(5) - YARD.HD, dx: YARD.HL + 3.5, dw: 2.2, dh: 5.1 };   // our front door (landing height, centre, size) and the second level behind it, the whole length of the house (floor, ceiling, back wall)
+function inUpper(x, z) { return x > YARD.HL && x < YARD.XR && z > UPPER.zF && z < UPPER.zB; }   // (inside our half of the house, front to back: the foyer, the second level, and the living room downstairs)
 let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [], bbqRig = null, yardWeeds = [], yardGate = null, frontDoor = null;     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
 const YARD_FENCES = [], YARD_POSTS = [], YARD_BUSHES = [];   // the chain-link runs (solid both ways, unless she's sailing over the top), tree trunks and cedars (solid), bushes and cedar foliage (she pushes through)
 const sliderGlass = [];
@@ -3498,7 +3498,8 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           const zF = WZ - HD, FZ0 = zF - 0.06, U = UPPER, LH = U.LH, dL = U.dx - U.dw / 2, dR = U.dx + U.dw / 2, dT = LH + U.dh;
           const rect = (x0, y0, x1, y1, tex, tu, tv) => { wallMesh(new THREE.Shape([new THREE.Vector2(x0, y0), new THREE.Vector2(x1, y0), new THREE.Vector2(x1, y1), new THREE.Vector2(x0, y1)]), tex, tu, tv, THREE.DoubleSide).position.z = zF; };
           rect(HL, 0, dL, BH, brickTex, 2.05, 1.37); rect(dR, 0, HR, BH, brickTex, 2.05, 1.37); rect(dL, 0, dR, LH, brickTex, 2.05, 1.37);   // brick (our doorway left open)...
-          rect(HL, BH, dL, XH, stuccoTex, 1.6, 1.6); rect(dR, BH, HR, XH, stuccoTex, 1.6, 1.6); rect(dL, dT, dR, XH, stuccoTex, 1.6, 1.6);    // ...and stucco above
+          rect(HL, BH, dL, XH, stuccoTex, 1.6, 1.6); rect(dL, dT, dR, XH, stuccoTex, 1.6, 1.6);    // ...and stucco above (round our picture window: you can see in)
+          { const g0 = XR - 5.8 - 3.45, g1 = XR - 5.8 + 3.45; rect(dR, BH, g0, XH, stuccoTex, 1.6, 1.6); rect(g1, BH, HR, XH, stuccoTex, 1.6, 1.6); rect(g0, BH, g1, 7.0, stuccoTex, 1.6, 1.6); rect(g0, 11.1, g1, XH, stuccoTex, 1.6, 1.6); }
           const tri = (w, h) => new THREE.Shape([new THREE.Vector2(-w / 2, 0), new THREE.Vector2(w / 2, 0), new THREE.Vector2(0, h)]);
           yBox(hd, W + 0.12, 0.32, 0.16, T, MX, BH + 0.02, FZ0); yBox(hd, W, 0.26, 0.12, T, MX, XH - 0.2, FZ0);   // the timber bands
           yBox(hd, W + 1.2, 0.34, 0.12, 0x3a2a20, MX, XH - 0.06, zF - 1.15); yBox(hd, W + 1.2, 0.08, 1.1, 0xe9e2d4, MX, XH - 0.22, zF - 0.58);   // fascia and soffit
@@ -3519,13 +3520,14 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
             if (half) { yBox(hd, U.dw, U.dh, 0.1, 0x2a2420, ex, LH + U.dh / 2, FZ0 - 0.02); yBox(hd, U.dw - 0.5, U.dh * 0.55, 0.04, 0x5d6b73, ex, LH + U.dh * 0.62, FZ0 - 0.08); }   // (next door's, shut)
             { const gw = 5.8, gy0 = dT + 0.35, gh = 2.4, ang = Math.atan2(gh, gw / 2), sl = Math.hypot(gw / 2, gh);   // the porch gable over it (no posts: it sits on the wall)
               wallMesh(tri(gw, gh), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.set(ex, gy0, zF - 0.9);
-              for (const s of [-1, 1]) { yBox(hd, sl + 0.3, 0.2, 0.12, T, ex + s * gw / 4, gy0 + gh / 2, zF - 0.95).rotation.z = -s * ang; yBox(hd, sl + 0.4, 0.14, 1.2, 0x8a3934, ex + s * gw / 4, gy0 + gh / 2 + 0.14, zF - 0.45).rotation.z = -s * ang; }
+              for (const s of [-1, 1]) { yBox(hd, sl + 0.3, 0.2, 0.12, T, ex + s * gw / 4, gy0 + gh / 2, zF - 0.95).rotation.z = -s * ang; yBox(hd, sl + 0.4, 0.14, 1.1, 0x8a3934, ex + s * gw / 4, gy0 + gh / 2 + 0.14, zF - 0.58).rotation.z = -s * ang; }   // (stopping at the wall, not poking through into the foyer)
               yBox(hd, 0.14, gh - 0.3, 0.1, T, ex, gy0 + (gh - 0.3) / 2, zF - 0.95); yBox(hd, gw, 0.18, 0.12, T, ex, gy0, zF - 0.95);
               for (const s of [-1, 1]) yBox(hd, 0.1, 0.9, 0.9, T, ex + s * (gw / 2 - 0.15), gy0 - 0.35, zF - 0.5);   // (little brackets under it)
               yBox(hd, 0.22, 0.34, 0.22, 0x2a2a2a, ex, gy0 + 0.75, zF - 1.0); yBox(hd, 0.14, 0.2, 0.12, 0xfff2b0, ex, gy0 + 0.7, zF - 1.08); }   // the porch light
             { const ww = 6.9, wy0 = 7.0, wh = 4.1, split = wy0 + wh * 0.3;                                         // the big picture window over the garage...
-              yBox(hd, ww + 0.4, wh + 0.4, 0.08, 0xf7f5f0, gx, wy0 + wh / 2, FZ0); yBox(hd, ww, wh, 0.05, 0x46535e, gx, wy0 + wh / 2, FZ0 - 0.03);
-              for (const s of [-1, 1]) yBox(hd, ww * 0.2, wh * 0.66, 0.04, 0xe9e4da, gx + s * ww * 0.39, split + wh * 0.35, FZ0 - 0.045);   // (net curtains inside)
+              if (half) { yBox(hd, ww + 0.4, wh + 0.4, 0.08, 0xf7f5f0, gx, wy0 + wh / 2, FZ0); yBox(hd, ww, wh, 0.05, 0x46535e, gx, wy0 + wh / 2, FZ0 - 0.03);
+                for (const s of [-1, 1]) yBox(hd, ww * 0.2, wh * 0.66, 0.04, 0xe9e4da, gx + s * ww * 0.39, split + wh * 0.35, FZ0 - 0.045); }   // (next door's: net curtains inside)
+              else for (const [w, h, x, y] of [[ww + 0.4, 0.2, gx, wy0 - 0.1], [ww + 0.4, 0.2, gx, wy0 + wh + 0.1], [0.2, wh, gx - ww / 2 - 0.1, wy0 + wh / 2], [0.2, wh, gx + ww / 2 + 0.1, wy0 + wh / 2]]) yBox(hd, w, h, 0.08, 0xf7f5f0, x, y, FZ0);   // (ours: just its frame. The glass, the blinds and the lit room behind are real)
               yBox(hd, ww, 0.12, 0.05, 0xf7f5f0, gx, split, FZ0 - 0.08); yBox(hd, 0.12, wh * 0.7, 0.05, 0xf7f5f0, gx, (split + wy0 + wh) / 2, FZ0 - 0.08);   // two big panes over a row of four small ones
               for (const k of [-1, 0, 1]) yBox(hd, 0.1, wh * 0.3, 0.05, 0xf7f5f0, gx + k * ww / 4, (wy0 + split) / 2, FZ0 - 0.08);
               yBox(hd, ww + 0.6, 0.14, 0.3, 0xf7f5f0, gx, wy0 - 0.2, FZ0 - 0.12); }
@@ -4685,185 +4687,431 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     yardLife.birds.push({ g, wings, ph: i * 0.35, off: new THREE.Vector3((i % 2) * 1.2 - 0.6, (i % 3) * 0.5, i * 0.9) }); }
   buildUpperFloor();
 }
-function mandalaTex() {                                               // a big red rug with a gold-and-teal mandala in the middle
-  return canvasTex(256, 196, (c, w, h) => {
-    c.fillStyle = '#8c1d2c'; c.fillRect(0, 0, w, h);
-    c.strokeStyle = '#e8b04a'; c.lineWidth = 7; c.strokeRect(8, 8, w - 16, h - 16); c.strokeStyle = '#1f6f78'; c.lineWidth = 3; c.strokeRect(19, 19, w - 38, h - 38);
-    const cx = w / 2, cy = h / 2;
-    for (const [r, col] of [[78, '#e8b04a'], [64, '#1f6f78'], [50, '#f2e6c9'], [34, '#c2410c'], [18, '#e8b04a'], [8, '#1f6f78']]) { c.fillStyle = col; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.fill(); }
-    for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; c.fillStyle = k % 2 ? '#f2e6c9' : '#c2410c'; c.beginPath(); c.ellipse(cx + Math.cos(a) * 57, cy + Math.sin(a) * 57, 11, 5, a, 0, 7); c.fill(); }
-    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2 + 0.2; c.fillStyle = '#e8b04a'; c.beginPath(); c.ellipse(cx + Math.cos(a) * 26, cy + Math.sin(a) * 26, 7, 3, a, 0, 7); c.fill(); }
-    for (const [x, y] of [[42, 38], [w - 42, 38], [42, h - 38], [w - 42, h - 38]]) { c.fillStyle = '#e8b04a'; c.beginPath(); c.arc(x, y, 13, 0, 7); c.fill(); c.fillStyle = '#1f6f78'; c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); }
-  }, 1, 1);
+function upTex(kind) {                                                // the upstairs' textures, made once. The furniture ones are light and neutral: each piece's colour tints them
+  const T = upTex.cache || (upTex.cache = {}); if (T[kind]) return T[kind];
+  let sd = 7 + kind.length * 131; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const mk = (w, h, draw) => { const t = canvasTex(w, h, draw, 1, 1); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
+  const grout = (c, w, h, n, col, lw) => { c.fillStyle = col; for (let i = 0; i <= n; i++) { c.fillRect(i * w / n - lw / 2, 0, lw, h); c.fillRect(0, i * h / n - lw / 2, w, lw); } };
+  T[kind] = kind === 'plaster' ? mk(128, 128, (c, w, h) => { c.fillStyle = '#f5f1e9'; c.fillRect(0, 0, w, h); for (let i = 0; i < 1500; i++) { const v = 220 + rnd() * 35 | 0; c.fillStyle = `rgba(${v},${v - 3},${v - 9},.32)`; c.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1 + rnd() * 3); } })
+    : kind === 'wood' ? mk(128, 128, (c, w, h) => { c.fillStyle = '#eee2cc'; c.fillRect(0, 0, w, h);
+        for (let i = 0; i < 70; i++) { const y = rnd() * h, a = 1 + rnd() * 2.5, f = 0.02 + rnd() * 0.05; c.strokeStyle = `rgba(${110 + rnd() * 40 | 0},${70 + rnd() * 30 | 0},40,${0.12 + rnd() * 0.16})`; c.lineWidth = 0.6 + rnd() * 1.2; c.beginPath(); for (let x = 0; x <= w; x += 4) c.lineTo(x, y + Math.sin(x * f + i) * a); c.stroke(); }
+        for (let i = 0; i < 3; i++) { c.fillStyle = 'rgba(90,55,25,.22)'; c.beginPath(); c.ellipse(rnd() * w, rnd() * h, 5, 2.5, 0, 0, 7); c.fill(); } })
+    : kind === 'fabric' ? mk(64, 64, (c, w, h) => { c.fillStyle = '#f0ebe4'; c.fillRect(0, 0, w, h); for (let x = 0; x < w; x += 2) { c.fillStyle = 'rgba(0,0,0,.06)'; c.fillRect(x, 0, 1, h); } for (let y = 0; y < h; y += 2) { c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(0, y, w, 1); } for (let i = 0; i < 300; i++) { c.fillStyle = 'rgba(0,0,0,.05)'; c.fillRect(rnd() * w, rnd() * h, 1, 1); } })
+    : kind === 'granite' ? mk(64, 64, (c, w, h) => { c.fillStyle = '#8f8f8f'; c.fillRect(0, 0, w, h); for (let i = 0; i < 900; i++) { const v = rnd(); c.fillStyle = v < 0.45 ? 'rgba(20,20,20,.7)' : v < 0.8 ? 'rgba(235,235,235,.55)' : 'rgba(150,120,90,.5)'; c.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 1.5, 1 + rnd() * 1.5); } })
+    : kind === 'tile' ? mk(128, 128, (c, w, h) => { for (let i = 0; i < 16; i++) { const v = 243 + rnd() * 12 | 0; c.fillStyle = `rgb(${v},${v},${v})`; c.fillRect((i % 4) * 32, (i / 4 | 0) * 32, 32, 32); } grout(c, w, h, 4, '#c4c4c4', 3); })
+    : kind === 'planks' ? mk(256, 256, (c, w, h) => { const rows = 8, rh = h / rows;                          // honey-coloured floorboards
+        for (let r = 0; r < rows; r++) { let x = -rnd() * 160; while (x < w) { const len = 100 + rnd() * 140, v = rnd(); c.fillStyle = `rgb(${172 + v * 36 | 0},${116 + v * 30 | 0},${66 + v * 22 | 0})`; c.fillRect(x, r * rh, len, rh);
+          for (let g = 0; g < 7; g++) { const y = r * rh + 3 + rnd() * (rh - 6); c.strokeStyle = `rgba(90,50,20,${0.1 + rnd() * 0.15})`; c.lineWidth = 0.8; c.beginPath(); c.moveTo(x, y); c.bezierCurveTo(x + len * 0.3, y + rnd() * 4 - 2, x + len * 0.7, y + rnd() * 4 - 2, x + len, y); c.stroke(); }
+          c.fillStyle = 'rgba(60,32,14,.55)'; c.fillRect(x, r * rh, 1.5, rh); x += len; }
+          c.fillStyle = 'rgba(60,32,14,.5)'; c.fillRect(0, r * rh, w, 1.5); } })
+    : kind === 'marble' ? mk(256, 256, (c, w, h) => { c.fillStyle = '#f1eee8'; c.fillRect(0, 0, w, h);             // white marble tiles, grey-veined
+        for (let i = 0; i < 26; i++) { c.strokeStyle = `rgba(${120 + rnd() * 40 | 0},${120 + rnd() * 40 | 0},${128 + rnd() * 40 | 0},${0.12 + rnd() * 0.25})`; c.lineWidth = 0.6 + rnd() * 1.8; c.beginPath(); const x = rnd() * w, y = rnd() * h; c.moveTo(x, y); c.bezierCurveTo(x + rnd() * 120 - 60, y + rnd() * 120 - 60, x + rnd() * 160 - 80, y + rnd() * 160 - 80, x + rnd() * 200 - 100, y + rnd() * 200 - 100); c.stroke(); }
+        grout(c, w, h, 2, '#d3cec4', 3); })
+    : kind === 'kitchenTile' ? mk(128, 128, (c, w, h) => { for (let i = 0; i < 4; i++) { const x0 = (i % 2) * 64, y0 = (i / 2 | 0) * 64;   // patterned cement tiles
+        c.fillStyle = '#efe4d0'; c.fillRect(x0, y0, 64, 64); c.fillStyle = '#c47a52'; c.beginPath(); c.moveTo(x0 + 32, y0 + 6); c.lineTo(x0 + 58, y0 + 32); c.lineTo(x0 + 32, y0 + 58); c.lineTo(x0 + 6, y0 + 32); c.fill();
+        c.fillStyle = '#efe4d0'; c.beginPath(); c.arc(x0 + 32, y0 + 32, 13, 0, 7); c.fill(); c.fillStyle = '#4d8078'; c.beginPath(); c.arc(x0 + 32, y0 + 32, 7, 0, 7); c.fill();
+        c.fillStyle = '#4d8078'; for (const [cx, cy] of [[0, 0], [64, 0], [0, 64], [64, 64]]) { c.beginPath(); c.arc(x0 + cx, y0 + cy, 9, 0, 7); c.fill(); } }
+        grout(c, w, h, 2, '#9c9282', 2); })
+    : kind === 'bathTile' ? mk(128, 128, (c, w, h) => { for (let i = 0; i < 64; i++) { c.fillStyle = (i + (i >> 3)) % 2 ? '#e9f2f8' : '#cfe2ee'; c.fillRect((i % 8) * 16, (i >> 3) * 16, 16, 16); } grout(c, w, h, 8, '#b9c6ce', 1.5); })
+    : kind === 'terracotta' ? mk(128, 128, (c, w, h) => { for (let i = 0; i < 4; i++) { const v = rnd(); c.fillStyle = `rgb(${178 + v * 30 | 0},${92 + v * 22 | 0},${54 + v * 14 | 0})`; c.fillRect((i % 2) * 64, (i >> 1) * 64, 64, 64); }
+        for (let i = 0; i < 500; i++) { c.fillStyle = rnd() < 0.5 ? 'rgba(90,40,20,.18)' : 'rgba(240,190,150,.14)'; c.fillRect(rnd() * w, rnd() * h, 2, 2); } grout(c, w, h, 2, '#7d4125', 3); })
+    : kind === 'mandala' ? canvasTex(256, 196, (c, w, h) => { c.fillStyle = '#8c1d2c'; c.fillRect(0, 0, w, h);    // the living room rug
+        c.strokeStyle = '#e8b04a'; c.lineWidth = 7; c.strokeRect(8, 8, w - 16, h - 16); c.strokeStyle = '#1f6f78'; c.lineWidth = 3; c.strokeRect(19, 19, w - 38, h - 38);
+        const cx = w / 2, cy = h / 2;
+        for (const [r, col] of [[78, '#e8b04a'], [64, '#1f6f78'], [50, '#f2e6c9'], [34, '#c2410c'], [18, '#e8b04a'], [8, '#1f6f78']]) { c.fillStyle = col; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.fill(); }
+        for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2; c.fillStyle = k % 2 ? '#f2e6c9' : '#c2410c'; c.beginPath(); c.ellipse(cx + Math.cos(a) * 57, cy + Math.sin(a) * 57, 11, 5, a, 0, 7); c.fill(); }
+        for (const [x, y] of [[42, 38], [w - 42, 38], [42, h - 38], [w - 42, h - 38]]) { c.fillStyle = '#e8b04a'; c.beginPath(); c.arc(x, y, 13, 0, 7); c.fill(); c.fillStyle = '#1f6f78'; c.beginPath(); c.arc(x, y, 6, 0, 7); c.fill(); } }, 1, 1)
+    : kind === 'dhurrie' ? canvasTex(128, 200, (c, w, h) => { const band = ['#1f6f78', '#f2e6c9', '#2c8a93', '#e8b04a', '#1f6f78', '#c2410c'];   // teal and saffron stripes, a fringe at each end
+        for (let y = 0, i = 0; y < h; i++) { const bh = [22, 6, 14, 4, 22, 5][i % 6]; c.fillStyle = band[i % 6]; c.fillRect(0, y, w, bh); y += bh; }
+        c.fillStyle = 'rgba(255,255,255,.08)'; for (let x = 0; x < w; x += 3) c.fillRect(x, 0, 1, h); c.fillStyle = '#efe4cf'; for (let x = 2; x < w; x += 5) { c.fillRect(x, 0, 2, 5); c.fillRect(x, h - 5, 2, 5); } }, 1, 1)
+    : kind === 'kilim' ? canvasTex(160, 240, (c, w, h) => { c.fillStyle = '#8c1d2c'; c.fillRect(0, 0, w, h); c.strokeStyle = '#1b2a4a'; c.lineWidth = 10; c.strokeRect(10, 10, w - 20, h - 20);   // red, with a border and rows of diamonds
+        c.strokeStyle = '#e8b04a'; c.lineWidth = 3; c.strokeRect(20, 20, w - 40, h - 40);
+        for (let y = 50; y < h - 30; y += 36) for (let x = 44; x < w - 30; x += 36) { c.fillStyle = (x + y) % 72 ? '#e8b04a' : '#f2e6c9'; c.beginPath(); c.moveTo(x, y - 13); c.lineTo(x + 13, y); c.lineTo(x, y + 13); c.lineTo(x - 13, y); c.fill(); c.fillStyle = '#1b2a4a'; c.beginPath(); c.moveTo(x, y - 5); c.lineTo(x + 5, y); c.lineTo(x, y + 5); c.lineTo(x - 5, y); c.fill(); }
+        c.fillStyle = 'rgba(0,0,0,.07)'; for (let y = 0; y < h; y += 2) c.fillRect(0, y, w, 1); }, 1, 1)
+    : kind === 'tapestry' ? canvasTex(128, 88, (c, w, h) => { c.fillStyle = '#1f3f8a'; c.fillRect(0, 0, w, h); c.fillStyle = '#e8b04a'; c.fillRect(5, 5, w - 10, h - 10); c.fillStyle = '#b3203a'; c.fillRect(11, 11, w - 22, h - 22);
+        for (let y = 26; y < h - 12; y += 20) for (let x = 24; x < w - 12; x += 20) { c.fillStyle = '#f2e6c9'; c.beginPath(); c.moveTo(x, y - 7); c.lineTo(x + 7, y); c.lineTo(x, y + 7); c.lineTo(x - 7, y); c.fill(); c.fillStyle = '#1f6f78'; c.beginPath(); c.arc(x, y, 2.5, 0, 7); c.fill(); } }, 1, 1)
+    : kind === 'madhubani' ? canvasTex(160, 120, (c, w, h) => { c.fillStyle = '#f3e3c3'; c.fillRect(0, 0, w, h); c.strokeStyle = '#1b1b1b'; c.lineWidth = 3; c.strokeRect(4, 4, w - 8, h - 8);   // a Madhubani-style painting: two fish and a sun
+        c.fillStyle = '#c0392b'; c.beginPath(); c.arc(w / 2, 34, 16, 0, 7); c.fill(); for (let k = 0; k < 12; k++) { const a = k / 12 * 6.28; c.strokeStyle = '#e8a33d'; c.beginPath(); c.moveTo(w / 2 + Math.cos(a) * 19, 34 + Math.sin(a) * 19); c.lineTo(w / 2 + Math.cos(a) * 27, 34 + Math.sin(a) * 27); c.stroke(); }
+        for (const [x, y, f, col] of [[46, 82, 1, '#1f6f78'], [114, 82, -1, '#2e8b3a']]) { c.fillStyle = col; c.beginPath(); c.ellipse(x, y, 26, 12, 0, 0, 7); c.fill(); c.beginPath(); c.moveTo(x - f * 24, y); c.lineTo(x - f * 38, y - 11); c.lineTo(x - f * 38, y + 11); c.fill();
+          c.strokeStyle = '#f3e3c3'; c.lineWidth = 1.5; for (let k = -2; k <= 2; k++) { c.beginPath(); c.arc(x + k * 7, y, 5, -1, 1); c.stroke(); } c.fillStyle = '#1b1b1b'; c.beginPath(); c.arc(x + f * 16, y - 3, 2.5, 0, 7); c.fill(); } }, 1, 1)
+    : kind === 'sign' ? canvasTex(512, 92, (c, w, h) => { c.fillStyle = '#ffd23a'; c.fillRect(0, 0, w, h); c.fillStyle = '#c41e3a'; c.fillRect(0, 0, w, 9); c.fillRect(0, h - 9, w, 9);
+        c.fillStyle = '#1b3a8a'; c.font = 'bold 34px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('LASSI • SHARBAT • CHAI', w / 2, h / 2 + 2); }, 1, 1)
+    : null;
+  return T[kind];
 }
-function buildUpperFloor() {                                          // behind our front door: a tiled foyer, nine stairs up, and the second level over the garage, done up Indian style
-  const Y = YARD, U = UPPER, HL = Y.HL, XR = Y.XR, zF = U.zF, zB = U.zB, UF = U.UF, CH = U.CH, LH = U.LH, VD = ROOM.visDepth;
-  const up = new THREE.Group(); up.userData.name = 'Upstairs'; povEndWall.add(up);                   // (solid: floors, walls, stairs, furniture: baked into one mesh)
-  const deco = new THREE.Group(); deco.userData.name = 'Upstairs'; deco.userData.noWalk = true; povEndWall.add(deco);   // (the flat, painted bits)
-  const dec = new THREE.Group(); dec.userData.name = 'Upstairs'; dec.userData.noWalk = true; povEndWall.add(dec);   // (the little things: garlands, glasses, plates, flames... drawn, but nothing to bump into)
-  const B = (x0, x1, y0, y1, z0, z1, c, par) => yBox(par || (Math.max(x1 - x0, y1 - y0, z1 - z0) < 0.2 ? dec : up), x1 - x0, y1 - y0, z1 - z0, c, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
-  const C = (r0, r1, h, c, x, y, z, seg, par) => yCyl(par || (Math.max(r0, r1) < 0.3 || h < 0.06 ? dec : up), r0, r1, h, c, x, y + h / 2, z, seg || 14);   // (y: what it stands on)
-  const O = (r, c, x, y, z, sy) => { if (r > 0.15) return yBlob(dec, r, c, x, y, z, sy); const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), yMat(c)); m.position.set(x, y, z); if (sy) m.scale.y = sy; dec.add(m); return m; };
-  const flatTex = (w, h, tex, x, y, z, ry, rx) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, fog: false })); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, 0, 'YXZ'); deco.add(m); return m; };
-  const garland = (x0, z0, x1, z1, y, sag, n) => { for (let i = 0; i <= n; i++) { const t = i / n; O(0.08, i % 2 ? 0xffa21f : 0xffd23a, x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * sag, z0 + (z1 - z0) * t); } };   // a marigold toran
-  const PLASTER = 0xf1e3c8, FLOOR = 0xb98a5a, WOOD = 0x5c3a22, TEAK = 0x8a5a2e, BRASS = 0xc9a227, STEEL = 0xc4c9ce, GLASS = 0xe6f1f8, WHITE = 0xfaf8f2;
-  const SW = zF + 2 + 9 * 0.62, dL = U.dx - U.dw / 2, dR = U.dx + U.dw / 2, dT = LH + U.dh, gx = XR - 5.8, winY = FT(12.5);
-  // -- the shell: the foyer and its stairs, the upstairs floor, plaster inside the brick, a ceiling
-  B(dL, dR, 0, LH, zF - 0.12, zF + 0.1, 0x9c9890);                                                        // the stone sill in the doorway
-  B(HL, -0.3, 0, LH, zF + 0.05, SW, 0xa89478);                                                            // the foyer floor, level with the landing outside
-  for (let i = 0; i < 6; i++) B(HL + 0.1 + i * 1.03, HL + 1.1 + i * 1.03, LH, LH + 0.01, zF + 0.15, zF + 1.9, i % 2 ? 0xbca98a : 0x9c8a6e);   // (a checked mat of tiles inside the door)
-  for (let k = 0; k < 9; k++) B(HL + 0.1, HL + 2.9, LH, LH + (k + 1) * 0.3, zF + 2 + k * 0.62, zF + 2.62 + k * 0.62, k % 2 ? 0x8a5a36 : 0x7e5230);   // nine stairs up (each one she can walk)
-  for (let k = 0; k < 9; k += 2) C(0.05, 0.05, 1.0, BRASS, HL + 2.95, LH + (k + 1) * 0.3, zF + 2.31 + k * 0.62, 6);   // a brass banister
-  { const run = 9 * 0.62, rise = 2.7, rl = B(0, 0.1, 0, 0.08, 0, Math.hypot(run, rise), BRASS); rl.position.set(HL + 2.95, LH + 1.3 + rise / 2, zF + 2 + run / 2); rl.rotation.x = -Math.atan2(rise, run); }
-  B(-0.3, XR, UF - 0.3, UF, zF + 0.05, zB, FLOOR); B(HL, -0.3, UF - 0.3, UF, SW, zB, FLOOR);            // the upstairs floor
-  B(-3.5, -0.3, UF, UF + 1.1, SW - 0.12, SW, TEAK);                                                       // a low wall along the top of the stairwell
-  const wall = (x0, x1, z0, z1, y0, y1) => B(x0, x1, y0, y1, z0, z1, PLASTER);
-  wall(HL, dL, zF + 0.02, zF + 0.12, LH, CH); wall(dR, -0.3, zF + 0.02, zF + 0.12, LH, CH); wall(dL, dR, zF + 0.02, zF + 0.12, dT, CH);   // plaster inside the front wall (round the doorway)...
-  wall(-0.3, XR, zF + 0.02, zF + 0.12, UF, CH);
-  wall(HL + 0.02, HL + 0.12, zF, zB, LH, CH); wall(XR - 0.12, XR - 0.02, zF, zB, UF, CH); wall(HL, XR, zB - 0.12, zB, UF, CH);   // ...the north wall, the party wall, the back
-  wall(-0.42, -0.3, zF, SW, 0, CH);                                                                       // the foyer's own wall (the living room's the other side)
-  wall(HL, -0.3, SW - 0.02, SW + 0.1, 0, UF - 0.3);                                                       // and its back wall, under the edge of the upstairs floor
-  B(HL, XR, CH, CH + 0.15, zF, zB, 0xf7f1e4);                                                             // the ceiling
-  // -- the windows, from inside: bright panes where they are outside
-  const frontPane = (cx, w, y0, y1) => { B(cx - w / 2 - 0.12, cx + w / 2 + 0.12, y0 - 0.12, y1 + 0.12, zF + 0.12, zF + 0.15, WHITE); B(cx - w / 2, cx + w / 2, y0, y1, zF + 0.15, zF + 0.17, GLASS); };
-  const sidePane = (cz, w, y0, y1) => { B(HL + 0.12, HL + 0.15, y0 - 0.12, y1 + 0.12, cz - w / 2 - 0.12, cz + w / 2 + 0.12, WHITE); B(HL + 0.15, HL + 0.17, y0, y1, cz - w / 2, cz + w / 2, GLASS); };
-  frontPane(gx, 6.9, 7.0, 11.1); B(gx - 0.06, gx + 0.06, 8.23, 11.1, zF + 0.17, zF + 0.19, WHITE); B(gx - 3.45, gx + 3.45, 8.17, 8.29, zF + 0.17, zF + 0.19, WHITE);   // the picture window: two big panes...
-  for (const k of [-1, 0, 1]) B(gx + k * 1.725 - 0.05, gx + k * 1.725 + 0.05, 7.0, 8.23, zF + 0.17, zF + 0.19, WHITE);                                           // ...over four small ones
-  for (const s of [-1, 1]) B(gx + s * 3.35 - 0.6, gx + s * 3.35 + 0.6, UF + 1.2, CH - 0.25, zF + 0.22, zF + 0.36, 0xd9731f);          // saffron curtains, drawn back
-  B(gx - 4.3, gx + 4.3, CH - 0.34, CH - 0.24, zF + 0.26, zF + 0.32, BRASS);                                                          // (on a brass rod)
-  for (const s of [-1, 1]) frontPane(U.dx + s * (U.dw / 2 + 0.55), 0.46, LH + 0.15, dT - 0.15);                                    // the sidelights, from the foyer
-  for (let k = 0; k < 6; k++) { const z = VD + IN(5) - 6.4 - k * 7.6; if (z < zF + 0.5 || z > zB - 0.5) continue;                   // the side windows down the north wall
-    sidePane(z, 2.05, winY - 0.93, winY + 0.93); if (k % 2 && z < SW) sidePane(z, 2.05, 3.3 - 0.83, 3.3 + 0.83); }
-  // -- the living room, over the garage: a low maroon sofa, a mandala rug, a carved coffee table with chai, poufs, a jhoola by the window, a little mandir
-  flatTex(9.2, 7, mandalaTex(), 6.2, UF + 0.012, zF + 6.2, 0, -Math.PI / 2);
-  { const x0 = XR - 2.3, x1 = XR - 0.14, z0 = zF + 1.8, z1 = zF + 9.8, RED = 0x7a1f2b;
-    B(x0, x1, UF, UF + 1.05, z0, z1, RED); B(XR - 0.85, x1, UF + 1.05, UF + 2.7, z0, z1, RED);
-    for (const z of [z0 - 0.4, z1]) B(x0, x1, UF, UF + 1.8, z, z + 0.4, 0x6a1a24);
-    for (let i = 0; i < 3; i++) B(x0 + 0.05, XR - 0.9, UF + 1.05, UF + 1.4, z0 + 0.05 + i * 2.65, z0 + 2.6 + i * 2.65, 0x8c2433);
-    [0xe8b04a, 0x1fa4a0, 0xd63384, 0xe8b04a, 0x7b3fa0].forEach((c, i) => { B(XR - 1.1, XR - 0.8, UF + 1.4, UF + 2.3, z0 + 0.7 + i * 1.6, z0 + 1.5 + i * 1.6, c).rotation.z = 0.25; });   // bright cushions
-    for (const z of [z0 + 0.2, z1 - 0.2]) yCyl(up, 0.3, 0.3, 1.8, 0xc9302c, XR - 1.2, UF + 1.75, z, 12).rotation.z = Math.PI / 2; }   // and bolsters against the arms
-  flatTex(3.4, 2.3, canvasTex(128, 88, (c, w, h) => { c.fillStyle = '#1f3f8a'; c.fillRect(0, 0, w, h); c.fillStyle = '#e8b04a'; c.fillRect(5, 5, w - 10, h - 10); c.fillStyle = '#b3203a'; c.fillRect(11, 11, w - 22, h - 22);
-    for (let y = 26; y < h - 12; y += 20) for (let x = 24; x < w - 12; x += 20) { c.fillStyle = '#f2e6c9'; c.beginPath(); c.moveTo(x, y - 7); c.lineTo(x + 7, y); c.lineTo(x, y + 7); c.lineTo(x - 7, y); c.fill(); c.fillStyle = '#1f6f78'; c.beginPath(); c.arc(x, y, 2.5, 0, 7); c.fill(); } }, 1, 1),
-    XR - 0.14, UF + 4.3, zF + 5.8, -Math.PI / 2);                                                         // a tapestry over the sofa
-  B(-0.3, 1.0, UF, UF + 1.5, zF + 3.4, zF + 8.6, WOOD); for (let i = 0; i < 3; i++) B(1.0, 1.04, UF + 0.25, UF + 1.25, zF + 3.6 + i * 1.7, zF + 4.9 + i * 1.7, TEAK);   // a carved teak console...
-  B(-0.3, -0.15, UF + 2.2, UF + 4.9, zF + 4.1, zF + 7.9, 0x121212);                                         // ...and the TV over it
-  O(0.2, 0x2e8b3a, 0.5, UF + 1.75, zF + 8.2, 1.2);
-  { const cx = 6.2, cz = zF + 6.2; B(cx - 1.6, cx + 1.6, UF + 0.95, UF + 1.15, cz - 1.0, cz + 1.0, WOOD);   // the coffee table...
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(cx + sx * 1.45 - 0.12, cx + sx * 1.45 + 0.12, UF, UF + 0.95, cz + sz * 0.85 - 0.12, cz + sz * 0.85 + 0.12, TEAK);
-    C(0.75, 0.75, 0.05, BRASS, cx, UF + 1.15, cz, 22);                                                     // ...a brass tray on it: four glasses of chai round the kettle
-    for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.4; C(0.09, 0.075, 0.26, 0x8b5a2b, cx + Math.cos(a) * 0.45, UF + 1.2, cz + Math.sin(a) * 0.45, 10); }
-    C(0.18, 0.14, 0.34, BRASS, cx, UF + 1.2, cz, 12); C(0.05, 0.05, 0.14, BRASS, cx, UF + 1.54, cz, 6); }
-  [[3.3, zF + 4.3, 0xd63384], [3.3, zF + 8.1, 0x1fa4a0], [9.6, zF + 9.6, 0xe8b04a]].forEach(([x, z, c]) => { C(0.6, 0.62, 0.95, c, x, UF, z, 16);   // embroidered poufs, little mirrors sewn round them
-    for (let k = 0; k < 8; k++) { const a = k * 0.785; B(x + Math.cos(a) * 0.61 - 0.05, x + Math.cos(a) * 0.61 + 0.05, UF + 0.4, UF + 0.52, z + Math.sin(a) * 0.61 - 0.05, z + Math.sin(a) * 0.61 + 0.05, 0xf4f4f4); } });
-  { const mx = 0.6, mz = zF + 1.0;                                                                        // the mandir in the corner: a carved shrine under a golden dome...
-    B(mx - 0.8, mx + 0.8, UF, UF + 2.1, mz - 0.7, mz + 0.7, TEAK); B(mx - 0.75, mx + 0.75, UF + 2.1, UF + 3.6, mz - 0.7, mz - 0.58, TEAK);
-    for (const sx of [-1, 1]) B(mx + sx * 0.7 - 0.07, mx + sx * 0.7 + 0.07, UF + 2.1, UF + 3.6, mz - 0.6, mz + 0.6, TEAK);
-    B(mx - 0.85, mx + 0.85, UF + 3.6, UF + 3.75, mz - 0.72, mz + 0.72, TEAK); C(0.04, 0.85, 1.1, BRASS, mx, UF + 3.75, mz, 8);
-    O(0.22, 0xe86a1c, mx, UF + 2.45, mz - 0.25);                                                            // ...a little idol in orange...
-    for (const sx of [-1, 1]) { C(0.1, 0.07, 0.08, 0xb5552b, mx + sx * 0.4, UF + 2.1, mz + 0.3, 8); O(0.05, 0xffd23a, mx + sx * 0.4, UF + 2.24, mz + 0.3, 1.8); }   // ...two lit diyas...
-    garland(mx - 0.72, mz + 0.64, mx + 0.72, mz + 0.64, UF + 3.55, 0.35, 10);                               // ...and marigolds
-    C(0.35, 0.4, 0.12, BRASS, 2.2, UF, zF + 0.8, 12); C(0.06, 0.06, 1.7, BRASS, 2.2, UF + 0.12, zF + 0.8, 6); C(0.3, 0.18, 0.12, BRASS, 2.2, UF + 1.82, zF + 0.8, 12);   // a tall brass oil lamp beside it
-    for (let k = 0; k < 4; k++) O(0.05, 0xffd23a, 2.2 + Math.cos(k * 1.57) * 0.24, UF + 2.0, zF + 0.8 + Math.sin(k * 1.57) * 0.24, 1.8);
-    C(0.02, 0.1, 0.3, BRASS, 2.2, UF + 1.94, zF + 0.8, 8); }
-  C(0.45, 0.35, 1.0, 0xb5552b, 12.6, UF, zF + 1.0, 12); O(0.6, 0x3f8a45, 12.6, UF + 1.6, zF + 1.0, 1.1); O(0.45, 0x4f9a50, 12.4, UF + 2.2, zF + 1.2);   // a big potted plant by the window
-  { const z = zF + 12;                                                                                    // a carved jaali screen between the living room and the dining
-    B(-0.3, 3.4, UF, UF + 0.3, z - 0.1, z + 0.1, WOOD); B(-0.3, 3.4, UF + 4.6, UF + 4.9, z - 0.1, z + 0.1, WOOD);
-    for (let x = -0.3; x <= 3.41; x += 0.46) B(x - 0.05, x + 0.05, UF + 0.3, UF + 4.6, z - 0.08, z + 0.08, WOOD);
-    for (let y = UF + 0.76; y < UF + 4.6; y += 0.46) B(-0.3, 3.4, y - 0.04, y + 0.04, z - 0.06, z + 0.06, TEAK);
-    for (let x = -0.07; x < 3.3; x += 0.46) for (let y = UF + 0.53; y < UF + 4.5; y += 0.46) B(x + 0.16, x + 0.3, y - 0.07, y + 0.07, z - 0.05, z + 0.05, BRASS).rotation.z = Math.PI / 4; }
-  garland(HL + 0.2, SW + 0.05, -3.6, SW + 0.05, UF + 4.9, 0.45, 14);                                     // a toran over the top of the stairs
-  // -- the dining table, set with steel thalis: dal, sabzi, raita, rice and rotis
-  { const tx = -1.2, tz = zF + 14.6, TOP = UF + 1.85;
-    B(tx - 2.6, tx + 2.6, TOP - 0.14, TOP, tz - 1.2, tz + 1.2, 0x6b3f22);
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(tx + sx * 2.35 - 0.12, tx + sx * 2.35 + 0.12, UF, TOP - 0.14, tz + sz * 0.95 - 0.12, tz + sz * 0.95 + 0.12, 0x5a3520);
+function bakeKinds(root, scales) {                                    // merge a group's meshes material by material (textures, lighting and colours kept; textures laid on in world space)
+  root.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), m4 = new THREE.Matrix4(), by = new Map(), col = new THREE.Color();
+  root.traverse(o => { if (o.isMesh && !o.isInstancedMesh && o.userData.col !== undefined) { if (!by.has(o.material)) by.set(o.material, []); by.get(o.material).push(o); } });
+  for (const [mat, list] of by) {
+    const sc = 1 / ((scales && scales.get(mat)) || 1); let n = 0;
+    const parts = list.map(o => { const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); g.applyMatrix4(m4.multiplyMatrices(inv, o.matrixWorld)); n += g.attributes.position.count; return [g, o.userData.col]; });
+    const P = new Float32Array(n * 3), N = new Float32Array(n * 3), UV = new Float32Array(n * 2), CO = new Float32Array(n * 3); let at = 0;
+    for (const [g, c] of parts) { const gp = g.attributes.position, gn = g.attributes.normal; col.setHex(c);
+      for (let i = 0; i < gp.count; i++, at++) {
+        const x = gp.getX(i), y = gp.getY(i), z = gp.getZ(i), ax = Math.abs(gn.getX(i)), ay = Math.abs(gn.getY(i)), az = Math.abs(gn.getZ(i));
+        P[at * 3] = x; P[at * 3 + 1] = y; P[at * 3 + 2] = z; N[at * 3] = gn.getX(i); N[at * 3 + 1] = gn.getY(i); N[at * 3 + 2] = gn.getZ(i);
+        const u = ay >= ax && ay >= az ? x : ax >= az ? z : x, v = ay >= ax && ay >= az ? z : y; UV[at * 2] = u * sc; UV[at * 2 + 1] = v * sc;
+        CO[at * 3] = col.r; CO[at * 3 + 1] = col.g; CO[at * 3 + 2] = col.b; }
+      g.dispose(); }
+    const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.BufferAttribute(P, 3)); bg.setAttribute('normal', new THREE.BufferAttribute(N, 3)); bg.setAttribute('uv', new THREE.BufferAttribute(UV, 2)); bg.setAttribute('color', new THREE.BufferAttribute(CO, 3));
+    bg.computeBoundingSphere(); bg.computeBoundingBox();
+    const mesh = new THREE.Mesh(bg, mat); mesh.raycast = nearRaycast; list.forEach(o => { o.parent.remove(o); o.geometry.dispose(); }); root.add(mesh);
+  }
+}
+function buildUpperFloor() {                                          // behind our front door: a marble foyer, stairs up, and the whole second floor, front to back, done up Indian style and lit like a real home
+  const Y = YARD, U = UPPER, HL = Y.HL, XR = Y.XR, zF = U.zF, zB = U.zB, UF = U.UF, CH = U.CH, LH = U.LH, VD = ROOM.visDepth, WZ = VD + IN(5), DX = SLIDER ? SLIDER.DX : -0.83;
+  const root = new THREE.Group(); root.userData.name = 'Upstairs'; root.visible = false; povEndWall.add(root); U.root = root;   // (only drawn when you're up here, in the foyer, or out front)
+  const grp = walkable => { const g = new THREE.Group(); g.userData.name = 'Upstairs'; if (!walkable) g.userData.noWalk = true; root.add(g); return g; };
+  const solid = grp(true), flat = grp(true), dec = grp(), glow = grp(), pics = grp();   // walls, stairs, furniture (baked room by room) / floors and ceiling / the little things / lit bulbs / rugs, paintings, glass
+  const ph = (o, sp, sh) => new THREE.MeshPhongMaterial(Object.assign({ vertexColors: true, specular: sp || 0x000000, shininess: sh || 4, fog: false }, o));   // (lit per pixel: the lamps throw pools of light on walls and floors)
+  const K = { plaster: ph({ map: upTex('plaster'), emissive: 0x2a2621 }, 0x060606), wood: ph({ map: upTex('wood') }, 0x1e1e1e, 24), fabric: ph({ map: upTex('fabric') }), granite: ph({ map: upTex('granite') }, 0x5a5a5a, 60),
+    tile: ph({ map: upTex('tile') }, 0x484848, 70), plain: ph({}), shiny: ph({}, 0x8a8a8a, 80), decal: ph({ polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), glow: new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }) };
+  const scales = new Map([[K.plaster, 3], [K.wood, 1.3], [K.fabric, 0.8], [K.granite, 1.2], [K.tile, 1.6]]);
+  const put = (geo, kind, col, par) => { const m = new THREE.Mesh(geo, K[kind]); m.userData.col = col; par.add(m); return m; };
+  const B = (x0, x1, y0, y1, z0, z1, col, kind, par) => { const w = x1 - x0, h = y1 - y0, d = z1 - z0, m = put(new THREE.BoxGeometry(w, h, d), kind || 'plain', col, par || (Math.max(w, h, d) < 0.2 ? dec : solid)); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); return m; };
+  const C = (r0, r1, h, col, x, y, z, seg, kind, par) => { const m = put(new THREE.CylinderGeometry(r0, r1, h, seg || 14), kind || 'plain', col, par || (Math.max(r0, r1) < 0.3 || h < 0.06 ? dec : solid)); m.position.set(x, y + h / 2, z); return m; };   // (y: what it stands on)
+  const S = (r, col, x, y, z, sy, kind, par) => { const m = put(new THREE.SphereGeometry(r, r > 0.2 ? 12 : 6, r > 0.2 ? 8 : 4), kind || 'plain', col, par || dec); m.position.set(x, y, z); if (sy) m.scale.y = sy; return m; };
+  const floor = (x0, x1, z0, z1, kind, tile, y) => { const t = upTex(kind).clone(); t.needsUpdate = true; t.repeat.set((x1 - x0) / tile, (z1 - z0) / tile);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), ph({ map: t, vertexColors: false, color: { marble: 0xbdb8b0, bathTile: 0xb4bcc2, planks: 0xdcd6ce, kitchenTile: 0xcfc9c0, terracotta: 0xd8d2ca }[kind] || 0xd0d0d0 }, kind === 'marble' || kind === 'bathTile' ? 0x333333 : 0x1a1a1a, kind === 'marble' ? 60 : 24));
+    m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, y === undefined ? UF : y, (z0 + z1) / 2); flat.add(m); return m; };
+  const picture = (w, h, tex, x, y, z, ry, rx) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), ph({ map: tex, vertexColors: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, 0, 'YXZ'); pics.add(m); return m; };
+  const shadow = (x, z, w, d, op, y) => rectShadow(root, x, z, w, d, 0, op || 0.28, y === undefined ? UF + 0.016 : y);   // (soft contact shadows, over the rugs)
+  const garland = (x0, z0, x1, z1, y, sag, n) => { for (let i = 0; i <= n; i++) { const t = i / n; S(0.08, i % 2 ? 0xffa21f : 0xffd23a, x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * sag, z0 + (z1 - z0) * t); } };   // a marigold toran
+  const PLASTER = 0xf6ecd8, TEAK = 0x8a5a2e, DARK = 0x4e3020, BRASS = 0xd4a93a, STEEL = 0xcdd3d8, WHITE = 0xfaf8f2;
+  const RISE = (UF - LH) / 14, SW = zF + 2 + 13 * 0.62, dL = U.dx - U.dw / 2, dR = U.dx + U.dw / 2, dT = LH + U.dh, gx = XR - 5.8, winY = FT(12.5), wx0 = gx - 3.45, wx1 = gx + 3.45, wy0 = 7.0, wy1 = 11.1;
+  U.SW = SW;
+  // ======== the shell: floors, stairs, walls, ceiling ========
+  B(dL, dR, LH - 0.3, LH + 0.015, zF - 0.06, zF + 0.12, 0x9c9890, 'granite');                              // a stone threshold in the doorway
+  floor(HL + 0.12, -0.3, zF + 0.1, SW, 'marble', 2.6, LH);                                                // the foyer: marble, level with the landing outside
+  B(HL, -0.3, UF - 0.3, UF - 0.005, SW, SW + 0.4, 0xefe7da, 'plaster');                                   // (the edge of the floor at the top of the stairs)
+  floor(-0.3, XR - 0.12, zF + 0.12, zF + 12, 'planks', 3.2);                                             // the living room: honey floorboards
+  floor(HL + 0.12, -0.3, SW, zF + 12, 'marble', 2.6); floor(HL + 0.12, 4.5, zF + 12, -6.5, 'marble', 2.6); floor(HL + 0.12, -2.5, -6.5, 6, 'marble', 2.6);   // the hall and the dining room: marble
+  floor(4.5, XR - 0.12, zF + 12, -6.5, 'kitchenTile', 1.6); floor(8.06, XR - 0.12, -6.5, -5.94, 'kitchenTile', 1.6);   // the kitchen: patterned cement tiles
+  floor(8.06, XR - 0.12, -5.94, 1.44, 'bathTile', 1.4);                                                  // the bathroom: little blue and white tiles
+  floor(-2.5, 8.06, -6.5, 6, 'terracotta', 1.8); floor(8.06, XR - 0.12, 1.44, 6, 'terracotta', 1.8);    // the bazaar room: terracotta
+  floor(HL + 0.12, XR - 0.12, 6, zB - 0.12, 'planks', 3.2);                                             // the bedrooms: floorboards
+  { const t = upTex('plaster').clone(); t.needsUpdate = true; t.repeat.set((XR - HL) / 3, (zB - zF) / 3);
+    const cl = new THREE.Mesh(new THREE.PlaneGeometry(XR - HL, zB - zF), ph({ map: t, vertexColors: false, emissive: 0x77726a, emissiveMap: t })); cl.rotation.x = Math.PI / 2; cl.position.set((HL + XR) / 2, CH, (zF + zB) / 2); flat.add(cl); }   // the ceiling
+  for (let k = 0; k < 13; k++) { const z0 = zF + 2 + k * 0.62, top = LH + (k + 1) * RISE;               // thirteen teak stairs, each with a darker tread
+    B(HL + 0.12, HL + 2.9, LH, top - 0.04, z0, z0 + 0.62, 0x7a4a2a, 'wood'); B(HL + 0.12, HL + 2.94, top - 0.04, top, z0 - 0.04, z0 + 0.62, 0x5a3520, 'wood'); }
+  { const run = 13 * 0.62, len = Math.hypot(run, 13 * RISE), a = Math.atan2(RISE, 0.62), cz = zF + 2 + run / 2, lineY = z => LH + (z - zF - 2) * RISE / 0.62;
+    const sg = B(0, 0.06, 0, 0.5, 0, len, DARK, 'wood'); sg.position.set(HL + 2.95, lineY(cz) + RISE * 0.5 - 0.25, cz); sg.rotation.x = -a;   // the stringer along the open side
+    for (let k = 0; k < 13; k += 2) C(0.045, 0.045, 1.05 + RISE * 0.5, BRASS, HL + 2.8, LH + (k + 1) * RISE, zF + 2.31 + k * 0.62, 8, 'shiny');   // brass balusters...
+    C(0.045, 0.045, 1.05 + RISE * 0.5, BRASS, HL + 2.8, LH + 13 * RISE, zF + 2.31 + 12 * 0.62, 8, 'shiny');
+    const rl = B(0, 0.1, 0, 0.09, 0, len, DARK, 'wood'); rl.position.set(HL + 2.8, lineY(cz) + RISE * 1.5 + 1.05 - 0.19 * RISE / 0.62, cz); rl.rotation.x = -a;   // ...and a teak handrail
+    B(HL + 2.66, HL + 2.94, LH, LH + 1.5, zF + 1.62, zF + 1.9, DARK, 'wood'); C(0.17, 0.12, 0.2, BRASS, HL + 2.8, LH + 1.5, zF + 1.76, 12, 'shiny'); }   // (the newel post, a brass cap)
+  const wall = (x0, x1, z0, z1, y0, y1) => B(x0, x1, y0, y1, z0, z1, PLASTER, 'plaster');
+  const skirt = (x0, x1, z0, z1, y) => B(x0, x1, y === undefined ? UF : y, (y === undefined ? UF : y) + 0.3, z0, z1, DARK, 'wood');
+  wall(HL, dL, zF + 0.02, zF + 0.14, LH, CH); wall(dR, -0.3, zF + 0.02, zF + 0.14, LH, CH); wall(dL, dR, zF + 0.02, zF + 0.14, dT, CH);   // plaster inside the front wall, round the doorway...
+  wall(-0.3, wx0, zF + 0.02, zF + 0.14, UF, CH); wall(wx1, XR, zF + 0.02, zF + 0.14, UF, CH); wall(wx0, wx1, zF + 0.02, zF + 0.14, UF, wy0); wall(wx0, wx1, zF + 0.02, zF + 0.14, wy1, CH);   // ...and round the picture window
+  wall(HL + 0.02, HL + 0.14, zF, zB, LH, CH); wall(XR - 0.14, XR - 0.02, zF, zB, UF, CH); wall(HL, XR, zB - 0.14, zB, UF, CH);   // the north wall, the party wall, the back wall
+  wall(-0.42, -0.3, zF + 0.14, SW - 0.02, LH, CH);                                                         // the foyer's side wall...
+  wall(HL + 0.14, HL + 2.95, SW - 0.02, SW + 0.1, LH, UF - 0.3); wall(HL + 2.95, -0.3, SW - 0.02, SW + 0.1, LH, UF + 1.1);   // ...its back wall, and a half-wall along the top of the stairwell
+  B(HL + 2.9, -0.24, UF + 1.1, UF + 1.2, SW - 0.08, SW + 0.16, DARK, 'wood');
+  wall(7.94, 8.06, -6.0, -3.3, UF, CH); wall(7.94, 8.06, -0.9, 1.5, UF, CH); wall(7.94, 8.06, -3.3, -0.9, UF + 5.0, CH);   // the bathroom (its door off the bazaar room)...
+  wall(8.06, XR - 0.14, -6.06, -5.94, UF, CH); wall(8.06, XR - 0.14, 1.44, 1.56, UF, CH);
+  wall(HL + 0.14, -5.3, 5.94, 6.06, UF, CH); wall(-2.8, 4.8, 5.94, 6.06, UF, CH); wall(7.3, XR - 0.14, 5.94, 6.06, UF, CH);   // ...the bedrooms' wall, a door into each...
+  for (const [a, b] of [[-5.3, -2.8], [4.8, 7.3]]) wall(a, b, 5.94, 6.06, UF + 5.0, CH);
+  wall(2.94, 3.06, 6.06, zB - 0.14, UF, CH);                                                               // ...and the wall between them
+  for (const [a, b, c, alongX] of [[-5.3, -2.8, 6, true], [4.8, 7.3, 6, true], [-3.3, -0.9, 8, false]]) {   // teak architraves round the doorways
+    if (alongX) { B(a - 0.14, a, UF, UF + 5.14, c - 0.1, c + 0.1, DARK, 'wood'); B(b, b + 0.14, UF, UF + 5.14, c - 0.1, c + 0.1, DARK, 'wood'); B(a - 0.14, b + 0.14, UF + 5.0, UF + 5.14, c - 0.1, c + 0.1, DARK, 'wood'); }
+    else { B(c - 0.1, c + 0.1, UF, UF + 5.14, a - 0.14, a, DARK, 'wood'); B(c - 0.1, c + 0.1, UF, UF + 5.14, b, b + 0.14, DARK, 'wood'); B(c - 0.1, c + 0.1, UF + 5.0, UF + 5.14, a - 0.14, b + 0.14, DARK, 'wood'); } }
+  skirt(HL + 0.14, XR - 0.14, zB - 0.2, zB - 0.14); skirt(XR - 0.2, XR - 0.14, zF + 0.14, zB - 0.14); skirt(HL + 0.14, HL + 0.2, SW + 0.1, zB - 0.14); skirt(-0.3, XR - 0.14, zF + 0.14, zF + 0.2);   // skirting boards...
+  skirt(-0.3, -0.24, zF + 0.2, SW - 0.02); skirt(HL + 2.95, -0.3, SW + 0.1, SW + 0.16);
+  skirt(HL + 0.14, HL + 0.2, zF + 0.14, zF + 2, LH); skirt(HL + 0.14, dL, zF + 0.14, zF + 0.2, LH); skirt(dR, -0.42, zF + 0.14, zF + 0.2, LH); skirt(-0.48, -0.42, zF + 0.2, SW - 0.02, LH); skirt(HL + 2.95, -0.42, SW - 0.08, SW - 0.02, LH);
+  for (const [z0, z1] of [[-6.0, -3.44], [-0.76, 1.5]]) { skirt(7.88, 7.94, z0, z1); skirt(8.06, 8.12, z0, z1); }
+  skirt(8.06, XR - 0.14, 1.56, 1.62); skirt(8.06, XR - 0.14, 1.38, 1.44); skirt(8.06, XR - 0.14, -5.94, -5.88);
+  for (const [x0, x1] of [[HL + 0.14, -5.44], [-2.66, 4.66], [7.44, XR - 0.14]]) { skirt(x0, x1, 5.88, 5.94); skirt(x0, x1, 6.06, 6.12); }
+  skirt(2.88, 2.94, 6.12, zB - 0.14); skirt(3.06, 3.12, 6.12, zB - 0.14);
+  for (const [x0, x1, z0, z1] of [[HL + 0.14, XR - 0.14, zB - 0.34, zB - 0.14], [-0.3, XR - 0.14, zF + 0.14, zF + 0.34], [XR - 0.34, XR - 0.14, zF + 0.14, zB - 0.14], [HL + 0.14, HL + 0.34, zF + 0.14, zB - 0.14], [dL - 0.3, -0.3, zF + 0.14, zF + 0.34]])
+    B(x0, x1, CH - 0.26, CH, z0, z1, WHITE, 'plaster');                                                    // ...and a coved cornice under the ceiling
+  // -- the windows, from inside: the picture window's real glass (with its blinds), bright daylight panes for the rest
+  { const rv = (x0, x1, y0, y1) => B(x0, x1, y0, y1, zF - 0.02, zF + 0.18, WHITE, 'plaster');           // the picture window: its reveals...
+    rv(wx0 - 0.1, wx0, wy0, wy1); rv(wx1, wx1 + 0.1, wy0, wy1); rv(wx0 - 0.1, wx1 + 0.1, wy0 - 0.1, wy0); rv(wx0 - 0.1, wx1 + 0.1, wy1, wy1 + 0.1);
+    B(wx0 - 0.3, wx1 + 0.3, wy0 - 0.14, wy0, zF + 0.14, zF + 0.5, WHITE, 'wood');                        // ...a deep sill inside...
+    const split = wy0 + (wy1 - wy0) * 0.3; B(gx - 0.06, gx + 0.06, split, wy1, zF - 0.02, zF + 0.1, WHITE, 'plain', dec); B(wx0, wx1, split - 0.06, split + 0.06, zF - 0.02, zF + 0.1, WHITE, 'plain', dec);   // ...its mullion and transom...
+    for (const k of [-1, 0, 1]) B(gx + k * 1.725 - 0.05, gx + k * 1.725 + 0.05, wy0, split, zF - 0.02, zF + 0.1, WHITE, 'plain', dec);
+    const gl = new THREE.Mesh(new THREE.PlaneGeometry(wx1 - wx0, wy1 - wy0), new THREE.MeshPhongMaterial({ color: 0xd6e8f2, transparent: true, opacity: 0.16, shininess: 120, specular: 0xffffff, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    gl.position.set(gx, (wy0 + wy1) / 2, zF + 0.03); gl.renderOrder = 2; pics.add(gl);                    // ...real glass: you can see in from the street (and out from the sofa)
+    const bt = blindsTex.clone(); bt.needsUpdate = true; const bh = (wy1 - wy0) * 0.42; bt.repeat.set(1, bh / 0.22);
+    const bl = new THREE.Mesh(new THREE.PlaneGeometry(wx1 - wx0 - 0.08, bh), ph({ map: bt, vertexColors: false, side: THREE.DoubleSide })); bl.position.set(gx, wy1 - bh / 2, zF + 0.12); pics.add(bl);   // ...blinds, a little under halfway down
+    B(wx0 + 0.04, wx1 - 0.04, wy1 - bh - 0.07, wy1 - bh, zF + 0.08, zF + 0.16, 0xe8e2d4, 'plain', dec);
+    for (const s of [-1, 1]) B(gx + s * 3.55 - 0.65, gx + s * 3.55 + 0.65, UF + 0.6, CH - 0.34, zF + 0.22, zF + 0.4, 0xd9731f, 'fabric');   // saffron curtains, drawn back...
+    B(gx - 4.5, gx + 4.5, CH - 0.44, CH - 0.34, zF + 0.28, zF + 0.34, BRASS, 'shiny', dec); }                   // ...on a brass rod
+  const pane = (axis, c, y0, y1, w) => { if (axis === 'x') { B(HL + 0.14, HL + 0.17, y0 - 0.14, y1 + 0.14, c - w / 2 - 0.14, c + w / 2 + 0.14, WHITE, 'wood', dec); B(HL + 0.17, HL + 0.19, y0, y1, c - w / 2, c + w / 2, 0xeaf4fb, 'glow', glow); }
+    else { B(c - w / 2 - 0.14, c + w / 2 + 0.14, y0 - 0.14, y1 + 0.14, zB - 0.17, zB - 0.14, WHITE, 'wood', dec); B(c - w / 2, c + w / 2, y0, y1, zB - 0.19, zB - 0.17, 0xeaf4fb, 'glow', glow); } };   // (a bright pane: daylight)
+  for (let k = 0; k < 6; k++) pane('x', WZ - 6.4 - k * 7.6, winY - 0.93, winY + 0.93, 2.05);              // down the north wall, where they are outside
+  pane('x', WZ - 3.2, winY - 0.72, winY + 0.72, 1.65);
+  for (const x of [DX - 3.0, DX + 5.4, DX + 11.2]) pane('z', x, winY - 0.95, winY + 0.95, 2.2);         // and across the back
+  for (const s of [-1, 1]) { const lx = U.dx + s * (U.dw / 2 + 0.55); B(lx - 0.35, lx + 0.35, LH, dT, zF + 0.14, zF + 0.17, WHITE, 'wood', dec); B(lx - 0.23, lx + 0.23, LH + 0.15, dT - 0.15, zF + 0.17, zF + 0.19, 0xeaf4fb, 'glow', glow); }   // the door's sidelights
+  // ======== the lights: warm lamps in every room (lit only when you're up here or out front), and the fittings you can see ========
+  U.lights = [];
+  const lamp = (x, y, z, i, dist) => { const L = new THREE.PointLight(0xffd9a8, 0, dist, 2); L.position.set(x, y, z); L.userData.base = i; scene.add(L); U.lights.push(L); };
+  const fitting = (x, z) => { C(0.5, 0.36, 0.18, BRASS, x, CH - 0.2, z, 16, 'shiny', dec); C(0.32, 0.32, 0.02, 0xfff3d2, x, CH - 0.215, z, 16, 'glow', glow); };
+  { const lx = -2.0, lz = zF + 5.8, ly = 9.3;                                                             // the foyer: a brass lantern hanging down the stairwell
+    C(0.02, 0.02, CH - ly - 0.5, 0x333333, lx, ly + 0.5, lz, 4, 'plain', dec); C(0.22, 0.34, 0.14, BRASS, lx, ly + 0.42, lz, 8, 'shiny', dec); C(0.34, 0.26, 0.14, BRASS, lx, ly - 0.52, lz, 8, 'shiny', dec);
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; B(lx + Math.cos(a) * 0.3 - 0.03, lx + Math.cos(a) * 0.3 + 0.03, ly - 0.4, ly + 0.42, lz + Math.sin(a) * 0.3 - 0.03, lz + Math.sin(a) * 0.3 + 0.03, BRASS, 'shiny', dec); }
+    C(0.26, 0.26, 0.8, 0xffe2a8, lx, ly - 0.4, lz, 12, 'glow', glow); lamp(lx, ly, lz, 0.75, 12); }
+  lamp(6.2, CH - 1.1, zF + 6.2, 0.8, 14);                                                                   // the living room (the fan's light)
+  fitting(5.0, -10.8); lamp(5.0, CH - 0.7, -10.8, 0.8, 13);                                                // the dining room and kitchen
+  fitting(4.0, 3.2); lamp(4.0, CH - 0.7, 3.2, 0.75, 14);                                                   // the bazaar room and the hall
+  fitting(-1.8, 14.5); lamp(-1.8, CH - 0.7, 14.5, 0.7, 12); fitting(8.3, 14.5); lamp(8.3, CH - 0.7, 14.5, 0.7, 12);   // the bedrooms
+  // ======== the foyer: a shoe rack by the door ========
+  B(-1.6, -0.46, LH, LH + 1.3, zF + 3.2, zF + 5.4, TEAK, 'wood'); for (let i = 0; i < 2; i++) B(-1.6, -0.46, LH + 0.45 + i * 0.45, LH + 0.5 + i * 0.45, zF + 3.25, zF + 5.35, DARK, 'wood', dec);
+  [[0x2a2a2a, 3.5], [0x8a5a2e, 3.95], [0xd63384, 4.45], [0x2a4a7a, 4.9]].forEach(([c, z]) => B(-1.5, -0.7, LH + 1.3, LH + 1.48, zF + z - 0.14, zF + z + 0.14, c, 'fabric', dec));   // (chappals and shoes on top)
+  shadow(-1.03, zF + 4.3, 1.2, 2.3, 0.3, LH + 0.004);
+  // ======== the living room, over the garage: a low maroon sofa, a mandala rug, a carved coffee table with chai, poufs, a jhoola by the window, a mandir ========
+  picture(9.2, 7, upTex('mandala'), 6.2, UF + 0.012, zF + 6.2, 0, -Math.PI / 2);
+  { const x0 = XR - 2.3, x1 = XR - 0.2, z0 = zF + 1.8, z1 = zF + 9.8, RED = 0x7a1f2b;
+    B(x0, x1, UF + 0.25, UF + 1.05, z0, z1, RED, 'fabric'); B(XR - 0.85, x1, UF + 1.05, UF + 2.7, z0, z1, RED, 'fabric'); B(x0 + 0.1, x1, UF, UF + 0.25, z0 + 0.1, z1 - 0.1, DARK, 'wood');
+    for (const z of [z0 - 0.4, z1]) B(x0, x1, UF, UF + 1.8, z, z + 0.4, 0x6a1a24, 'fabric');
+    for (let i = 0; i < 3; i++) B(x0 + 0.05, XR - 0.9, UF + 1.05, UF + 1.42, z0 + 0.05 + i * 2.65, z0 + 2.6 + i * 2.65, 0x8c2433, 'fabric');
+    [0xe8b04a, 0x1fa4a0, 0xd63384, 0xe8b04a, 0x7b3fa0].forEach((c, i) => { B(XR - 1.26, XR - 0.96, UF + 1.42, UF + 2.3, z0 + 0.75 + i * 1.45, z0 + 1.55 + i * 1.45, c, 'fabric').rotation.z = -0.25; });   // cushions, leaning back
+    for (const z of [z0 + 0.35, z1 - 0.35]) { const bo = C(0.3, 0.3, 1.25, 0xc9302c, XR - 1.5, UF + 1.12, z, 12, 'fabric'); bo.position.y = UF + 1.72; bo.rotation.z = Math.PI / 2; }   // round bolsters against the arms
+    shadow((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0 + 0.3, z1 - z0 + 1.1, 0.34); }
+  picture(3.4, 2.3, upTex('tapestry'), XR - 0.16, UF + 3.85, zF + 5.8, -Math.PI / 2);                        // a tapestry over the sofa
+  B(-0.3, 1.0, UF, UF + 1.5, zF + 3.4, zF + 8.6, TEAK, 'wood'); for (let i = 0; i < 3; i++) B(1.0, 1.05, UF + 0.25, UF + 1.25, zF + 3.6 + i * 1.7, zF + 4.9 + i * 1.7, 0x6b4428, 'wood', dec);   // a carved teak console...
+  for (let i = 0; i < 3; i++) C(0.05, 0.05, 0.06, BRASS, 1.07, UF + 0.72, zF + 4.25 + i * 1.7, 8, 'shiny', dec).rotation.z = Math.PI / 2;
+  B(-0.3, -0.12, UF + 2.2, UF + 4.9, zF + 4.1, zF + 7.9, 0x111111, 'shiny'); B(-0.12, -0.1, UF + 2.35, UF + 4.75, zF + 4.25, zF + 7.75, 0x1d2733, 'shiny', dec);   // ...the TV over it
+  S(0.2, 0x2e8b3a, 0.5, UF + 1.75, zF + 8.2, 1.2); C(0.14, 0.11, 0.25, 0xb5552b, 0.5, UF + 1.5, zF + 8.2, 10);
+  shadow(0.35, zF + 6, 1.6, 5.6, 0.28);
+  { const cx = 6.2, cz = zF + 6.2; B(cx - 1.6, cx + 1.6, UF + 0.95, UF + 1.15, cz - 1.0, cz + 1.0, TEAK, 'wood');   // the coffee table...
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(cx + sx * 1.45 - 0.12, cx + sx * 1.45 + 0.12, UF, UF + 0.95, cz + sz * 0.85 - 0.12, cz + sz * 0.85 + 0.12, DARK, 'wood');
+    C(0.75, 0.75, 0.05, BRASS, cx, UF + 1.15, cz, 22, 'shiny');                                              // ...a brass tray: the chai set
+    for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.4; C(0.09, 0.075, 0.26, 0x8b5a2b, cx + Math.cos(a) * 0.45, UF + 1.2, cz + Math.sin(a) * 0.45, 10, 'shiny'); }
+    C(0.18, 0.14, 0.34, BRASS, cx, UF + 1.2, cz, 12, 'shiny'); C(0.05, 0.05, 0.14, BRASS, cx, UF + 1.54, cz, 6, 'shiny');
+    shadow(cx, cz, 3.4, 2.2, 0.3); }
+  [[3.3, zF + 4.3, 0xd63384], [3.3, zF + 8.1, 0x1fa4a0], [9.6, zF + 9.6, 0xe8b04a]].forEach(([x, z, c]) => { C(0.6, 0.62, 0.95, c, x, UF, z, 16, 'fabric'); C(0.62, 0.62, 0.05, 0xd4a93a, x, UF + 0.93, z, 16, 'shiny', dec);   // embroidered poufs, mirror-work round them
+    for (let k = 0; k < 8; k++) { const a = k * 0.785; B(x + Math.cos(a) * 0.61 - 0.05, x + Math.cos(a) * 0.61 + 0.05, UF + 0.4, UF + 0.52, z + Math.sin(a) * 0.61 - 0.05, z + Math.sin(a) * 0.61 + 0.05, 0xf4f4f4, 'shiny'); }
+    shadow(x, z, 1.3, 1.3, 0.28); });
+  { const mx = 0.6, mz = zF + 1.0;                                                                        // the mandir: a carved shrine under a golden dome
+    B(mx - 0.8, mx + 0.8, UF, UF + 2.1, mz - 0.7, mz + 0.7, TEAK, 'wood'); B(mx - 0.75, mx + 0.75, UF + 2.1, UF + 3.6, mz - 0.7, mz - 0.58, 0xb8322f, 'fabric');
+    for (const sx of [-1, 1]) B(mx + sx * 0.7 - 0.07, mx + sx * 0.7 + 0.07, UF + 2.1, UF + 3.6, mz - 0.6, mz + 0.6, TEAK, 'wood');
+    B(mx - 0.85, mx + 0.85, UF + 3.6, UF + 3.75, mz - 0.72, mz + 0.72, TEAK, 'wood'); C(0.04, 0.85, 1.1, BRASS, mx, UF + 3.75, mz, 8, 'shiny');
+    S(0.22, 0xe86a1c, mx, UF + 2.3, mz - 0.25);
+    for (const sx of [-1, 1]) { C(0.1, 0.07, 0.08, 0xb5552b, mx + sx * 0.4, UF + 2.1, mz + 0.3, 8); S(0.05, 0xffd23a, mx + sx * 0.4, UF + 2.24, mz + 0.3, 1.8, 'glow', glow); }
+    garland(mx - 0.72, mz + 0.64, mx + 0.72, mz + 0.64, UF + 3.55, 0.35, 10);
+    C(0.35, 0.4, 0.12, BRASS, 2.2, UF, zF + 0.8, 12, 'shiny'); C(0.06, 0.06, 1.7, BRASS, 2.2, UF + 0.12, zF + 0.8, 6, 'shiny'); C(0.3, 0.18, 0.12, BRASS, 2.2, UF + 1.82, zF + 0.8, 12, 'shiny');   // a tall brass oil lamp, lit
+    for (let k = 0; k < 4; k++) S(0.05, 0xffd23a, 2.2 + Math.cos(k * 1.57) * 0.24, UF + 2.0, zF + 0.8 + Math.sin(k * 1.57) * 0.24, 1.8, 'glow', glow);
+    shadow(mx, mz, 1.8, 1.6, 0.3); }
+  C(0.4, 0.3, 0.9, 0xb5552b, 12.7, UF, zF + 0.75, 12); S(0.5, 0x3f8a45, 12.7, UF + 1.4, zF + 0.75, 1.1); S(0.4, 0x4f9a50, 12.5, UF + 1.95, zF + 0.9); shadow(12.7, zF + 0.75, 1.0, 1.0, 0.3);   // a potted plant in the corner
+  { const z = zF + 12;                                                                                    // a carved jaali screen between the living room and the dining room
+    B(-0.3, 3.4, UF, UF + 0.3, z - 0.1, z + 0.1, DARK, 'wood'); B(-0.3, 3.4, UF + 4.6, UF + 4.9, z - 0.1, z + 0.1, DARK, 'wood');
+    for (let x = -0.3; x <= 3.41; x += 0.46) B(x - 0.05, x + 0.05, UF + 0.3, UF + 4.6, z - 0.08, z + 0.08, DARK, 'wood');
+    for (let y = UF + 0.76; y < UF + 4.6; y += 0.46) B(-0.3, 3.4, y - 0.04, y + 0.04, z - 0.06, z + 0.06, TEAK, 'wood');
+    for (let x = -0.07; x < 3.3; x += 0.46) for (let y = UF + 0.53; y < UF + 4.5; y += 0.46) B(x - 0.07, x + 0.07, y - 0.07, y + 0.07, z - 0.05, z + 0.05, BRASS, 'shiny').rotation.z = Math.PI / 4; }   // (a brass diamond in every opening)
+  garland(HL + 2.95, SW + 0.05, -0.3, SW + 0.05, UF + 4.9, 0.45, 14);                                     // a toran over the top of the stairs
+  // ======== the hall: a console with a brass urli of floating flowers, a Madhubani painting ========
+  B(HL + 0.2, HL + 1.3, UF, UF + 2.0, -9.4, -7.0, TEAK, 'wood'); C(0.55, 0.3, 0.2, BRASS, HL + 0.75, UF + 2.0, -8.2, 18, 'shiny'); C(0.5, 0.5, 0.02, 0x7fb3c9, HL + 0.75, UF + 2.17, -8.2, 18, 'shiny', dec);
+  for (let k = 0; k < 7; k++) S(0.07, [0xff6f3a, 0xffd23a, 0xff4f8a][k % 3], HL + 0.75 + Math.cos(k * 0.9) * 0.3, UF + 2.21, -8.2 + Math.sin(k * 0.9) * 0.3, 0.5);
+  shadow(HL + 0.75, -8.2, 1.3, 2.6, 0.3);
+  picture(3.0, 2.25, upTex('madhubani'), HL + 0.17, UF + 3.4, -1.2, Math.PI / 2);
+  // ======== the dining room: a sheesham table set with steel thalis, two brass pendants over it ========
+  { const tx = 1.0, tz = -10.8, TOP = UF + 1.85;
+    B(tx - 2.6, tx + 2.6, TOP - 0.14, TOP, tz - 1.2, tz + 1.2, 0x6b3f22, 'wood');
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(tx + sx * 2.35 - 0.12, tx + sx * 2.35 + 0.12, UF, TOP - 0.14, tz + sz * 0.95 - 0.12, tz + sz * 0.95 + 0.12, DARK, 'wood');
     for (const sz of [-1, 1]) for (const i of [-1, 0, 1]) { const cx = tx + i * 1.7, cz = tz + sz * 1.75;
-      B(cx - 0.55, cx + 0.55, UF + 1.05, UF + 1.18, cz - 0.5, cz + 0.5, 0xc9a66b); B(cx - 0.55, cx + 0.55, UF + 1.18, UF + 2.9, cz + sz * 0.45 - 0.06, cz + sz * 0.45 + 0.06, 0x5a3520);
-      for (const lx of [-0.45, 0.45]) for (const lz of [-0.4, 0.4]) B(cx + lx - 0.06, cx + lx + 0.06, UF, UF + 1.05, cz + lz - 0.06, cz + lz + 0.06, 0x5a3520);
-      const pz = tz + sz * 0.62; C(0.42, 0.42, 0.04, STEEL, cx, TOP, pz, 20);
-      [[0xe8b31c, -0.2, -0.12], [0x4f8a2a, 0.2, -0.12], [0xf4f1e6, 0, 0.2]].forEach(([c, ox, oz]) => { C(0.11, 0.09, 0.09, STEEL, cx + ox, TOP + 0.04, pz + oz * sz, 10); C(0.1, 0.1, 0.01, c, cx + ox, TOP + 0.12, pz + oz * sz, 10); });
-      O(0.12, 0xfaf6ee, cx - 0.15, TOP + 0.07, pz + 0.05 * sz, 0.6); C(0.2, 0.2, 0.03, 0xc9a06a, cx + 0.18, TOP + 0.05, pz + 0.12 * sz, 14); }
-    C(0.2, 0.16, 0.5, STEEL, tx, TOP, tz, 12); C(0.08, 0.08, 0.08, STEEL, tx, TOP + 0.5, tz, 8);
-    for (const i of [-1, 0, 1]) { C(0.015, 0.015, CH - TOP - 2.6, 0x333333, tx + i * 1.7, TOP + 2.6, tz, 4); C(0.22, 0.32, 0.45, BRASS, tx + i * 1.7, TOP + 2.15, tz, 12); O(0.12, 0xfff0b0, tx + i * 1.7, TOP + 2.1, tz); } }   // brass pendant lamps
-  // -- the kitchen: a gas stove with the pressure cooker going, a kadai of curry, the masala dabba, rotis on the tawa, achaar, copper pots
-  { const K0 = zF + 12.3, K1 = zF + 19.9, CT = UF + 2.3, T2 = CT + 0.12;
-    B(XR - 1.3, XR - 0.12, UF, CT, K0, K1, 0xe7ddc9); B(XR - 1.36, XR - 0.12, CT, T2, K0 - 0.05, K1 + 0.05, 0x2b2b30);
-    B(6.2, XR - 1.3, UF, CT, zF + 19.2, zF + 20.4, 0xe7ddc9); B(6.2, XR - 1.3, CT, T2, zF + 19.15, zF + 20.4, 0x2b2b30);
-    B(XR - 0.8, XR - 0.12, UF + 4.1, UF + 5.5, K0, K1, 0xd9ccb2); for (let i = 0; i < 5; i++) B(XR - 1.34, XR - 1.3, UF + 0.3, CT - 0.2, K0 + 0.15 + i * 1.5, K0 + 1.45 + i * 1.5, 0xd4c8b0);
-    B(XR - 1.2, XR - 0.3, T2, T2 + 0.1, zF + 13.2, zF + 15.2, 0x1a1a1a); for (const z of [zF + 13.7, zF + 14.7]) C(0.2, 0.2, 0.04, 0x444444, XR - 0.75, T2 + 0.1, z, 12);
-    C(0.3, 0.3, 0.5, STEEL, XR - 0.75, T2 + 0.14, zF + 13.7, 16); B(XR - 0.77, XR - 0.73, T2 + 0.64, T2 + 0.7, zF + 13.2, zF + 14.35, 0x222222); C(0.05, 0.03, 0.2, 0x222222, XR - 0.75, T2 + 0.64, zF + 13.7, 6);
-    C(0.5, 0.26, 0.28, 0x3a3a3a, XR - 0.75, T2 + 0.14, zF + 14.7, 18); C(0.44, 0.44, 0.02, 0xc85a1e, XR - 0.75, T2 + 0.36, zF + 14.7, 18);
-    { const mx = XR - 0.8, mz = zF + 16.4; C(0.5, 0.5, 0.14, STEEL, mx, T2, mz, 20);
-      [0xe8b31c, 0xc2261f, 0x7a5a36, 0x2d2520, 0x9a8a4a, 0x6e3b1f, 0xc7a23a].forEach((c, i) => { const a = i * 1.05, r = i ? 0.3 : 0; C(0.12, 0.12, 0.03, c, mx + Math.cos(a) * r, T2 + 0.13, mz + Math.sin(a) * r, 10); }); }
-    B(XR - 1.15, XR - 0.3, T2 - 0.35, T2 + 0.01, zF + 17.4, zF + 18.9, STEEL); C(0.04, 0.04, 0.6, STEEL, XR - 0.3, T2, zF + 18.15, 6);
-    for (let i = 0; i < 3; i++) { C(0.17, 0.17, 0.42, 0xf2ead8, 7 + i * 0.5, T2, zF + 19.8, 12); C(0.18, 0.18, 0.08, [0xd9480f, 0xc2261f, 0x8a9a2a][i], 7 + i * 0.5, T2 + 0.42, zF + 19.8, 12); }
-    C(0.42, 0.42, 0.04, 0x2a2a2a, 9.2, T2, zF + 19.8, 18); for (let i = 0; i < 4; i++) C(0.32, 0.32, 0.03, 0xc9a06a, 9.2, T2 + 0.04 + i * 0.03, zF + 19.8, 16);
-    B(4.3, 6.1, UF, UF + 5.2, zF + 18.6, zF + 20.4, 0xe9ecef); B(5.95, 6.05, UF + 2.4, UF + 3.6, zF + 18.55, zF + 18.62, 0x9aa2a8);   // the fridge
-    B(XR - 1.0, XR - 0.95, UF + 3.95, UF + 4.01, zF + 13.0, zF + 16.0, BRASS);
-    for (let i = 0; i < 3; i++) { C(0.01, 0.01, 0.3, 0x333333, XR - 0.98, UF + 3.7, zF + 13.5 + i * 1.0, 4); C(0.3, 0.22, 0.3, 0xb87333, XR - 0.98, UF + 3.4, zF + 13.5 + i * 1.0, 12); } }
-  // -- the bazaar corner: a drinks cart like the ones in the Indian food markets. Big steel buckets of lassi, rose sharbat, mango,
-  //    jaljeera, nimbu pani and chai, rows of glasses, a clay matka, sacks of spices, crates of fruit, marigolds and fairy lights
-  { const cx = -1.6, cz = zF + 22.4, CT = UF + 2.3, T2 = CT + 0.12;
-    B(cx - 2.6, cx + 2.6, UF + 1.0, CT, cz - 0.95, cz + 0.95, 0x2f7d6d); B(cx - 2.75, cx + 2.75, CT, T2, cz - 1.1, cz + 1.1, TEAK);
-    for (let i = 0; i < 5; i++) B(cx - 2.3 + i * 1.15, cx - 2.1 + i * 1.15, UF + 1.1, CT - 0.1, cz - 0.97, cz - 0.95, 0xf2c14e);
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const wx = cx + sx * 1.4, wz = cz + sz * 1.05, tyre = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.07, 6, 24), yMat(0x2a2a2a)); tyre.position.set(wx, UF + 0.9, wz); dec.add(tyre);   // spoked wheels (just for show: the cart itself is solid)
-      C(0.12, 0.12, 0.1, 0x8a8a8a, wx, UF + 0.85, wz, 8).rotation.x = Math.PI / 2; for (let k = 0; k < 4; k++) B(wx - 0.03, wx + 0.03, UF + 0.1, UF + 1.7, wz - 0.03, wz + 0.03, 0x9a9a9a, dec).rotation.z = k * Math.PI / 4; C(0.05, 0.05, 2.5, WOOD, cx + sx * 2.6, T2, cz + sz * 1.0, 6); }
-    for (let i = 0; i < 10; i++) B(cx - 2.9 + i * 0.58, cx - 2.9 + (i + 1) * 0.58, T2 + 2.45, T2 + 2.55, cz - 1.5, cz + 1.3, i % 2 ? 0xf7efe0 : 0xd62828).rotation.x = -0.12;   // a striped awning
-    flatTex(4.6, 0.82, canvasTex(512, 92, (c, w, h) => { c.fillStyle = '#ffd23a'; c.fillRect(0, 0, w, h); c.fillStyle = '#c41e3a'; c.fillRect(0, 0, w, 9); c.fillRect(0, h - 9, w, 9);
-      c.fillStyle = '#1b3a8a'; c.font = 'bold 34px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('LASSI • SHARBAT • CHAI', w / 2, h / 2 + 2); }, 1, 1),
-      cx, T2 + 2.1, cz - 1.52, Math.PI);                                                                    // its hand-painted sign
-    const DR = [0xf5f0e1, 0xef6f9c, 0xffa928, 0x6fa83a, 0xf1e56b, 0x9a6b3f];                                 // lassi, rose sharbat, mango, jaljeera, nimbu pani, masala chai
-    DR.forEach((c, i) => { const x = cx - 2.2 + i * 0.88, z = cz + 0.3; C(0.38, 0.3, 0.56, STEEL, x, T2, z, 12); C(0.36, 0.36, 0.03, c, x, T2 + 0.55, z, 12);   // big steel buckets, brim-full...
-      const ld = yCyl(up, 0.025, 0.025, 1.0, STEEL, x + 0.14, T2 + 0.95, z + 0.05, 6); ld.rotation.z = -0.35; O(0.08, STEEL, x - 0.02, T2 + 0.55, z + 0.05, 0.5); });   // ...each with its ladle
-    for (let r = 0; r < 2; r++) for (let i = 0; i < 8; i++) { const x = cx - 2.3 + i * 0.64, z = cz - 0.5 - r * 0.33, c = DR[(i + r * 3) % 6];   // rows of glasses, most of them poured
-      if ((i + r) % 3) { C(0.1, 0.085, 0.32, c, x, T2, z, 10); C(0.105, 0.1, 0.07, 0xe6f0f4, x, T2 + 0.32, z, 10); } else C(0.105, 0.09, 0.4, 0xd5e4ea, x, T2, z, 10); }
-    { const mx = cx + 3.6, mz = cz - 0.4; C(0.3, 0.35, 0.9, WOOD, mx, UF, mz, 8);                             // a clay matka of cool water, a red cloth round it
-      const mk = new THREE.Mesh(new THREE.SphereGeometry(0.62, 14, 10), yMat(0xb5552b)); mk.position.set(mx, UF + 1.45, mz); dec.add(mk);
-      C(0.3, 0.26, 0.25, 0xa84a24, mx, UF + 1.95, mz, 12); C(0.64, 0.64, 0.14, 0xc41e3a, mx, UF + 1.33, mz, 16, dec); }
-    [0xe8b31c, 0xc2261f, 0x7a5a36, 0x9a8a3a, 0xd9480f].forEach((c, i) => { const x = HL + 0.9 + i * 1.2, z = zB - 0.9;   // jute sacks of spices along the back wall, heaped in cones
-      C(0.5, 0.55, 1.0, 0xc9a66b, x, UF, z, 12); C(0.56, 0.56, 0.12, 0xb8955a, x, UF + 1.0, z, 12); C(0.02, 0.45, 0.5, c, x, UF + 1.08, z, 12, dec); });
-    [[zF + 18.4, 'mango'], [zF + 19.8, 'banana'], [zF + 21.2, 'coconut']].forEach(([z, fruit]) => { const x = HL + 0.8;   // crates of fruit along the north wall
-      B(x - 0.6, x + 0.6, UF, UF + 0.7, z - 0.5, z + 0.5, 0xa87a4a); for (let k = 0; k < 3; k++) B(x - 0.61, x + 0.61, UF + 0.15 + k * 0.22, UF + 0.2 + k * 0.22, z - 0.51, z + 0.51, 0x8a5e36);
+      B(cx - 0.55, cx + 0.55, UF + 1.05, UF + 1.18, cz - 0.5, cz + 0.5, 0xc9a66b, 'fabric'); B(cx - 0.55, cx + 0.55, UF + 1.18, UF + 2.9, cz + sz * 0.45 - 0.06, cz + sz * 0.45 + 0.06, DARK, 'wood');
+      for (const lx of [-0.45, 0.45]) for (const lz of [-0.4, 0.4]) B(cx + lx - 0.06, cx + lx + 0.06, UF, UF + 1.05, cz + lz - 0.06, cz + lz + 0.06, DARK, 'wood');
+      const pz = tz + sz * 0.62; C(0.42, 0.42, 0.04, STEEL, cx, TOP, pz, 20, 'shiny');                       // a thali: three katoris of dal, sabzi and raita, rice, a roti
+      [[0xe8b31c, -0.22, -0.2], [0x4f8a2a, 0, -0.26], [0xf4f1e6, 0.22, -0.2]].forEach(([c, ox, oz]) => { C(0.11, 0.09, 0.09, STEEL, cx + ox, TOP + 0.04, pz - oz * sz, 10, 'shiny'); C(0.1, 0.1, 0.01, c, cx + ox, TOP + 0.12, pz - oz * sz, 10); });
+      S(0.12, 0xfaf6ee, cx - 0.14, TOP + 0.07, pz - 0.12 * sz, 0.6); C(0.15, 0.15, 0.03, 0xc9a06a, cx + 0.16, TOP + 0.05, pz - 0.12 * sz, 14); }
+    C(0.2, 0.16, 0.5, STEEL, tx, TOP, tz, 12, 'shiny'); C(0.08, 0.08, 0.08, STEEL, tx, TOP + 0.5, tz, 8, 'shiny');
+    for (const i of [-1, 1]) { C(0.015, 0.015, CH - TOP - 2.6, 0x333333, tx + i * 1.7, TOP + 2.6, tz, 4); C(0.22, 0.32, 0.45, BRASS, tx + i * 1.7, TOP + 2.15, tz, 12, 'shiny', dec); S(0.13, 0xfff0b0, tx + i * 1.7, TOP + 2.12, tz, 1, 'glow', glow); }
+    shadow(tx, tz, 6.2, 5.0, 0.26); }
+  // ======== the kitchen: tiles and granite, a chimney over the gas stove, a steel sink, the fridge, a water purifier... and (see below) a terrible mess ========
+  const K0 = zF + 12.3, KE = -6.08, CT = UF + 2.3, T2 = CT + 0.12, KX0 = XR - 1.3, SZ0 = -7.9, SZ1 = -6.5, SX0 = XR - 1.15, SX1 = XR - 0.3, SM = (SZ0 + SZ1) / 2;
+  B(KX0, XR - 0.14, UF + 0.2, CT, K0, SZ0, 0xe3d7c1, 'wood'); B(KX0, XR - 0.14, UF + 0.2, T2 - 0.4, SZ0, SZ1, 0xe3d7c1, 'wood'); B(KX0, XR - 0.14, UF + 0.2, CT, SZ1, KE, 0xe3d7c1, 'wood');   // the long counter...
+  B(KX0 + 0.05, XR - 0.2, UF, UF + 0.2, K0 + 0.05, KE - 0.05, DARK, 'wood');
+  B(KX0 - 0.06, XR - 0.14, CT, T2, K0 - 0.05, SZ0 + 0.05, 0x3a3a3e, 'granite'); B(KX0 - 0.06, XR - 0.14, CT, T2, SZ1 - 0.05, KE, 0x3a3a3e, 'granite');   // ...its granite top, round the sink
+  B(KX0 - 0.06, SX0, CT, T2, SZ0 + 0.05, SZ1 - 0.05, 0x3a3a3e, 'granite'); B(SX1, XR - 0.14, CT, T2, SZ0 + 0.05, SZ1 - 0.05, 0x3a3a3e, 'granite');
+  B(SX0, SX1, T2 - 0.4, T2 - 0.36, SZ0 + 0.05, SZ1 - 0.05, STEEL, 'shiny');                               // the steel sink: a real basin
+  B(SX0, SX0 + 0.04, T2 - 0.36, T2 + 0.01, SZ0 + 0.05, SZ1 - 0.05, STEEL, 'shiny'); B(SX1 - 0.04, SX1, T2 - 0.36, T2 + 0.01, SZ0 + 0.05, SZ1 - 0.05, STEEL, 'shiny');
+  B(SX0, SX1, T2 - 0.36, T2 + 0.01, SZ0 + 0.05, SZ0 + 0.09, STEEL, 'shiny'); B(SX0, SX1, T2 - 0.36, T2 + 0.01, SZ1 - 0.09, SZ1 - 0.05, STEEL, 'shiny');
+  C(0.04, 0.04, 0.62, STEEL, XR - 0.22, T2, SM, 6, 'shiny'); B(XR - 0.62, XR - 0.2, T2 + 0.56, T2 + 0.62, SM - 0.03, SM + 0.03, STEEL, 'shiny', dec);   // (its tap)
+  B(10.1, KX0, UF + 0.2, CT, -7.5, -6.1, 0xe3d7c1, 'wood'); B(10.15, KX0, UF, UF + 0.2, -7.45, -6.12, DARK, 'wood'); B(10.04, KX0 - 0.06, CT, T2, -7.56, -6.1, 0x3a3a3e, 'granite');   // a short counter along the bathroom wall
+  for (let i = 0; i < 5; i++) { const z = K0 + 0.15 + i * 1.6; if (i !== 2 && z + 1.45 < SZ0) B(KX0 - 0.04, KX0, UF + 0.3, CT - 0.15, z, z + 1.45, 0xd8ccb4, 'wood', dec); if (z + 0.95 < SZ0) B(KX0 - 0.08, KX0 - 0.04, CT - 0.4, CT - 0.34, z + 0.5, z + 0.95, STEEL, 'shiny', dec); }   // cupboard doors, handles
+  B(XR - 0.17, XR - 0.14, T2, T2 + 1.45, K0, KE, 0xffffff, 'tile', dec); B(10.1, XR - 0.14, T2, T2 + 1.45, -6.1, -6.06, 0xffffff, 'tile', dec);   // white tiles behind them
+  B(XR - 0.8, XR - 0.14, UF + 3.9, UF + 5.1, K0, K0 + 3.5, 0xd8ccb4, 'wood'); B(XR - 0.8, XR - 0.14, UF + 3.9, UF + 5.1, K0 + 5.5, KE, 0xd8ccb4, 'wood');   // wall cupboards over them...
+  for (let z = K0 + 1.17; z < KE - 0.3; z += 1.17) if (z < K0 + 3.4 || z > K0 + 5.6) B(XR - 0.82, XR - 0.8, UF + 3.95, UF + 5.05, z - 0.012, z + 0.012, 0x9c8a6c, 'plain', dec);
+  B(XR - 1.2, XR - 0.14, T2 + 2.0, T2 + 2.45, K0 + 3.6, K0 + 5.4, STEEL, 'shiny'); B(XR - 0.8, XR - 0.14, T2 + 2.45, CH, K0 + 4.0, K0 + 5.0, STEEL, 'shiny');   // ...and the chimney over the stove
+  B(XR - 1.2, XR - 0.3, T2, T2 + 0.08, K0 + 3.6, K0 + 5.4, 0x151515, 'shiny'); for (const z of [K0 + 4.1, K0 + 4.9]) { C(0.22, 0.22, 0.03, BRASS, XR - 0.75, T2 + 0.08, z, 12, 'shiny'); B(XR - 1.24, XR - 1.2, T2 + 0.01, T2 + 0.07, z - 0.04, z + 0.04, 0x222222, 'plain', dec); }   // the gas stove, its knobs
+  C(0.3, 0.3, 0.5, STEEL, XR - 0.75, T2 + 0.11, K0 + 4.1, 16, 'shiny'); B(XR - 0.77, XR - 0.73, T2 + 0.61, T2 + 0.67, K0 + 3.6, K0 + 4.4, 0x222222, 'plain', dec); C(0.05, 0.03, 0.2, 0x222222, XR - 0.75, T2 + 0.61, K0 + 4.1, 6);   // the pressure cooker
+  C(0.42, 0.24, 0.28, 0x3a3a3a, XR - 0.75, T2 + 0.11, K0 + 4.9, 18, 'shiny'); C(0.38, 0.38, 0.02, 0xc85a1e, XR - 0.75, T2 + 0.33, K0 + 4.9, 18);   // a kadai of curry
+  { const mx = XR - 0.8, mz = K0 + 6.3; C(0.48, 0.48, 0.14, STEEL, mx, T2, mz, 20, 'shiny');                   // the masala dabba, lid off
+    [0xe8b31c, 0xc2261f, 0x7a5a36, 0x2d2520, 0x9a8a4a, 0x6e3b1f, 0xc7a23a].forEach((c, i) => { const a = i * 1.05, r = i ? 0.29 : 0; C(0.12, 0.12, 0.03, c, mx + Math.cos(a) * r, T2 + 0.13, mz + Math.sin(a) * r, 10); }); }
+  B(8.2, 10.0, UF, UF + 4.6, -7.7, -6.1, 0xdfe3e7, 'shiny'); B(8.2, 10.0, UF + 3.2, UF + 3.23, -7.73, -7.7, 0xa9b0b6, 'shiny', dec);   // the fridge...
+  for (const [y, h] of [[UF + 2.0, 0.9], [UF + 3.45, 0.7]]) B(9.72, 9.8, y, y + h, -7.78, -7.73, 0x9aa2a8, 'shiny', dec);
+  [[8.6, UF + 2.6, 0xe63946], [8.95, UF + 2.35, 0x1d7fd6], [8.75, UF + 2.0, 0xf2c14e], [9.2, UF + 2.75, 0x2e8b3a]].forEach(([x, y, c]) => B(x - 0.1, x + 0.1, y - 0.1, y + 0.1, -7.74, -7.7, c, 'plain', dec));   // ...fridge magnets
+  shadow(9.1, -6.9, 2.1, 1.9, 0.32);
+  B(10.3, 10.9, T2, T2 + 0.45, -7.2, -6.5, WHITE, 'shiny'); C(0.17, 0.19, 0.45, 0xdfe9ee, 10.6, T2 + 0.45, -6.85, 10, 'shiny', dec);   // a mixie
+  B(10.8, 11.7, T2 + 1.3, T2 + 2.5, -6.28, -6.1, WHITE, 'shiny'); B(10.95, 11.55, T2 + 1.6, T2 + 2.2, -6.3, -6.28, 0x2a7fc0, 'shiny', dec);   // the water purifier on the wall
+  shadow(XR - 0.72, (K0 + KE) / 2, 1.5, KE - K0 + 0.3, 0.3); shadow(11.15, -6.8, 2.2, 1.6, 0.3);
+  // -- ...and the kitchen's a mess: dishes heaped in the sink, spills everywhere, peels, an overflowing bin (the flies love it)
+  { const P = (SX0 + SX1) / 2;
+    for (let i = 0; i < 6; i++) { const m = C(0.3, 0.3, 0.03, STEEL, P - 0.05 + (i % 2) * 0.1, T2 - 0.34 + i * 0.07, SM - 0.3 + (i % 3) * 0.26, 16, 'shiny'); m.rotation.set(0.35 + (i % 3) * 0.2, i, 0.25 - (i % 2) * 0.5);
+      const st = C(0.17, 0.17, 0.012, [0xe8b31c, 0x8b5a2b, 0xc85a1e][i % 3], 0, 0, 0, 10); st.position.copy(m.position); st.position.y += 0.02; st.rotation.copy(m.rotation); }
+    C(0.26, 0.22, 0.36, STEEL, P + 0.1, T2 - 0.3, SM + 0.35, 14, 'shiny', dec).rotation.z = 0.5;
+    for (let i = 0; i < 3; i++) C(0.11, 0.09, 0.09, STEEL, P - 0.2 + i * 0.2, T2 + 0.02 + i * 0.04, SM - 0.4 + i * 0.3, 10, 'shiny').rotation.x = 0.6 + i * 0.4;
+    for (const [z, c] of [[K0 + 2.3, 0xe8b31c], [K0 + 2.8, 0xc2261f]]) { B(XR - 1.25, XR - 0.3, T2, T2 + 0.012, z - 0.18, z + 0.18, c, 'decal'); C(0.12, 0.12, 0.03, c, XR - 1.0, T2 + 0.03, z, 10).rotation.x = 1.2; }   // turmeric and chilli, spilt
+    for (let k = 0; k < 7; k++) B(XR - 0.19, XR - 0.18, T2 + 0.3 + (k % 3) * 0.3, T2 + 0.42 + (k % 3) * 0.3 + (k % 2) * 0.1, K0 + 3.7 + k * 0.25, K0 + 3.85 + k * 0.25 + (k % 3) * 0.06, k % 2 ? 0xc8742a : 0x8b5a2b, 'decal', dec);   // splatter on the tiles behind the stove
+    C(0.35, 0.35, 0.01, 0x7a4a22, XR - 0.75, T2 + 0.08, K0 + 4.5, 14, 'decal');                               // (and a boil-over)
+    B(XR - 1.15, XR - 0.35, T2, T2 + 0.05, K0 + 0.1, K0 + 0.8, 0xc19a6b, 'wood', dec);                      // a cutting board: half an onion, a tomato, green chillies, the knife
+    S(0.13, 0x8e3b6e, XR - 0.95, T2 + 0.14, K0 + 0.35, 0.8); S(0.12, 0xd62828, XR - 0.6, T2 + 0.16, K0 + 0.6);
+    for (let k = 0; k < 3; k++) B(XR - 0.75 + k * 0.08, XR - 0.72 + k * 0.08, T2 + 0.05, T2 + 0.08, K0 + 0.15, K0 + 0.45, 0x3f9a2a, 'plain', dec);
+    B(XR - 0.62, XR - 0.58, T2 + 0.05, T2 + 0.07, K0 + 0.05, K0 + 0.65, 0xbfc5c9, 'shiny', dec); B(XR - 0.63, XR - 0.57, T2 + 0.05, T2 + 0.09, K0 + 0.65, K0 + 0.85, 0x2a2a2a, 'plain', dec);
+    C(0.36, 0.36, 0.05, 0xd9b98a, XR - 0.75, T2, K0 + 1.3, 18, 'wood'); S(0.12, 0xf1e0c0, XR - 0.7, T2 + 0.13, K0 + 1.25, 0.7); C(0.035, 0.035, 0.9, 0xc9a06a, XR - 0.95, T2 + 0.06, K0 + 1.45, 8, 'wood').rotation.x = Math.PI / 2;   // the chakla, dough and belan...
+    B(XR - 1.3, XR - 0.2, T2, T2 + 0.012, K0 + 0.9, K0 + 1.8, 0xf6f1e6, 'decal', dec);                       // ...in a drift of flour
+    let sd = 11; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+    for (let k = 0; k < 9; k++) { const x = 11.2 + rn() * 0.9, z = K0 + 0.2 + rn() * 1.3; B(x, x + 0.1, UF, UF + 0.015, z, z + 0.12, k % 2 ? 0xb56a8a : 0xd9b7c8, 'decal', dec).rotation.y = rn() * 3; }   // onion peels on the floor
+    for (const [x, z, r] of [[9.4, -11.1, 0.55], [9.9, -10.7, 0.4], [9.1, -10.5, 0.3]]) C(r, r, 0.012, 0xd9a520, x, UF, z, 16, 'decal');   // a whole pot of dal went over...
+    { const tb = C(0.12, 0.1, 0.32, STEEL, 10.3, UF - 0.04, -11.25, 12, 'shiny', dec); tb.rotation.set(0, 0.6, Math.PI / 2); }   // ...and the tumbler it came in, on its side
+    for (let k = 0; k < 28; k++) { const x = 8.2 + rn() * 2.4, z = -12.8 + rn() * 2.2; B(x, x + 0.05, UF, UF + 0.02, z, z + 0.03, 0xfaf6ee, 'decal', dec).rotation.y = rn() * 3; }   // rice everywhere
+    C(0.24, 0.24, 0.02, 0xc9a06a, 7.6, UF, -12.4, 14, 'decal');                                              // a dropped roti
+    B(10.6, 11.3, UF, UF + 0.02, -9.4, -8.9, 0xb03a2e, 'fabric', dec).rotation.y = 0.5;                       // a dish towel
+    { const bx = 7.3, bz = -7.2; C(0.42, 0.36, 1.2, 0xb8bec6, bx, UF, bz, 14, 'shiny'); const lid = C(0.44, 0.44, 0.06, 0x9aa2a8, bx - 0.3, UF + 1.3, bz, 14, 'shiny', dec); lid.rotation.z = -1.1;   // the bin, overflowing
+      [[0xe3a33c, 0.2], [0x6b8e23, 0.18], [0xf4f1e6, 0.17], [0x8b5a2b, 0.16], [0xd9480f, 0.15]].forEach(([c, r], i) => S(r, c, bx + Math.cos(i * 1.3) * 0.16, UF + 1.3 + (i % 2) * 0.12, bz + Math.sin(i * 1.3) * 0.16, 0.8));
+      B(bx - 0.95, bx - 0.55, UF, UF + 0.03, bz - 0.45, bz - 0.32, 0xf2d43d, 'decal', dec).rotation.y = 0.8; S(0.06, 0xf8f4ec, bx - 0.6, UF + 0.04, bz - 0.8, 0.6); S(0.06, 0xf8f4ec, bx - 0.45, UF + 0.04, bz - 0.95, 0.6);   // (a banana peel, eggshells)
+      shadow(bx, bz, 1.0, 1.0, 0.3); }
+    { const ab = B(11.4, 12.05, UF, UF + 0.9, -8.6, -8.1, 0xe8dcc0, 'fabric'); ab.rotation.z = 0.15; B(11.0, 12.2, UF, UF + 0.012, -9.1, -8.6, 0xf6f1e6, 'decal', dec); }   // an atta bag slumped over, flour on the floor
+    C(0.34, 0.3, 0.32, STEEL, 11.5, T2, -6.75, 12, 'shiny'); C(0.3, 0.26, 0.26, 0x3a3a3a, 11.5, T2 + 0.32, -6.75, 12, 'shiny'); C(0.25, 0.2, 0.22, 0xb87333, 11.52, T2 + 0.58, -6.75, 12, 'shiny');   // unwashed pots, stacked
+    for (let i = 0; i < 3; i++) { C(0.09, 0.075, 0.26, 0xd5e4ea, 12.0, T2, -6.35 - i * 0.27, 8, 'shiny'); C(0.08, 0.08, 0.02, 0x7a4a22, 12.0, T2 + 0.03, -6.35 - i * 0.27, 8); }   // used chai glasses
+    { const z0 = K0 + 0.15 + 2 * 1.6, dr = B(0, 0.04, 0, CT - UF - 0.45, 0, 1.45, 0xd8ccb4, 'wood', dec); dr.position.set(KX0 - 0.55, UF + 0.3 + (CT - UF - 0.45) / 2, z0 + 0.2); dr.rotation.y = -1.0; }   // a cupboard door left hanging open
+  }
+  // ======== the bathroom: tiled, a western loo with its health faucet, the bucket and mug, a basin and mirror, the geyser ========
+  { const t = (x0, x1, z0, z1) => B(x0, x1, UF, UF + 4.2, z0, z1, 0xdfeaf2, 'tile', dec);
+    t(8.06, 8.09, -5.94, -3.3); t(8.06, 8.09, -0.9, 1.44); t(8.06, XR - 0.14, -5.94, -5.91); t(8.06, XR - 0.14, 1.41, 1.44); t(XR - 0.17, XR - 0.14, -5.94, 1.44);
+    B(XR - 0.5, XR - 0.17, UF + 1.3, UF + 2.6, -5.3, -4.2, WHITE, 'shiny'); C(0.45, 0.35, 1.25, WHITE, XR - 1.15, UF, -4.75, 18, 'shiny'); C(0.48, 0.48, 0.07, WHITE, XR - 1.15, UF + 1.25, -4.75, 18, 'shiny');   // the loo
+    C(0.03, 0.03, 0.4, STEEL, XR - 0.25, UF + 1.0, -3.9, 6, 'shiny'); S(0.06, STEEL, XR - 0.25, UF + 1.45, -3.9, 1.4, 'shiny');   // its health faucet
+    C(0.45, 0.38, 0.9, STEEL, 9.3, UF, -4.8, 18, 'shiny'); C(0.42, 0.42, 0.02, 0x9fd0ea, 9.3, UF + 0.86, -4.8, 18, 'shiny', dec);   // the steel bucket, full...
+    { const mug = C(0.15, 0.13, 0.3, 0x2a7fd6, 9.45, UF + 0.88, -4.65, 12, 'shiny', dec); mug.rotation.z = 0.25; B(9.62, 9.66, UF + 0.95, UF + 1.12, -4.7, -4.6, 0x2a7fd6, 'shiny', dec); }   // ...and the blue plastic mug
+    B(10.2, 11.0, UF, UF + 0.45, -5.2, -4.4, 0x8a5a2e, 'wood');                                              // a low wooden patla to sit on
+    C(0.16, 0.2, 2.2, WHITE, 8.5, UF, 0.4, 12, 'shiny'); B(8.1, 9.0, UF + 2.2, UF + 2.55, -0.05, 0.85, WHITE, 'shiny');   // the basin...
+    B(8.09, 8.12, UF + 3.0, UF + 4.5, -0.1, 0.9, 0xcfe3ea, 'shiny', dec); B(8.12, 8.35, UF + 2.75, UF + 2.8, -0.05, 0.85, 0xf4f4f4, 'shiny', dec); C(0.07, 0.06, 0.25, 0x2a9d8f, 8.25, UF + 2.8, 0.1, 8);   // ...its mirror, a shelf, the toothbrush cup
+    { const gy = C(0.35, 0.35, 1.2, WHITE, XR - 0.55, UF + 4.3, -1.5, 16, 'shiny'); gy.position.y = UF + 4.3; gy.rotation.x = Math.PI / 2; S(0.05, 0xff2a2a, XR - 0.9, UF + 4.35, -1.1, 1, 'glow', glow); }   // the geyser (its light's on)
+    B(8.8, 10.8, UF + 3.2, UF + 3.25, 1.36, 1.41, STEEL, 'shiny', dec); B(9.0, 10.2, UF + 2.2, UF + 3.2, 1.33, 1.38, 0xe86a1c, 'fabric', dec);   // a towel on its rail
+    B(9.9, 12.7, CH - 0.08, CH, -2.3, -2.1, WHITE, 'plain', dec); B(10.0, 12.6, CH - 0.14, CH - 0.08, -2.26, -2.14, 0xfffbef, 'glow', glow);   // a tube light
+    shadow(9.3, -4.8, 1.2, 1.2, 0.3); shadow(XR - 0.9, -4.75, 1.3, 1.6, 0.3); }
+  // ======== the bazaar room: a drinks cart like the ones in the Indian food markets. Big steel buckets of lassi, rose sharbat, mango,
+  //          jaljeera, nimbu pani and chai, rows of glasses, a clay matka, sacks of spices, crates of fruit, marigolds, fairy lights ========
+  { const cx = 2.0, cz = 0.0, CTc = UF + 2.3, T3 = CTc + 0.12;
+    B(cx - 2.6, cx + 2.6, UF + 1.0, CTc, cz - 0.95, cz + 0.95, 0x2f7d6d, 'wood'); B(cx - 2.75, cx + 2.75, CTc, T3, cz - 1.1, cz + 1.1, TEAK, 'wood');
+    for (let i = 0; i < 5; i++) B(cx - 2.3 + i * 1.15, cx - 2.1 + i * 1.15, UF + 1.1, CTc - 0.1, cz - 0.97, cz - 0.95, 0xf2c14e, 'plain', dec);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const wx = cx + sx * 1.4, wz = cz + sz * 1.05, ty = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.07, 6, 24), K.plain); ty.userData.col = 0x2a2a2a; ty.position.set(wx, UF + 0.9, wz); dec.add(ty);
+      C(0.12, 0.12, 0.1, 0x8a8a8a, wx, UF + 0.85, wz, 8, 'shiny', dec).rotation.x = Math.PI / 2; for (let k = 0; k < 4; k++) B(wx - 0.03, wx + 0.03, UF + 0.1, UF + 1.7, wz - 0.03, wz + 0.03, 0x9a9a9a, 'shiny', dec).rotation.z = k * Math.PI / 4;
+      C(0.05, 0.05, sz < 0 ? 2.36 : 2.62, DARK, cx + sx * 2.6, T3, cz + sz * 1.0, 6, 'wood'); }
+    for (let i = 0; i < 10; i++) B(cx - 2.9 + i * 0.58, cx - 2.9 + (i + 1) * 0.58, T3 + 2.45, T3 + 2.55, cz - 1.5, cz + 1.3, i % 2 ? 0xf7efe0 : 0xd62828, 'fabric').rotation.x = -0.12;   // its striped awning
+    picture(4.6, 0.82, upTex('sign'), cx, T3 + 2.1, cz - 1.64, Math.PI);
+    const DR = [0xf5f0e1, 0xef6f9c, 0xffa928, 0x6fa83a, 0xf1e56b, 0x9a6b3f];
+    DR.forEach((c, i) => { const x = cx - 2.2 + i * 0.88, z = cz + 0.3; C(0.38, 0.3, 0.56, STEEL, x, T3, z, 16, 'shiny'); C(0.36, 0.36, 0.03, c, x, T3 + 0.55, z, 16, 'shiny');
+      const ld = C(0.025, 0.025, 1.0, STEEL, x + 0.14, T3 + 0.45, z + 0.05, 6, 'shiny'); ld.rotation.z = -0.35; S(0.08, STEEL, x - 0.02, T3 + 0.55, z + 0.05, 0.5, 'shiny'); });
+    for (let r = 0; r < 2; r++) for (let i = 0; i < 8; i++) { const x = cx - 2.3 + i * 0.64, z = cz - 0.5 - r * 0.33, c = DR[(i + r * 3) % 6];
+      if ((i + r) % 3) { C(0.1, 0.085, 0.32, c, x, T3, z, 10, 'shiny'); C(0.105, 0.1, 0.07, 0xe6f0f4, x, T3 + 0.32, z, 10, 'shiny'); } else C(0.105, 0.09, 0.4, 0xd5e4ea, x, T3, z, 10, 'shiny'); }
+    { const mx = cx + 3.6, mz = cz - 0.4; C(0.3, 0.35, 0.9, DARK, mx, UF, mz, 8, 'wood'); S(0.62, 0xb5552b, mx, UF + 1.45, mz, 1, 'plain'); C(0.3, 0.26, 0.25, 0xa84a24, mx, UF + 1.95, mz, 12); C(0.64, 0.64, 0.14, 0xc41e3a, mx, UF + 1.33, mz, 16, 'fabric', dec); shadow(mx, mz, 1.4, 1.4, 0.3); }
+    [0xe8b31c, 0xc2261f, 0x7a5a36, 0x9a8a3a, 0xd9480f].forEach((c, i) => { const x = -1.9 + i * 1.2, z = 5.1;   // jute sacks of spices along the wall, heaped in cones
+      C(0.5, 0.55, 1.0, 0xc9a66b, x, UF, z, 12, 'fabric'); C(0.56, 0.56, 0.12, 0xb8955a, x, UF + 1.0, z, 12, 'fabric', dec); C(0.02, 0.45, 0.5, c, x, UF + 1.08, z, 12, 'fabric', dec); shadow(x, z, 1.3, 1.3, 0.3); });
+    [[2.6, 'mango'], [3.9, 'banana'], [5.2, 'coconut']].forEach(([z, fruit]) => { const x = 9.8;           // crates of fruit
+      B(x - 0.6, x + 0.6, UF, UF + 0.7, z - 0.5, z + 0.5, 0xa87a4a, 'wood'); for (let k = 0; k < 3; k++) B(x - 0.61, x + 0.61, UF + 0.15 + k * 0.22, UF + 0.2 + k * 0.22, z - 0.51, z + 0.51, 0x8a5e36, 'wood', dec);
       for (let k = 0; k < 9; k++) { const fx = x - 0.4 + (k % 3) * 0.4, fz = z - 0.3 + (k / 3 | 0) * 0.3;
-        if (fruit === 'mango') O(0.17, k % 2 ? 0xffb52e : 0xf2c53d, fx, UF + 0.82, fz, 0.8); else if (fruit === 'banana') B(fx - 0.25, fx + 0.25, UF + 0.72, UF + 0.84, fz - 0.07, fz + 0.07, 0xf2d43d); else O(0.2, 0x6b4a2a, fx, UF + 0.86, fz); } });
-    C(0.38, 0.42, 1.0, 0xe63946, cx - 1.2, UF, cz - 2.3, 12); C(0.38, 0.42, 1.0, 0x1d7fd6, cx + 1.0, UF, cz - 2.5, 12);   // plastic stools
-    for (let k = 0; k < 6; k++) for (let j = 0; j < 7; j++) O(0.07, j % 2 ? 0xffa21f : 0xffd23a, cx - 2.4 + k * 0.96, T2 + 2.35 - j * 0.15, cz - 1.47);   // marigolds hanging off the awning
-    [0xffd23a, 0xff6fae, 0x7fd8ff, 0x9cf03a, 0xff9a3c].forEach((c, ci) => { for (let i = ci; i < 30; i += 5) { const t = i / 29; O(0.07, c, HL + 0.4 + (2.6 - HL) * t, CH - 0.25 - Math.sin(t * Math.PI) * 0.8, zF + 17.4 + (zB - 0.4 - zF - 17.4) * t); } }); }   // fairy lights across the ceiling
-  // -- the bedroom at the back: a carved bed with an indigo block-print spread, bolster and pillows, a steel almirah, a dressing table
-  { const bx0 = 3.0, bz0 = zF + 20.5, bx = 8.6;
-    B(bx0, XR, UF, CH, bz0 - 0.06, bz0 + 0.06, PLASTER);
-    B(bx0 - 0.06, bx0 + 0.06, UF, CH, zF + 23.2, zB, PLASTER); B(bx0 - 0.06, bx0 + 0.06, UF + 5.0, CH, zF + 21.0, zF + 23.2, PLASTER); B(bx0 - 0.06, bx0 + 0.06, UF, CH, bz0, zF + 21.0, PLASTER);
-    garland(bx0 - 0.12, zF + 21.0, bx0 - 0.12, zF + 23.2, UF + 4.9, 0.35, 10);                              // (a toran over its doorway)
-    B(bx - 2.3, bx + 2.3, UF, UF + 1.0, zB - 5.5, zB - 0.15, WOOD); B(bx - 2.4, bx + 2.4, UF, UF + 3.2, zB - 0.42, zB - 0.13, WOOD);
-    for (const sx of [-1, 1]) C(0.12, 0.12, 3.6, TEAK, bx + sx * 2.4, UF, zB - 0.3, 8);
-    B(bx - 2.15, bx + 2.15, UF + 1.0, UF + 1.5, zB - 5.4, zB - 0.45, 0xf4efe6);
-    B(bx - 2.2, bx + 2.2, UF + 1.5, UF + 1.58, zB - 5.45, zB - 1.8, 0x2c3e87); B(bx - 2.2, bx + 2.2, UF + 1.51, UF + 1.59, zB - 5.45, zB - 5.1, 0xc0392b);
-    for (let i = 0; i < 6; i++) B(bx - 2.0 + i * 0.75, bx - 1.75 + i * 0.75, UF + 1.58, UF + 1.6, zB - 4.9, zB - 2.0, 0xf2c14e);
-    for (const sx of [-1, 1]) B(bx + sx * 1.05 - 0.9, bx + sx * 1.05 + 0.9, UF + 1.5, UF + 1.85, zB - 1.4, zB - 0.6, 0xfbf8f1);
-    yCyl(up, 0.22, 0.22, 3.8, 0xd4a017, bx, UF + 1.75, zB - 1.65, 12).rotation.z = Math.PI / 2;
-    B(XR - 1.9, XR - 0.15, UF, UF + 5.0, bz0 + 0.3, bz0 + 2.9, 0x7d8f9b); B(XR - 1.92, XR - 1.9, UF + 0.3, UF + 4.7, bz0 + 1.58, bz0 + 1.62, 0x5d6f7b); B(XR - 1.97, XR - 1.9, UF + 2.3, UF + 2.9, bz0 + 1.4, bz0 + 1.5, 0xd0d4d8);   // the steel almirah
-    B(bx0 + 0.1, bx0 + 1.3, UF, UF + 2.4, zB - 2.6, zB - 0.8, WOOD); B(bx0 + 0.07, bx0 + 0.12, UF + 2.8, UF + 4.7, zB - 2.3, zB - 1.1, 0xcfe3ea);   // a dressing table and its mirror
-    B(4.8, 12.2, UF + 0.005, UF + 0.02, zB - 5.9, zB - 0.6, 0xa8323a); }
-  { const parts = {};                                                    // bake the solid things room by room: each chunk's box stays small, so her feelers only test what's near her
+        if (fruit === 'mango') S(0.17, k % 2 ? 0xffb52e : 0xf2c53d, fx, UF + 0.82, fz, 0.8); else if (fruit === 'banana') B(fx - 0.25, fx + 0.25, UF + 0.72, UF + 0.84, fz - 0.07, fz + 0.07, 0xf2d43d, 'plain', dec); else S(0.2, 0x6b4a2a, fx, UF + 0.86, fz); }
+      shadow(x, z, 1.4, 1.2, 0.28); });
+    C(0.38, 0.42, 1.0, 0xe63946, cx - 1.2, UF, cz - 2.3, 12, 'shiny'); C(0.38, 0.42, 1.0, 0x1d7fd6, cx + 1.0, UF, cz - 2.5, 12, 'shiny');   // plastic stools
+    shadow(cx, cz, 5.8, 2.6, 0.3); shadow(cx - 1.2, cz - 2.3, 0.9, 0.9, 0.26); shadow(cx + 1.0, cz - 2.5, 0.9, 0.9, 0.26);
+    for (let k = 0; k < 6; k++) for (let j = 0; j < 7; j++) S(0.07, j % 2 ? 0xffa21f : 0xffd23a, cx - 2.4 + k * 0.96, T3 + 2.35 - j * 0.15, cz - 1.36);   // marigolds hanging off the awning
+    for (const fz of [-4.0, 3.4]) [0xffd23a, 0xff6fae, 0x7fd8ff, 0x9cf03a, 0xff9a3c].forEach((c, ci) => { for (let i = ci; i < 34; i += 5) { const t = i / 33; S(0.07, c, -2.3 + 10.1 * t, CH - 0.25 - Math.sin(t * Math.PI) * 0.7, fz, 1, 'glow', glow); } });   // fairy lights, strung across
+    garland(-5.3, 5.86, -2.8, 5.86, UF + 4.9, 0.35, 10); garland(4.8, 5.86, 7.3, 5.86, UF + 4.9, 0.35, 10); }   // torans over the bedroom doors
+  // ======== bedroom two: a divan with a bright phulkari spread, a study desk under the window, a bookshelf ========
+  { B(HL + 0.14, HL + 2.6, UF, UF + 1.0, 11.8, 17.4, TEAK, 'wood'); B(HL + 0.2, HL + 2.55, UF + 1.0, UF + 1.4, 11.9, 17.3, 0xf4efe6, 'fabric'); B(HL + 0.18, HL + 2.58, UF + 1.4, UF + 1.46, 11.9, 17.3, 0xe0457b, 'fabric');
+    for (let i = 0; i < 5; i++) B(HL + 0.3, HL + 2.4, UF + 1.46, UF + 1.48, 12.3 + i * 1.0, 12.6 + i * 1.0, 0xf2c14e, 'fabric', dec);
+    for (const z of [12.5, 16.6]) { const bo = C(0.28, 0.28, 2.2, 0x1fa4a0, HL + 1.37, UF + 1.5, z, 12, 'fabric'); bo.position.y = UF + 1.74; bo.rotation.z = Math.PI / 2; }
+    shadow(HL + 1.4, 14.6, 2.8, 6.0, 0.32);
+    B(-5.2, -2.4, UF + 1.9, UF + 2.05, 21.6, zB - 0.2, TEAK, 'wood'); for (const x of [-5.1, -2.5]) B(x - 0.08, x + 0.08, UF, UF + 1.9, 21.7, zB - 0.3, DARK, 'wood');   // the desk...
+    B(-4.4, -3.2, UF + 2.05, UF + 2.1, 22.1, 22.9, 0x2a2a2e, 'shiny', dec); const lid = B(-4.4, -3.2, UF + 2.1, UF + 2.14, 0, 0.8, 0x2a2a2e, 'shiny', dec); lid.position.set(-3.8, UF + 2.45, 22.95); lid.rotation.x = 1.3;   // ...a laptop
+    C(0.08, 0.2, 0.05, DARK, -2.8, UF + 2.05, 22.7, 8, 'plain', dec); C(0.02, 0.02, 0.6, DARK, -2.8, UF + 2.1, 22.7, 4, 'plain', dec); C(0.1, 0.22, 0.2, 0xfff0c0, -2.8, UF + 2.7, 22.7, 10, 'glow', glow);   // a desk lamp, on
+    B(-4.3, -3.3, UF + 1.1, UF + 1.2, 20.6, 21.5, 0x2a4a7a, 'fabric'); B(-4.3, -3.3, UF + 1.2, UF + 2.8, 20.5, 20.62, 0x2a4a7a, 'fabric'); for (const x of [-4.2, -3.4]) for (const z of [20.6, 21.4]) B(x - 0.05, x + 0.05, UF, UF + 1.1, z - 0.05, z + 0.05, 0x333333, 'shiny');   // its chair
+    shadow(-3.8, 22.4, 3.0, 1.8, 0.28);
+    B(2.3, 2.94, UF, UF + 5.0, 7.6, 11.4, TEAK, 'wood'); for (let s = 0; s < 4; s++) { B(2.28, 2.3, UF + 0.2 + s * 1.2, UF + 0.28 + s * 1.2, 7.7, 11.3, DARK, 'wood', dec);   // a bookshelf, full
+      let z = 7.8; for (let b = 0; z < 11.1; b++) { const w = 0.18 + ((b * 7 + s * 3) % 5) * 0.05, h = 0.7 + ((b * 5 + s) % 4) * 0.1; B(2.24, 2.3, UF + 0.28 + s * 1.2, UF + 0.28 + s * 1.2 + h, z, z + w, [0xb8322f, 0x2a4a7a, 0xe8b04a, 0x2e8b3a, 0x7b3fa0, 0xf4efe6][(b + s) % 6], 'fabric', dec); z += w + 0.02; } }
+    shadow(2.6, 9.5, 1.0, 4.0, 0.3);
+    picture(7.3, 11.5, upTex('dhurrie'), -1.85, UF + 0.012, 13.75, 0, -Math.PI / 2);                    // a striped cotton dhurrie
+    picture(2.8, 2.1, upTex('madhubani'), HL + 0.17, UF + 3.7, 12.6, Math.PI / 2); }
+  // ======== the master bedroom: a carved bed with an indigo block-print spread, the steel almirah, a dressing table ========
+  { const bz0 = 12.3, bz1 = 17.1, bx0 = XR - 5.5;
+    B(XR - 0.45, XR - 0.14, UF, UF + 3.4, bz0 - 0.2, bz1 + 0.2, TEAK, 'wood'); for (const z of [bz0 - 0.2, bz1 + 0.2]) C(0.12, 0.12, 3.8, DARK, XR - 0.35, UF, z, 8, 'wood');   // headboard and posts
+    B(bx0, XR - 0.45, UF, UF + 1.0, bz0, bz1, TEAK, 'wood'); B(bx0 + 0.1, XR - 0.5, UF + 1.0, UF + 1.5, bz0 + 0.1, bz1 - 0.1, 0xf4efe6, 'fabric');
+    B(bx0 + 0.05, XR - 1.8, UF + 1.5, UF + 1.58, bz0 + 0.05, bz1 - 0.05, 0x2c3e87, 'fabric'); B(bx0 + 0.04, bx0 + 0.4, UF + 1.51, UF + 1.59, bz0 + 0.05, bz1 - 0.05, 0xc0392b, 'fabric');   // the indigo spread, its red border...
+    for (let i = 0; i < 6; i++) B(bx0 + 0.6, XR - 2.0, UF + 1.58, UF + 1.6, bz0 + 0.3 + i * 0.75, bz0 + 0.55 + i * 0.75, 0xf2c14e, 'fabric', dec);   // ...and gold stripes
+    for (const s of [-1, 1]) B(XR - 1.5, XR - 0.6, UF + 1.5, UF + 1.85, (bz0 + bz1) / 2 + s * 1.1 - 0.9, (bz0 + bz1) / 2 + s * 1.1 + 0.9, 0xfbf8f1, 'fabric');
+    { const bo = C(0.22, 0.22, 3.8, 0xd4a017, XR - 1.75, UF + 1.53, (bz0 + bz1) / 2, 12, 'fabric'); bo.position.y = UF + 1.72; bo.rotation.x = Math.PI / 2; }
+    for (const z of [bz0 - 1.1, bz1 + 1.1]) { B(XR - 1.1, XR - 0.2, UF, UF + 1.4, z - 0.45, z + 0.45, TEAK, 'wood'); C(0.08, 0.14, 0.6, BRASS, XR - 0.65, UF + 1.4, z, 10, 'shiny'); C(0.18, 0.3, 0.45, 0xfff0c8, XR - 0.65, UF + 2.0, z, 12, 'glow', glow); shadow(XR - 0.65, z, 1.2, 1.2, 0.28); }   // bedside tables, lamps on
+    shadow((bx0 + XR) / 2, (bz0 + bz1) / 2, 5.7, 5.4, 0.32);
+    B(3.06, 4.7, UF, UF + 5.0, 8.4, 11.2, 0x7d8f9b, 'shiny'); B(4.7, 4.72, UF + 0.3, UF + 4.7, 9.78, 9.82, 0x5d6f7b, 'shiny', dec); B(4.72, 4.78, UF + 2.3, UF + 2.9, 9.6, 9.7, 0xd0d4d8, 'shiny', dec);   // the steel almirah
+    shadow(3.9, 9.8, 2.0, 3.2, 0.32);
+    B(6.6, 8.4, UF, UF + 2.4, zB - 1.0, zB - 0.16, TEAK, 'wood'); B(6.8, 8.2, UF + 2.8, UF + 4.6, zB - 0.2, zB - 0.16, 0xcfe3ea, 'shiny', dec); B(6.7, 8.3, UF + 2.7, UF + 4.7, zB - 0.17, zB - 0.15, TEAK, 'wood', dec);   // a dressing table and mirror...
+    C(0.35, 0.35, 1.3, 0xb8322f, 7.5, UF, zB - 1.9, 12, 'fabric'); shadow(7.5, zB - 1.2, 2.2, 1.9, 0.28);   // ...and its stool
+    picture(8.6, 13, upTex('kilim'), 8.3, UF + 0.012, 14.5, 0, -Math.PI / 2); }                           // a red kilim under it all
+  // ======== bake: solid things room by room (her feelers only test what's near her), the rest kind by kind ========
+  { const parts = {};
     const key = o => { o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox, sx = (b.max.x - b.min.x) * o.scale.x, sz = (b.max.z - b.min.z) * o.scale.z;
       if (sx > 6 || sz > 6) return 'shell'; const x = o.position.x, z = o.position.z;
-      return x < -0.3 && z < SW ? 'foyer' : z < zF + 12 ? (x > -0.3 ? 'living' : 'hall') : z < zF + 17 ? (x < 4 ? 'dining' : 'kitchen') : x < 3 ? 'bazaar' : z < zF + 20.5 ? 'kitchen' : 'bedroom'; };
-    for (const o of up.children.slice()) { if (!o.isMesh) continue; const k = key(o); (parts[k] = parts[k] || new THREE.Group()).add(o); }
-    for (const k in parts) { parts[k].userData.name = 'Upstairs'; up.add(parts[k]); bakeYard(parts[k]); } }
-  bakeYard(dec);
-  // -- things that move: the jhoola sways, the fan turns, the front door opens
-  { const jh = new THREE.Group(); jh.position.set(gx, CH, zF + 2.8); jh.userData.name = 'Jhoola'; povEndWall.add(jh); const drop = CH - (UF + 1.55);   // a jhoola: a carved swing seat on chains, by the big window
-    yBox(jh, 3.2, 0.16, 1.3, WOOD, 0, -drop, 0); yBox(jh, 3.0, 0.14, 1.1, 0xe8b04a, 0, -drop + 0.15, 0.05);
-    yBox(jh, 3.2, 1.1, 0.12, WOOD, 0, -drop + 0.65, -0.6); yBox(jh, 3.4, 0.16, 0.18, TEAK, 0, -drop + 1.25, -0.6);
-    for (const sx of [-1.5, 1.5]) for (const sz of [-0.55, 0.55]) yCyl(jh, 0.025, 0.025, drop, 0x9a9a9a, sx, -drop / 2, sz, 5);
-    bakeYard(jh); U.jhoola = jh; }
-  { const fan = new THREE.Group(); fan.position.set(6.2, CH - 0.45, zF + 6.2); fan.userData.noWalk = true; povEndWall.add(fan);   // a ceiling fan
-    yCyl(fan, 0.03, 0.03, 0.45, 0x5a3a22, 0, 0.22, 0, 6); yCyl(fan, 0.3, 0.24, 0.22, BRASS, 0, 0, 0, 14);
-    for (let k = 0; k < 3; k++) { const a = k * 2.094; yBox(fan, 2.3, 0.04, 0.42, 0x6b4428, Math.cos(a) * 1.3, -0.04, Math.sin(a) * 1.3).rotation.y = -a; }
-    U.fan = fan; }
+      return x < -0.3 && z < SW ? 'foyer' : z < zF + 12 ? 'living' : x < -2.5 && z < 6 ? 'hall' : z < -6.1 ? (x < 4.5 ? 'dining' : 'kitchen') : z < 6 ? (x > 8 && z < 1.5 ? 'bath' : 'bazaar') : x < 3 ? 'bed2' : 'master'; };
+    for (const o of solid.children.slice()) { if (!o.isMesh) continue; const k = key(o); if (!parts[k]) { parts[k] = new THREE.Group(); parts[k].userData.name = 'Upstairs'; solid.add(parts[k]); } parts[k].add(o); }
+    for (const k in parts) bakeKinds(parts[k], scales); }
+  bakeKinds(dec, scales); bakeKinds(glow, scales);
+  for (const m of root.children) if (m.isMesh && m.material.userData.shadow) {                         // soft shadows by a wall: trim their fade so none shows through it (or outside the house)
+    const px = m.position.x, pz = m.position.z, sx = m.scale.x, sy = m.scale.y, cx0 = Math.max(px - sx / 2, HL + 0.14), cx1 = Math.min(px + sx / 2, XR - 0.14), cz0 = Math.max(pz - sy / 2, zF + 0.14), cz1 = Math.min(pz + sy / 2, zB - 0.14);
+    if (cx0 <= px - sx / 2 && cx1 >= px + sx / 2 && cz0 <= pz - sy / 2 && cz1 >= pz + sy / 2) continue;
+    const g = m.geometry.clone(), P = g.attributes.position, UV = g.attributes.uv;
+    for (let i = 0; i < P.count; i++) { const lx = (THREE.MathUtils.clamp(px + P.getX(i) * sx, cx0, cx1) - px) / sx, ly = -(THREE.MathUtils.clamp(pz - P.getY(i) * sy, cz0, cz1) - pz) / sy; P.setXY(i, lx, ly); UV.setXY(i, lx + 0.5, ly + 0.5); }
+    m.geometry = g; }
+  // ======== things that move: the jhoola sways, the fan turns (its light on), the front door opens; and the flies ========
+  { const jh = new THREE.Group(); jh.position.set(gx, CH, zF + 2.8); jh.userData.name = 'Jhoola'; root.add(jh); const drop = CH - (UF + 1.3);
+    put(new THREE.BoxGeometry(3.2, 0.16, 1.3), 'wood', TEAK, jh).position.set(0, -drop, 0); put(new THREE.BoxGeometry(3.0, 0.14, 1.1), 'fabric', 0xe8b04a, jh).position.set(0, -drop + 0.15, 0.05);
+    put(new THREE.BoxGeometry(3.2, 1.1, 0.12), 'wood', TEAK, jh).position.set(0, -drop + 0.65, -0.6); put(new THREE.BoxGeometry(3.4, 0.16, 0.18), 'wood', DARK, jh).position.set(0, -drop + 1.25, -0.6);
+    for (const sx of [-1.5, 1.5]) for (const sz of [-0.55, 0.55]) put(new THREE.CylinderGeometry(0.025, 0.025, drop, 5), 'shiny', 0x9a9a9a, jh).position.set(sx, -drop / 2, sz);
+    bakeKinds(jh, scales); U.jhoola = jh; }
+  { const fan = new THREE.Group(); fan.position.set(6.2, CH - 0.45, zF + 6.2); fan.userData.noWalk = true; root.add(fan);
+    put(new THREE.CylinderGeometry(0.03, 0.03, 0.45, 6), 'wood', DARK, fan).position.set(0, 0.22, 0); put(new THREE.CylinderGeometry(0.3, 0.24, 0.22, 14), 'shiny', BRASS, fan);
+    for (let k = 0; k < 3; k++) { const a = k * 2.094, b = put(new THREE.BoxGeometry(2.3, 0.04, 0.42), 'wood', 0x6b4428, fan); b.position.set(Math.cos(a) * 1.3, -0.04, Math.sin(a) * 1.3); b.rotation.y = -a; }
+    const bowl = put(new THREE.SphereGeometry(0.26, 14, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), 'glow', 0xfff1cf, fan); bowl.position.y = -0.1;   // (a frosted glass bowl under it, lit)
+    bakeKinds(fan, scales); U.fan = fan; }
+  { const N = 16;                                                                                          // flies, buzzing round the kitchen mess
+    const body = new THREE.InstancedMesh(new THREE.SphereGeometry(0.036, 6, 4), new THREE.MeshBasicMaterial({ color: 0x141414, fog: false }), N);
+    const wing = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.004, 0.05), new THREE.MeshBasicMaterial({ color: 0xdde6ee, transparent: true, opacity: 0.55, depthWrite: false, fog: false }), N);
+    for (const m of [body, wing]) { m.userData.noWalk = true; m.frustumCulled = false; root.add(m); }
+    const hot = [[(SX0 + SX1) / 2, T2 + 0.45, SM], [7.3, UF + 1.75, -7.2], [9.5, UF + 0.45, -10.9], [XR - 0.75, T2 + 0.75, K0 + 4.9], [11.5, T2 + 1.1, -6.75]];
+    U.flies = { body, wing, scatter: 0, buzzT: 0, cx: 10.0, cz: -9.5, list: Array.from({ length: N }, (_, i) => ({ h: hot[i % hot.length], r: 0.3 + Math.random() * 0.45, w: [1.6 + Math.random() * 2.2, 2.4 + Math.random() * 2.6, 1.3 + Math.random() * 2.4], ph: [Math.random() * 6.3, Math.random() * 6.3, Math.random() * 6.3], p: new THREE.Vector3() })) }; }
   { const g = new THREE.Group(); g.position.set(dR, LH, zF + 0.06); g.userData.name = 'Front door'; povEndWall.add(g);   // our front door: dark, the storm door's glass on it, hinged on the right so it swings in
     yBox(g, U.dw - 0.06, U.dh - 0.04, 0.1, 0x2a2420, -U.dw / 2, U.dh / 2, 0); yBox(g, U.dw - 0.55, U.dh * 0.55, 0.04, 0x5d6b73, -U.dw / 2, U.dh * 0.62, -0.07);
     for (const sz of [-1, 1]) yBox(g, 0.13, 0.13, 0.13, BRASS, -U.dw + 0.32, U.dh * 0.46, sz * 0.1);
     frontDoor = { g, open: 0, want: 0, openAt: 0, said: false, inside: false }; }
+}
+function upstairsView(c) { const U = UPPER; return inUpper(c.x, c.z) && (c.y > CEIL_H + 0.05 || (c.z < U.SW + 0.2 && c.x < -0.2)); }   // (a point up there, or in the foyer: not the living room below)
+function updateUpperLights() {                                        // the upstairs is only drawn (and its lamps only lit) when you could see it: you're up there or in the foyer, or out front looking in
+  const U = UPPER; if (!U.root) return;
+  const c = camera.position, p = walk.pos, see = walk.on && (upstairsView(c) || c.z < U.zF + 1.5 || upstairsView(p));
+  U.root.visible = see;                                               // (her feelers skip hidden things: it's always drawn while she's inside)
+  for (const L of U.lights) L.intensity = see ? L.userData.base : 0;    // (lights never come and go, so no shaders rebuild: they just go dark)
+}
+const _flyM = new THREE.Matrix4(), _flyQ = new THREE.Quaternion(), _flyS = new THREE.Vector3(), _flyE = new THREE.Euler(), _flyP = new THREE.Vector3();
+function updateFlies(dt) {                                            // the kitchen flies: erratic loops round the mess; a swipe scatters them for a bit
+  const F = UPPER.flies; if (!F) return;
+  F.scatter = Math.max(0, F.scatter - dt); const sc = 1 + Math.min(1, F.scatter) * 2.5, t = clock;
+  F.list.forEach((f, i) => {
+    const [a, b, c] = f.w, [pa, pb, pc] = f.ph, r = f.r * sc;
+    _flyP.set(f.h[0] + Math.sin(t * a + pa) * r + Math.sin(t * 17 + i) * 0.03, f.h[1] + Math.sin(t * b + pb) * 0.3 * sc + (sc - 1) * 0.4, f.h[2] + Math.cos(t * c + pc) * r + Math.cos(t * 19 + i) * 0.03);
+    const yaw = Math.atan2(_flyP.x - f.p.x, _flyP.z - f.p.z); f.p.copy(_flyP);
+    _flyQ.setFromEuler(_flyE.set(0, yaw, 0)); _flyM.compose(_flyP, _flyQ, _flyS.set(1, 0.8, 1.6)); F.body.setMatrixAt(i, _flyM);
+    _flyP.y += 0.03; _flyM.compose(_flyP, _flyQ, _flyS.set(0.35 + Math.abs(Math.sin(t * 90 + i * 1.7)) * 0.65, 1, 1)); F.wing.setMatrixAt(i, _flyM);   // (wings a blur)
+  });
+  F.body.instanceMatrix.needsUpdate = F.wing.instanceMatrix.needsUpdate = true;
+  if (walk.on && state === 'playing' && inUpper(walk.pos.x, walk.pos.z) && walk.pos.y > UPPER.UF - 0.3 && clock > F.buzzT) {   // bzzz, louder the closer she gets
+    const d = Math.hypot(walk.pos.x - F.cx, walk.pos.z - F.cz); if (d < 8) { F.buzzT = clock + 0.16; tone(205 + Math.random() * 30, 200 + Math.random() * 30, 0.2, 'sawtooth', 0.001 + 0.004 * (1 - d / 8)); }
+  }
+}
+function flySwipe(paw) {                                              // she bats at the flies: they scatter (and soon come straight back)
+  const F = UPPER.flies; if (!F || !walk.on || !F.list.some(f => f.p.distanceTo(paw) < 1.4)) return false;
+  F.scatter = 2.5; showWalkName('\ud83e\udeb0 Shoo! Shoo!'); noise(0.1, 0.05, 2600); return true;
 }
 function knockDoor(paw) {                                             // she swipes at our front door: knock knock... and it creaks open
   const D = frontDoor, U = UPPER; if (!D || D.want) return false;
@@ -4872,17 +5120,18 @@ function knockDoor(paw) {                                             // she swi
   showWalkName('🚪 Knock knock...'); D.want = 1; D.openAt = clock + 1.1; return true;
 }
 function updateFrontDoor(dt) {                                        // the door swings in once she's knocked; the jhoola sways; the fan turns
-  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 2.2;
+  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 2.2; updateFlies(dt);
   const D = frontDoor; if (!D) return;
   const go = D.want && clock > D.openAt;
   if (go && !D.said) { D.said = true; tone(260, 185, 0.55, 'sawtooth', 0.02); noise(0.35, 0.03, 500); showWalkName('🚪 ...the door creaks open. Come on in!'); }
   D.open += ((go ? 1 : 0) - D.open) * Math.min(1, dt * 2.2); D.g.rotation.y = D.open * 1.5;
-  if (walk.on && !D.inside && inUpper(walk.pos.x, walk.pos.z) && walk.pos.y > U.UF - 0.2) {
+  if (walk.on && !D.inside && walk.grounded && inUpper(walk.pos.x, walk.pos.z) && walk.pos.y > U.UF - 0.2 && walk.pos.y < U.CH) {
     D.inside = true; const fresh = !achDone.knockKnock; unlock('knockKnock'); showWalkName(fresh ? '🏠 Welcome upstairs!' : '🏠 Welcome upstairs! Something smells amazing...');
   }
 }
 function indoorsOK(x, z) {                                            // inside our front door (the foyer, the stairs, the second level: their walls are solid) or in the doorway itself
-  const U = UPPER; return (x > YARD.HL + 0.15 && x < YARD.XR - 0.15 && z > U.zF + 0.1 && z < U.zB - 0.1) || (Math.abs(x - U.dx) < U.dw / 2 - 0.1 && z > U.zF - 0.9 && z <= U.zF + 0.1);
+  const U = UPPER, y = walk.pos.y;                                    // (only at those heights: the ground floor behind the walls isn't anywhere to be)
+  return (x > YARD.HL + 0.15 && x < YARD.XR - 0.15 && z > U.zF + 0.1 && z < U.zB - 0.1 && (y > U.UF - 0.6 || (z < U.SW + 0.2 && x < -0.2 && y > U.LH - 0.6))) || (Math.abs(x - U.dx) < U.dw / 2 - 0.1 && z > U.zF - 0.9 && z <= U.zF + 0.1);
 }
 function yardShadowMat() {                                            // a soft round contact shadow on the grass
   if (yardShadowMat.m) return yardShadowMat.m;
@@ -5991,7 +6240,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-28 14:26';                                              // stamped when the site is published
+const BUILD = '2026-09-28 18:33';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -9095,6 +9344,12 @@ function startWalk() {
   fitCamera();
   showBanner('Free roam!');
 }
+const _wUp = new THREE.Vector3(0, 1, 0);
+function headRoom(x, z, y) {                                         // how high she can rise here before her head meets the underside of something
+  _wRay.set(_wO.set(x, y + 0.3, z), _wUp); _wRay.far = 3;
+  for (const h of _wRay.intersectObjects(walk.meshes, false)) { let shown = true; for (let q = h.object; q; q = q.parent) if (!q.visible) { shown = false; break; } if (shown) return h.point.y - WALK.height - 0.01; }
+  return Infinity;
+}
 function standMeshes(extra) {                                         // everything solid enough to stand on or bump into (Free roam, and the mouse in Mouse mode)
   if (!walk.rig) { walk.rig = makeWalker(); if (!walk.on) { walk.rig.g.visible = false; walk.rig.shadow.visible = false; } }
   const skip = new Set([walk.rig.g, cat, heist.player.root, heistGoal.g, heist.ring, gunRig.held, chippy.g, ...blanketRigs.map(b => b.lump), ...mice.map(m => m.root), ...(MW.dk ? [MW.dk.rig.g] : []), ...(extra || [])]);
@@ -9135,7 +9390,7 @@ function updateWalk(dt) {
   if ((kx || ky) && !walk.frozen) { const l = Math.hypot(kx, ky); sx = kx / l; sy = ky / l; }
   if (mirrorWorld) sx = -sx;                                          // the picture is flipped, so left/right are too
   const yaw = fc.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);   // stick up = away from the camera
-  _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * nipK().walk * (!inRoomXZ(p.x, p.z) ? 1.9 : 1));   // (outdoors, back or front, she tears about)   // catnip: zoomies / a floaty drift / a slow zen amble
+  _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * nipK().walk * (!inRoomXZ(p.x, p.z) && !upstairsView(p) ? 1.9 : 1));   // (outdoors, back or front, she tears about; indoors upstairs, she walks)   // catnip: zoomies / a floaty drift / a slow zen amble
   if (yardOpen() && inBush(p.x, p.z, p.y)) { _wv.multiplyScalar(0.6); if (_wv.lengthSq() > 1 && clock > (walk.rustleT || 0)) { walk.rustleT = clock + 0.32; noise(0.16, 0.05, 1300 + Math.random() * 600); } }   // (pushing through a bush: slower, and rustling)
   walk.vel.lerp(_wv, 1 - Math.exp(-dt * (walk.grounded ? 12 : 8)));
   if (walk.jumpQ > 0 && clock - walk.jumpQ < 0.2 && walk.grounded) {   // (a press just before landing still counts)
@@ -9154,7 +9409,7 @@ function updateWalk(dt) {
         const yo = yardOpen(), lx2 = yo ? nx + mx / ml * WALK.reach : THREE.MathUtils.clamp(nx + mx / ml * WALK.reach, -lx, lx), lz2 = yo ? nz + mz / ml * WALK.reach : THREE.MathUtils.clamp(nz + mz / ml * WALK.reach, 0.3, ROOM.visDepth - 0.45);
         if (yo && !walkRoamOK(lx2, lz2)) return false;                 // (slider open: never a grab that lands her inside a wall)
         const top = surfaceTop(lx2, lz2, p.y + 0.5);
-        if (!(top > p.y - 0.05 && top - p.y < 0.5) || surfaceTop(lx2, lz2, top + WALK.height) > top + WALK.step) return false;
+        if (!(top > p.y - 0.05 && top - p.y < 0.5) || surfaceTop(lx2, lz2, top + WALK.height) > top + WALK.step || sideBlocked(p.x, p.z, top, lx2 - p.x, lz2 - p.z)) return false;   // (and never through a wall to a floor behind it)
         p.set(lx2, top, lz2); walk.vy = 0; walk.grounded = true; walk.squash = 0.6; sfx.padThud(0.3); return true;
       }
       p.x = nx; p.z = nz; return true;
@@ -9168,8 +9423,9 @@ function updateWalk(dt) {
     if (g >= p.y - WALK.step) p.y = g; else { walk.grounded = false; walk.vy = 0; }
   } else {
     walk.vy -= WALK.grav * nipK().grav * dt;                          // (slow-mo catnip: moon gravity)
-    const cap = inRoomXZ(p.x, p.z) ? CEIL_H - WALK.height - 0.05 : inUpper(p.x, p.z) && p.y > UPPER.LH - 0.5 ? UPPER.CH - WALK.height - 0.05 : walk.free ? 60 : 9;   // (no ceiling out in the yard, or anywhere once she's out)
+    const cap = inRoomXZ(p.x, p.z) && p.y < CEIL_H ? CEIL_H - WALK.height - 0.05 : inUpper(p.x, p.z) && p.y > UPPER.LH - 0.5 ? UPPER.CH - WALK.height - 0.05 : walk.free ? 60 : 9;   // (no ceiling out in the yard, or anywhere once she's out)
     let ny = p.y + walk.vy * dt; if (ny > cap) { ny = cap; walk.vy = Math.min(walk.vy, 0); }
+    if (walk.vy > 0 && upstairsView(p)) { const hy = headRoom(p.x, p.z, p.y); if (ny > hy) { ny = Math.max(p.y, Math.min(ny, hy)); walk.vy = 0; } }   // (upstairs: she bumps her head on cupboards and tabletops, never jumps up into them)
     if (walk.vy <= 0 && discoCatch(ny)) walk.vy = 0;
     else if (walk.vy <= 0) {
       const g = surfaceTop(p.x, p.z, p.y + 0.02);
@@ -9290,12 +9546,12 @@ function walkCam(S) {                                                // keep the
     camera.position.set(_wc.x + fx * 0.14, _wc.y + 0.04, _wc.z + fz * 0.14);
     { const from = _fpA.set(walk.pos.x, camera.position.y, walk.pos.z), d = _fpB.subVectors(camera.position, from), L = d.length();   // eyes ahead of her body: not inside the sofa she's nosing
       if (L > 0.01 && walk.meshes.length) { raycaster.set(from, d.divideScalar(L)); raycaster.far = L + 0.1; const h = raycaster.intersectObjects(walk.meshes, false)[0]; raycaster.far = Infinity; if (h && h.distance < L + 0.08) camera.position.copy(from).addScaledVector(d, Math.max(0, h.distance - 0.1)); }
-      const VD = ROOM.visDepth, c = camera.position; if (inRoomXZ(walk.pos.x, walk.pos.z)) c.x = THREE.MathUtils.clamp(c.x, -ROOM.halfW + 0.1, ROOM.halfW - 0.1); if (!yardOpen() && c.z > VD - 0.1) c.z = VD - 0.1; }   // (and never through the back wall / glass)
+      const VD = ROOM.visDepth, c = camera.position; if (inRoomXZ(walk.pos.x, walk.pos.z) && walk.pos.y < CEIL_H) c.x = THREE.MathUtils.clamp(c.x, -ROOM.halfW + 0.1, ROOM.halfW - 0.1); if (!yardOpen() && c.z > VD - 0.1) c.z = VD - 0.1; }   // (and never through the back wall / glass)
     camera.lookAt(camera.position.x + fx * Math.cos(pitch), camera.position.y + Math.sin(pitch), camera.position.z + fz * Math.cos(pitch));
   } else {
     const c = camera.position, f = S.focus, VD = ROOM.visDepth, SD = SLIDER;
     const byHouse = x => x > YARD.HL - 0.35 && x < YARD.HR + 0.35;    // (in line with the house: its back wall and the slider matter)
-    if (walk.free && !inRoomXZ(f.x, f.z) && (f.z < VD - 0.12 || !byHouse(f.x))) {   // she's got out round the side or the front: an ordinary outdoor camera, just kept out of walls and off the ground
+    if ((walk.free && !inRoomXZ(f.x, f.z) && (f.z < VD - 0.12 || !byHouse(f.x))) || upstairsView(f)) {   // she's got out round the side or the front: an ordinary outdoor camera, just kept out of walls and off the ground
       if (walk.view !== 'chase') { const h = camHit(f, c); if (h) c.copy(f).addScaledVector(_camV, Math.max(0.3, h.distance - 0.25)); }   // (the chase cam does its own, below)
       c.y = Math.max(c.y, 0.25);
     } else if (yardOpen() && SD) {                                            // the slider's open: the camera can follow her out into the yard (and back), but only through the doorway
@@ -9547,6 +9803,7 @@ function walkSwipe() {                                               // swipe at
   if (coonSwipe(paw)) return;                                        // the raccoon at the slider: whack the glass right in front of it
   if (dogSwipe(paw)) return;                                         // the Doberman out in the yard
   if (knockDoor(paw)) return;                                        // our front door: knock knock
+  if (flySwipe(paw)) return;                                         // the kitchen flies: shoo!
   if (laundrySwipe(paw)) return;
   if (weedSwipe(paw)) return;                                        // a weed in the lawn
   if (duckSwipe(paw)) return;                                        // the rubber ducks on the table                                     // the folded laundry on the armchair: all over the floor
@@ -10424,7 +10681,8 @@ function frame(now) {
   if (sliderDisco) updateSliderDisco(dt);
   updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateYardGate(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
 
-  if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && (camera.position.z >= ROOM.visDepth - 0.05 || !inRoomXZ(camera.position.x, camera.position.z)));   // (or out in the yard, or round the front)   // the end wall + door: only from inside the room
+  if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && (camera.position.z >= ROOM.visDepth - 0.05 || !inRoomXZ(camera.position.x, camera.position.z) || upstairsView(camera.position)));   // (or out in the yard, round the front, or upstairs)
+  updateUpperLights();   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
   if (state !== 'tvgame') renderer.render(scene, camera);           // (the room is hidden behind the full-screen TV)
 }
