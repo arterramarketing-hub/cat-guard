@@ -660,10 +660,11 @@ function softShadowMat(opacity, rect) {                                // a soft
     _softRectTex = canvasTex(128, 128, (c, w, h) => { c.clearRect(0, 0, w, h); c.shadowColor = 'rgba(0,0,0,1)'; c.shadowBlur = 20; c.fillStyle = '#000'; c.fillRect(25, 25, 78, 78); c.fillRect(25, 25, 78, 78); }, 1, 1);
     for (const t of [_softShTex, _softRectTex]) t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   }
-  return new THREE.MeshBasicMaterial({ map: rect ? _softRectTex : _softShTex, color: 0x000000, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const m = new THREE.MeshBasicMaterial({ map: rect ? _softRectTex : _softShTex, color: 0x000000, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  m.userData.shadow = true; return m;
 }
 function softShadow(parent, opacity, rect) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), softShadowMat(opacity, rect)); m.rotation.x = -Math.PI / 2; m.renderOrder = 1; m.userData.noWalk = true; parent.add(m); return m; }
-function rectShadow(parent, x, z, w, d, ry, opacity, y) { const m = softShadow(parent, opacity, true); m.position.set(x, (y || 0) + 0.006, z); m.rotation.z = -(ry || 0); m.scale.set(w / 0.62, d / 0.62, 1); return m; }   // (the texture's solid core is ~62% of it)
+function rectShadow(parent, x, z, w, d, ry, opacity, y) { const m = softShadow(parent, opacity, true); m.position.set(x, (y || 0) + 0.006, z); m.rotation.z = ry || 0; m.scale.set(w / 0.62, d / 0.62, 1); return m; }   // (the texture's solid core is ~62% of it)
 // beige carpet
 const floorTex = canvasTex(128, 128, (g, w, h) => {
   g.fillStyle = '#a08a74'; g.fillRect(0, 0, w, h);
@@ -3471,6 +3472,45 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           yBox(hd, 0.06, 2.1, 2.3, 0xf7f5f0, x, winY, z); yBox(hd, 0.05, 1.85, 2.05, 0x34414f, x + sd * 0.03, winY, z);
           if (k % 2) { yBox(hd, 0.06, 1.9, 2.3, 0xf7f5f0, x, 3.3, z); yBox(hd, 0.05, 1.65, 2.05, 0x34414f, x + sd * 0.03, 3.3, z); }
         }
+        { // the front of the house, from the photo (only seen if she ever gets round there): each half has its garage by the middle,
+          // a side door, and the front door up a short flight of steps under a little gable; a big window over the garage under a
+          // front gable of its own. Brick below, stucco and dark timber above, the red roof over it all
+          const zF = WZ - HD, FZ0 = zF - 0.06;
+          wallMesh(new THREE.Shape([new THREE.Vector2(HL, 0), new THREE.Vector2(HR, 0), new THREE.Vector2(HR, BH), new THREE.Vector2(HL, BH)]), brickTex, 2.05, 1.37, THREE.DoubleSide).position.z = zF;
+          wallMesh(new THREE.Shape([new THREE.Vector2(HL, BH), new THREE.Vector2(HR, BH), new THREE.Vector2(HR, XH), new THREE.Vector2(HL, XH)]), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.z = zF;
+          yBox(hd, W + 0.12, 0.34, 0.16, T, MX, BH + 0.05, FZ0); yBox(hd, W, 0.28, 0.12, T, MX, XH - 0.2, FZ0);   // the timber beams
+          yBox(hd, W + 1.2, 0.34, 0.12, 0x3a2a20, MX, XH - 0.06, zF - 1.15); yBox(hd, W + 1.2, 0.08, 1.1, 0xe9e2d4, MX, XH - 0.22, zF - 0.58);   // fascia and soffit
+          const steps = new THREE.Group(); steps.userData.name = 'Front steps'; povEndWall.add(steps);           // (solid: she can climb them)
+          const plaque = n => canvasTex(64, 32, (c, w, h) => { c.fillStyle = '#f4efe4'; c.fillRect(0, 0, w, h); c.fillStyle = '#3a2a20'; c.font = 'bold 22px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(n, w / 2, h / 2 + 1); }, 1, 1);
+          for (const half of [0, 1]) {
+            const mx = x => half ? 2 * XR - x : x, gx = mx(XR - 4.1), dx = mx(XR - 8.3), ex = mx(HL + 4.2), LH = 2.3;
+            yBox(hd, 6.7, 5.35, 0.08, 0xf2f0ea, gx, 2.675, FZ0); yBox(hd, 6.3, 5.1, 0.1, 0x4a2c20, gx, 2.55, FZ0 - 0.03);   // the garage door: dark brown panels in a white frame
+            for (let k = 1; k < 5; k++) yBox(hd, 6.3, 0.05, 0.04, 0x3a2218, gx, k * 1.02, FZ0 - 0.09);
+            yBox(hd, 1.3, 2.95, 0.08, 0xf2f0ea, dx, 1.475, FZ0); yBox(hd, 1.1, 2.8, 0.1, 0xf4f2ee, dx, 1.4, FZ0 - 0.03); yBox(hd, 0.7, 0.9, 0.04, 0x5a6b78, dx, 2.2, FZ0 - 0.09);   // the side door
+            yBox(hd, 2.2, 3.0, 0.08, 0xf2f0ea, ex, LH + 1.5, FZ0); yBox(hd, 1.0, 2.75, 0.1, 0x3a2a20, ex, LH + 1.375, FZ0 - 0.03); yBox(hd, 0.5, 1.1, 0.04, 0x8fa3ad, ex, LH + 1.9, FZ0 - 0.09);   // the front door...
+            for (const sd of [-1, 1]) yBox(hd, 0.32, 2.6, 0.04, 0x8fa3ad, ex + sd * 0.72, LH + 1.35, FZ0 - 0.06);                // ...and its sidelights
+            { const gw = 3.6, gy0 = LH + 3.2, gh = 1.9, ang = Math.atan2(gh, gw / 2), sl = Math.hypot(gw / 2, gh);                // the porch gable over it, with the house number
+              wallMesh(new THREE.Shape([new THREE.Vector2(-gw / 2, 0), new THREE.Vector2(gw / 2, 0), new THREE.Vector2(0, gh)]), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.set(ex, gy0, zF - 0.9);
+              for (const sd of [-1, 1]) { yBox(hd, sl + 0.3, 0.2, 0.12, T, ex + sd * gw / 4, gy0 + gh / 2, zF - 0.95).rotation.z = -sd * ang; yBox(hd, sl + 0.4, 0.14, 1.2, 0x8a3934, ex + sd * gw / 4, gy0 + gh / 2 + 0.14, zF - 0.45).rotation.z = -sd * ang; }
+              yBox(hd, 0.14, gh - 0.3, 0.1, T, ex, gy0 + (gh - 0.3) / 2, zF - 0.95); yBox(hd, gw, 0.18, 0.12, T, ex, gy0, zF - 0.95);
+              for (const sd of [-1, 1]) yBox(hd, 0.16, gy0 - LH, 0.16, 0xf2f0ea, ex + sd * (gw / 2 - 0.1), LH + (gy0 - LH) / 2, zF - 0.9);   // two white posts holding it up
+              const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.31), new THREE.MeshBasicMaterial({ map: plaque(half ? '26' : '28'), fog: false })); pl.rotation.y = Math.PI; pl.position.set(ex, gy0 + 0.55, zF - 0.97); pl.userData.noWalk = true; povEndWall.add(pl); }
+            yBox(steps, 2.6, LH, 1.5, 0x9c9890, ex, LH / 2, zF - 0.75);                                                          // the landing, and seven shallow steps down to the walk (each one a cat can walk up)
+            for (let k = 0; k < 7; k++) { const h = LH - (k + 1) * LH / 8; yBox(steps, 2.2, h, 0.62, 0xa6a29a, ex, h / 2, zF - 1.81 - k * 0.62); }
+            for (const sd of [-1, 1]) {                                                                                           // white railings either side
+              const rx = ex + sd * 1.2, run = 4.34, rl = yBox(hd, 0.07, 0.07, Math.hypot(run, LH), 0xf4f4f0, rx, LH / 2 + 0.9, zF - 1.5 - run / 2); rl.rotation.x = -Math.atan2(LH, run);
+              for (let k = 0; k < 7; k += 2) { const h = LH - (k + 1) * LH / 8; yBox(hd, 0.05, 0.9, 0.05, 0xf4f4f0, rx, h + 0.45, zF - 1.81 - k * 0.62); }
+            }
+            const wy = BH + 2.6;                                                                                                  // the big window over the garage...
+            yBox(hd, 4.6, 2.7, 0.08, 0xf7f5f0, gx, wy, FZ0); yBox(hd, 4.2, 2.35, 0.08, 0x34414f, gx, wy, FZ0 - 0.03); yBox(hd, 0.1, 2.35, 0.05, 0xf7f5f0, gx, wy, FZ0 - 0.08); yBox(hd, 4.2, 0.08, 0.05, 0xf7f5f0, gx, wy - 0.55, FZ0 - 0.08);
+            for (const x of [gx - 3.1, gx + 3.1, ex - 2.3, ex + 2.3]) yBox(hd, 0.2, XH - BH, 0.1, T, x, (BH + XH) / 2, FZ0);    // timber posts
+            { const gw = 8.2, gh = 3.6, ang = Math.atan2(gh, gw / 2), sl = Math.hypot(gw / 2, gh);                                // ...under its own front gable, timbered
+              wallMesh(new THREE.Shape([new THREE.Vector2(-gw / 2, 0), new THREE.Vector2(gw / 2, 0), new THREE.Vector2(0, gh)]), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.set(gx, XH - 0.1, zF - 0.4);
+              for (const sd of [-1, 1]) { yBox(hd, sl + 0.4, 0.26, 0.14, T, gx + sd * gw / 4, XH - 0.1 + gh / 2, zF - 0.46).rotation.z = -sd * ang; yBox(hd, sl + 0.6, 0.16, 3.2, 0x8a3934, gx + sd * gw / 4 * 1.02, XH - 0.1 + gh / 2 + 0.2, zF + 0.9).rotation.z = -sd * ang; }
+              yBox(hd, 0.18, gh - 0.4, 0.12, T, gx, XH - 0.1 + (gh - 0.4) / 2, zF - 0.46); for (const sd of [-1, 1]) yBox(hd, 0.16, 2.2, 0.1, T, gx + sd * 1.3, XH + 0.9, zF - 0.46).rotation.z = sd * 0.7; }
+          }
+          bakeYard(steps);
+        }
         bakeYard(hd);
       }
     }
@@ -3993,8 +4033,9 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           const RY = 8.5, z0 = FZ + 22, z1 = FZ + 31, rd = new THREE.Group(); rd.userData.name = 'Off-ramp'; rd.userData.noWalk = true; povEndWall.add(rd);
           const asTex = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#4a4a4c'; c.fillRect(0, 0, w, h); for (let i = 0; i < 1400; i++) { const v = 50 + Math.random() * 60 | 0; c.fillStyle = `rgba(${v},${v},${v + 2},.6)`; c.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5); } }, 40, 3);
           const road = new THREE.Mesh(new THREE.PlaneGeometry(170, z1 - z0), new THREE.MeshBasicMaterial({ map: asTex, fog: false })); road.rotation.x = -Math.PI / 2; road.position.set(0, RY + 0.02, (z0 + z1) / 2); rd.add(road);
-          const line = (z, dash, col) => { for (let x = -85; x < 85; x += dash ? 4 : 170) { const m = new THREE.Mesh(new THREE.PlaneGeometry(dash ? 2.2 : 170, 0.14), new THREE.MeshBasicMaterial({ color: col, fog: false })); m.rotation.x = -Math.PI / 2; m.position.set(dash ? x + 1.1 : 0, RY + 0.03, z); rd.add(m); } };
-          line(z0 + 0.35, false, 0xf2f2ee); line(z1 - 0.35, false, 0xf2f2ee); line((z0 + z1) / 2, true, 0xf4c430);
+          const lines = new THREE.Group(); rd.add(lines);
+          const line = (z, dash, col) => { for (let x = -85; x < 85; x += dash ? 4 : 170) { const m = new THREE.Mesh(new THREE.PlaneGeometry(dash ? 2.2 : 170, 0.14), new THREE.MeshBasicMaterial({ color: col, fog: false })); m.rotation.x = -Math.PI / 2; m.position.set(dash ? x + 1.1 : 0, RY + 0.03, z); lines.add(m); } };
+          line(z0 + 0.35, false, 0xf2f2ee); line(z1 - 0.35, false, 0xf2f2ee); line((z0 + z1) / 2, true, 0xf4c430); bakeYard(lines);
           const gb = new THREE.Group(); rd.add(gb); yBox(gb, 170, 0.32, 0.12, 0xb8bcc0, 0, RY + 0.75, z1 + 0.6); for (let x = -84; x < 85; x += 3) yBox(gb, 0.12, 0.8, 0.12, 0x8e9296, x, RY + 0.4, z1 + 0.66); bakeYard(gb);
           yardLife = yardLife || {}; yardLife.cars = [];
           for (const [lane, col, x0, sp] of [[z0 + 2.3, 0xc0392b, -60, 13], [z1 - 2.3, 0x2e6fb0, 40, -15]]) {
@@ -4385,6 +4426,11 @@ function hipRoof(par, x0, x1, z0, z1, y0, pitch, col, capCol) {      // four slo
   }
 }
 var YARD_SUN, _yardMat;
+function nearRaycast(rc, hits) {                                    // a baked yard mesh: a short ray (her feelers, the camera's) that can't reach its box skips the triangles
+  const b = nearRaycast.b || (nearRaycast.b = new THREE.Box3());
+  if (rc.far !== Infinity && b.copy(this.geometry.boundingBox).applyMatrix4(this.matrixWorld).distanceToPoint(rc.ray.origin) > rc.far) return;
+  THREE.Mesh.prototype.raycast.call(this, rc, hits);
+}
 function bakeYard(root) {
   root.updateMatrixWorld(true); YARD_SUN = YARD_SUN || new THREE.Vector3(-0.45, 0.78, -0.43).normalize();   // (the afternoon sun)
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), list = [], _m = new THREE.Matrix4(), n3 = new THREE.Vector3();
@@ -4404,8 +4450,8 @@ function bakeYard(root) {
     }
     at += P.count; gl.dispose(); gw.dispose();
   }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals(); g.computeBoundingSphere();
-  const mesh = new THREE.Mesh(g, _yardMat || (_yardMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide })));
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals(); g.computeBoundingSphere(); g.computeBoundingBox();
+  const mesh = new THREE.Mesh(g, _yardMat || (_yardMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }))); mesh.raycast = nearRaycast;
   list.forEach(o => o.parent.remove(o)); root.add(mesh);
 }
 function buildYardLife(VD, DX, DW) {                                  // the backyard, lived in (only ever seen from Free roam / the cat's eyes)
@@ -4508,22 +4554,55 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
       else { yCyl(g, 0.08, 0.13, 0.14, 0x4f7f34, 0, hgt - 0.02, 0, 8); yBlob(g, 0.11, 0xa04fbf, 0, hgt + 0.1, 0, 1.2); }     // ...and a thistle
       bakeYard(g); yardWeeds.push({ g, x, z, pull: 0 }); n++;
     } }
+  // -- out front (only if she ever gets round there): lawn round the front and sides, the driveway in front of the two garages, the
+  // front walks, a red maple, the sidewalk and Chipwood Crescent, and the houses across the street
+  { const zF = VD + IN(5) - Y.HD, fr = grp('Out front', true), cb = new THREE.Group(); fr.add(cb);
+    const tex = (base, spk, rx, ry) => canvasTex(128, 128, (c, w, h) => { c.fillStyle = base; c.fillRect(0, 0, w, h); for (let i = 0; i < 1300; i++) { c.fillStyle = spk[i % spk.length]; c.fillRect(Math.random() * w, Math.random() * h, 1.5 + Math.random() * 1.5, 1.5); } }, rx, ry);
+    const flat = (w, d, x, z, y, map, name) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map, fog: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.userData.name = name; m.userData.noWalk = true; povEndWall.add(m); return m; };
+    flat(190, 125, 0, VD - 62.5, -0.016, tex('#5c9c3c', ['rgba(38,86,28,.45)', 'rgba(150,204,96,.4)'], 64, 42), 'Front lawn');   // (under the house too: you never see that bit)
+    const asph = tex('#4b4b4d', ['rgba(30,30,32,.5)', 'rgba(110,110,112,.5)'], 8, 10), conc = tex('#c3c0b8', ['rgba(150,146,138,.5)', 'rgba(220,218,212,.5)'], 4, 12);
+    flat(15.4, 22, XR, zF - 11, 0.006, asph, 'Driveway');                                                     // one wide driveway in front of both garages
+    for (const ex of [Y.HL + 4.2, 2 * XR - Y.HL - 4.2]) flat(1.5, 17.8, ex, zF - 13.2, 0.008, conc, 'Front walk');   // the front walks, from the steps to the sidewalk
+    flat(190, 2.4, 0, zF - 23.2, 0.01, tex('#c9c6be', ['rgba(150,146,138,.45)'], 70, 1), 'Sidewalk');
+    yBox(cb, 190, 0.16, 0.25, 0xb9b6ae, 0, 0.08, zF - 24.5);                                                   // the curb
+    flat(190, 19, 0, zF - 34.1, 0.004, tex('#3f3f42', ['rgba(25,25,27,.5)', 'rgba(95,95,98,.45)'], 60, 6), 'Chipwood Crescent');
+    yBox(cb, 190, 0.16, 0.25, 0xb9b6ae, 0, 0.08, zF - 43.7); flat(190, 2.4, 0, zF - 45.1, 0.01, tex('#c9c6be', ['rgba(150,146,138,.45)'], 70, 1), 'Sidewalk');
+    { const mp = grp('Red maple', true), TX = Y.HL - 3.2, TZ = zF - 15; mp.position.set(TX, 0, TZ);        // the red maple in the photo, out front on the north side
+      yCyl(mp, 0.32, 0.5, 5, 0x5a4034, 0, 2.5, 0, 9);
+      for (let k = 0; k < 12; k++) { const a = k * 2.3, r = 1.5 + (k % 3) * 0.4; yBlob(mp, r, [0x8b3a2e, 0x9c4632, 0x7a2e26, 0xa85a3a][k % 4], Math.cos(a) * 1.9, 5.6 + (k % 4) * 0.55, Math.sin(a) * 1.7, 0.85); }
+      bakeYard(mp); shadow(TX, TZ, 3.2, 2.8); }
+    { const car = grp('Parked car'), cx = XR + 3.9, cz = zF - 7;                                               // next door's car on the driveway
+      yBox(car, 1.8, 1.0, 4.2, 0x7d8a96, cx, 0.75, cz); yBox(car, 1.6, 0.8, 2.3, 0x7d8a96, cx, 1.6, cz + 0.2); yBox(car, 1.64, 0.62, 2.1, 0x2a3440, cx, 1.62, cz + 0.2);
+      for (const [wx, wz] of [[-0.9, -1.3], [0.9, -1.3], [-0.9, 1.3], [0.9, 1.3]]) yCyl(car, 0.38, 0.38, 0.28, 0x1b1b1d, cx + wx, 0.38, cz + wz, 14).rotation.z = Math.PI / 2;
+      bakeYard(car); shadow(cx, cz, 1.3, 2.6); }
+    const across = (x, w, d, wall, roof) => {                                                                   // across the street: two storeys, a hipped roof, windows, a garage door and a driveway
+      const z1 = zF - 56, z0 = z1 - d, g = new THREE.Group(), H = FT(17); fr.add(g);
+      yBox(g, w, H, d, wall, x, H / 2, (z0 + z1) / 2);
+      for (let c = 0; c < 3; c++) for (const y of [H * 0.28, H * 0.7]) { const wx = x - w * 0.3 + c * w * 0.3; if (c === 2 && y < H / 2) continue; yBox(g, 2.1, 1.8, 0.08, 0xf7f5f0, wx, y, z1 + 0.04); yBox(g, 1.85, 1.55, 0.08, 0x3a4a5a, wx, y, z1 + 0.07); }
+      yBox(g, 4.8, 4.2, 0.08, 0xe8e4dc, x + w * 0.3, 2.1, z1 + 0.05);
+      hipRoof(g, x - w / 2 - 0.5, x + w / 2 + 0.5, z0 - 0.5, z1 + 0.5, H + 0.05, 0.45, roof, 0x4a4e52);
+      const dw = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 9.4), new THREE.MeshBasicMaterial({ map: asph, fog: false })); dw.rotation.x = -Math.PI / 2; dw.position.set(x + w * 0.3, 0.006, z1 + 4.7); dw.userData.noWalk = true; povEndWall.add(dw);
+      bakeYard(g);
+    };
+    across(-44, 17, 14, 0xe7e2d6, 0x5d6166); across(-19, 18, 15, 0xd6c1a8, 0x8a3934); across(7, 16, 14, 0xdfe5e8, 0x4f5358); across(33, 19, 15, 0xe9d9c3, 0x5d6166);
+    bakeYard(cb); }
   // -- the neighbours, to scale from the satellite view: 30 & 32 (a grey-roofed semi) to the north, set 5 m further back than us, with
   // white siding; 22 & 24 to the south, past next door. Two storeys, white-trimmed windows all round, hipped roofs
-  { const nb = grp('Neighbourhood', true), H = FT(18);
+  { const hood = grp('Neighbourhood', true), H = FT(18);
     const home = (x0, x1, z0, z1, wall, roof, cap) => {
+      const nb = new THREE.Group(); hood.add(nb);                          // (each house baked on its own)
       yBox(nb, x1 - x0, H, z1 - z0, wall, (x0 + x1) / 2, H / 2, (z0 + z1) / 2);
       const win = (x, y, z, nx, nz) => { yBox(nb, nx ? 0.08 : 2.3, 2.0, nz ? 0.08 : 2.3, 0xf7f5f0, x + nx * 0.02, y, z + nz * 0.02); yBox(nb, nx ? 0.08 : 2.0, 1.72, nz ? 0.08 : 2.0, 0x3a4a5a, x + nx * 0.05, y, z + nz * 0.05); };
       for (const y of [H * 0.28, H * 0.7]) {
         for (let z = z0 + 3.5; z < z1 - 2; z += 7) { win(x0, y, z, -1, 0); win(x1, y, z, 1, 0); }
         for (let x = x0 + 3.5; x < x1 - 2; x += 7) { win(x, y, z1, 0, 1); win(x, y, z0, 0, -1); }
       }
-      hipRoof(nb, x0 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.5, H + 0.05, 0.4, roof, cap);
+      hipRoof(nb, x0 - 0.5, x1 + 0.5, z0 - 0.5, z1 + 0.5, H + 0.05, 0.4, roof, cap); bakeYard(nb);
     };
     home(-61, -19.9, VD - 21.5, VD + 13.4, 0xe4e4df, 0x5d6166, 0x4a4e52);                              // 30 & 32
     home(Y.HR + 2.6, Y.HR + 46, VD - 56, VD - 8, 0xd2c2ab, 0x5d6166, 0x4a4e52);                         // 22 & 24 (its back wall a little nearer the street than ours)
-    yBox(nb, 2.8, 2.6, 4.4, 0xf2f2ee, Y.HR + 4.4, 1.3, VD - 5.2);                                         // (and the little white lean-to off the back of 24)
-    bakeYard(nb); }
+    { const lt = new THREE.Group(); hood.add(lt); yBox(lt, 2.8, 2.6, 4.4, 0xf2f2ee, Y.HR + 4.4, 1.3, VD - 5.2); bakeYard(lt); }   // (and the little white lean-to off the back of 24)
+  }
   // -- life: butterflies round the flower beds, a few birds wheeling overhead
   yardLife = Object.assign(yardLife || {}, { butterflies: [], birds: [], chirpT: 3 });
   for (let i = 0; i < 5; i++) { const b = makeButterfly(); b.scale.setScalar(0.75); b.userData.noWalk = true; povEndWall.add(b); const az = VD + 4 + i * 5.2; yardLife.butterflies.push({ g: b, ax: i % 2 ? YARD.XR - 2.2 : yardXL(az) + 2.2, az, r: 1.5 + (i % 3) * 0.6, sp: 0.5 + i * 0.13, ph: i * 1.7 }); }
@@ -4534,7 +4613,8 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
 function yardShadowMat() {                                            // a soft round contact shadow on the grass
   if (yardShadowMat.m) return yardShadowMat.m;
   const t = canvasTex(64, 64, (c, w, h) => { const g = c.createRadialGradient(32, 32, 2, 32, 32, 32); g.addColorStop(0, 'rgba(20,35,15,.42)'); g.addColorStop(0.65, 'rgba(20,35,15,.22)'); g.addColorStop(1, 'rgba(20,35,15,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h); }, 1, 1);
-  return (yardShadowMat.m = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1 }));
+  yardShadowMat.m = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1 }); yardShadowMat.m.userData.shadow = true;
+  return yardShadowMat.m;
 }
 function updateYardLife(dt) {                                         // the sky rides with the camera; clouds drift; butterflies flit; birds circle; birdsong outside
   if (!skyRig || !povEndWall || !povEndWall.visible) return;
@@ -4714,7 +4794,7 @@ class Cheese {
     this.warnMat = new THREE.MeshBasicMaterial({ color: 0xe2452c, transparent: true, opacity: 0, depthWrite: false });
     this.warn = new THREE.Mesh(warnGeo, this.warnMat); this.warn.rotation.x = -Math.PI / 2;
     this.warn.visible = false;     // warning ring under cheese removed
-    this.shadow = softShadow(scene, 0.34); this.shadow.layers.set(1);   // (layer 1, like the mushroom: the mirror doesn't see it)
+    this.shadow = softShadow(scene, 0.2); this.shadow.layers.set(1);   // (layer 1, like the mushroom: the mirror doesn't see it)
     scene.add(this.warn);
     this.reset();
   }
@@ -4744,11 +4824,11 @@ class Cheese {
   nudge(dir, dist) { if (!this.alive || this.state === 'carried' || this.fall) return; this.yaw += (Math.random() < 0.5 ? -1 : 1) * (0.4 + Math.random() * 0.25); this.wob = 1;
     this.tdir = dir !== undefined ? dir + (Math.random() - 0.5) * 0.5 : Math.atan2(this.pos.x - CAT_POS.x, this.pos.z - CAT_POS.z) + (Math.random() - 0.5) * 0.9;   // batted away from the cat (or wherever Free-walk Princess hit it from)
     this.roll = { t: 0, e: 0, dur: dist ? 0.6 + dist * 0.2 : 0.75, dist: dist || 1.0 + Math.random() * 0.6 }; this.downT = 0; sfx.nudge(); }
-  lose() { this.state = 'gone'; this.alive = false; this.claimant = null; this.wedge.visible = false; }
+  lose() { this.state = 'gone'; this.alive = false; this.claimant = null; this.wedge.visible = false; if (this.shadow) this.shadow.visible = false; }
   shade(y) {                                                         // its soft shadow on whatever it's sitting on (bigger and fainter the higher it is)
     const sh = this.shadow, on = this.alive && this.wedge.visible && this.state !== 'carried'; sh.visible = on; if (!on) return;
     const h = Math.max(0, y - this.pos.y), bs = this.wedge.userData.baseScale || 1;
-    sh.position.set(this.pos.x + this.off.x, this.pos.y + 0.012, this.pos.z + this.off.y); sh.scale.setScalar(0.95 * bs * (1 + h * 0.3)); sh.material.opacity = 0.34 / (1 + h * 0.9);
+    sh.position.set(this.pos.x + this.off.x, this.pos.y + 0.012, this.pos.z + this.off.y); sh.scale.setScalar(0.95 * bs * (1 + h * 0.3)); sh.material.opacity = 0.2 / (1 + h * 0.9);
   }
   update(dt, time) {
     let y = this.pos.y, s = 1;                           // sits on the carpet (Mouse mode: or a sofa, a table, the mantel...)
@@ -5455,7 +5535,9 @@ class Mouse {
     this.feet.forEach((f, i) => { const ph = this.gait + (i === 0 || i === 3 ? 0 : Math.PI); f.position.set(f.userData.home.x, f.userData.home.y + Math.max(0, Math.sin(ph)) * 0.05 * run, f.userData.home.z + Math.cos(ph) * 0.06 * run); });
     this.tailPivot.rotation.y = Math.sin(time * (3 + 6 * run) + this.gait * 0.2) * (0.25 + 0.2 * run);
     this.tailPivot.rotation.x = -0.1 + Math.sin(time * 2.3) * 0.08;
-    this.shadow.scale.setScalar(Math.max(0.001, this.pop * this.visScale));
+    if (this.state === 'kJump') { const hy = Math.max(0, this.root.position.y); this.shadow.position.y = 0.012 - hy; this.shadowK = 1 / (1 + hy * 0.6); }   // (Karen's leap off the TV: her shadow stays on the carpet, small while she's high)
+    else if (this.state !== 'player') { this.shadow.position.y = 0.012; this.shadowK = 1; }
+    this.shadow.scale.setScalar(Math.max(0.001, this.pop * this.visScale * (this.shadowK || 1)));
     this.center.set(p.x, 0.3 * s, p.z);
   }
 }
@@ -5586,7 +5668,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-27 22:25';                                              // stamped when the site is published
+const BUILD = '2026-09-27 23:16';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -5930,7 +6012,7 @@ function updateHeist(dt) {
   }
   const gy = heistFloorY(pos);
   p.model.rotation.x = heist.air ? THREE.MathUtils.clamp(-heist.vy * 0.05, -0.45, 0.45) : 0;   // nose up on the way up, down on the way down
-  p.shadow.position.y = gy - pos.y + 0.012;                           // (her shadow stays on whatever's under her)
+  p.shadow.position.y = gy - pos.y + 0.012; p.shadowK = 1 / (1 + Math.max(0, pos.y - gy) * 1.1);   // (her shadow stays on whatever's under her, shrinking as she jumps)
   p.sqY += (1 - p.sqY) * Math.min(1, dt * 4); p.sqXZ += (1 - p.sqXZ) * Math.min(1, dt * 4);
   heist.invuln = Math.max(0, heist.invuln - dt); p.root.visible = heist.invuln <= 0 || Math.sin(clock * 30) > 0;   // blinks while safe
   heist.ghostT = Math.max(0, heist.ghostT - dt);
@@ -8623,8 +8705,11 @@ let _tvTop = null;
 // can't slide into a sofa or the box, not just her nose)
 const BODY_PTS = [[0.36, 0], [0.18, 0.17], [0.18, -0.17], [-0.14, 0.17], [-0.14, -0.17], [-0.32, 0], [0, 0]];
 function bodyHits(x, z, face, lim, top) {                            // how far her body is pushed into things (0 = clear): the sum of how much each point is overlapped
-  const fx = Math.sin(face), fz = Math.cos(face), g = walk.gScale || 1; let n = 0;
-  for (const [f, sd] of BODY_PTS) n += Math.min(1, Math.max(0, surfaceTop(x + (fx * f + fz * sd) * g, z + (fz * f - fx * sd) * g, top) - lim));
+  const fx = Math.sin(face), fz = Math.cos(face), g = walk.gScale || 1, hz = hillY(z); let n = 0;
+  for (const [f, sd] of BODY_PTS) {
+    const px = x + (fx * f + fz * sd) * g, pz = z + (fz * f - fx * sd) * g, rise = Math.max(0, hillY(pz) - hz);   // (out on the bank: the slope of the ground itself isn't a ledge)
+    n += Math.min(1, Math.max(0, surfaceTop(px, pz, top + rise) - lim - rise));
+  }
   return n;
 }
 // horizontal feelers at knee and head height, from her middle and both flanks, reaching past her nose: they catch the
@@ -8654,7 +8739,7 @@ function tvHits(x, z, face, y) {                                      // the TV 
 function cabHits(x, z, face, y) {                                    // how much of her is inside the credenza (the cupboards behind their doors): nose, middle, rump
   if (y > CAB_H - 0.15) return 0;
   const fx = Math.sin(face), fz = Math.cos(face), x1 = MAIN_X0 + MAIN_W; let n = 0;
-  for (const k of [-0.3, 0, 0.3]) { const px = x + fx * k, pz = z + fz * k; if (pz < DEPTH + 0.02 && px > LEFT_X0 && px < x1) n++; }
+  for (const k of [-0.3, 0, 0.3]) { const px = x + fx * k, pz = z + fz * k; if (pz < DEPTH + 0.02 && pz > -0.3 && px > LEFT_X0 && px < x1) n++; }
   return n;
 }
 function walkBlocked(nx, nz, ox, oz) {
@@ -8753,7 +8838,7 @@ function updateWalk(dt) {
     if (g >= p.y - WALK.step) p.y = g; else { walk.grounded = false; walk.vy = 0; }
   } else {
     walk.vy -= WALK.grav * nipK().grav * dt;                          // (slow-mo catnip: moon gravity)
-    const cap = p.z > ROOM.visDepth ? 9 : CEIL_H - WALK.height - 0.05;   // (no ceiling out in the yard)
+    const cap = inRoomXZ(p.x, p.z) ? CEIL_H - WALK.height - 0.05 : walk.free ? 60 : 9;   // (no ceiling out in the yard, or anywhere once she's out)
     let ny = p.y + walk.vy * dt; if (ny > cap) { ny = cap; walk.vy = Math.min(walk.vy, 0); }
     if (walk.vy <= 0 && discoCatch(ny)) walk.vy = 0;
     else if (walk.vy <= 0) {
@@ -8856,13 +8941,14 @@ function updateWalk(dt) {
     W.peepers.forEach(e => { e.visible = k < 0.5; }); W.lids.forEach(l => { l.visible = k >= 0.5; });
   } else if (W.lids[0].visible) { W.peepers.forEach(e => { e.visible = true; }); W.lids.forEach(l => { l.visible = false; }); }
   const gy = surfaceTop(p.x, p.z, p.y + 0.05), hgt = p.y - gy;
-  W.shadow.position.set(p.x, gy + 0.012, p.z); W.shadow.rotation.z = -walk.face; W.shadow.scale.set(0.9, 1.45, 1).multiplyScalar((1 + hgt * 0.15) / (1 + hgt * 0.4)); W.shadow.material.opacity = 0.5 / (1 + hgt * 0.8);
+  W.shadow.position.set(p.x, gy + 0.012, p.z); W.shadow.rotation.z = walk.face; W.shadow.scale.set(0.9, 1.45, 1).multiplyScalar(1 / (1 + hgt * 0.55)); W.shadow.material.opacity = 0.5 / (1 + hgt * 0.6);   // (lined up with her; smaller and fainter the higher she jumps)
   W.shadow.visible = !walk.fp;
-  if (walk.free && !walk.farSaid && Math.hypot(p.x, p.z - ROOM.visDepth) > 70) { walk.farSaid = true; showWalkName('🐾 Princess has left the level. Byeee!'); }
+  if (walk.free && !walk.farSaid && Math.hypot(p.x - 8, p.z - (ROOM.visDepth - 25)) > 80) { walk.farSaid = true; showWalkName('🐾 Princess has left the level. Byeee!'); }
   fc.focus.set(p.x, p.y + 0.55, p.z);
   updateMirrorWorld(dt);
 }
 const _fpA = new THREE.Vector3(), _fpB = new THREE.Vector3();
+function inRoomXZ(x, z) { return Math.abs(x) < ROOM.halfW + 0.3 && z > -0.3 && z < ROOM.visDepth + 0.1; }   // (over the living room's floor, rather than out round the side or the front)
 function walkCam(S) {                                                // keep the follow camera inside the room, or look out through her eyes
   if (walk.fp && walk.rig) {
     walk.rig.head.getWorldPosition(_wc);
@@ -8870,11 +8956,14 @@ function walkCam(S) {                                                // keep the
     camera.position.set(_wc.x + fx * 0.14, _wc.y + 0.04, _wc.z + fz * 0.14);
     { const from = _fpA.set(walk.pos.x, camera.position.y, walk.pos.z), d = _fpB.subVectors(camera.position, from), L = d.length();   // eyes ahead of her body: not inside the sofa she's nosing
       if (L > 0.01 && walk.meshes.length) { raycaster.set(from, d.divideScalar(L)); raycaster.far = L + 0.1; const h = raycaster.intersectObjects(walk.meshes, false)[0]; raycaster.far = Infinity; if (h && h.distance < L + 0.08) camera.position.copy(from).addScaledVector(d, Math.max(0, h.distance - 0.1)); }
-      const VD = ROOM.visDepth, c = camera.position; c.x = THREE.MathUtils.clamp(c.x, -ROOM.halfW + 0.1, ROOM.halfW - 0.1); if (!yardOpen() && c.z > VD - 0.1) c.z = VD - 0.1; }   // (and never through the back wall / glass)
+      const VD = ROOM.visDepth, c = camera.position; if (inRoomXZ(walk.pos.x, walk.pos.z)) c.x = THREE.MathUtils.clamp(c.x, -ROOM.halfW + 0.1, ROOM.halfW - 0.1); if (!yardOpen() && c.z > VD - 0.1) c.z = VD - 0.1; }   // (and never through the back wall / glass)
     camera.lookAt(camera.position.x + fx * Math.cos(pitch), camera.position.y + Math.sin(pitch), camera.position.z + fz * Math.cos(pitch));
   } else {
     const c = camera.position, f = S.focus, VD = ROOM.visDepth, SD = SLIDER;
-    if (yardOpen() && SD) {                                            // the slider's open: the camera can follow her out into the yard (and back), but only through the doorway
+    if (walk.free && f.z < VD - 0.12 && !inRoomXZ(f.x, f.z)) {         // she's got out round the side or the front: an ordinary outdoor camera, just kept out of walls and off the ground
+      const h = camHit(f, c); if (h) c.copy(f).addScaledVector(_camV, Math.max(0.3, h.distance - 0.25));
+      c.y = Math.max(c.y, 0.25);
+    } else if (yardOpen() && SD) {                                            // the slider's open: the camera can follow her out into the yard (and back), but only through the doorway
       const ox0 = SD.DX - SD.DW / 2 + 0.12, ox1 = SD.DX + SD.DW / 2 - 0.12, oh = SD.DH - 0.08;
       if ((c.z - VD) * (f.z - VD) < 0) {                              // on the other side of the back wall from her...
         const t = (VD - f.z) / (c.z - f.z), ix = f.x + (c.x - f.x) * t, iy = f.y + (c.y - f.y) * t;
@@ -9079,7 +9168,7 @@ function updateDarkKitty(dt) {
   R.tail.forEach((sg, i) => { sg.rotation.x = (i ? 0.25 : 0.9); sg.rotation.y = Math.sin(clock * (d.state === 'lurk' ? 3 : 7) - i * 0.55) * (0.15 + i * 0.04); });   // an angry lashing tail
   R.eyes.forEach(e => e.scale.setScalar(0.12 + (d.state === 'windup' || d.state === 'taunt' ? 0.1 : 0) + Math.sin(clock * 6) * 0.015));
   const gy = surfaceTop(q.x, q.z, q.y + 0.05), hgt = q.y - gy;
-  R.shadow.position.set(q.x, gy + 0.012, q.z); R.shadow.scale.set(1, 1.5, 1).multiplyScalar(1 / (1 + hgt * 0.4)); R.shadow.rotation.z = -d.face;
+  R.shadow.position.set(q.x, gy + 0.012, q.z); R.shadow.scale.set(1, 1.5, 1).multiplyScalar(1 / (1 + hgt * 0.4)); R.shadow.rotation.z = d.face;
 }
 function updateMirrorWorld(dt) {
   MW.portalCD = Math.max(0, MW.portalCD - dt); MW.hurtT = Math.max(0, MW.hurtT - dt);
@@ -9361,7 +9450,7 @@ function updateRaccoon(dt) {
       if (t > 1.8) coonSet('taunt');
       break;
   }
-  { const sh = R.shadow, lying = coon.state === 'dying' && coon.t > 2.5; sh.visible = g.visible; sh.position.set(pos.x, (pos.y > 0.04 ? IN(1.2) : 0) + 0.014, pos.z + (lying ? 0.62 : 0)); sh.rotation.z = lying ? 0 : -g.rotation.y; sh.scale.set(0.95, lying ? 2.1 : 1.15, 1); }   // its shadow on the pads (stretched out, once it's down)
+  { const sh = R.shadow, lying = coon.state === 'dying' && coon.t > 2.5; sh.visible = g.visible; sh.position.set(pos.x, (pos.y > 0.04 ? IN(1.2) : 0) + 0.014, pos.z + (lying ? 0.62 : 0)); sh.rotation.z = lying ? 0 : g.rotation.y; sh.scale.set(0.95, lying ? 2.1 : 1.15, 1); }   // its shadow on the pads (stretched out, once it's down)
 }
 const _lw = new THREE.Vector3();
 function weedSwipe(paw) {                                             // a weed at her paw: yanked out, roots and all
@@ -9576,7 +9665,7 @@ function updateDog(dt) {
     R.legs.forEach((l, i) => { l.rotation.x = Math.sin(clock * 14 + i * 1.7) * 0.5 * k; });
     if (t > 1.8) porterBolt(1.6);                                     // ...and up and away for another go
   }
-  { const sh = R.shadow, h = Math.max(0, pos.y); sh.visible = g.visible; sh.position.set(pos.x, 0.015, pos.z); sh.rotation.z = -g.rotation.y; sh.scale.set(1.15, 2.5, 1).multiplyScalar((1 + h * 0.1) / (1 + h * 0.35)); sh.material.opacity = 0.44 / (1 + h * 0.5); }   // his shadow: long and soft, fading as he leaps
+  { const sh = R.shadow, h = Math.max(0, pos.y); sh.visible = g.visible; sh.position.set(pos.x, 0.015, pos.z); sh.rotation.z = g.rotation.y; sh.scale.set(1.15, 2.5, 1).multiplyScalar(1 / (1 + h * 0.45)); sh.material.opacity = 0.44 / (1 + h * 0.5); }   // his shadow: long and soft, fading as he leaps
   tagHud();
 }
 function yardOpen() { return walk.on && sliderGlass.length > 0 && sliderGlass.every(g => !g.visible); }
@@ -9589,7 +9678,8 @@ function walkZoneOK(nx, nz) {                                         // where s
 function walkRoamOK(nx, nz) {                                        // the yard (walkZoneOK) and, once she's got out, the whole neighbourhood
   if (walkZoneOK(nx, nz)) return true;
   const VD = ROOM.visDepth, inHouse = nx > YARD.HL - 0.35 && nx < YARD.HR + 0.35 && nz < VD + 0.45 && nz > VD - YARD.HD - 0.4;
-  if (inHouse || Math.abs(nx) > 95 || nz < VD - 75 || nz > VD + 130) return false;
+  const FZ = YARD.FZ, off = nz < VD ? Math.abs(nx) > 94 || nz < VD - 124 : nz < FZ ? Math.hypot(nx, nz - VD) > 71 : Math.abs(nx) > 83 || nz > FZ + 70;
+  if (inHouse || off) return false;
   if (walk.free) return true;
   if (walk.pos.y > 4.8 && nz > VD + 0.5) {                           // high enough (off the shed roof, say) to clear the fence: out she goes
     walk.free = true; unlock('notAGlitch'); showWalkName('🐾 Over the fence and away... this is NOT a glitch.'); tone(523, 1047, 0.3, 'triangle', 0.04); return true;
@@ -9819,7 +9909,7 @@ function walkTap(x, y) {
     if (!h.object.isMesh) return false;
     for (let q = h.object; q; q = q.parent) if (!q.visible || q === walk.rig.g) return false;
     const m = Array.isArray(h.object.material) ? h.object.material[h.face ? h.face.materialIndex : 0] : h.object.material;
-    return m && m !== noFace && m.visible !== false && m.blending !== THREE.AdditiveBlending && !(m.transparent && m.opacity < 0.1);
+    return m && m !== noFace && m.visible !== false && m.blending !== THREE.AdditiveBlending && !(m.transparent && m.opacity < 0.1) && !m.userData.shadow;
   });
   if (h && mirrorWorld && MW.dk && MW.dk.state !== 'dead') {          // tapped the dark kitty: close enough, it's a hit
     let q = h.object; while (q && q !== MW.dk.rig.g) q = q.parent;
@@ -9937,7 +10027,7 @@ function frame(now) {
   if (sliderDisco) updateSliderDisco(dt);
   updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
 
-  if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && camera.position.z >= ROOM.visDepth - 0.05);   // (or out in the yard)   // the end wall + door: only from inside the room
+  if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && (camera.position.z >= ROOM.visDepth - 0.05 || !inRoomXZ(camera.position.x, camera.position.z)));   // (or out in the yard, or round the front)   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
   if (state !== 'tvgame') renderer.render(scene, camera);           // (the room is hidden behind the full-screen TV)
 }
