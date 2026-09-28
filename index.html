@@ -3376,7 +3376,7 @@ let povEndWall = null, sliderDisco = null, catCondo = null, SLIDER = null, laund
 const YARD = { HL: -6.5, XR: 13.5, HR: 33.8, XL0: -15, XL1: -19, FZ: ROOM.visDepth + 36, FH: FT(4), HD: 50.5 };
 function hillY(z) { const t = THREE.MathUtils.clamp((z - YARD.FZ - 1.4) / 14, 0, 1); return 8.5 * t * t * (3 - 2 * t); }   // the bank behind the back fence, climbing up to the off-ramp
 function yardXL(z) { const k = THREE.MathUtils.clamp((z - ROOM.visDepth) / (YARD.FZ - ROOM.visDepth), 0, 1); return YARD.XL0 + (YARD.XL1 - YARD.XL0) * k; }   // the neighbours'-side fence: the lot widens toward the back
-let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [], bbqRig = null;     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
+let skyRig = null, cloudDome = null, yardLife = null, YARD_BLOCKS = [], bbqRig = null, yardWeeds = [];     // the sky that travels with the camera; butterflies, birds and birdsong; what Porter runs round
 const sliderGlass = [];
 const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit: no lamp in the room shines up at it
 {
@@ -3850,7 +3850,8 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         BX(pads, PS, IN(1.2), PS, edgeMat, x, IN(0.6) - 0.004, z);
       }
       const bbq = named(new THREE.Group(), 'Kettle BBQ'); bbq.position.set(DX + PS * 0.72, IN(1.2), VD + IN(4) + PS * 1.45 + GAP);   // standing on the far corner of the pads, where it shows through the glass
-      const black = new THREE.MeshPhongMaterial({ color: 0x151515, shininess: 90, specular: 0x777777 }), steel = new THREE.MeshPhongMaterial({ color: 0xb8bcc2, shininess: 80, specular: 0xffffff });
+      const black = new THREE.MeshPhongMaterial({ color: 0x151515, shininess: 90, specular: 0x777777, side: THREE.DoubleSide }),   // (both sides: knocked over, you see into the open kettle)
+        steel = new THREE.MeshPhongMaterial({ color: 0xb8bcc2, shininess: 80, specular: 0xffffff });
       const KR = IN(9), KY = IN(27);
       const bowl = new THREE.Mesh(new THREE.SphereGeometry(KR, 26, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), black); bowl.position.y = KY; bowl.scale.y = 0.9; bbq.add(bowl);
       const lid = new THREE.Mesh(new THREE.SphereGeometry(KR * 1.01, 26, 12, 0, Math.PI * 2, 0, Math.PI / 2), black); lid.position.y = KY + IN(0.3); lid.scale.y = 0.85; bbq.add(lid);
@@ -3863,7 +3864,15 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         leg.position.set(Math.cos(a) * IN(5.5), KY / 2, Math.sin(a) * IN(5.5)); leg.rotation.set(Math.sin(a) * 0.22, 0, -Math.cos(a) * 0.22); bbq.add(leg);
         if (i < 2) { const wh = new THREE.Mesh(new THREE.CylinderGeometry(IN(2.2), IN(2.2), IN(0.9), 16), black); wh.rotation.z = Math.PI / 2; wh.position.set(Math.cos(a) * IN(8.5), IN(2.2), Math.sin(a) * IN(8.5)); bbq.add(wh); }
       }
-      bbqRig = { g: bbq, lid, home: bbq.position.clone(), lidHome: lid.position.clone(), crashed: false };   // (the raccoon's big death scene knocks it flying)
+      { const coal = lam(0x262220), ash = lam(0x8d8a86);                                                        // inside: the grill grate and a bed of charcoal
+        const grateTex = canvasTex(64, 64, (c, w, h) => { c.clearRect(0, 0, w, h); c.fillStyle = '#a3a8ad'; for (let x = 2; x < w; x += 6) c.fillRect(x, 0, 2, h); c.fillRect(0, h / 2 - 1, w, 2); }, 1, 1);
+        const grate = new THREE.Mesh(new THREE.CircleGeometry(KR * 0.93, 24), new THREE.MeshBasicMaterial({ map: grateTex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide })); grate.rotation.x = -Math.PI / 2; grate.position.y = KY - IN(1.5); bbq.add(grate);
+        const bed = new THREE.Mesh(new THREE.CircleGeometry(KR * 0.7, 18), new THREE.MeshLambertMaterial({ color: 0x3a3532, side: THREE.DoubleSide })); bed.rotation.x = -Math.PI / 2; bed.position.y = KY - KR * 0.55; bbq.add(bed);
+        for (let k = 0; k < 9; k++) { const a = k * 2.4, r = KR * 0.42 * Math.sqrt((k + 1) / 9), m = new THREE.Mesh(new THREE.DodecahedronGeometry(IN(1.2), 0), coal); m.position.set(Math.cos(a) * r, KY - KR * 0.5, Math.sin(a) * r); bbq.add(m); }
+        const spill = named(new THREE.Group(), 'Spilled charcoal'); spill.userData.noWalk = true; spill.visible = false; spill.position.set(bbq.position.x + 0.15, 0, bbq.position.z + 2.6);   // (out on the grass, once it's knocked over)
+        for (let k = 0; k < 14; k++) { const m = new THREE.Mesh(new THREE.DodecahedronGeometry(IN(1.1 + Math.random()), 0), k % 4 ? coal : ash); m.position.set((Math.random() - 0.5) * 1.3, IN(0.8), (Math.random() - 0.3) * 1.1); m.rotation.set(Math.random() * 3, Math.random() * 3, 0); spill.add(m); }
+        const ap = new THREE.Mesh(new THREE.CircleGeometry(0.7, 20), new THREE.MeshBasicMaterial({ color: 0x7c7975, transparent: true, opacity: 0.55, depthWrite: false })); ap.rotation.x = -Math.PI / 2; ap.position.y = 0.015; ap.scale.set(1.2, 0.8, 1); spill.add(ap);
+        bbqRig = { g: bbq, lid, home: bbq.position.clone(), lidHome: lid.position.clone(), crashed: false, spill }; }   // (the raccoon's big death scene knocks it flying)
     }
     { // the upstairs balcony overhangs the slider: a square covered patio with a cream concrete soffit, a beam, two square posts, two jar lights
       const yard = named(new THREE.Group(), 'Covered patio'); yard.userData.noWalk = true;
@@ -3927,10 +3936,28 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       for (let z = VD + 16; z < FZ - 2; z += 6.5 + rnd() * 4) tree(yardXL(z) - 4 - rnd() * 3, z, 8.5 + rnd() * 4);   // (their trees, behind their house)
       for (let z = VD + 17; z < FZ - 0.5; z += 2.3 + rnd()) bush(Y.XR + 1.15, z, 0.85 + rnd() * 0.4);         // over the middle fence toward the back of next door's
       for (const [x, z, h] of [[Y.XR + 7, FZ - 6, 10.5], [Y.XR + 14, FZ - 13, 9], [Y.HR + 7, VD + 14, 10], [Y.HR + 9, FZ - 4, 11]]) tree(x, z, h);
-      const lm = new THREE.InstancedMesh(blob, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), leaves.length); lm.userData.name = 'Bushes';
+      for (let z = VD + 15; z < FZ - 2; z += 4.2 + rnd() * 2.5) tree(yardXL(z) - 6.5 - rnd() * 4, z, 8 + rnd() * 4);   // more trees in 30 & 32's yard...
+      for (let z = VD - 4; z < FZ - 2; z += 4.8 + rnd() * 2.5) tree(Y.HR + 6 + rnd() * 7, z, 8 + rnd() * 4);          // ...and in 24's
+      const blob0 = new THREE.IcosahedronGeometry(1, 0), b0 = blob0.attributes.position, sh0 = [];                // (the bank's far foliage: fewer faces, you can't tell from down in the yard)
+      for (let i = 0; i < b0.count; i++) { const y = b0.getY(i), k = 0.55 + 0.45 * (y * 0.5 + 0.5); sh0.push(k, k, k); } blob0.setAttribute('color', new THREE.Float32BufferAttribute(sh0, 3));
       const M = new THREE.Matrix4(), C = new THREE.Color(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), E = new THREE.Euler();
-      leaves.forEach(([lx, ly, lz, r, c], i) => { Q.setFromEuler(E.set(0, rnd() * 6, 0)); M.compose(P.set(lx, ly, lz), Q, S.set(r, r * 0.85, r)); lm.setMatrixAt(i, M); lm.setColorAt(i, C.setHex(c)); });
-      yard.add(lm);
+      for (const [list, geo] of [[leaves.filter(l => l[2] < FZ + 2.2), blob], [leaves.filter(l => l[2] >= FZ + 2.2), blob0]]) {
+        const lm = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), list.length); lm.userData.name = 'Bushes';
+        list.forEach(([lx, ly, lz, r, c], i) => { Q.setFromEuler(E.set(0, rnd() * 6, 0)); M.compose(P.set(lx, ly, lz), Q, S.set(r, r * 0.85, r)); lm.setMatrixAt(i, M); lm.setColorAt(i, C.setHex(c)); });
+        yard.add(lm);
+      }
+      { // tall cedars in a row along both side lot lines: a green wall between us and the houses either side
+        const cg = new THREE.ConeGeometry(1, 1, 9, 4), cp = cg.attributes.position, csh = [];
+        for (let i = 0; i < cp.count; i++) { const x = cp.getX(i), y = cp.getY(i), z = cp.getZ(i), k = 0.6 + 0.4 * (y + 0.5) + (hsh(x, y, z, 7) - 0.5) * 0.14; cp.setXYZ(i, x * (0.9 + hsh(x, y, z, 5) * 0.2), y, z * (0.9 + hsh(x, y, z, 6) * 0.2)); csh.push(k, k, k); }
+        cg.translate(0, 0.5, 0); cg.setAttribute('color', new THREE.Float32BufferAttribute(csh, 3));
+        const ced = [], CED = [0x2f5d2e, 0x355f30, 0x3b6a34, 0x2c5229];
+        for (let z = VD - 22; z < FZ - 1.5; z += 2.0 + rnd() * 0.6) ced.push([yardXL(z) - 2.1, z, 1.0 + rnd() * 0.25, 5.2 + rnd() * 2.4]);   // north: between us and 30 & 32
+        for (let z = VD - 6; z < FZ - 1.5; z += 2.2 + rnd() * 0.6) ced.push([Y.HR + 2.5, z, 1.0 + rnd() * 0.25, 5 + rnd() * 2.4]);          // south: next door and 24
+        const cm = new THREE.InstancedMesh(cg, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), ced.length); cm.userData.name = 'Cedars';
+        const M2 = new THREE.Matrix4(), Q2 = new THREE.Quaternion(), S2 = new THREE.Vector3(), P2 = new THREE.Vector3(), C2 = new THREE.Color(), E2 = new THREE.Euler();
+        ced.forEach(([x, z, r, h], i) => { Q2.setFromEuler(E2.set(0, rnd() * 6, 0)); M2.compose(P2.set(x, 0, z), Q2, S2.set(r, h, r)); cm.setMatrixAt(i, M2); cm.setColorAt(i, C2.setHex(CED[rnd() * CED.length | 0])); });
+        yard.add(cm);
+      }
       const tg = new THREE.CylinderGeometry(0.28, 0.42, 1, 8); tg.translate(0, 0.5, 0);                         // all the trunks in one go
       const tm = new THREE.InstancedMesh(tg, new THREE.MeshBasicMaterial({ color: 0x5b4a3a, fog: false }), trunks.length); tm.userData.name = 'Tree';
       trunks.forEach(([x, z, h, b], i) => { Q.identity(); M.compose(P.set(x, b, z), Q, S.set(1, h, 1)); tm.setMatrixAt(i, M); }); yard.add(tm);
@@ -4363,13 +4390,7 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     const tri = new THREE.Shape([new THREE.Vector2(-2.1, 0), new THREE.Vector2(2.1, 0), new THREE.Vector2(0, 1.2)]);
     for (const sz of [-1, 1]) { const m = new THREE.Mesh(new THREE.ShapeGeometry(tri), yMat(0x8fae8a)); m.position.set(0, 3.25, sz * 1.705); if (sz < 0) m.rotation.y = Math.PI; sh.add(m); }
     bakeYard(sh); shadow(SX, SZ, 2.5, 3.0); block(SX - 1.9, SX + 1.9, SZ - 2.3, SZ + 2.3); }
-  // -- a big shade tree with a tire swing, out in the middle of the lawn, and two more toward the back
-  { const tr = grp('Tree', true), TX = -1.5, TZ = VD + 21; tr.position.set(TX, 0, TZ);
-    yCyl(tr, 0.42, 0.68, 5.4, 0x6b4a32, 0, 2.7, 0, 10);
-    const br = yCyl(tr, 0.16, 0.26, 3.4, 0x6b4a32, 1.35, 4.55, 0, 8); br.rotation.z = -1.05;
-    for (let k = 0; k < 10; k++) { const a = k * 2.4, r = 1.7 + (k % 3) * 0.45; yBlob(tr, r, [0x4f8a3a, 0x5c9a42, 0x6aa84a, 0x467e34][k % 4], Math.cos(a) * 2.2 + 0.6, 6.3 + (k % 4) * 0.55, Math.sin(a) * 1.9, 0.82); }
-    yCyl(tr, 0.03, 0.03, 3.9, 0xcbb892, 2.75, 3.2, 0, 5); const tire = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.15, 8, 18), yMat(0x1f1f21)); tire.position.set(2.75, 1.15, 0); tr.add(tire);
-    bakeYard(tr); shadow(TX + 0.8, TZ, 3.6, 3.0); block(TX - 0.9, TX + 0.9, TZ - 0.9, TZ + 0.9); }
+  // -- two big trees toward the back
   for (const [TX, TZ, H] of [[Y.XL1 + 5.2, FZ - 3.6, 7.2], [XR - 4.2, FZ - 4.4, 7.8]]) {                   // (the drone photo's back half is all tree canopy)
     const tr = grp('Tree', true); tr.position.set(TX, 0, TZ); yCyl(tr, 0.38, 0.62, H, 0x5f4330, 0, H / 2, 0, 10);
     for (let k = 0; k < 11; k++) { const a = k * 2.3, r = 2.1 + (k % 3) * 0.5; yBlob(tr, r, [0x3f7a32, 0x4f8a3a, 0x5c9a42, 0x467e34][k % 4], Math.cos(a) * 2.6, H + 0.4 + (k % 4) * 0.6, Math.sin(a) * 2.4, 0.8); }
@@ -4433,6 +4454,19 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     const dais = []; for (let i = 0; i < 480; i++) { const z = VD + 2 + rnd() * (FZ - VD - 5), x0 = yardXL(z) + 1, x = x0 + rnd() * (XR - 1 - x0); if (Math.abs(x - DX) < 3.2 && z < VD + 5.5) continue; dais.push([x, 0.02, z, 0.05 + rnd() * 0.03, rnd() < 0.7 ? 0xffffff : 0xffe36a]); }
     const dg = new THREE.CircleGeometry(1, 6); dg.rotateX(-Math.PI / 2); { const sh = []; for (let i = 0; i < dg.attributes.position.count; i++) sh.push(1, 1, 1); dg.setAttribute('color', new THREE.Float32BufferAttribute(sh, 3)); }
     inst(dais, dg, 'Daisies'); }
+  // -- weeds in the lawn (dandelions, a gone-to-seed one, a thistle): swipe one and she yanks it out
+  { let seed = 77; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647; yardWeeds = [];
+    for (let n = 0, tries = 0; n < 9 && tries < 500; tries++) {
+      const z = VD + 4 + rnd() * (FZ - VD - 8), x0 = yardXL(z) + 2, x = x0 + rnd() * (XR - 2 - x0);
+      if (Math.hypot(x - DX, z - (VD + 2.5)) < 4.5 || YARD_BLOCKS.some(([a, b, c, d]) => x > a - 1.2 && x < b + 1.2 && z > c - 1.2 && z < d + 1.2) || yardWeeds.some(w => Math.hypot(w.x - x, w.z - z) < 3.2)) continue;
+      const g = grp('Weed'), kind = n % 3; g.position.set(x, 0, z); g.rotation.y = rnd() * 6;
+      for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2, l = yBox(g, 0.11, 0.03, 0.5 + rnd() * 0.2, kind === 2 ? 0x5f8f3a : 0x4f8a2e, Math.sin(a) * 0.2, 0.07, Math.cos(a) * 0.2); l.rotation.set(-0.4, a, 0, 'YXZ'); }   // a rosette of jagged leaves
+      const hgt = kind === 2 ? 1.0 : 0.7; yCyl(g, 0.022, 0.03, hgt, 0x5a8a34, 0, hgt / 2, 0, 5);
+      if (kind === 0) { yBlob(g, 0.12, 0xffd21f, 0, hgt + 0.04, 0, 0.6); yBlob(g, 0.07, 0xf5b800, 0, hgt + 0.08, 0, 0.6); }   // a dandelion...
+      else if (kind === 1) yBlob(g, 0.17, 0xf4f4ee, 0, hgt + 0.06, 0);                                                         // ...one gone to seed...
+      else { yCyl(g, 0.08, 0.13, 0.14, 0x4f7f34, 0, hgt - 0.02, 0, 8); yBlob(g, 0.11, 0xa04fbf, 0, hgt + 0.1, 0, 1.2); }     // ...and a thistle
+      bakeYard(g); yardWeeds.push({ g, x, z, pull: 0 }); n++;
+    } }
   // -- the neighbours, to scale from the satellite view: 30 & 32 (a grey-roofed semi) to the north, set 5 m further back than us, with
   // white siding; 22 & 24 to the south, past next door. Two storeys, white-trimmed windows all round, hipped roofs
   { const nb = grp('Neighbourhood'), H = FT(18);
@@ -4464,6 +4498,10 @@ function yardShadowMat() {                                            // a soft 
 function updateYardLife(dt) {                                         // the sky rides with the camera; clouds drift; butterflies flit; birds circle; birdsong outside
   if (!skyRig || !povEndWall || !povEndWall.visible) return;
   skyRig.position.copy(camera.position); cloudDome.rotation.y += dt * 0.006;
+  for (const w of yardWeeds) if (w.pull > 0) {                         // a pulled weed: up out of the lawn with a twirl, and gone
+    w.pull += dt; const k = Math.min(1, w.pull / 0.55); w.g.position.y = Math.sin(k * Math.PI) * 0.9 + k * 0.4; w.g.rotation.z = k * 4; w.g.scale.setScalar(Math.max(0.01, 1 - k * k));
+    if (k >= 1) { w.g.visible = false; w.pull = 0; }
+  }
   const L = yardLife; if (!L) return;
   for (const b of L.butterflies) { const t = clock * b.sp + b.ph; b.g.position.set(b.ax + Math.cos(t) * b.r * 0.6, 0.35 + Math.abs(Math.sin(t * 1.7)) * 0.9, b.az + Math.sin(t * 1.3) * b.r); b.g.rotation.y = Math.atan2(-Math.sin(t) * b.r * 0.6, Math.cos(t * 1.3) * b.r * 1.3); b.g.userData.anim(clock, b.ph * 3); }
   const VD = ROOM.visDepth, a = clock * 0.09;
@@ -5452,8 +5490,9 @@ const ACHIEVEMENTS = [
     ['copsCalled', '🚨', 'Someone called the cops', 'Stick around until the sirens show up after the raccoon incident'],
     ['laundryMess', '🧺', 'Laundry day', 'In Free roam, swipe the folded laundry off the armchair'],
     ['tvTop', '📺', 'King of the TV', 'In Free roam, stand on top of the TV'],
-    ['dogMeet', '🐕', 'Who let the dog in?', 'In Free roam, go out into the backyard and over toward Porter\'s fence'],
+    ['dogMeet', '🐕', 'Who let the dog in?', 'In Free roam, meow at Porter over the fence'],
     ['dogTag', '🏃', 'Gotcha, Porter!', 'In Free roam, catch Porter 3 times'],
+    ['greenThumb', '🌿', 'Green thumb', 'In Free roam, pull 5 weeds out of the backyard lawn'],
     ['chippy', '🐰', 'Wind-up warrior', 'Swipe Chippy the wind-up bunny off the credenza and let it loose on the mice'],
     ['chippyNo', '💥', 'Rest in fluff', 'Find out what happens when Chippy gets carried away'],
     ['blanketGhost', '👻', 'Blanket ghost', 'In Free roam, get caught under a blanket, then swipe it off'],
@@ -5477,7 +5516,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-27 21:55';                                              // stamped when the site is published
+const BUILD = '2026-09-27 22:09';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -9010,6 +9049,7 @@ function walkSwipe() {                                               // swipe at
   if (coonSwipe(paw)) return;                                        // the raccoon at the slider: whack the glass right in front of it
   if (dogSwipe(paw)) return;                                         // the Doberman out in the yard
   if (laundrySwipe(paw)) return;
+  if (weedSwipe(paw)) return;                                        // a weed in the lawn
   if (duckSwipe(paw)) return;                                        // the rubber ducks on the table                                     // the folded laundry on the armchair: all over the floor
   if (mirrorWorld && MW.dk && MW.dk.state !== 'dead') {                // the dark kitty within reach: that's who gets it
     const q = MW.dk.pos; if (Math.hypot(q.x - paw.x, q.z - paw.z) < 1.0 && Math.abs(q.y + 0.4 - paw.y) < 0.9) { hitDark(); return; }
@@ -9132,7 +9172,7 @@ function coonSay(text) { showWalkName('🦝 ' + text); }            // (one subt
 function chitter(n, hi) { for (let i = 0; i < (n || 5); i++) tone((hi || 1700) + Math.random() * 500, 1300 + Math.random() * 400, 0.05, 'square', 0.022, i * 0.07); }
 function coonHide() { if (coon.rig) coon.rig.g.visible = false; coon.state = 'hidden'; coon.dead = false; coon.next = Math.max(coon.next, 8); }
 function coonSet(st) { coon.state = st; coon.t = 0; coon.said = 0; }
-function coonActive() { return coon.rig && coon.rig.g.visible && ['taunt', 'mock', 'laugh', 'startle'].includes(coon.state); }
+function coonActive() { return coon.rig && coon.rig.g.visible && ['taunt', 'mock', 'laugh', 'startle', 'gun'].includes(coon.state); }
 function coonReact(kind) {                                            // she meowed
   if (!coonActive() || !walk.on || walk.pos.distanceTo(coon.rig.g.position) > 14) return;
   coonSet(kind === 'angry' ? 'startle' : 'mock');
@@ -9157,7 +9197,7 @@ function updateRaccoon(dt) {
     if (coon.dead) return;                                             // (it's not coming back)
     if (walk.pos.z > SLIDER.VD - 3.2 && Math.abs(walk.pos.x - SLIDER.DX) < 3.5 && clock > (coon.cool || 0)) coon.next = Math.min(coon.next, 1.2);   // she's come up to the slider: out it pops
     coon.next -= dt; if (coon.next > 0) return;
-    coon.from.set(home.x + 5.5, home.y, home.z + 2.4); coon.to.copy(home); pos.copy(coon.from); g.visible = true; coon.swipes = 0; coonSet('arrive'); chitter(3);
+    coon.from.set(home.x + 5.5, home.y, home.z + 2.4); coon.to.copy(home); coon.sawGun = false; pos.copy(coon.from); g.visible = true; coon.swipes = 0; coonSet('arrive'); chitter(3);
   }
   // reset the pose, then each state strikes its own
   const b = R.body; b.position.set(0, 0, 0); b.rotation.set(0, 0, 0); b.scale.setScalar(1);
@@ -9183,6 +9223,7 @@ function updateRaccoon(dt) {
       break;
     case 'taunt': {
       g.rotation.y = Math.PI; coon.stay -= dt; coon.tauntT += dt;
+      if (!coon.sawGun && gunRig.state === 'cat' && walk.pos.distanceTo(pos) < 13) { coon.sawGun = true; coonSet('gun'); break; }   // she's come to the window with a pistol in her mouth
       if (coon.tauntT > 2.9) { coon.tauntT = 0; coon.taunt = (coon.taunt + 1 + (Math.random() * (COON_TAUNTS.length - 1) | 0)) % COON_TAUNTS.length; coon.said = 0; }
       if (coon.stay <= 0) { coonSay('Later, loser!'); chitter(4); coon.from.copy(pos); coon.to.set(home.x - 6, home.y, home.z + 2.2); coonSet('leave'); break; }
       const [kind, line] = COON_TAUNTS[coon.taunt], k = coon.tauntT;
@@ -9227,6 +9268,18 @@ function updateRaccoon(dt) {
       else if (t < 2.1) { R.arms[1].rotation.set(-0.3, 0, Math.PI - 0.75 + Math.sin(clock * 22) * 0.2); R.head.rotation.y = lookYaw; if (coon.said < 2) { coon.said = 2; coonSay(coon.swipes === 2 ? 'One more and I\'m OUTTA here!' : 'Hmph! Missed me anyway!'); chitter(5, 1200); } }   // shaking its fist
       else coonSet('taunt');
       break;
+    case 'gun':                                                          // a double take at the gun... then it calls her bluff
+      g.rotation.y = Math.PI; R.head.rotation.y = lookYaw;
+      if (t < 2.4) {
+        const k = Math.min(1, t / 0.4); b.position.z = 0.12 * k; R.eyes.forEach(e => e.scale.setScalar(1 + 0.6 * k)); R.head.rotation.x = -0.15 * k;
+        R.arms[1].rotation.set(-1.5, 0, -0.15);                          // pointing at it
+        if (!coon.said) { coon.said = 1; coonSay('Wait, is that a gun?'); chitter(2, 2400); }
+      } else if (t < 5.2) {
+        R.arms.forEach((a, i) => a.rotation.set(-0.2, 0, (i ? 1 : -1) * 1.25));   // arms out wide: go on then
+        R.head.rotation.z = Math.sin(clock * 3) * 0.15; b.position.y = Math.abs(Math.sin(t * 6)) * 0.02;
+        if (coon.said < 2) { coon.said = 2; coonSay("What're you gonna do, shoot me?"); chitter(5, 1500); }
+      } else { coonSet('taunt'); coon.tauntT = 0; coon.said = 1; }
+      break;
     case 'dying': coonDying(R, t, b); break;
     case 'laugh':                                                        // she swiped from across the room: it points and laughs
       g.rotation.y = Math.PI; R.arms[1].rotation.set(-1.6, 0, -0.1 + lookYaw * 0.5); b.position.y = Math.abs(Math.sin(t * 18)) * 0.03; R.head.rotation.y = lookYaw;
@@ -9236,6 +9289,14 @@ function updateRaccoon(dt) {
   }
 }
 const _lw = new THREE.Vector3();
+function weedSwipe(paw) {                                             // a weed at her paw: yanked out, roots and all
+  const w = yardWeeds.find(q => q.g.visible && !q.pull && Math.hypot(q.x - paw.x, q.z - paw.z) < 0.85 && paw.y < 1.2); if (!w) return false;
+  w.pull = 0.001; walk.weeds = (walk.weeds || 0) + 1; const n = walk.weeds;
+  burst(new THREE.Vector3(w.x, 0.35, w.z), 0x5f9a3a, 10, 1.8, 2.4, 0.5); burst(new THREE.Vector3(w.x, 0.1, w.z), 0x6b4a2e, 6, 1.2, 1.6, 0.4);   // leaves flying, a spray of soil
+  noise(0.18, 0.08, 900); tone(420, 720, 0.12, 'triangle', 0.03);
+  if (n === 5) { unlock('greenThumb'); showWalkName('🌿 Green thumb! Five weeds pulled'); } else showWalkName(n < 5 ? `🌿 Weed pulled! (${n}/5)` : '🌿 Weed pulled!');
+  return true;
+}
 function laundrySwipe(paw) {
   const L = laundry; if (!L || L.state !== 'folded') return false;
   L.stack.getWorldPosition(_lw); if (Math.hypot(_lw.x - paw.x, _lw.z - paw.z) > 0.75 || Math.abs(_lw.y + 0.15 - paw.y) > 0.8) return false;
@@ -9351,6 +9412,7 @@ function tagHud() {                                                   // the lit
     if (!dog.match) html = `<div class="sub">🐕 Swipe Porter to play!</div>`;
     else html = `<div class="row"><span>🐕 ${inside ? 'Porter\'s waiting outside...' : dog.state === 'caught' ? 'Caught Porter! 🐾' : 'Catch Porter!'}</span>${dog.you ? `<span class="to">caught <b>${dog.you}${dog.you < 3 ? '/3' : ''}</b></span>` : ''}</div>`;
   }
+  if (gameMode === 'walk' && walk.on && !mirrorWorld && dog.rig && dog.rig.g.visible && dog.state === 'yard' && walk.pos.z > SLIDER.VD + 0.6 && walk.pos.x > YARD.XR - 6.5) html = `<div class="sub">🐕 Porter wants to play: meow at him!</div>`;
   if (html !== dog.hud) { dog.hud = html; el.innerHTML = html; el.hidden = !html; }
 }
 function updateDog(dt) {
@@ -9379,14 +9441,16 @@ function updateDog(dt) {
   const inside = walk.pos.z < VD + 0.4;                                // she's gone back indoors
   const waitAtSlider = () => { const tx = THREE.MathUtils.clamp(SLIDER.DX, xl(VD + 1.6), xr), tz = VD + 1.6; if (!moveTo(tx, tz, 4) || Math.hypot(tx - pos.x, tz - pos.z) < 0.1) { face(walk.pos.x, walk.pos.z); R.head.rotation.z = Math.sin(clock * 2.3) * 0.18; } pos.y = 0; };
   const cdx = walk.pos.x - pos.x, cdz = walk.pos.z - pos.z, cd = Math.hypot(cdx, cdz);
-  if (dog.state === 'yard') {                                          // on his own side of the middle fence: trotting along it level with her, barking to come and play
-    const tz = THREE.MathUtils.clamp(walk.pos.z, VD + 3, FZ - 3);
-    if (Math.abs(tz - pos.z) > 0.4) moveTo(Y.XR + 2.3, tz, Math.min(6, Math.abs(tz - pos.z) * 2 + 2)); else { face(walk.pos.x, walk.pos.z); R.head.rotation.z = Math.sin(clock * 2.3) * 0.18; }
+  if (dog.state === 'yard') {                                          // on his own side of the middle fence, level with her. She comes up to it: he barks at her. She meows back: over he comes
+    const out = walk.pos.z > VD + 0.6, near = out && walk.pos.x > Y.XR - 6.5, tz = THREE.MathUtils.clamp(walk.pos.z, VD + 3, FZ - 3), tx = Y.XR + (near ? 1.2 : 2.3), dd = Math.hypot(tx - pos.x, tz - pos.z);
+    if (dd > 0.4) moveTo(tx, tz, Math.min(6, dd * 2 + 2));
+    else { face(walk.pos.x, walk.pos.z); if (near) bow(0.35 + 0.35 * Math.sin(clock * 3)); else R.head.rotation.z = Math.sin(clock * 2.3) * 0.18; }   // (at the fence: play bows)
     pos.y = 0;
-    if (clock > dog.barkAt) { dog.barkAt = clock + 2.2 + Math.random() * 3; bark(1 + (Math.random() * 2 | 0)); R.head.rotation.x = -0.2; }
-    if (walk.pos.z > VD + 0.6 && (walk.pos.x > Y.XR - 6.5 || walk.pos.z > VD + 13)) {   // she's come over toward his fence (or right out into the yard): over it he comes
-      dog.from.copy(pos); dog.to.set(Y.XR - 2.8, 0, pos.z); g.rotation.y = -Math.PI / 2;
-      dogSet('leap'); dog.match = false; bark(3); showWalkName('🐕 WOOF! Porter the Doberman just jumped the fence!'); unlock('dogMeet');
+    if (clock > dog.barkAt) { dog.barkAt = clock + (near ? 0.8 + Math.random() * 0.6 : 2.4 + Math.random() * 3); bark(near ? 2 : 1); R.head.rotation.x = -0.3; }
+    if (near && !dog.hinted) { dog.hinted = true; showWalkName("🐕 Porter's barking at you over the fence... meow back!"); }
+    if (dog.meowAt && clock > dog.meowAt + 0.55) {                    // she meowed at him (a beat to hear it): up and over
+      dog.meowAt = 0;
+      if (out) { dog.from.copy(pos); dog.to.set(Y.XR - 2.8, 0, pos.z); g.rotation.y = -Math.PI / 2; dogSet('leap'); dog.match = false; bark(3); showWalkName('🐕 WOOF! Porter the Doberman just jumped the fence!'); unlock('dogMeet'); }
     }
   } else if (dog.state === 'leap') {                                  // clean over the chain-link
     const k = Math.min(1, t / 1.0);
@@ -9446,7 +9510,7 @@ function walkZoneOK(nx, nz) {                                         // where s
   return nz >= VD + 0.5 && nz <= YARD.FZ - 0.6 && nx >= yardXL(nz) + 0.6 && nx <= YARD.XR - 0.6;   // (our half of the yard, inside the chain-link)
 }
 function coonInSights() {
-  const R = coon.rig; if (!R || !R.g.visible || coon.dead || !['arrive', 'taunt', 'mock', 'laugh', 'startle', 'flinch', 'leave'].includes(coon.state)) return false;
+  const R = coon.rig; if (!R || !R.g.visible || coon.dead || !['arrive', 'taunt', 'mock', 'laugh', 'startle', 'flinch', 'leave', 'gun'].includes(coon.state)) return false;
   const h = gunHand(), dx = R.g.position.x - h.x, dz = R.g.position.z - h.z, d = Math.hypot(dx, dz);
   return d < 16 && (dx * Math.sin(walk.face) + dz * Math.cos(walk.face)) / d > 0.72;
 }
@@ -9531,7 +9595,7 @@ function coonDying(R, t, b) {                                        // a long, 
       B.g.rotation.x = 1.38 * bt * bt; B.g.position.set(B.home.x, B.home.y + 0.17 * bt, B.home.z + 0.25 * bt);   // (lying on its side on the grass, not sunk into it)
       const f = THREE.MathUtils.smoothstep(bt, 0, 1), s0 = B.home.clone().add(B.lidHome), w = new THREE.Vector3(s0.x + 0.9 * f, s0.y * (1 - f) + 0.56 * f + Math.sin(f * Math.PI) * 0.5, s0.z + 2.3 * f);   // the lid's flight, in the yard's own space...
       B.g.updateMatrixWorld(); B.lid.position.copy(B.g.worldToLocal(w)); B.lid.rotation.set(1.6 * bt - B.g.rotation.x, 0, -2.2 * bt);   // ...(the kettle it came off is tipping under it), landing on its rim
-      if (bt > 0.6 && !B.crashed) { B.crashed = true; noise(0.35, 0.3, 1800); tone(620, 180, 0.4, 'square', 0.05); tone(1240, 900, 0.6, 'sine', 0.03, 0.05); burst(new THREE.Vector3(B.home.x, 0.6, B.home.z + 0.9), 0x8d8a86, 14, 1.4, 1.6, 1.0); shake = Math.max(shake, reduceMotion ? 0.03 : 0.18); }
+      if (bt > 0.6 && !B.crashed) { B.crashed = true; B.spill.visible = true; noise(0.35, 0.3, 1800); tone(620, 180, 0.4, 'square', 0.05); tone(1240, 900, 0.6, 'sine', 0.03, 0.05); burst(new THREE.Vector3(B.home.x, 0.6, B.home.z + 0.9), 0x8d8a86, 14, 1.4, 1.6, 1.0); shake = Math.max(shake, reduceMotion ? 0.03 : 0.18); }
     }
   }
   if (t < 0.3) {                                                     // BLAM: jolted back, arms flung up
@@ -9584,10 +9648,11 @@ function freeMesh(m) {                                               // take a o
   m.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(x => x.dispose()); });
 }
 function resetSliderScene() {                                         // a fresh Free walk: new glass, no mess, the raccoon's back to its old tricks
-  dog.state = 'hidden'; dog.match = false; if (dog.rig) dog.rig.g.visible = false;     // (and the Doberman's back over its own fence)
+  dog.state = 'hidden'; dog.match = false; dog.meowAt = 0; dog.hinted = false; if (dog.rig) dog.rig.g.visible = false;     // (and the Doberman's back over its own fence)
   sliderGlass.forEach(g => { g.visible = true; }); shards.forEach(s2 => freeMesh(s2.m)); shards.length = 0;
   if (mosaicArt) { const MA = mosaicArt; MA.bits.forEach(b => freeMesh(b.m)); MA.bits = []; MA.state = 'wall'; MA.g.visible = true; MA.g.position.copy(MA.home); MA.g.rotation.set(0, Math.PI, 0); }
-  if (bbqRig) { const B = bbqRig; B.g.rotation.set(0, 0, 0); B.g.position.copy(B.home); B.lid.position.copy(B.lidHome); B.lid.rotation.set(0, 0, 0); B.crashed = false; }   // (the BBQ back on its feet)
+  for (const w of yardWeeds) { w.g.visible = true; w.pull = 0; w.g.position.y = 0; w.g.rotation.z = 0; w.g.scale.setScalar(1); } walk.weeds = 0;   // (the weeds grow back for a fresh Free roam)
+  if (bbqRig) { const B = bbqRig; B.g.rotation.set(0, 0, 0); B.g.position.copy(B.home); B.lid.position.copy(B.lidHome); B.lid.rotation.set(0, 0, 0); B.crashed = false; B.spill.visible = false; }   // (the BBQ back on its feet)
   coon.dead = false; if (coon.rig && coon.rig.halo) coon.rig.halo.visible = false; if (coon.pool) { freeMesh(coon.pool); coon.pool = null; } cops.at = 0; cops.t = -1; if (cops.rig) cops.rig.visible = false;
 }
 function duckSqueak(pitch) { const f = pitch || 1300 + Math.random() * 500; tone(f, f * 0.72, 0.09, 'square', 0.028); tone(f * 1.5, f * 1.1, 0.06, 'sine', 0.02, 0.02); }
@@ -9637,6 +9702,7 @@ function walkMeow() {
   const head = walk.pos.clone().setY(walk.pos.y + 1.05);
   if (walkInLitter() && clock > (walk.poopReady || 0)) { walk.poopReady = clock + 2; setTimeout(dropPoop, 450); }   // a meow in the litter box... and then a little present
   coonReact(walk.meowRun >= 10 ? 'angry' : 'meow');
+  if (dog.state === 'yard' && dog.rig && walk.pos.z > SLIDER.VD + 0.6 && walk.pos.distanceTo(dog.rig.g.position) < 12) dog.meowAt = clock;   // Porter, over the middle fence, hears her
   if (Math.hypot(walk.pos.x - WTABLE.x, walk.pos.z - WTABLE.z) < 3.6) duckChorus();   // the rubber duck army answers                  // the raccoon at the slider has opinions about her meows
   if (walk.meowRun >= 10) {                                          // the tenth in a row: a furious, LOUD yowl
     walk.meowRun = 0; walk.meowT = 1.1; walk.puff = 1;
