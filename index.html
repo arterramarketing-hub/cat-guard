@@ -3433,9 +3433,14 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const bs = new THREE.Shape([new THREE.Vector2(HL, 0), new THREE.Vector2(HR, 0), new THREE.Vector2(HR, BH), new THREE.Vector2(HL, BH)]);
       const hole = new THREE.Path(); hole.moveTo(DX - DW / 2, 0); hole.lineTo(DX - DW / 2, DH); hole.lineTo(DX + DW / 2, DH); hole.lineTo(DX + DW / 2, 0); hole.lineTo(DX - DW / 2, 0); bs.holes.push(hole);
       wallMesh(bs, brickTex, 2.05, 1.37).position.z = WZ;                                                        // brick: 8 courses a tile, 4 bricks across
-      wallMesh(new THREE.Shape([new THREE.Vector2(HL, BH), new THREE.Vector2(HR, BH), new THREE.Vector2(HR, XH), new THREE.Vector2(HL, XH)]), stuccoTex, 1.6, 1.6).position.z = WZ;
+      const upY = FT(12.5); UPPER.winY = upY; UPPER.winN = [0, 1, 2, 3, 4, 5].map(k => [WZ - 6.4 - k * 7.6, 2.05, 1.85]).concat([[WZ - 3.2, 1.65, 1.45]]); UPPER.winB = [DX - 3.0, DX + 5.4, DX + 11.2].map(x => [x, 2.2, 1.9]);   // our upstairs windows are see-through: real holes in the walls
+      { const sh = new THREE.Shape([new THREE.Vector2(HL, BH), new THREE.Vector2(HR, BH), new THREE.Vector2(HR, XH), new THREE.Vector2(HL, XH)]);
+        for (const [xc, w, h] of UPPER.winB) { const hp = new THREE.Path(); hp.moveTo(xc - w / 2, upY - h / 2); hp.lineTo(xc + w / 2, upY - h / 2); hp.lineTo(xc + w / 2, upY + h / 2); hp.lineTo(xc - w / 2, upY + h / 2); hp.lineTo(xc - w / 2, upY - h / 2); sh.holes.push(hp); }
+        wallMesh(sh, stuccoTex, 1.6, 1.6).position.z = WZ; }
       for (const x of [HL, HR]) for (const [y0, y1, tex, tu, tv] of [[0, BH, brickTex, 2.05, 1.37], [BH, XH, stuccoTex, 1.6, 1.6]]) {   // the two ends of the house (the side yard looks along one)
-        const m = wallMesh(new THREE.Shape([new THREE.Vector2(0, y0), new THREE.Vector2(HD, y0), new THREE.Vector2(HD, y1), new THREE.Vector2(0, y1)]), tex, tu, tv, THREE.DoubleSide);
+        const sh = new THREE.Shape([new THREE.Vector2(0, y0), new THREE.Vector2(HD, y0), new THREE.Vector2(HD, y1), new THREE.Vector2(0, y1)]);
+        if (x === HL && y0 === BH) for (const [zc, w, h] of UPPER.winN) { const u0 = WZ - zc - w / 2, u1 = u0 + w, hp = new THREE.Path(); hp.moveTo(u0, upY - h / 2); hp.lineTo(u1, upY - h / 2); hp.lineTo(u1, upY + h / 2); hp.lineTo(u0, upY + h / 2); hp.lineTo(u0, upY - h / 2); sh.holes.push(hp); }
+        const m = wallMesh(sh, tex, tu, tv, THREE.DoubleSide);
         m.rotation.y = Math.PI / 2; m.position.set(x, 0, WZ);
       }
       { // the timbering, trim, windows, downspouts, roof... all baked into one sunlit mesh
@@ -3455,12 +3460,14 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           const cx = HL + (i + 0.5) * step; if (upWins.some(wx => Math.abs(cx - wx) < winW / 2 + step / 2)) continue;
           const h = rails[0] - BH, br = yBox(hd, 0.16, Math.hypot(step, h), 0.08, T, cx, (BH + rails[0]) / 2, TZ - 0.01); br.rotation.z = (i % 2 ? 1 : -1) * Math.atan2(step, h);
         }
-        const winAt = (x, y, w, h, glass) => {                                                                    // a white-framed window: frame, glass, a mullion and transom, a sill
-          yBox(hd, w + 0.3, h + 0.3, 0.06, 0xf7f5f0, x, y, WZ + 0.08); yBox(hd, w, h, 0.05, glass || 0x34414f, x, y, WZ + 0.12);
+        const winAt = (x, y, w, h, glass, see) => {                                                                    // a white-framed window: frame, glass, a mullion and transom, a sill
+          if (see) for (const s of [-1, 1]) { yBox(hd, w + 0.3, 0.15, 0.06, 0xf7f5f0, x, y + s * (h / 2 + 0.075), WZ + 0.08); yBox(hd, 0.15, h, 0.06, 0xf7f5f0, x + s * (w / 2 + 0.075), y, WZ + 0.08); }   // (ours upstairs: a frame round a real hole)
+          else { yBox(hd, w + 0.3, h + 0.3, 0.06, 0xf7f5f0, x, y, WZ + 0.08); yBox(hd, w, h, 0.05, glass || 0x34414f, x, y, WZ + 0.12); }
           yBox(hd, 0.08, h, 0.04, 0xf7f5f0, x, y, WZ + 0.15); yBox(hd, w, 0.07, 0.04, 0xf7f5f0, x, y + h * 0.22, WZ + 0.15);
           yBox(hd, w + 0.5, 0.12, 0.3, 0xf7f5f0, x, y - h / 2 - 0.2, WZ + 0.2);
         };
-        for (const wx of upWins) winAt(wx, winY, winW, winH);
+        upWins.forEach((wx, i) => winAt(wx, winY, winW, winH, null, i < 3));
+        const ringX = (x, y, z, w, h) => { const t = 0.125; for (const s of [-1, 1]) { yBox(hd, 0.06, t, w + 2 * t, 0xf7f5f0, x, y + s * (h + t) / 2, z); yBox(hd, 0.06, h, t, 0xf7f5f0, x, y, z + s * (w + t) / 2); } };   // (a side window's frame, round a real hole)
         winAt(DX + 8.6, 3.2, 2.8, 2.0);                                                                             // our kitchen window, with a flower box (past the living room's side wall)
         yBox(hd, 3.1, 0.4, 0.45, 0x5a3a26, DX + 8.6, 1.9, WZ + 0.3);
         for (let k = 0; k < 9; k++) { const c = [0xff6fae, 0xffd23a, 0xffffff, 0xb07aff, 0xff5a4e][k % 5]; yBlob(hd, 0.2, 0x3f7a36, DX + 7.4 + k * 0.3, 2.2, WZ + 0.32); yBlob(hd, 0.12, c, DX + 7.45 + k * 0.3, 2.35, WZ + 0.38); }
@@ -3479,11 +3486,11 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           yBox(hd, 0.1, 0.3, 0.1, 0xb8bcc2, rx, 1.55, WZ + 0.1); for (const sx of [-1, 1]) yBox(hd, 0.08, 1.0, 0.7, 0x2f6b3a, rx + sx * 0.36, 0.5, rz);
           const coil = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.14, 8, 18), yMat(0x3b9a4c)); coil.rotation.y = Math.PI / 2; coil.position.set(rx, 0.6, rz); hd.add(coil); }
         { const sx = HL - 0.04, sz = WZ - 3.2;                                                                      // a little window in the end wall, over the side yard
-          yBox(hd, 0.06, 1.7, 1.9, 0xf7f5f0, sx, winY, sz); yBox(hd, 0.05, 1.45, 1.65, 0x34414f, sx - 0.03, winY, sz);
+          ringX(sx, winY, sz, 1.65, 1.45);
           for (const x of [HL - 0.05, HR + 0.05]) { yBox(hd, 0.1, 0.34, HD + 0.1, T, x, BH + 0.05, WZ - HD / 2); yBox(hd, 0.1, 0.28, HD, T, x, XH - 0.2, WZ - HD / 2); } }
         for (const [x, sd] of [[HL - 0.04, -1], [HR + 0.04, 1]]) for (let k = 0; k < 6; k++) {                  // windows all down both sides: the rest of the house (kitchen, bedrooms...) we never go in
           const z = WZ - 6.4 - k * 7.6;
-          yBox(hd, 0.06, 2.1, 2.3, 0xf7f5f0, x, winY, z); yBox(hd, 0.05, 1.85, 2.05, 0x34414f, x + sd * 0.03, winY, z);
+          if (sd < 0) ringX(x, winY, z, 2.05, 1.85); else { yBox(hd, 0.06, 2.1, 2.3, 0xf7f5f0, x, winY, z); yBox(hd, 0.05, 1.85, 2.05, 0x34414f, x + sd * 0.03, winY, z); }
           if (k % 2 && !(sd < 0 && z > 0 && z < VD)) { yBox(hd, 0.06, 1.9, 2.3, 0xf7f5f0, x, 3.3, z); yBox(hd, 0.05, 1.65, 2.05, 0x34414f, x + sd * 0.03, 3.3, z); }   // (downstairs: none along the living room but its own)
         }
         { const sx = HL - 0.04, sz = DOOR_Z0 + WIN_W / 2, sy = WIN_SILL + WIN_H / 2;                            // the living room's window, seen from the side yard: right where it is inside
@@ -3503,7 +3510,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           const tri = (w, h) => new THREE.Shape([new THREE.Vector2(-w / 2, 0), new THREE.Vector2(w / 2, 0), new THREE.Vector2(0, h)]);
           yBox(hd, W + 0.12, 0.32, 0.16, T, MX, BH + 0.02, FZ0); yBox(hd, W, 0.26, 0.12, T, MX, XH - 0.2, FZ0);   // the timber bands
           yBox(hd, W + 1.2, 0.34, 0.12, 0x3a2a20, MX, XH - 0.06, zF - 1.15); yBox(hd, W + 1.2, 0.08, 1.1, 0xe9e2d4, MX, XH - 0.22, zF - 0.58);   // fascia and soffit
-          for (const s of [-1, 1]) yBox(hd, 0.14, U.dh + 0.1, 0.4, 0xf2f0ea, U.dx + s * (U.dw / 2 + 0.07), LH + (U.dh + 0.1) / 2, zF + 0.05);   // the jambs of our doorway (the wall's thickness)
+          for (const s of [-1, 1]) yBox(hd, 0.14, U.dh + 0.2, 0.4, 0xf2f0ea, U.dx + s * (U.dw / 2 + 0.07), LH - 0.1 + (U.dh + 0.2) / 2, zF + 0.05);   // the jambs of our doorway (the wall's thickness; their feet sunk into the landing, so no flicker there)
           yBox(hd, U.dw + 0.28, 0.14, 0.4, 0xf2f0ea, U.dx, dT + 0.05, zF + 0.05);
           const steps = new THREE.Group(); steps.userData.name = 'Front steps'; povEndWall.add(steps);           // (solid: she can climb them)
           for (const half of [0, 1]) {
@@ -3513,11 +3520,11 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
             yBox(hd, 2.45, 5.28, 0.08, 0xf2f0ea, sx, 2.64, FZ0); yBox(hd, 2.1, 5.1, 0.1, 0xf7f6f2, sx, 2.55, FZ0 - 0.03);   // the side door: a white storm door...
             yBox(hd, 1.55, 2.3, 0.05, 0xb9c6ce, sx, 3.8, FZ0 - 0.09); yBox(hd, 0.14, 0.14, 0.12, 0xc9a227, sx - out * 0.75, 2.5, FZ0 - 0.1);   // ...its glass, its handle
             yBox(hd, 0.26, 0.38, 0.22, 0x2a2a2a, sx, 5.75, FZ0 - 0.1); yBox(hd, 0.16, 0.2, 0.1, 0xfff2b0, sx, 5.7, FZ0 - 0.2);   // and a little lamp over it
-            for (const s of [-1, 1]) yBox(hd, 0.2, U.dh + 0.2, 0.14, 0xf2f0ea, ex + s * (U.dw / 2 + 0.1), LH + (U.dh + 0.2) / 2, FZ0);   // the front door's frame...
+            for (const s of [-1, 1]) yBox(hd, 0.2, U.dh + 0.3, 0.14, 0xf2f0ea, ex + s * (U.dw / 2 + 0.1), LH - 0.1 + (U.dh + 0.3) / 2, FZ0);   // the front door's frame...
             yBox(hd, U.dw + 0.4, 0.2, 0.14, 0xf2f0ea, ex, dT + 0.1, FZ0);
             for (const s of [-1, 1]) { const lx = ex + s * (U.dw / 2 + 0.55);                                   // ...and a tall narrow sidelight either side
-              yBox(hd, 0.7, U.dh, 0.08, 0xf2f0ea, lx, LH + U.dh / 2, FZ0); yBox(hd, 0.46, U.dh - 0.3, 0.05, 0xc8d3da, lx, LH + U.dh / 2, FZ0 - 0.05); }
-            if (half) { yBox(hd, U.dw, U.dh, 0.1, 0x2a2420, ex, LH + U.dh / 2, FZ0 - 0.02); yBox(hd, U.dw - 0.5, U.dh * 0.55, 0.04, 0x5d6b73, ex, LH + U.dh * 0.62, FZ0 - 0.08); }   // (next door's, shut)
+              yBox(hd, 0.7, U.dh + 0.1, 0.08, 0xf2f0ea, lx, LH - 0.1 + (U.dh + 0.1) / 2, FZ0); yBox(hd, 0.46, U.dh - 0.3, 0.05, 0xc8d3da, lx, LH + U.dh / 2, FZ0 - 0.05); }
+            if (half) { yBox(hd, U.dw, U.dh + 0.1, 0.1, 0x2a2420, ex, LH - 0.1 + (U.dh + 0.1) / 2, FZ0 - 0.02); yBox(hd, U.dw - 0.5, U.dh * 0.55, 0.04, 0x5d6b73, ex, LH + U.dh * 0.62, FZ0 - 0.08); }   // (next door's, shut)
             { const gw = 5.8, gy0 = dT + 0.35, gh = 2.4, ang = Math.atan2(gh, gw / 2), sl = Math.hypot(gw / 2, gh);   // the porch gable over it (no posts: it sits on the wall)
               wallMesh(tri(gw, gh), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.set(ex, gy0, zF - 0.9);
               for (const s of [-1, 1]) { yBox(hd, sl + 0.3, 0.2, 0.12, T, ex + s * gw / 4, gy0 + gh / 2, zF - 0.95).rotation.z = -s * ang; yBox(hd, sl + 0.4, 0.14, 1.1, 0x8a3934, ex + s * gw / 4, gy0 + gh / 2 + 0.14, zF - 0.58).rotation.z = -s * ang; }   // (stopping at the wall, not poking through into the foyer)
@@ -4728,6 +4735,39 @@ function upTex(kind) {                                                // the ups
         c.strokeStyle = '#e8b04a'; c.lineWidth = 3; c.strokeRect(20, 20, w - 40, h - 40);
         for (let y = 50; y < h - 30; y += 36) for (let x = 44; x < w - 30; x += 36) { c.fillStyle = (x + y) % 72 ? '#e8b04a' : '#f2e6c9'; c.beginPath(); c.moveTo(x, y - 13); c.lineTo(x + 13, y); c.lineTo(x, y + 13); c.lineTo(x - 13, y); c.fill(); c.fillStyle = '#1b2a4a'; c.beginPath(); c.moveTo(x, y - 5); c.lineTo(x + 5, y); c.lineTo(x, y + 5); c.lineTo(x - 5, y); c.fill(); }
         c.fillStyle = 'rgba(0,0,0,.07)'; for (let y = 0; y < h; y += 2) c.fillRect(0, y, w, 1); }, 1, 1)
+    : kind === 'grime' ? mk(512, 512, c => {                                     // a sheet of grime decals, 4 x 4: stain, streaks, splat, paws / mould, cobweb, crack, scuff / smear, dust, cup rings, drip / rust, ants, puddle, newspaper
+        const cell = (i, f) => { c.save(); c.translate((i % 4) * 128, (i >> 2) * 128); c.beginPath(); c.rect(6, 6, 116, 116); c.clip(); f(); c.restore(); };
+        const blob = (x, y, r, a, rgb) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${rgb || '255,255,255'},${a})`); g.addColorStop(1, `rgba(${rgb || '255,255,255'},0)`); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); };
+        cell(0, () => { for (let k = 0; k < 8; k++) blob(40 + rnd() * 48, 40 + rnd() * 48, 20 + rnd() * 24, 0.35); c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2.5; c.beginPath(); for (let a = 0; a <= 6.4; a += 0.2) { const r = 40 + Math.sin(a * 3) * 6 + rnd() * 5; c.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r); } c.stroke(); });
+        cell(1, () => { for (let k = 0; k < 16; k++) { const x = 10 + rnd() * 108, len = 30 + rnd() * 85, wd = 2 + rnd() * 7, g = c.createLinearGradient(0, 6, 0, 6 + len); g.addColorStop(0, `rgba(70,58,40,${0.35 + rnd() * 0.3})`); g.addColorStop(1, 'rgba(70,58,40,0)'); c.fillStyle = g; c.fillRect(x, 6, wd, len); } });
+        cell(2, () => { blob(64, 64, 26, 0.9); for (let k = 0; k < 22; k++) { const a = rnd() * 6.3, r = 20 + rnd() * 38; blob(64 + Math.cos(a) * r, 64 + Math.sin(a) * r, 2 + rnd() * 6, 0.9); } });
+        cell(3, () => { c.fillStyle = 'rgba(78,56,34,.72)'; for (let k = 0; k < 4; k++) { const x = 30 + k * 22 + (k % 2) * 8, y = 100 - k * 26; c.beginPath(); c.ellipse(x, y, 7, 6, 0, 0, 7); c.fill(); for (let q = 0; q < 4; q++) { c.beginPath(); c.arc(x - 7 + q * 4.7, y - 9 - (q % 3 ? 2 : 0), 2.4, 0, 7); c.fill(); } } });
+        cell(4, () => { for (let k = 0; k < 140; k++) { const a = rnd() * 6.3, r = Math.pow(rnd(), 0.6) * 54; c.fillStyle = rnd() < 0.5 ? `rgba(30,40,24,${0.25 + rnd() * 0.5})` : `rgba(70,86,40,${0.2 + rnd() * 0.4})`; c.beginPath(); c.arc(64 + Math.cos(a) * r, 64 + Math.sin(a) * r, 0.8 + rnd() * 2.6, 0, 7); c.fill(); } });
+        cell(5, () => { c.strokeStyle = 'rgba(235,235,230,.8)'; c.lineWidth = 1; for (let k = 0; k <= 8; k++) { const a = Math.PI * k / 8; c.beginPath(); c.moveTo(64, 7); c.lineTo(64 + Math.cos(a) * 60, 7 + Math.sin(a) * 110); c.stroke(); }
+          for (let r = 12; r < 110; r += 11) { c.beginPath(); for (let k = 0; k <= 8; k++) { const a = Math.PI * k / 8, rr = r * (0.85 + rnd() * 0.25); c.lineTo(64 + Math.cos(a) * rr * 0.55, 7 + Math.sin(a) * rr); } c.stroke(); } });
+        cell(6, () => { c.strokeStyle = 'rgba(62,52,42,.8)'; c.lineWidth = 1.4; const br = (x, y, a, n) => { c.beginPath(); c.moveTo(x, y); for (let k = 0; k < n; k++) { a += (rnd() - 0.5) * 0.9; x += Math.cos(a) * 7; y += Math.sin(a) * 7; c.lineTo(x, y); if (rnd() < 0.15 && n > 4) { c.stroke(); br(x, y, a + (rnd() - 0.5) * 1.8, n / 2 | 0); c.beginPath(); c.moveTo(x, y); } } c.stroke(); }; br(20, 30, 0.7, 14); br(100, 20, 2.2, 10); });
+        cell(7, () => { for (let k = 0; k < 12; k++) { c.strokeStyle = `rgba(${rnd() < 0.4 ? '20,20,20' : '60,52,44'},${0.25 + rnd() * 0.35})`; c.lineWidth = 1 + rnd() * 3; const y = 30 + rnd() * 68, x = 8 + rnd() * 60; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 20 + rnd() * 50, y + (rnd() - 0.5) * 8); c.stroke(); } });
+        cell(8, () => { blob(64, 76, 26, 0.5, '96,76,44'); for (let k = 0; k < 4; k++) blob(40 + k * 16, 38 - (k % 3 ? 4 : 0), 9, 0.5, '96,76,44'); blob(94, 70, 9, 0.5, '96,76,44'); });
+        cell(9, () => { for (let k = 0; k < 14; k++) blob(20 + rnd() * 88, 20 + rnd() * 88, 14 + rnd() * 26, 0.14 + rnd() * 0.16, '112,98,78'); for (let k = 0; k < 60; k++) { c.fillStyle = 'rgba(80,70,56,.35)'; c.fillRect(14 + rnd() * 100, 14 + rnd() * 100, 1.5, 1.5); } });
+        cell(10, () => { c.strokeStyle = 'rgba(255,255,255,.6)'; for (const [x, y, r] of [[48, 52, 24], [76, 74, 22], [60, 88, 20]]) { c.lineWidth = 3 + rnd() * 2; c.beginPath(); c.arc(x, y, r, rnd(), rnd() + 5.6); c.stroke(); } });
+        cell(11, () => { blob(64, 16, 34, 0.55); const g = c.createLinearGradient(0, 10, 0, 116); g.addColorStop(0, 'rgba(255,255,255,.6)'); g.addColorStop(1, 'rgba(255,255,255,.15)'); c.fillStyle = g; c.beginPath(); c.moveTo(48, 12); c.quadraticCurveTo(58, 60, 60, 106); c.lineTo(68, 106); c.quadraticCurveTo(72, 60, 82, 12); c.fill(); blob(64, 108, 8, 0.8); });
+        cell(12, () => { for (let k = 0; k < 10; k++) blob(20 + rnd() * 88, 20 + rnd() * 88, 10 + rnd() * 22, 0.4 + rnd() * 0.3, rnd() < 0.5 ? '150,72,30' : '110,50,24'); for (let k = 0; k < 90; k++) { c.fillStyle = `rgba(${90 + rnd() * 80 | 0},${40 + rnd() * 30 | 0},20,.55)`; c.fillRect(10 + rnd() * 108, 10 + rnd() * 108, 1.5 + rnd() * 2, 1.5 + rnd() * 2); } });
+        cell(13, () => { c.fillStyle = 'rgba(15,12,10,.9)'; for (let k = 0; k < 18; k++) { const x = 10 + k * 6.2, y = 64 + Math.sin(k * 0.7) * 10; for (let q = 0; q < 3; q++) { c.beginPath(); c.arc(x + q * 1.6, y, q === 1 ? 1.1 : 1.5, 0, 7); c.fill(); } } });
+        cell(14, () => { c.fillStyle = 'rgba(255,255,255,.62)'; c.beginPath(); for (let a = 0; a <= 6.4; a += 0.25) { const r = 38 + Math.sin(a * 3 + 1) * 10 + Math.sin(a * 5) * 6; c.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r * 0.8); } c.fill(); blob(52, 54, 10, 0.5); });
+        cell(15, () => { c.fillStyle = '#e9e5da'; c.fillRect(10, 18, 108, 92); c.fillStyle = '#3a3a3a'; c.fillRect(16, 24, 96, 10); c.fillStyle = '#9a9a9a'; c.fillRect(16, 40, 44, 30); for (let col = 0; col < 3; col++) for (let y = 76; y < 104; y += 4) c.fillRect(16 + col * 33, y, 28, 1.5); for (let y = 40; y < 72; y += 4) c.fillRect(64, y, 48, 1.5); c.fillStyle = 'rgba(0,0,0,.08)'; c.fillRect(62, 18, 3, 92); });
+      })
+    : kind === 'dirt' ? mk(256, 256, (c, w, h) => {                              // floor grime: soft dirty patches and grit (it tiles)
+        for (let k = 0; k < 40; k++) { const x = rnd() * w, y = rnd() * h, r = 12 + rnd() * 50, a = 0.06 + rnd() * 0.14;
+          for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) { const g = c.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r); g.addColorStop(0, `rgba(78,64,44,${a})`); g.addColorStop(1, 'rgba(78,64,44,0)'); c.fillStyle = g; c.fillRect(x + ox - r, y + oy - r, 2 * r, 2 * r); } }
+        for (let k = 0; k < 500; k++) { c.fillStyle = `rgba(60,50,38,${0.15 + rnd() * 0.35})`; c.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 1.5, 1 + rnd() * 1.5); } })
+    : kind === 'hygiene' ? canvasTex(256, 160, (c, w, h) => { c.fillStyle = '#c29a62'; c.fillRect(0, 0, w, h);   // a bit of cardboard, marker pen
+        c.fillStyle = 'rgba(90,60,30,.22)'; for (let k = 0; k < 6; k++) c.fillRect(20 + k * 40, 0, 3, h);
+        c.textAlign = 'center'; c.font = 'bold 40px "Comic Sans MS", "Marker Felt", cursive'; c.fillStyle = '#1b3a8a'; c.fillText('FRESH ✔', w / 2, 52); c.fillStyle = '#b3203a'; c.fillText('HYGENIC ✔', w / 2, 100);
+        c.fillStyle = '#2a2a2a'; c.font = 'italic 20px "Comic Sans MS", "Marker Felt", cursive'; c.fillText('*since tuesday', w / 2 + 40, 138);
+        c.fillStyle = 'rgba(235,235,225,.6)'; c.fillRect(0, 0, 44, 16); c.fillRect(w - 44, h - 16, 44, 16); }, 1, 1)
+    : kind === 'flush' ? canvasTex(256, 128, (c, w, h) => { c.fillStyle = '#fbfbf6'; c.fillRect(0, 0, w, h); c.strokeStyle = '#c41e3a'; c.lineWidth = 8; c.strokeRect(6, 6, w - 12, h - 12);
+        c.textAlign = 'center'; c.fillStyle = '#c41e3a'; c.font = 'bold 32px Georgia, serif'; c.fillText('PLEASE FLUSH!!', w / 2, 50); c.fillStyle = '#444'; c.font = 'italic 17px Georgia, serif'; c.fillText('— Management', w / 2 + 50, 76);
+        c.save(); c.translate(w / 2 - 6, 108); c.rotate(-0.05); c.fillStyle = '#1b3a8a'; c.font = '21px "Comic Sans MS", "Marker Felt", cursive'; c.fillText('(someone didn’t)', 0, 0); c.restore(); }, 1, 1)
     : kind === 'tapestry' ? canvasTex(128, 88, (c, w, h) => { c.fillStyle = '#1f3f8a'; c.fillRect(0, 0, w, h); c.fillStyle = '#e8b04a'; c.fillRect(5, 5, w - 10, h - 10); c.fillStyle = '#b3203a'; c.fillRect(11, 11, w - 22, h - 22);
         for (let y = 26; y < h - 12; y += 20) for (let x = 24; x < w - 12; x += 20) { c.fillStyle = '#f2e6c9'; c.beginPath(); c.moveTo(x, y - 7); c.lineTo(x + 7, y); c.lineTo(x, y + 7); c.lineTo(x - 7, y); c.fill(); c.fillStyle = '#1f6f78'; c.beginPath(); c.arc(x, y, 2.5, 0, 7); c.fill(); } }, 1, 1)
     : kind === 'madhubani' ? canvasTex(160, 120, (c, w, h) => { c.fillStyle = '#f3e3c3'; c.fillRect(0, 0, w, h); c.strokeStyle = '#1b1b1b'; c.lineWidth = 3; c.strokeRect(4, 4, w - 8, h - 8);   // a Madhubani-style painting: two fish and a sun
@@ -4764,26 +4804,39 @@ function buildUpperFloor() {                                          // behind 
   const grp = walkable => { const g = new THREE.Group(); g.userData.name = 'Upstairs'; if (!walkable) g.userData.noWalk = true; root.add(g); return g; };
   const solid = grp(true), flat = grp(true), dec = grp(), glow = grp(), pics = grp();   // walls, stairs, furniture (baked room by room) / floors and ceiling / the little things / lit bulbs / rugs, paintings, glass
   const ph = (o, sp, sh) => new THREE.MeshPhongMaterial(Object.assign({ vertexColors: true, specular: sp || 0x000000, shininess: sh || 4, fog: false }, o));   // (lit per pixel: the lamps throw pools of light on walls and floors)
-  const K = { plaster: ph({ map: upTex('plaster'), emissive: 0x2a2621 }, 0x060606), wood: ph({ map: upTex('wood') }, 0x1e1e1e, 24), fabric: ph({ map: upTex('fabric') }), granite: ph({ map: upTex('granite') }, 0x5a5a5a, 60),
+  const K = { porcelain: ph({ side: THREE.DoubleSide }, 0x9a9a9a, 90), plaster: ph({ map: upTex('plaster'), emissive: 0x2a2621 }, 0x060606), wood: ph({ map: upTex('wood') }, 0x1e1e1e, 24), fabric: ph({ map: upTex('fabric') }), granite: ph({ map: upTex('granite') }, 0x5a5a5a, 60),
     tile: ph({ map: upTex('tile') }, 0x484848, 70), plain: ph({}), shiny: ph({}, 0x8a8a8a, 80), decal: ph({ polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), glow: new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }) };
   const scales = new Map([[K.plaster, 3], [K.wood, 1.3], [K.fabric, 0.8], [K.granite, 1.2], [K.tile, 1.6]]);
+  const DEC = [], DIRTQ = [], GLASS = [], BLIND = [];                         // (grime decals, floor dirt, window glass, blinds: each merged into a single mesh at the end)
+  const quad = (list, w, h, x, y, z, ry, rx, rz, uv, tint) => { const g = new THREE.PlaneGeometry(w, h); if (uv) { const Q = g.attributes.uv; for (let i = 0; i < Q.count; i++) Q.setXY(i, uv[0] + Q.getX(i) * (uv[2] - uv[0]), uv[1] + Q.getY(i) * (uv[3] - uv[1])); }
+    const col = new THREE.Color(tint === undefined ? 0xffffff : tint), C3 = new Float32Array(12); for (let i = 0; i < 4; i++) col.toArray(C3, i * 3); g.setAttribute('color', new THREE.BufferAttribute(C3, 3));
+    const m = new THREE.Mesh(g); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0, 'YXZ'); list.push(m); return m; };
+  const decal = (cell, x, y, z, w, h, ry, rx, rz, tint) => { const u = (cell % 4) / 4, v = 1 - ((cell >> 2) + 1) / 4; quad(DEC, w, h, x, y, z, ry, rx, rz, [u, v, u + 0.25, v + 0.25], tint); };
+  const onFloor = (cell, x, z, w, h, spin, tint, y) => decal(cell, x, y === undefined ? UF + 0.007 : y, z, w, h, spin || 0, -Math.PI / 2, 0, tint);
+  const onCeil = (cell, x, z, w, h, spin, tint) => decal(cell, x, CH - 0.006, z, w, h, spin || 0, Math.PI / 2, 0, tint);
+  const mergeQ = (list, mat, name, uvWorld) => { if (!list.length) return null; let n = 0; const gs = list.map(m => { m.updateMatrixWorld(true); const g = m.geometry.toNonIndexed().applyMatrix4(m.matrixWorld); m.geometry.dispose(); n += g.attributes.position.count; return g; });
+    const P = new Float32Array(n * 3), N = new Float32Array(n * 3), UV = new Float32Array(n * 2), CO = new Float32Array(n * 3); let at = 0;
+    for (const g of gs) { const k = g.attributes.position.count; P.set(g.attributes.position.array, at * 3); N.set(g.attributes.normal.array, at * 3); UV.set(g.attributes.uv.array, at * 2); CO.set(g.attributes.color.array, at * 3); at += k; g.dispose(); }
+    if (uvWorld) for (let i = 0; i < n; i++) { UV[i * 2] = P[i * 3] / uvWorld; UV[i * 2 + 1] = P[i * 3 + 2] / uvWorld; }
+    const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.BufferAttribute(P, 3)); bg.setAttribute('normal', new THREE.BufferAttribute(N, 3)); bg.setAttribute('uv', new THREE.BufferAttribute(UV, 2)); bg.setAttribute('color', new THREE.BufferAttribute(CO, 3)); bg.computeBoundingSphere();
+    const m = new THREE.Mesh(bg, mat); m.userData.name = name || 'Upstairs'; m.userData.noWalk = true; root.add(m); return m; };
   const put = (geo, kind, col, par) => { const m = new THREE.Mesh(geo, K[kind]); m.userData.col = col; par.add(m); return m; };
   const B = (x0, x1, y0, y1, z0, z1, col, kind, par) => { const w = x1 - x0, h = y1 - y0, d = z1 - z0, m = put(new THREE.BoxGeometry(w, h, d), kind || 'plain', col, par || (Math.max(w, h, d) < 0.2 ? dec : solid)); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); return m; };
   const C = (r0, r1, h, col, x, y, z, seg, kind, par) => { const m = put(new THREE.CylinderGeometry(r0, r1, h, seg || 14), kind || 'plain', col, par || (Math.max(r0, r1) < 0.3 || h < 0.06 ? dec : solid)); m.position.set(x, y + h / 2, z); return m; };   // (y: what it stands on)
   const S = (r, col, x, y, z, sy, kind, par) => { const m = put(new THREE.SphereGeometry(r, r > 0.2 ? 12 : 6, r > 0.2 ? 8 : 4), kind || 'plain', col, par || dec); m.position.set(x, y, z); if (sy) m.scale.y = sy; return m; };
   const floor = (x0, x1, z0, z1, kind, tile, y) => { const t = upTex(kind).clone(); t.needsUpdate = true; t.repeat.set((x1 - x0) / tile, (z1 - z0) / tile);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), ph({ map: t, vertexColors: false, color: { marble: 0xbdb8b0, bathTile: 0xb4bcc2, planks: 0xdcd6ce, kitchenTile: 0xcfc9c0, terracotta: 0xd8d2ca }[kind] || 0xd0d0d0 }, kind === 'marble' || kind === 'bathTile' ? 0x333333 : 0x1a1a1a, kind === 'marble' ? 60 : 24));
-    m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, y === undefined ? UF : y, (z0 + z1) / 2); flat.add(m); return m; };
+    m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, y === undefined ? UF : y, (z0 + z1) / 2); flat.add(m); quad(DIRTQ, x1 - x0, z1 - z0, (x0 + x1) / 2, (y === undefined ? UF : y) + 0.003, (z0 + z1) / 2, 0, -Math.PI / 2); return m; };
   const picture = (w, h, tex, x, y, z, ry, rx) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), ph({ map: tex, vertexColors: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, 0, 'YXZ'); pics.add(m); return m; };
   const shadow = (x, z, w, d, op, y) => rectShadow(root, x, z, w, d, 0, op || 0.28, y === undefined ? UF + 0.016 : y);   // (soft contact shadows, over the rugs)
   const garland = (x0, z0, x1, z1, y, sag, n) => { for (let i = 0; i <= n; i++) { const t = i / n; S(0.08, i % 2 ? 0xffa21f : 0xffd23a, x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * sag, z0 + (z1 - z0) * t); } };   // a marigold toran
-  const PLASTER = 0xf6ecd8, TEAK = 0x8a5a2e, DARK = 0x4e3020, BRASS = 0xd4a93a, STEEL = 0xcdd3d8, WHITE = 0xfaf8f2;
+  const PLASTER = 0xe9dcc0, TEAK = 0x8a5a2e, DARK = 0x4e3020, BRASS = 0xd4a93a, STEEL = 0xcdd3d8, WHITE = 0xfaf8f2;
   const RISE = (UF - LH) / 14, SW = zF + 2 + 13 * 0.62, dL = U.dx - U.dw / 2, dR = U.dx + U.dw / 2, dT = LH + U.dh, gx = XR - 5.8, winY = FT(12.5), wx0 = gx - 3.45, wx1 = gx + 3.45, wy0 = 7.0, wy1 = 11.1;
   U.SW = SW;
   // ======== the shell: floors, stairs, walls, ceiling ========
   B(dL, dR, LH - 0.3, LH + 0.015, zF - 0.06, zF + 0.12, 0x9c9890, 'granite');                              // a stone threshold in the doorway
   floor(HL + 0.12, -0.3, zF + 0.1, SW, 'marble', 2.6, LH);                                                // the foyer: marble, level with the landing outside
-  B(HL, -0.3, UF - 0.3, UF - 0.005, SW, SW + 0.4, 0xefe7da, 'plaster');                                   // (the edge of the floor at the top of the stairs)
+  B(HL + 0.02, -0.3, UF - 0.3, UF - 0.005, SW, SW + 0.4, 0xefe7da, 'plaster');                                   // (the edge of the floor at the top of the stairs)
   floor(-0.3, XR - 0.12, zF + 0.12, zF + 12, 'planks', 3.2);                                             // the living room: honey floorboards
   floor(HL + 0.12, -0.3, SW, zF + 12, 'marble', 2.6); floor(HL + 0.12, 4.5, zF + 12, -6.5, 'marble', 2.6); floor(HL + 0.12, -2.5, -6.5, 6, 'marble', 2.6);   // the hall and the dining room: marble
   floor(4.5, XR - 0.12, zF + 12, -6.5, 'kitchenTile', 1.6); floor(8.06, XR - 0.12, -6.5, -5.94, 'kitchenTile', 1.6);   // the kitchen: patterned cement tiles
@@ -4791,7 +4844,7 @@ function buildUpperFloor() {                                          // behind 
   floor(-2.5, 8.06, -6.5, 6, 'terracotta', 1.8); floor(8.06, XR - 0.12, 1.44, 6, 'terracotta', 1.8);    // the bazaar room: terracotta
   floor(HL + 0.12, XR - 0.12, 6, zB - 0.12, 'planks', 3.2);                                             // the bedrooms: floorboards
   { const t = upTex('plaster').clone(); t.needsUpdate = true; t.repeat.set((XR - HL) / 3, (zB - zF) / 3);
-    const cl = new THREE.Mesh(new THREE.PlaneGeometry(XR - HL, zB - zF), ph({ map: t, vertexColors: false, emissive: 0x77726a, emissiveMap: t })); cl.rotation.x = Math.PI / 2; cl.position.set((HL + XR) / 2, CH, (zF + zB) / 2); flat.add(cl); }   // the ceiling
+    const cl = new THREE.Mesh(new THREE.PlaneGeometry(XR - HL, zB - zF), ph({ map: t, vertexColors: false, emissive: 0x69645a, emissiveMap: t })); cl.rotation.x = Math.PI / 2; cl.position.set((HL + XR) / 2, CH, (zF + zB) / 2); flat.add(cl); }   // the ceiling
   for (let k = 0; k < 13; k++) { const z0 = zF + 2 + k * 0.62, top = LH + (k + 1) * RISE;               // thirteen teak stairs, each with a darker tread
     B(HL + 0.12, HL + 2.9, LH, top - 0.04, z0, z0 + 0.62, 0x7a4a2a, 'wood'); B(HL + 0.12, HL + 2.94, top - 0.04, top, z0 - 0.04, z0 + 0.62, 0x5a3520, 'wood'); }
   { const run = 13 * 0.62, len = Math.hypot(run, 13 * RISE), a = Math.atan2(RISE, 0.62), cz = zF + 2 + run / 2, lineY = z => LH + (z - zF - 2) * RISE / 0.62;
@@ -4802,9 +4855,13 @@ function buildUpperFloor() {                                          // behind 
     B(HL + 2.66, HL + 2.94, LH, LH + 1.5, zF + 1.62, zF + 1.9, DARK, 'wood'); C(0.17, 0.12, 0.2, BRASS, HL + 2.8, LH + 1.5, zF + 1.76, 12, 'shiny'); }   // (the newel post, a brass cap)
   const wall = (x0, x1, z0, z1, y0, y1) => B(x0, x1, y0, y1, z0, z1, PLASTER, 'plaster');
   const skirt = (x0, x1, z0, z1, y) => B(x0, x1, y === undefined ? UF : y, (y === undefined ? UF : y) + 0.3, z0, z1, DARK, 'wood');
-  wall(HL, dL, zF + 0.02, zF + 0.14, LH, CH); wall(dR, -0.3, zF + 0.02, zF + 0.14, LH, CH); wall(dL, dR, zF + 0.02, zF + 0.14, dT, CH);   // plaster inside the front wall, round the doorway...
-  wall(-0.3, wx0, zF + 0.02, zF + 0.14, UF, CH); wall(wx1, XR, zF + 0.02, zF + 0.14, UF, CH); wall(wx0, wx1, zF + 0.02, zF + 0.14, UF, wy0); wall(wx0, wx1, zF + 0.02, zF + 0.14, wy1, CH);   // ...and round the picture window
-  wall(HL + 0.02, HL + 0.14, zF, zB, LH, CH); wall(XR - 0.14, XR - 0.02, zF, zB, UF, CH); wall(HL, XR, zB - 0.14, zB, UF, CH);   // the north wall, the party wall, the back wall
+  wall(HL + 0.02, dL - 0.14, zF + 0.02, zF + 0.14, LH, CH); wall(dR + 0.14, -0.3, zF + 0.02, zF + 0.14, LH, CH); wall(dL - 0.14, dR + 0.14, zF + 0.02, zF + 0.14, dT + 0.12, CH);   // plaster inside the front wall, round the doorway...
+  wall(-0.3, wx0 - 0.1, zF + 0.02, zF + 0.14, UF, CH); wall(wx1 + 0.1, XR, zF + 0.02, zF + 0.14, UF, CH); wall(wx0 - 0.1, wx1 + 0.1, zF + 0.02, zF + 0.14, UF, wy0 - 0.1); wall(wx0 - 0.1, wx1 + 0.1, zF + 0.02, zF + 0.14, wy1 + 0.1, CH);   // ...and round the picture window
+  const NW = U.winN.map(([c, w, h]) => [c - w / 2, c + w / 2, winY - h / 2, winY + h / 2]), BW = U.winB.map(([c, w, h]) => [c - w / 2, c + w / 2, winY - h / 2, winY + h / 2]);   // (where the windows go through)
+  const holed = (alongZ, t0, t1, a0, a1, y0, y1, holes) => { const W = (b0, b1, c0, c1) => alongZ ? wall(t0, t1, b0, b1, c0, c1) : wall(b0, b1, t0, t1, c0, c1); let a = a0;   // a wall with window holes in it
+    for (const [h0, h1, hy0, hy1] of holes.filter(h => h[1] > a0 && h[0] < a1).sort((p, q) => p[0] - q[0])) { if (h0 > a) W(a, h0, y0, y1); W(h0, h1, y0, hy0); W(h0, h1, hy1, y1); a = h1; }
+    if (a < a1) W(a, a1, y0, y1); };
+  holed(true, HL + 0.02, HL + 0.14, zF + 0.02, zB, LH, CH, NW); wall(XR - 0.14, XR - 0.02, zF + 0.02, zB, UF, CH); holed(false, zB - 0.14, zB, HL + 0.02, XR, UF, CH, BW);   // the north wall, the party wall, the back wall
   wall(-0.42, -0.3, zF + 0.14, SW - 0.02, LH, CH);                                                         // the foyer's side wall...
   wall(HL + 0.14, HL + 2.95, SW - 0.02, SW + 0.1, LH, UF - 0.3); wall(HL + 2.95, -0.3, SW - 0.02, SW + 0.1, LH, UF + 1.1);   // ...its back wall, and a half-wall along the top of the stairwell
   B(HL + 2.9, -0.24, UF + 1.1, UF + 1.2, SW - 0.08, SW + 0.16, DARK, 'wood');
@@ -4814,11 +4871,11 @@ function buildUpperFloor() {                                          // behind 
   for (const [a, b] of [[-5.3, -2.8], [4.8, 7.3]]) wall(a, b, 5.94, 6.06, UF + 5.0, CH);
   wall(2.94, 3.06, 6.06, zB - 0.14, UF, CH);                                                               // ...and the wall between them
   for (const [a, b, c, alongX] of [[-5.3, -2.8, 6, true], [4.8, 7.3, 6, true], [-3.3, -0.9, 8, false]]) {   // teak architraves round the doorways
-    if (alongX) { B(a - 0.14, a, UF, UF + 5.14, c - 0.1, c + 0.1, DARK, 'wood'); B(b, b + 0.14, UF, UF + 5.14, c - 0.1, c + 0.1, DARK, 'wood'); B(a - 0.14, b + 0.14, UF + 5.0, UF + 5.14, c - 0.1, c + 0.1, DARK, 'wood'); }
-    else { B(c - 0.1, c + 0.1, UF, UF + 5.14, a - 0.14, a, DARK, 'wood'); B(c - 0.1, c + 0.1, UF, UF + 5.14, b, b + 0.14, DARK, 'wood'); B(c - 0.1, c + 0.1, UF + 5.0, UF + 5.14, a - 0.14, b + 0.14, DARK, 'wood'); } }
+    if (alongX) { B(a - 0.14, a + 0.03, UF, UF + 5.14, c - 0.1, c + 0.1, DARK, 'wood'); B(b - 0.03, b + 0.14, UF, UF + 5.14, c - 0.1, c + 0.1, DARK, 'wood'); B(a - 0.14, b + 0.14, UF + 4.97, UF + 5.14, c - 0.1, c + 0.1, DARK, 'wood'); }
+    else { B(c - 0.1, c + 0.1, UF, UF + 5.14, a - 0.14, a + 0.03, DARK, 'wood'); B(c - 0.1, c + 0.1, UF, UF + 5.14, b - 0.03, b + 0.14, DARK, 'wood'); B(c - 0.1, c + 0.1, UF + 4.97, UF + 5.14, a - 0.14, b + 0.14, DARK, 'wood'); } }   // (standing just proud of the wall ends: never sharing a face with them, so no flicker)
   skirt(HL + 0.14, XR - 0.14, zB - 0.2, zB - 0.14); skirt(XR - 0.2, XR - 0.14, zF + 0.14, zB - 0.14); skirt(HL + 0.14, HL + 0.2, SW + 0.1, zB - 0.14); skirt(-0.3, XR - 0.14, zF + 0.14, zF + 0.2);   // skirting boards...
   skirt(-0.3, -0.24, zF + 0.2, SW - 0.02); skirt(HL + 2.95, -0.3, SW + 0.1, SW + 0.16);
-  skirt(HL + 0.14, HL + 0.2, zF + 0.14, zF + 2, LH); skirt(HL + 0.14, dL, zF + 0.14, zF + 0.2, LH); skirt(dR, -0.42, zF + 0.14, zF + 0.2, LH); skirt(-0.48, -0.42, zF + 0.2, SW - 0.02, LH); skirt(HL + 2.95, -0.42, SW - 0.08, SW - 0.02, LH);
+  skirt(HL + 0.14, HL + 0.2, zF + 0.14, zF + 2, LH); skirt(HL + 0.14, dL - 0.14, zF + 0.14, zF + 0.2, LH); skirt(dR + 0.14, -0.42, zF + 0.14, zF + 0.2, LH); skirt(-0.48, -0.42, zF + 0.2, SW - 0.02, LH); skirt(HL + 2.95, -0.42, SW - 0.08, SW - 0.02, LH);
   for (const [z0, z1] of [[-6.0, -3.44], [-0.76, 1.5]]) { skirt(7.88, 7.94, z0, z1); skirt(8.06, 8.12, z0, z1); }
   skirt(8.06, XR - 0.14, 1.56, 1.62); skirt(8.06, XR - 0.14, 1.38, 1.44); skirt(8.06, XR - 0.14, -5.94, -5.88);
   for (const [x0, x1] of [[HL + 0.14, -5.44], [-2.66, 4.66], [7.44, XR - 0.14]]) { skirt(x0, x1, 5.88, 5.94); skirt(x0, x1, 6.06, 6.12); }
@@ -4828,7 +4885,7 @@ function buildUpperFloor() {                                          // behind 
   // -- the windows, from inside: the picture window's real glass (with its blinds), bright daylight panes for the rest
   { const rv = (x0, x1, y0, y1) => B(x0, x1, y0, y1, zF - 0.02, zF + 0.18, WHITE, 'plaster');           // the picture window: its reveals...
     rv(wx0 - 0.1, wx0, wy0, wy1); rv(wx1, wx1 + 0.1, wy0, wy1); rv(wx0 - 0.1, wx1 + 0.1, wy0 - 0.1, wy0); rv(wx0 - 0.1, wx1 + 0.1, wy1, wy1 + 0.1);
-    B(wx0 - 0.3, wx1 + 0.3, wy0 - 0.14, wy0, zF + 0.14, zF + 0.5, WHITE, 'wood');                        // ...a deep sill inside...
+    B(wx0 - 0.3, wx1 + 0.3, wy0 - 0.14, wy0 + 0.012, zF + 0.18, zF + 0.5, WHITE, 'wood');                        // ...a deep sill inside...
     const split = wy0 + (wy1 - wy0) * 0.3; B(gx - 0.06, gx + 0.06, split, wy1, zF - 0.02, zF + 0.1, WHITE, 'plain', dec); B(wx0, wx1, split - 0.06, split + 0.06, zF - 0.02, zF + 0.1, WHITE, 'plain', dec);   // ...its mullion and transom...
     for (const k of [-1, 0, 1]) B(gx + k * 1.725 - 0.05, gx + k * 1.725 + 0.05, wy0, split, zF - 0.02, zF + 0.1, WHITE, 'plain', dec);
     const gl = new THREE.Mesh(new THREE.PlaneGeometry(wx1 - wx0, wy1 - wy0), new THREE.MeshPhongMaterial({ color: 0xd6e8f2, transparent: true, opacity: 0.16, shininess: 120, specular: 0xffffff, depthWrite: false, side: THREE.DoubleSide, fog: false }));
@@ -4838,11 +4895,18 @@ function buildUpperFloor() {                                          // behind 
     B(wx0 + 0.04, wx1 - 0.04, wy1 - bh - 0.07, wy1 - bh, zF + 0.08, zF + 0.16, 0xe8e2d4, 'plain', dec);
     for (const s of [-1, 1]) B(gx + s * 3.55 - 0.65, gx + s * 3.55 + 0.65, UF + 0.6, CH - 0.34, zF + 0.22, zF + 0.4, 0xd9731f, 'fabric');   // saffron curtains, drawn back...
     B(gx - 4.5, gx + 4.5, CH - 0.44, CH - 0.34, zF + 0.28, zF + 0.34, BRASS, 'shiny', dec); }                   // ...on a brass rod
-  const pane = (axis, c, y0, y1, w) => { if (axis === 'x') { B(HL + 0.14, HL + 0.17, y0 - 0.14, y1 + 0.14, c - w / 2 - 0.14, c + w / 2 + 0.14, WHITE, 'wood', dec); B(HL + 0.17, HL + 0.19, y0, y1, c - w / 2, c + w / 2, 0xeaf4fb, 'glow', glow); }
-    else { B(c - w / 2 - 0.14, c + w / 2 + 0.14, y0 - 0.14, y1 + 0.14, zB - 0.17, zB - 0.14, WHITE, 'wood', dec); B(c - w / 2, c + w / 2, y0, y1, zB - 0.19, zB - 0.17, 0xeaf4fb, 'glow', glow); } };   // (a bright pane: daylight)
-  for (let k = 0; k < 6; k++) pane('x', WZ - 6.4 - k * 7.6, winY - 0.93, winY + 0.93, 2.05);              // down the north wall, where they are outside
-  pane('x', WZ - 3.2, winY - 0.72, winY + 0.72, 1.65);
-  for (const x of [DX - 3.0, DX + 5.4, DX + 11.2]) pane('z', x, winY - 0.95, winY + 0.95, 2.2);         // and across the back
+  // -- the windows: real holes through the walls, glass, blinds (some way down, a different way in each)
+  const WB = (north, u0, u1, y0, y1, n0, n1, col, kind, par) => north ? B(HL + n0, HL + n1, y0, y1, u0, u1, col, kind, par) : B(u0, u1, y0, y1, WZ - n1, WZ - n0, col, kind, par);   // (a box in a wall's own terms: along it, up it, in from its outside face)
+  let wk = 0;
+  for (const [north, list] of [[true, NW], [false, BW]]) for (const [u0, u1, y0, y1] of list) {
+    const dI = north ? 0.14 : 0.16, r = 0.04, uc = (u0 + u1) / 2, yc = (y0 + y1) / 2, gw = u1 - u0 - 2 * r, gh = y1 - y0 - 2 * r, at = (d, uu, yy) => north ? [HL + d, yy, uu] : [uu, yy, WZ - d], ry = north ? Math.PI / 2 : Math.PI;
+    WB(north, u0, u1, y1 - r, y1, -0.01, dI, WHITE, 'plaster'); WB(north, u0, u1, y0, y0 + r, -0.01, dI, WHITE, 'plaster');   // reveals, through the wall...
+    WB(north, u0, u0 + r, y0 + r, y1 - r, -0.01, dI, WHITE, 'plaster'); WB(north, u1 - r, u1, y0 + r, y1 - r, -0.01, dI, WHITE, 'plaster');
+    WB(north, u0 - 0.12, u1 + 0.12, y1, y1 + 0.12, dI, dI + 0.04, WHITE, 'wood'); WB(north, u0 - 0.12, u0, y0, y1, dI, dI + 0.04, WHITE, 'wood'); WB(north, u1, u1 + 0.12, y0, y1, dI, dI + 0.04, WHITE, 'wood');   // ...a casing...
+    WB(north, u0 - 0.2, u1 + 0.2, y0 - 0.1, y0 + r + 0.01, dI - 0.02, dI + 0.28, WHITE, 'wood');   // ...a sill
+    { const [x, y, z] = at(0.05, uc, yc); quad(GLASS, gw, gh, x, y, z, ry); }                                // the glass
+    const bh = gh * [0.3, 0.55, 0.2, 0.75, 0.4][wk++ % 5]; { const [x, y, z] = at(dI - 0.03, uc, y1 - r - bh / 2); quad(BLIND, gw - 0.04, bh, x, y, z, ry, 0, 0, [0, 0, 1, bh / 0.22]); }
+    { const [x, y, z] = at(dI - 0.03, uc, y1 - r - bh - 0.035); if (north) B(x - 0.02, x + 0.02, y - 0.035, y + 0.035, uc - gw / 2, uc + gw / 2, 0xe8e2d4, 'plain', dec); else B(uc - gw / 2, uc + gw / 2, y - 0.035, y + 0.035, z - 0.02, z + 0.02, 0xe8e2d4, 'plain', dec); } }
   for (const s of [-1, 1]) { const lx = U.dx + s * (U.dw / 2 + 0.55); B(lx - 0.35, lx + 0.35, LH, dT, zF + 0.14, zF + 0.17, WHITE, 'wood', dec); B(lx - 0.23, lx + 0.23, LH + 0.15, dT - 0.15, zF + 0.17, zF + 0.19, 0xeaf4fb, 'glow', glow); }   // the door's sidelights
   // ======== the lights: warm lamps in every room (lit only when you're up here or out front), and the fittings you can see ========
   U.lights = [];
@@ -4857,7 +4921,7 @@ function buildUpperFloor() {                                          // behind 
   fitting(4.0, 3.2); lamp(4.0, CH - 0.7, 3.2, 0.75, 14);                                                   // the bazaar room and the hall
   fitting(-1.8, 14.5); lamp(-1.8, CH - 0.7, 14.5, 0.7, 12); fitting(8.3, 14.5); lamp(8.3, CH - 0.7, 14.5, 0.7, 12);   // the bedrooms
   // ======== the foyer: a shoe rack by the door ========
-  B(-1.6, -0.46, LH, LH + 1.3, zF + 3.2, zF + 5.4, TEAK, 'wood'); for (let i = 0; i < 2; i++) B(-1.6, -0.46, LH + 0.45 + i * 0.45, LH + 0.5 + i * 0.45, zF + 3.25, zF + 5.35, DARK, 'wood', dec);
+  B(-1.6, -0.46, LH, LH + 1.3, zF + 3.2, zF + 5.4, TEAK, 'wood'); for (let i = 0; i < 2; i++) B(-1.585, -0.475, LH + 0.45 + i * 0.45, LH + 0.5 + i * 0.45, zF + 3.25, zF + 5.35, DARK, 'wood', dec);
   [[0x2a2a2a, 3.5], [0x8a5a2e, 3.95], [0xd63384, 4.45], [0x2a4a7a, 4.9]].forEach(([c, z]) => B(-1.5, -0.7, LH + 1.3, LH + 1.48, zF + z - 0.14, zF + z + 0.14, c, 'fabric', dec));   // (chappals and shoes on top)
   shadow(-1.03, zF + 4.3, 1.2, 2.3, 0.3, LH + 0.004);
   // ======== the living room, over the garage: a low maroon sofa, a mandala rug, a carved coffee table with chai, poufs, a jhoola by the window, a mandir ========
@@ -4866,7 +4930,7 @@ function buildUpperFloor() {                                          // behind 
     B(x0, x1, UF + 0.25, UF + 1.05, z0, z1, RED, 'fabric'); B(XR - 0.85, x1, UF + 1.05, UF + 2.7, z0, z1, RED, 'fabric'); B(x0 + 0.1, x1, UF, UF + 0.25, z0 + 0.1, z1 - 0.1, DARK, 'wood');
     for (const z of [z0 - 0.4, z1]) B(x0, x1, UF, UF + 1.8, z, z + 0.4, 0x6a1a24, 'fabric');
     for (let i = 0; i < 3; i++) B(x0 + 0.05, XR - 0.9, UF + 1.05, UF + 1.42, z0 + 0.05 + i * 2.65, z0 + 2.6 + i * 2.65, 0x8c2433, 'fabric');
-    [0xe8b04a, 0x1fa4a0, 0xd63384, 0xe8b04a, 0x7b3fa0].forEach((c, i) => { B(XR - 1.26, XR - 0.96, UF + 1.42, UF + 2.3, z0 + 0.75 + i * 1.45, z0 + 1.55 + i * 1.45, c, 'fabric').rotation.z = -0.25; });   // cushions, leaning back
+    [0xe8b04a, 0x1fa4a0, 0xd63384, 0xe8b04a, 0x7b3fa0].forEach((c, i) => { if (i === 2) return; B(XR - 1.26, XR - 0.96, UF + 1.42, UF + 2.3, z0 + 0.75 + i * 1.45, z0 + 1.55 + i * 1.45, c, 'fabric').rotation.z = -0.25; });   // cushions, leaning back
     for (const z of [z0 + 0.35, z1 - 0.35]) { const bo = C(0.3, 0.3, 1.25, 0xc9302c, XR - 1.5, UF + 1.12, z, 12, 'fabric'); bo.position.y = UF + 1.72; bo.rotation.z = Math.PI / 2; }   // round bolsters against the arms
     shadow((x0 + x1) / 2, (z0 + z1) / 2, x1 - x0 + 0.3, z1 - z0 + 1.1, 0.34); }
   picture(3.4, 2.3, upTex('tapestry'), XR - 0.16, UF + 3.85, zF + 5.8, -Math.PI / 2);                        // a tapestry over the sofa
@@ -4978,42 +5042,79 @@ function buildUpperFloor() {                                          // behind 
     for (let i = 0; i < 3; i++) { C(0.09, 0.075, 0.26, 0xd5e4ea, 12.0, T2, -6.35 - i * 0.27, 8, 'shiny'); C(0.08, 0.08, 0.02, 0x7a4a22, 12.0, T2 + 0.03, -6.35 - i * 0.27, 8); }   // used chai glasses
     { const z0 = K0 + 0.15 + 2 * 1.6, dr = B(0, 0.04, 0, CT - UF - 0.45, 0, 1.45, 0xd8ccb4, 'wood', dec); dr.position.set(KX0 - 0.55, UF + 0.3 + (CT - UF - 0.45) / 2, z0 + 0.2); dr.rotation.y = -1.0; }   // a cupboard door left hanging open
   }
-  // ======== the bathroom: tiled, a western loo with its health faucet, the bucket and mug, a basin and mirror, the geyser ========
-  { const t = (x0, x1, z0, z1) => B(x0, x1, UF, UF + 4.2, z0, z1, 0xdfeaf2, 'tile', dec);
+  // ======== the bathroom: tiled (and mouldy), a proper western loo (someone didn't flush), the bathtub doing duty as the dishwasher, the bucket and mug, a basin, the geyser ========
+  { const t = (x0, x1, z0, z1) => B(x0, x1, UF, UF + 4.2, z0, z1, 0xd4e0e6, 'tile', dec);
     t(8.06, 8.09, -5.94, -3.3); t(8.06, 8.09, -0.9, 1.44); t(8.06, XR - 0.14, -5.94, -5.91); t(8.06, XR - 0.14, 1.41, 1.44); t(XR - 0.17, XR - 0.14, -5.94, 1.44);
-    B(XR - 0.5, XR - 0.17, UF + 1.3, UF + 2.6, -5.3, -4.2, WHITE, 'shiny'); C(0.45, 0.35, 1.25, WHITE, XR - 1.15, UF, -4.75, 18, 'shiny'); C(0.48, 0.48, 0.07, WHITE, XR - 1.15, UF + 1.25, -4.75, 18, 'shiny');   // the loo
-    C(0.03, 0.03, 0.4, STEEL, XR - 0.25, UF + 1.0, -3.9, 6, 'shiny'); S(0.06, STEEL, XR - 0.25, UF + 1.45, -3.9, 1.4, 'shiny');   // its health faucet
-    C(0.45, 0.38, 0.9, STEEL, 9.3, UF, -4.8, 18, 'shiny'); C(0.42, 0.42, 0.02, 0x9fd0ea, 9.3, UF + 0.86, -4.8, 18, 'shiny', dec);   // the steel bucket, full...
-    { const mug = C(0.15, 0.13, 0.3, 0x2a7fd6, 9.45, UF + 0.88, -4.65, 12, 'shiny', dec); mug.rotation.z = 0.25; B(9.62, 9.66, UF + 0.95, UF + 1.12, -4.7, -4.6, 0x2a7fd6, 'shiny', dec); }   // ...and the blue plastic mug
-    B(10.2, 11.0, UF, UF + 0.45, -5.2, -4.4, 0x8a5a2e, 'wood');                                              // a low wooden patla to sit on
+    const lx = XR - 1.32, lz = -2.2, E = 1.28, WLv = UF + 0.655;                                        // the loo: a turned porcelain bowl (hollow: you can see in), its seat, the lid up against the cistern
+    const bowl = put(new THREE.LatheGeometry([[0.26, 0], [0.29, 0.06], [0.31, 0.3], [0.37, 0.6], [0.44, 0.84], [0.47, 0.97], [0.45, 1.02], [0.4, 1.0], [0.33, 0.88], [0.24, 0.73], [0.15, 0.62], [0.001, 0.57]].map(([r, y]) => new THREE.Vector2(r, y)), 28), 'porcelain', WHITE, solid);
+    bowl.position.set(lx, UF, lz); bowl.scale.set(E, 1, 1);
+    C(0.19, 0.19, 0.012, 0xc9c07a, lx, WLv - 0.012, lz, 20, 'shiny').scale.x = E;                       // the water (not the colour water should be)...
+    { const ring = put(new THREE.TorusGeometry(0.215, 0.012, 6, 28), 'plain', 0xa8904a, dec); ring.position.set(lx, WLv + 0.05, lz); ring.rotation.x = Math.PI / 2; ring.scale.set(E, 1, 1); }   // ...a ring round the bowl...
+    [[0.1, 0.05, 0.03], [0.075, 0.045, 0.1], [0.048, 0.04, 0.16]].forEach(([R, r, y]) => { const tp = put(new THREE.TorusGeometry(R, r, 8, 16), 'shiny', 0x5a3a1c, dec); tp.position.set(lx - 0.02, WLv + y, lz); tp.rotation.x = Math.PI / 2; });   // ...and a poop, sitting pretty
+    { const tip = put(new THREE.ConeGeometry(0.045, 0.1, 10), 'shiny', 0x5a3a1c, dec); tip.position.set(lx - 0.03, WLv + 0.23, lz); tip.rotation.z = 0.35; }
+    { const seat = put(new THREE.TorusGeometry(0.395, 0.05, 8, 30), 'porcelain', 0xf4f0e6, solid); seat.position.set(lx, UF + 1.06, lz); seat.rotation.x = Math.PI / 2; seat.scale.set(E, 1, 0.7); }
+    { const lid = put(new THREE.CylinderGeometry(0.44, 0.44, 0.05, 28), 'porcelain', 0xf4f0e6, solid); lid.scale.set(E, 1, 1); lid.position.set(lx + 0.55, UF + 1.55, lz); lid.rotation.z = Math.PI / 2 - 0.12; }
+    B(XR - 0.62, XR - 0.17, UF + 1.25, UF + 2.45, lz - 0.55, lz + 0.55, WHITE, 'shiny'); B(XR - 0.66, XR - 0.17, UF + 2.45, UF + 2.53, lz - 0.6, lz + 0.6, WHITE, 'shiny'); C(0.06, 0.06, 0.03, STEEL, XR - 0.4, UF + 2.53, lz, 12, 'shiny');   // the cistern, its flush button (unpressed)
+    B(XR - 0.8, XR - 0.62, UF + 0.75, UF + 1.1, lz - 0.14, lz + 0.14, WHITE, 'shiny');   // (the pipe to the bowl: hidden in its back wall, not poking into it)
+    B(XR - 0.22, XR - 0.17, UF + 1.5, UF + 1.56, lz + 0.8, lz + 0.9, STEEL, 'shiny', dec); B(XR - 0.32, XR - 0.22, UF + 1.3, UF + 1.6, lz + 0.8, lz + 0.9, STEEL, 'shiny', dec);   // the health faucet on its hook
+    B(XR - 0.24, XR - 0.17, UF + 1.9, UF + 1.95, lz - 1.1, lz - 0.8, STEEL, 'shiny', dec); { const tube = C(0.06, 0.06, 0.3, 0xb8956a, XR - 0.3, UF + 1.72, lz - 0.95, 10, 'plain', dec); tube.rotation.x = Math.PI / 2; }   // the loo roll: just the tube
+    for (let k = 0; k < 6; k++) B(XR - 0.9, XR - 0.3, UF + k * 0.03, UF + 0.025 + k * 0.03, lz - 1.4, lz - 1.0, k % 2 ? 0xe8e4d8 : 0xd8d2c0, 'plain', dec).rotation.y = k * 0.08;   // (newspaper, for emergencies)
+    C(0.1, 0.09, 0.3, 0x3a8a8a, XR - 0.4, UF, lz + 1.15, 10, 'shiny'); C(0.015, 0.015, 0.5, 0xeeeeee, XR - 0.4, UF + 0.3, lz + 1.15, 5, 'plain', dec);   // the loo brush
+    picture(1.1, 0.55, upTex('flush'), XR - 0.18, UF + 3.3, lz, -Math.PI / 2);                               // PLEASE FLUSH!! (someone didn't)
+    onFloor(14, lx - 0.95, lz + 0.1, 0.9, 0.7, 0.4, 0xd6c65a);
+    const X0 = 9.2, X1 = XR - 0.17, Z0 = -5.91, Z1 = -4.1, TH = UF + 1.4, WL = UF + 0.95;                   // the bathtub...
+    B(X0, X1, UF, TH, Z1 - 0.2, Z1, WHITE, 'shiny'); B(X0, X1, UF, TH, Z0, Z0 + 0.2, WHITE, 'shiny'); B(X0, X0 + 0.2, UF, TH, Z0 + 0.2, Z1 - 0.2, WHITE, 'shiny'); B(X1 - 0.2, X1, UF, TH, Z0 + 0.2, Z1 - 0.2, WHITE, 'shiny');
+    B(X0 - 0.04, X1, TH, TH + 0.05, Z1 - 0.24, Z1 + 0.04, WHITE, 'shiny');
+    B(X0 + 0.2, X1 - 0.2, UF, WL, Z0 + 0.2, Z1 - 0.2, 0x8e8a62, 'shiny');                                    // ...full of grey dishwater...
+    let ds = 5; const dr = () => (ds = (ds * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 18; i++) { const pl = C(0.34, 0.34, 0.03, i % 4 ? STEEL : 0xe8e0d0, X0 + 0.55 + dr() * (X1 - X0 - 1.1), WL, Z0 + 0.5 + dr() * (Z1 - Z0 - 1.0), 18, 'shiny', dec); pl.position.y = WL + 0.02 + dr() * 0.12; pl.rotation.set(1.1 + dr() * 0.7, dr() * 3, (dr() - 0.5) * 0.6); }   // ...and every dish in the house
+    { const pot = C(0.4, 0.34, 0.5, 0x9aa0a4, X0 + 1.2, WL - 0.3, -5.0, 16, 'shiny'); pot.rotation.z = 0.35; const kd = C(0.52, 0.28, 0.28, 0x3a3a3a, X1 - 1.0, WL - 0.12, -4.9, 18, 'shiny'); kd.rotation.x = -0.3;
+      const ck = C(0.3, 0.3, 0.5, STEEL, 11.4, WL - 0.1, -5.25, 16, 'shiny'); ck.rotation.z = 1.3; }
+    for (let i = 0; i < 5; i++) { const gl = C(0.09, 0.075, 0.26, STEEL, X0 + 0.6 + i * 0.75, WL - 0.08, -4.5 - (i % 2) * 0.5, 10, 'shiny', dec); gl.rotation.set(0.5 + i * 0.3, i, 0.4); }
+    { const ld = B(0, 0.05, 0, 0.05, 0, 1.2, STEEL, 'shiny', dec); ld.position.set(10.6, WL + 0.2, -4.8); ld.rotation.set(0.5, 0.9, 0); }   // a ladle
+    for (let i = 0; i < 26; i++) S(0.06 + dr() * 0.09, 0xf8f8f2, X0 + 0.4 + dr() * (X1 - X0 - 0.8), WL + 0.02, Z0 + 0.4 + dr() * (Z1 - Z0 - 0.8), 0.55);   // suds
+    { const dx = X1 - 0.8, dz = -4.55; S(0.14, 0xffd23a, dx, WL + 0.07, dz, 0.8); S(0.09, 0xffd23a, dx - 0.1, WL + 0.22, dz); { const bk = put(new THREE.ConeGeometry(0.035, 0.08, 8), 'plain', 0xe8741a, dec); bk.position.set(dx - 0.2, WL + 0.21, dz); bk.rotation.z = Math.PI / 2; } for (const s of [-1, 1]) S(0.014, 0x111111, dx - 0.16, WL + 0.25, dz + s * 0.04); }   // a rubber duck, supervising
+    B(X0 + 0.25, X0 + 0.55, TH + 0.05, TH + 0.12, Z1 - 0.2, Z1 - 0.05, 0xf2d43d, 'fabric', dec); B(X0 + 0.25, X0 + 0.55, TH + 0.12, TH + 0.15, Z1 - 0.2, Z1 - 0.05, 0x3f9a2a, 'fabric', dec);   // a scrubber
+    C(0.08, 0.09, 0.36, 0x2e8b3a, X0 + 0.95, TH + 0.05, Z1 - 0.12, 10, 'shiny'); C(0.035, 0.035, 0.08, 0xf2d43d, X0 + 0.95, TH + 0.41, Z1 - 0.12, 8, 'plain', dec);   // the dish soap
+    B(XR - 0.4, XR - 0.17, TH + 0.35, TH + 0.45, -5.05, -4.95, STEEL, 'shiny', dec); B(XR - 0.24, XR - 0.17, TH + 1.6, TH + 2.0, -5.25, -5.1, STEEL, 'shiny', dec);   // its tap and a hand shower
+    for (let k = 0; k < 3; k++) onFloor(k ? 0 : 4, 9.8 + k * 1.1, -5.0 + (k % 2) * 0.4, 0.8, 0.7, k, [0xffffff, 0x6a6a4a, 0x8a7a50][k], WL + 0.005);   // a grey scum on it
+    { const gy = C(0.35, 0.35, 1.2, WHITE, XR - 0.55, UF + 4.3, -5.0, 16, 'shiny'); gy.position.y = UF + 4.4; gy.rotation.x = Math.PI / 2; S(0.05, 0xff2a2a, XR - 0.9, UF + 4.45, -4.4, 1, 'glow', glow); }   // the geyser (its light's on)
+    C(0.42, 0.36, 0.85, STEEL, 8.72, UF, -3.72, 18, 'shiny'); C(0.39, 0.39, 0.02, 0x9fb8a8, 8.72, UF + 0.81, -3.72, 18, 'shiny', dec);   // the steel bucket, full...
+    { const mug = C(0.15, 0.13, 0.3, 0x2a7fd6, 8.88, UF + 0.83, -3.58, 12, 'shiny', dec); mug.rotation.z = 0.25; B(9.05, 9.09, UF + 0.9, UF + 1.07, -3.63, -3.53, 0x2a7fd6, 'shiny', dec); }   // ...and the blue plastic mug
     C(0.16, 0.2, 2.2, WHITE, 8.5, UF, 0.4, 12, 'shiny'); B(8.1, 9.0, UF + 2.2, UF + 2.55, -0.05, 0.85, WHITE, 'shiny');   // the basin...
-    B(8.09, 8.12, UF + 3.0, UF + 4.5, -0.1, 0.9, 0xcfe3ea, 'shiny', dec); B(8.12, 8.35, UF + 2.75, UF + 2.8, -0.05, 0.85, 0xf4f4f4, 'shiny', dec); C(0.07, 0.06, 0.25, 0x2a9d8f, 8.25, UF + 2.8, 0.1, 8);   // ...its mirror, a shelf, the toothbrush cup
-    { const gy = C(0.35, 0.35, 1.2, WHITE, XR - 0.55, UF + 4.3, -1.5, 16, 'shiny'); gy.position.y = UF + 4.3; gy.rotation.x = Math.PI / 2; S(0.05, 0xff2a2a, XR - 0.9, UF + 4.35, -1.1, 1, 'glow', glow); }   // the geyser (its light's on)
-    B(8.8, 10.8, UF + 3.2, UF + 3.25, 1.36, 1.41, STEEL, 'shiny', dec); B(9.0, 10.2, UF + 2.2, UF + 3.2, 1.33, 1.38, 0xe86a1c, 'fabric', dec);   // a towel on its rail
+    B(8.09, 8.12, UF + 3.0, UF + 4.5, -0.1, 0.9, 0xb8c8c8, 'shiny', dec); B(8.12, 8.35, UF + 2.75, UF + 2.8, -0.05, 0.85, 0xf4f4f4, 'shiny', dec); C(0.07, 0.06, 0.25, 0x2a9d8f, 8.25, UF + 2.8, 0.1, 8);   // ...its mirror, a shelf, the toothbrush cup
+    for (let k = 0; k < 4; k++) decal(2, 8.125, UF + 3.4 + k * 0.25, -0.05 + k * 0.28, 0.25, 0.25, Math.PI / 2, 0, k, 0xf4f4f4);   // (toothpaste on the mirror)
+    B(8.8, 10.8, UF + 3.2, UF + 3.25, 1.36, 1.41, STEEL, 'shiny', dec); B(9.0, 10.2, UF + 2.2, UF + 3.2, 1.33, 1.38, 0xa8744a, 'fabric', dec);   // a grubby towel on its rail...
+    B(10.4, 11.6, UF, UF + 0.05, -0.8, -0.1, 0xb8844a, 'fabric', dec).rotation.y = 0.5;                       // ...and another on the floor
     B(9.9, 12.7, CH - 0.08, CH, -2.3, -2.1, WHITE, 'plain', dec); B(10.0, 12.6, CH - 0.14, CH - 0.08, -2.26, -2.14, 0xfffbef, 'glow', glow);   // a tube light
-    shadow(9.3, -4.8, 1.2, 1.2, 0.3); shadow(XR - 0.9, -4.75, 1.3, 1.6, 0.3); }
+    for (const [x, y, z, ry] of [[8.095, UF + 0.5, -5.4, Math.PI / 2], [8.095, UF + 3.8, 1.0, Math.PI / 2], [XR - 0.175, UF + 0.45, 0.9, -Math.PI / 2], [XR - 0.175, UF + 3.7, -0.4, -Math.PI / 2], [9.5, UF + 3.6, 1.405, Math.PI], [12.2, UF + 0.5, 1.405, Math.PI], [11.0, UF + 2.2, -5.905, 0], [9.6, UF + 3.8, -5.905, 0]]) decal(4, x, y, z, 1.0, 0.9, ry, 0, y);   // mould
+    shadow(8.72, -3.72, 1.1, 1.1, 0.3); shadow(lx, lz, 1.5, 1.2, 0.3); shadow((X0 + X1) / 2, (Z0 + Z1) / 2, X1 - X0 + 0.3, Z1 - Z0 + 0.3, 0.3); }
   // ======== the bazaar room: a drinks cart like the ones in the Indian food markets. Big steel buckets of lassi, rose sharbat, mango,
   //          jaljeera, nimbu pani and chai, rows of glasses, a clay matka, sacks of spices, crates of fruit, marigolds, fairy lights ========
   { const cx = 2.0, cz = 0.0, CTc = UF + 2.3, T3 = CTc + 0.12;
-    B(cx - 2.6, cx + 2.6, UF + 1.0, CTc, cz - 0.95, cz + 0.95, 0x2f7d6d, 'wood'); B(cx - 2.75, cx + 2.75, CTc, T3, cz - 1.1, cz + 1.1, TEAK, 'wood');
+    B(cx - 2.6, cx + 2.6, UF + 1.0, CTc, cz - 0.95, cz + 0.95, 0x4f6a58, 'wood'); B(cx - 2.75, cx + 2.75, CTc, T3, cz - 1.1, cz + 1.1, TEAK, 'wood');
     for (let i = 0; i < 5; i++) B(cx - 2.3 + i * 1.15, cx - 2.1 + i * 1.15, UF + 1.1, CTc - 0.1, cz - 0.97, cz - 0.95, 0xf2c14e, 'plain', dec);
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const wx = cx + sx * 1.4, wz = cz + sz * 1.05, ty = new THREE.Mesh(new THREE.TorusGeometry(0.82, 0.07, 6, 24), K.plain); ty.userData.col = 0x2a2a2a; ty.position.set(wx, UF + 0.9, wz); dec.add(ty);
       C(0.12, 0.12, 0.1, 0x8a8a8a, wx, UF + 0.85, wz, 8, 'shiny', dec).rotation.x = Math.PI / 2; for (let k = 0; k < 4; k++) B(wx - 0.03, wx + 0.03, UF + 0.1, UF + 1.7, wz - 0.03, wz + 0.03, 0x9a9a9a, 'shiny', dec).rotation.z = k * Math.PI / 4;
       C(0.05, 0.05, sz < 0 ? 2.36 : 2.62, DARK, cx + sx * 2.6, T3, cz + sz * 1.0, 6, 'wood'); }
-    for (let i = 0; i < 10; i++) B(cx - 2.9 + i * 0.58, cx - 2.9 + (i + 1) * 0.58, T3 + 2.45, T3 + 2.55, cz - 1.5, cz + 1.3, i % 2 ? 0xf7efe0 : 0xd62828, 'fabric').rotation.x = -0.12;   // its striped awning
+    for (let i = 0; i < 10; i++) B(cx - 2.9 + i * 0.58, cx - 2.9 + (i + 1) * 0.58, T3 + 2.45, T3 + 2.55, cz - 1.5, cz + 1.3, i % 2 ? 0xcdbf9c : 0x9e3a2c, 'fabric').rotation.x = -0.12;   // its striped awning, faded and filthy
     picture(4.6, 0.82, upTex('sign'), cx, T3 + 2.1, cz - 1.64, Math.PI);
-    const DR = [0xf5f0e1, 0xef6f9c, 0xffa928, 0x6fa83a, 0xf1e56b, 0x9a6b3f];
+    const DR = [0xd9d0a8, 0xb86a78, 0xc98a2e, 0x6b7a3a, 0xc4bd86, 0x6e5234];   // (none of them quite the colour they should be)
     DR.forEach((c, i) => { const x = cx - 2.2 + i * 0.88, z = cz + 0.3; C(0.38, 0.3, 0.56, STEEL, x, T3, z, 16, 'shiny'); C(0.36, 0.36, 0.03, c, x, T3 + 0.55, z, 16, 'shiny');
       const ld = C(0.025, 0.025, 1.0, STEEL, x + 0.14, T3 + 0.45, z + 0.05, 6, 'shiny'); ld.rotation.z = -0.35; S(0.08, STEEL, x - 0.02, T3 + 0.55, z + 0.05, 0.5, 'shiny'); });
+    DR.forEach((c, i) => { const x = cx - 2.2 + i * 0.88, z = cz + 0.3; for (let q = 0; q < 4; q++) C(0.03 + (q % 2) * 0.03, 0.03 + (q % 2) * 0.03, 0.008, i === 3 ? 0x2e3a1e : 0x4a3a24, x + Math.cos(q * 1.9 + i) * 0.2, T3 + 0.58, z + Math.sin(q * 1.9 + i) * 0.2, 8); });   // a scum on every one...
+    for (let q = 0; q < 7; q++) S(0.05, q % 2 ? 0xc8d8a0 : 0x6a8a3a, cx - 2.2 + 3 * 0.88 + Math.cos(q) * 0.18, T3 + 0.585, cz + 0.3 + Math.sin(q * 1.3) * 0.18, 0.3);   // ...green fuzz on the jaljeera...
+    { const fx = cx - 2.28, fz = cz + 0.22; S(0.035, 0x111111, fx, T3 + 0.59, fz, 0.7); for (const s of [-1, 1]) B(fx + s * 0.02, fx + s * 0.08, T3 + 0.6, T3 + 0.605, fz - 0.02, fz + 0.02, 0xdde6ee, 'plain', dec); }   // ...and a fly doing the backstroke in the lassi
     for (let r = 0; r < 2; r++) for (let i = 0; i < 8; i++) { const x = cx - 2.3 + i * 0.64, z = cz - 0.5 - r * 0.33, c = DR[(i + r * 3) % 6];
-      if ((i + r) % 3) { C(0.1, 0.085, 0.32, c, x, T3, z, 10, 'shiny'); C(0.105, 0.1, 0.07, 0xe6f0f4, x, T3 + 0.32, z, 10, 'shiny'); } else C(0.105, 0.09, 0.4, 0xd5e4ea, x, T3, z, 10, 'shiny'); }
-    { const mx = cx + 3.6, mz = cz - 0.4; C(0.3, 0.35, 0.9, DARK, mx, UF, mz, 8, 'wood'); S(0.62, 0xb5552b, mx, UF + 1.45, mz, 1, 'plain'); C(0.3, 0.26, 0.25, 0xa84a24, mx, UF + 1.95, mz, 12); C(0.64, 0.64, 0.14, 0xc41e3a, mx, UF + 1.33, mz, 16, 'fabric', dec); shadow(mx, mz, 1.4, 1.4, 0.3); }
+      if ((i + r) % 3) { C(0.1, 0.085, 0.32, c, x, T3, z, 10, 'shiny'); C(0.105, 0.1, 0.07, 0xe6f0f4, x, T3 + 0.32, z, 10, 'shiny'); } else C(0.105, 0.09, 0.4, 0xb9c1ae, x, T3, z, 10, 'shiny'); }
+    { const mx = cx + 3.6, mz = cz - 0.4; C(0.3, 0.35, 0.9, DARK, mx, UF, mz, 8, 'wood'); S(0.62, 0xb5552b, mx, UF + 1.45, mz, 1, 'plain'); C(0.3, 0.26, 0.25, 0xa84a24, mx, UF + 1.95, mz, 12); C(0.64, 0.64, 0.14, 0xc41e3a, mx, UF + 1.33, mz, 16, 'fabric', dec); C(0.6, 0.6, 0.12, 0x4f6a2e, mx, UF + 1.02, mz, 16, 'plain', dec); shadow(mx, mz, 1.4, 1.4, 0.3); }
     [0xe8b31c, 0xc2261f, 0x7a5a36, 0x9a8a3a, 0xd9480f].forEach((c, i) => { const x = -1.9 + i * 1.2, z = 5.1;   // jute sacks of spices along the wall, heaped in cones
       C(0.5, 0.55, 1.0, 0xc9a66b, x, UF, z, 12, 'fabric'); C(0.56, 0.56, 0.12, 0xb8955a, x, UF + 1.0, z, 12, 'fabric', dec); C(0.02, 0.45, 0.5, c, x, UF + 1.08, z, 12, 'fabric', dec); shadow(x, z, 1.3, 1.3, 0.3); });
     [[2.6, 'mango'], [3.9, 'banana'], [5.2, 'coconut']].forEach(([z, fruit]) => { const x = 9.8;           // crates of fruit
       B(x - 0.6, x + 0.6, UF, UF + 0.7, z - 0.5, z + 0.5, 0xa87a4a, 'wood'); for (let k = 0; k < 3; k++) B(x - 0.61, x + 0.61, UF + 0.15 + k * 0.22, UF + 0.2 + k * 0.22, z - 0.51, z + 0.51, 0x8a5e36, 'wood', dec);
       for (let k = 0; k < 9; k++) { const fx = x - 0.4 + (k % 3) * 0.4, fz = z - 0.3 + (k / 3 | 0) * 0.3;
-        if (fruit === 'mango') S(0.17, k % 2 ? 0xffb52e : 0xf2c53d, fx, UF + 0.82, fz, 0.8); else if (fruit === 'banana') B(fx - 0.25, fx + 0.25, UF + 0.72, UF + 0.84, fz - 0.07, fz + 0.07, 0xf2d43d, 'plain', dec); else S(0.2, 0x6b4a2a, fx, UF + 0.86, fz); }
+        if (fruit === 'mango') { S(0.17, [0x3a2a14, 0x8a6a2a, 0xd9a53a][k % 3], fx, UF + 0.82, fz, 0.8); if (k % 3 === 0) for (let q = 0; q < 3; q++) S(0.05, 0xeeeee0, fx + (q - 1) * 0.07, UF + 0.93, fz + (q % 2) * 0.05 - 0.02, 0.7); }   // (rotten, furry)
+        else if (fruit === 'banana') B(fx - 0.25, fx + 0.25, UF + 0.72, UF + 0.84, fz - 0.07, fz + 0.07, k % 2 ? 0x4a3418 : 0x9a7a2a, 'plain', dec); else S(0.2, 0x6b4a2a, fx, UF + 0.86, fz); }
       shadow(x, z, 1.4, 1.2, 0.28); });
     C(0.38, 0.42, 1.0, 0xe63946, cx - 1.2, UF, cz - 2.3, 12, 'shiny'); C(0.38, 0.42, 1.0, 0x1d7fd6, cx + 1.0, UF, cz - 2.5, 12, 'shiny');   // plastic stools
     shadow(cx, cz, 5.8, 2.6, 0.3); shadow(cx - 1.2, cz - 2.3, 0.9, 0.9, 0.26); shadow(cx + 1.0, cz - 2.5, 0.9, 0.9, 0.26);
@@ -5050,6 +5151,136 @@ function buildUpperFloor() {                                          // behind 
     B(6.6, 8.4, UF, UF + 2.4, zB - 1.0, zB - 0.16, TEAK, 'wood'); B(6.8, 8.2, UF + 2.8, UF + 4.6, zB - 0.2, zB - 0.16, 0xcfe3ea, 'shiny', dec); B(6.7, 8.3, UF + 2.7, UF + 4.7, zB - 0.17, zB - 0.15, TEAK, 'wood', dec);   // a dressing table and mirror...
     C(0.35, 0.35, 1.3, 0xb8322f, 7.5, UF, zB - 1.9, 12, 'fabric'); shadow(7.5, zB - 1.2, 2.2, 1.9, 0.28);   // ...and its stool
     picture(8.6, 13, upTex('kilim'), 8.3, UF + 0.012, 14.5, 0, -Math.PI / 2); }                           // a red kilim under it all
+  // ======== and it's all FILTHY: nobody's cleaned since Diwali (Kamla bai is on leave). Stains, streaks, scuffs, mould, cracks, cobwebs, dust, muddy paw prints, clutter ========
+  let gs = 91; const gr = () => (gs = (gs * 16807) % 2147483647) / 2147483647;
+  const TEA = 0x8a6a3a, GRY = 0x6f675c, YEL = 0xb09a4a, GRN = 0x5c6a3c, BRN = 0x5e4630, ALL = 99;
+  const scatter = (at, ry, a0, a1, fy, n, holes) => { for (let i = 0; i < n; i++) { const r = gr(); let cell, w, h, y, tint = 0xffffff, spin = (gr() - 0.5) * 1.2;
+      if (r < 0.3) { cell = 0; w = h = 0.6 + gr() * 1.1; y = fy + 0.8 + gr() * (CH - fy - 1.6); tint = [TEA, GRY, YEL, BRN][i % 4]; }
+      else if (r < 0.45) { cell = 1; w = 0.9 + gr() * 0.9; h = 1.2 + gr() * 1.4; y = CH - 0.27 - h / 2; spin = 0; }
+      else if (r < 0.62) { cell = 7; w = 1.0 + gr() * 1.2; h = 0.35; y = fy + 0.5 + gr() * 0.6; spin *= 0.1; }
+      else if (r < 0.72) { cell = 8; w = h = 0.45 + gr() * 0.2; y = fy + 1.8 + gr() * 1.2; }
+      else if (r < 0.82) { cell = 6; w = h = 0.8 + gr() * 0.8; y = fy + 1 + gr() * (CH - fy - 2); }
+      else if (r < 0.92) { cell = 11; w = 0.5 + gr() * 0.4; h = 1.4 + gr() * 1.2; y = CH - 0.27 - h / 2; tint = [TEA, BRN, GRN][i % 3]; spin = 0; }
+      else { cell = 4; w = h = 0.7 + gr() * 0.9; y = gr() < 0.5 ? CH - 0.3 - h / 2 : fy + 0.35 + h / 2; }
+      if (a1 - a0 < w + 0.1) continue; const a = a0 + w / 2 + gr() * (a1 - a0 - w);
+      if (holes && holes.some(([h0, h1, hy0, hy1]) => a + w / 2 > h0 - 0.1 && a - w / 2 < h1 + 0.1 && y + h / 2 > hy0 - 0.1 && y - h / 2 < hy1 + 0.1)) continue;
+      const [x, yy, z] = at(a, y); decal(cell, x, yy, z, w, h, ry, 0, spin, tint); } };
+  const aX = x => (a, y) => [x, y, a], aZ = z => (a, y) => [a, y, z], DOORS = [[-5.5, -2.6, -ALL, ALL], [4.6, 7.5, -ALL, ALL]];
+  scatter(aX(HL + 0.145), Math.PI / 2, SW + 0.2, zB - 0.2, UF, 30, NW); scatter(aX(HL + 0.145), Math.PI / 2, zF + 0.2, SW - 0.2, LH, 7, NW);   // the north wall (and the foyer's)
+  scatter(aX(XR - 0.145), -Math.PI / 2, zF + 0.2, zB - 0.2, UF, 28);                                     // the party wall
+  scatter(aZ(zB - 0.145), Math.PI, HL + 0.2, XR - 0.2, UF, 12, BW.concat([[2.7, 3.3, -ALL, ALL]]));      // the back wall
+  scatter(aZ(zF + 0.145), 0, -0.2, XR - 0.2, UF, 7, [[wx0 - 0.4, wx1 + 0.4, wy0 - 0.4, wy1 + 0.4]]); scatter(aZ(zF + 0.145), 0, HL + 0.2, dL - 0.3, LH, 3, [[-5.1, -4.2, -ALL, ALL]]);   // the front
+  scatter(aX(-0.425), -Math.PI / 2, zF + 0.2, SW - 0.2, LH, 6); scatter(aX(-0.295), Math.PI / 2, zF + 0.2, SW - 0.2, UF, 4);
+  scatter(aZ(5.935), Math.PI, HL + 0.2, XR - 0.2, UF, 9, DOORS); scatter(aZ(6.065), 0, HL + 0.2, XR - 0.2, UF, 7, DOORS.concat([[2.7, 3.3, -ALL, ALL]]));
+  scatter(aX(2.935), -Math.PI / 2, 6.3, zB - 0.3, UF, 3); scatter(aX(3.065), Math.PI / 2, 6.3, zB - 0.3, UF, 3);
+  scatter(aX(7.935), -Math.PI / 2, -5.9, 1.4, UF, 4, [[-3.6, -0.6, -ALL, ALL]]); scatter(aZ(1.565), 0, 8.2, XR - 0.2, UF, 3);
+  for (let k = 0; k < 10; k++) decal(2, XR - 0.176, T2 + 0.25 + gr() * 1.1, K0 + 2.8 + gr() * 3.6, 0.35 + gr() * 0.4, 0.35 + gr() * 0.4, -Math.PI / 2, 0, gr() * 6, [0xc8742a, 0x8b5a2b, 0xd9a520, 0x7a3a1a][k % 4]);   // curry up the tiles
+  for (let k = 0; k < 5; k++) decal(2, 10.3 + gr() * 1.8, T2 + 0.3 + gr() * 1.0, -6.105, 0.3 + gr() * 0.3, 0.3 + gr() * 0.3, Math.PI, 0, gr() * 6, [0xc8742a, 0x8b5a2b][k % 2]);
+  onCeil(0, XR - 0.8, K0 + 4.5, 2.6, 2.6, 0.3, 0x3a3228); onCeil(0, 10.8, -2.2, 3.2, 2.6, 1.1, YEL); onCeil(0, 6.2, zF + 6.2, 2.2, 2.2, 0, GRY); onCeil(0, 4.0, 3.2, 1.6, 1.6, 0.5, GRY); onCeil(0, -3.5, 12, 2.4, 1.8, 2, YEL); onCeil(6, 1.0, -3.0, 1.8, 1.8, 0.7);   // soot over the stove, a leak over the bathroom, grime round the fan and the lamps, a crack
+  for (const [x, z, dx, dz] of [[HL + 0.14, zF + 0.14, 1, 1], [-0.42, zF + 0.14, -1, 1], [XR - 0.14, zF + 0.14, -1, 1], [-0.3, zF + 0.14, 1, 1], [XR - 0.14, zB - 0.14, -1, -1], [HL + 0.14, zB - 0.14, 1, -1], [2.94, zB - 0.14, -1, -1], [3.06, zB - 0.14, 1, -1],
+    [HL + 0.14, 5.94, 1, -1], [8.09, -5.91, 1, 1], [XR - 0.17, 1.41, -1, -1], [XR - 0.14, -6.06, -1, -1], [HL + 0.14, 6.06, 1, 1], [XR - 0.14, 6.06, -1, 1], [HL + 0.14, -6.5, 1, 1]]) decal(5, x + dx * 0.46, CH - 0.5, z + dz * 0.46, 1.3, 0.95, Math.atan2(dx, dz));   // cobwebs in the corners
+  for (let k = 0; k < 7; k++) onFloor(3, U.dx - 0.25 + (k % 2) * 0.5 - k * 0.3, zF + 0.5 + k * 0.3, 0.55, 0.55, 0.9, 0xffffff, LH + 0.007);   // muddy paw prints: in the door...
+  for (let k = 0; k < 13; k++) onFloor(3, HL + 1.3 + (k % 2) * 0.35, zF + 2.31 + k * 0.62, 0.5, 0.5, 0, 0xffffff, LH + (k + 1) * RISE + 0.007);   // ...up the stairs...
+  for (let k = 0; k < 9; k++) onFloor(3, HL + 1.6 + k * 0.7, SW + 0.5 + k * 0.45, 0.5, 0.5, -0.95);           // ...and off across the hall
+  for (let k = 0; k < 26; k++) { const side = k % 4, a = gr(), xz = side === 0 ? [HL + 0.45, SW + 0.5 + a * (zB - SW - 1)] : side === 1 ? [XR - 0.45, zF + 0.5 + a * (zB - zF - 1)] : side === 2 ? [HL + 0.5 + a * (XR - HL - 1), zB - 0.45] : [-0.3 + a * 13.3, zF + 0.45]; onFloor(9, xz[0], xz[1], 0.9 + gr() * 0.8, 0.9 + gr() * 0.8, gr() * 6); }   // dust along the skirting
+  onFloor(14, 9.9, -8.2, 1.3, 1.0, 0.6, 0x9a8a4a); onFloor(14, 11.0, -12.9, 0.9, 0.8, 1.2, 0x7a5a3a); onFloor(14, 10.2, -3.6, 1.2, 0.8, 0.3, 0x7a8a4a);   // a slick by the sink, something brown by the stove, slime by the tub
+  onFloor(15, 9.9, zF + 10.5, 1.5, 1.05, 0.35); onFloor(15, -4.2, -3.5, 1.3, 0.95, 2.4);                    // newspapers
+  onFloor(0, 4.4, zF + 7.4, 1.1, 0.9, 0.5, TEA, UF + 0.016); onFloor(0, 8.4, zF + 4.0, 0.8, 0.8, 1.5, GRY, UF + 0.016); onFloor(0, -1.0, 11.5, 1.0, 0.8, 0.3, TEA, UF + 0.016); onFloor(0, 6.0, 18.5, 1.2, 1.0, 1, GRY, UF + 0.016);   // stains on the rugs
+  onFloor(10, 7.4, zF + 5.6, 0.6, 0.6, 0, 0x6a4a2a, UF + 1.155); onFloor(10, 5.0, zF + 6.8, 0.55, 0.55, 2, 0x6a4a2a, UF + 1.155);   // cup rings on the coffee table
+  onFloor(0, 0.2, -10.6, 0.7, 0.5, 0.4, YEL, UF + 1.855); onFloor(10, 2.2, -11.0, 0.6, 0.6, 0, 0x6a4a2a, UF + 1.855); onFloor(2, -0.9, -10.9, 0.5, 0.5, 1, 0xc8742a, UF + 1.855);   // ...and on the dining table
+  // -- clutter
+  [[-1.9, zF + 2.4, 0x2a2a2a, 0.4], [-2.6, zF + 3.2, 0xd63384, 1.1], [-1.3, zF + 6.2, 0x8a5a2e, 2.2], [-2.3, zF + 6.8, 0x2a4a7a, 0.3], [-3.5, zF + 1.2, 0x2a2a2a, 2.8]].forEach(([x, z, c, r]) => { B(x - 0.13, x + 0.13, LH, LH + 0.15, z - 0.28, z + 0.28, c, 'fabric', dec).rotation.y = r; });   // shoes kicked off everywhere
+  for (let k = 0; k < 6; k++) B(-2.4 + k * 0.12, -2.0 + k * 0.12, LH, LH + 0.012 + k * 0.005, zF + 0.35 + (k % 3) * 0.12, zF + 0.65 + (k % 3) * 0.12, [0xf4f1ea, 0xe8d8b0, 0xd9e8f4][k % 3], 'plain', dec).rotation.y = k * 0.7;   // post nobody's opened
+  S(0.12, 0xd63384, HL + 2.1, LH + 5 * RISE + 0.05, zF + 2.31 + 4 * 0.62, 0.4);                                // a sock on the stairs
+  { const cp = B(8.2, 8.62, UF, UF + 0.14, zF + 10.5, zF + 11.0, 0xe8b31c, 'shiny', dec); cp.rotation.set(0.15, 0.7, 0.1); }   // an empty chips packet
+  for (let k = 0; k < 12; k++) S(0.05, 0xc9a06a, 10.2 + gr() * 0.8, UF + 0.03, zF + 3 + gr() * 6, 0.5);          // peanut shells
+  S(0.13, 0xf4f4f4, 3.0, UF + 0.05, zF + 10.3, 0.4); S(0.12, 0x2a2a2a, 7.9, UF + 0.05, zF + 1.7, 0.4);           // odd socks
+  { const cup = C(0.09, 0.075, 0.26, 0x8b5a2b, 4.7, UF, zF + 7.3, 10, 'shiny'); cup.position.y = UF + 0.1; cup.rotation.set(0, 0.8, Math.PI / 2); }   // a chai glass, knocked over
+  B(9.7, 10.6, UF, UF + 0.3, zF + 10.4, zF + 11.2, 0x1fa4a0, 'fabric').rotation.y = 0.4;                       // a cushion on the floor
+  for (let k = 0; k < 7; k++) B(1.15, 1.95, UF + k * 0.06, UF + 0.05 + k * 0.06, zF + 9.0, zF + 9.9, k % 2 ? 0xe8e4d8 : 0xd8d2c0, 'plain', dec).rotation.y = (k % 3) * 0.1;   // old newspapers, stacked
+  for (let k = 0; k < 10; k++) S(0.09 + gr() * 0.06, 0x9a948a, HL + 0.4 + gr() * 0.4, UF + 0.05, SW + 1 + k * 2.1, 0.55);   // dust bunnies
+  for (let k = 0; k < 5; k++) S(0.1, 0xf4f1ea, -1.2 + k * 0.9, UF + 1.93, -10.8 + (k % 2 ? 0.5 : -0.4), 0.7);   // crumpled napkins
+  { const g2 = C(0.1, 0.085, 0.3, STEEL, 1.9, UF + 1.9, -10.75, 10, 'shiny'); g2.position.y = UF + 1.95; g2.rotation.set(0, 0.4, Math.PI / 2); onFloor(14, 2.3, -10.6, 0.7, 0.5, 0.4, 0xb8c0c4, UF + 1.855); }   // a glass knocked over
+  B(3.2, 3.55, UF + 1.85, UF + 1.88, -11.0, -10.94, 0xd62828, 'plain', dec); B(3.15, 3.5, UF + 1.85, UF + 1.87, -10.75, -10.4, 0xd62828, 'plain', dec);   // a fly swatter, at the ready
+  for (let k = 0; k < 20; k++) S(0.03, [0xc9a06a, 0xfaf6ee, 0xe8b31c][k % 3], -1 + gr() * 4, UF + 0.02, -12.4 + gr() * 3.2, 0.5);   // crumbs under the table
+  S(0.42, 0x1a1a1a, 6.6, UF + 0.36, -7.7, 0.85, 'shiny'); S(0.36, 0x1a1a1a, 6.9, UF + 0.3, -8.35, 0.85, 'shiny'); S(0.1, 0x1a1a1a, 6.6, UF + 0.75, -7.7, 1.2, 'shiny');   // bin bags, piling up
+  [[0x2a4a7a, 0], [0xe0457b, 0.08], [0xf2c14e, 0.16], [0x2e8b3a, 0.22], [0xf4efe6, 0.3]].forEach(([c, y], k) => S(0.42 - k * 0.04, c, 0.4 + (k % 2) * 0.15, UF + 0.1 + y, 20.2 + (k % 3) * 0.12, 0.35, 'fabric'));   // a mountain of clothes
+  C(0.13, 0.1, 0.25, 0xf4f4f4, -4.7, UF + 2.05, 22.4, 12, 'plain', dec); C(0.12, 0.12, 0.01, 0xe8a33d, -4.7, UF + 2.29, 22.4, 12, 'plain', dec);   // an instant noodle cup...
+  for (const s of [-1, 1]) B(-4.72 + s * 0.02, -4.7 + s * 0.02, UF + 2.2, UF + 2.24, 22.2, 22.8, 0xd9b98a, 'wood', dec).rotation.x = 0.6;   // ...chopsticks in it
+  for (let k = 0; k < 7; k++) S(0.09, 0xf4f1ea, -5.2 + gr() * 3, UF + 0.08, 20.2 + gr() * 2.2, 0.9);             // crumpled paper
+  for (let k = 0; k < 3; k++) S(0.55, 0xe0457b, HL + 1.2 + k * 0.2, UF + 1.55, 13 + k * 1.3, 0.3, 'fabric');     // a rumpled blanket
+  B(5.2, 6.4, UF, UF + 0.06, 12.0, 13.2, 0xc9a06a, 'plain', dec); { const lid = B(5.2, 6.4, UF, UF + 0.03, 0, 1.2, 0xc9a06a, 'plain', dec); lid.position.set(5.8, UF + 0.55, 11.95); lid.rotation.x = -1.35; }
+  C(0.3, 0.3, 0.03, 0xe8a33d, 5.6, UF + 0.06, 12.6, 3, 'plain', dec); C(0.3, 0.3, 0.03, 0xd9483a, 6.0, UF + 0.06, 12.7, 3, 'plain', dec);   // a pizza box, two slices left
+  for (let k = 0; k < 4; k++) { const b = C(0.08, 0.08, 0.45, 0xbfe0f0, 7.0 + k * 0.4, UF, 17.8 + (k % 2) * 0.3, 10, 'shiny'); if (k % 2) { b.rotation.z = Math.PI / 2; b.position.y = UF + 0.08; } }   // empty water bottles
+  C(0.45, 0.38, 0.9, 0x8a6a4a, 4.2, UF, 20.8, 14, 'wood'); for (let k = 0; k < 5; k++) S(0.28, [0x2a4a7a, 0xf4efe6, 0xc0392b, 0x2e8b3a, 0x7b3fa0][k], 4.2 + Math.cos(k * 1.3) * 0.2, UF + 0.95 + (k % 2) * 0.12, 20.8 + Math.sin(k * 1.3) * 0.2, 0.6, 'fabric');   // the laundry basket, overflowing
+  S(0.3, 0xf4efe6, 4.9, UF + 0.08, 21.2, 0.3, 'fabric'); S(0.32, 0x2a4a7a, 7.5, UF + 1.4, zB - 1.9, 0.45, 'fabric');
+  // -- the drinks cart, gross: rust, dribbles, sticky puddles, ants, a sign that is not reassuring, used cups, and Chotu the rat
+  picture(1.3, 0.8, upTex('hygiene'), 2.0, UF + 1.86, -0.975, Math.PI).rotation.z = 0.06;
+  for (let k = 0; k < 6; k++) decal(12, -0.2 + k * 0.9, UF + 1.25 + gr() * 0.7, -0.957, 0.7, 0.6, Math.PI, 0, gr() * 6);
+  for (let k = 0; k < 4; k++) decal(12, 0.0 + k * 1.3, UF + 1.3 + gr() * 0.6, 0.957, 0.8, 0.6, 0, 0, gr() * 6);
+  for (let k = 0; k < 5; k++) decal(11, -0.3 + k * 1.1, UF + 1.9, -0.958, 0.4, 0.8, Math.PI, 0, 0, [0xc06a7a, 0xd08a3a, 0x9a8a50][k % 3]);
+  for (let k = 0; k < 4; k++) onFloor(14, 0.2 + k * 1.2, -0.75 + (k % 2) * 0.1, 0.45, 0.3, k, [0xc06a7a, 0xd08a3a][k % 2], UF + 2.425);
+  onFloor(14, 2.4, -0.4, 1.8, 1.4, 0.2, 0xc06a7a); onFloor(14, 3.6, 0.9, 1.2, 1.0, 1.4, 0xd08a3a); onFloor(14, 0.2, 0.6, 1.0, 0.8, 2.2, 0x9a8a50);
+  for (let k = 0; k < 3; k++) onFloor(13, -2.2 + k * 1.1, 2.6 - k * 0.8, 1.2, 0.35, -0.6); onFloor(13, 1.2, -0.3, 1.2, 0.35, 0.3, 0xffffff, UF + 2.43);
+  for (let k = 0; k < 6; k++) { const pc = C(0.09, 0.065, 0.22, 0xf4f1ea, -0.8 + gr() * 5.6, UF, -2.6 + gr() * 5.4, 10, 'plain', dec); pc.position.y = UF + 0.08; pc.rotation.set(0, gr() * 3, Math.PI / 2); }
+  const vermin = { roaches: [] };
+  { const rat = new THREE.Group(); rat.position.set(2.6, UF, 0.35); rat.rotation.y = -0.7; rat.userData.name = 'Chotu the rat'; root.add(rat);
+    const rb = put(new THREE.SphereGeometry(0.2, 12, 10), 'plain', 0x6b6660, rat); rb.position.set(0, 0.16, 0); rb.scale.set(0.8, 0.75, 1.3);
+    const rh = new THREE.Group(); rh.position.set(0, 0.18, 0.24); rat.add(rh);
+    { const sn = put(new THREE.ConeGeometry(0.1, 0.24, 10), 'plain', 0x6b6660, rh); sn.position.set(0, 0, 0.08); sn.rotation.x = Math.PI / 2; }
+    put(new THREE.SphereGeometry(0.025, 6, 5), 'plain', 0xe98a9a, rh).position.set(0, 0, 0.21);
+    for (const s of [-1, 1]) { const ear = put(new THREE.CylinderGeometry(0.055, 0.055, 0.012, 10), 'plain', 0xe98a9a, rh); ear.position.set(s * 0.07, 0.08, -0.01); ear.rotation.x = Math.PI / 2; put(new THREE.SphereGeometry(0.014, 6, 5), 'plain', 0x111111, rh).position.set(s * 0.045, 0.04, 0.09); }
+    bakeKinds(rh, scales);
+    const rt = new THREE.Group(); rt.position.set(0, 0.1, -0.24); rat.add(rt);
+    for (let k = 0; k < 4; k++) { const seg = put(new THREE.CylinderGeometry(0.018 - k * 0.003, 0.02 - k * 0.003, 0.2, 6), 'plain', 0xd98a8a, rt); seg.position.set(Math.sin(k * 0.5) * 0.06 * k, -0.05, -0.1 - k * 0.18); seg.rotation.x = Math.PI / 2; }
+    bakeKinds(rt, scales); bakeKinds(rat, scales); vermin.rat = rat; vermin.ratHead = rh; vermin.ratTail = rt; }
+  const roach = (x, y, z, ry, a, b, sp, ph) => { const r = new THREE.Group(); r.position.set(x, y + 0.03, z); r.rotation.y = ry; r.userData.name = 'Cockroach'; r.userData.noWalk = true; root.add(r);   // cockroaches
+    put(new THREE.SphereGeometry(0.07, 10, 8), 'shiny', 0x5a2e14, r).scale.set(0.75, 0.35, 1.4); put(new THREE.SphereGeometry(0.035, 8, 6), 'shiny', 0x3a1e0c, r).position.set(0, 0.005, 0.1);
+    for (let k = 0; k < 6; k++) { const lg = put(new THREE.BoxGeometry(0.1, 0.006, 0.006), 'plain', 0x2a140a, r); lg.position.set((k % 2 ? 1 : -1) * 0.06, -0.012, -0.04 + (k >> 1) * 0.04); lg.rotation.y = (k % 2 ? 1 : -1) * (0.3 - (k >> 1) * 0.3); }
+    for (const s of [-1, 1]) { const an = put(new THREE.BoxGeometry(0.004, 0.004, 0.16), 'plain', 0x2a140a, r); an.position.set(s * 0.03, 0.02, 0.18); an.rotation.y = s * 0.3; }
+    bakeKinds(r, scales); vermin.roaches.push({ g: r, a, b, sp, ph }); };
+  roach(7.6, UF, -9.2, 0, [7.6, -9.2], [5.6, -11.2], 1.3, 0); roach(10.6, UF, -3.8, 1.2); roach(-0.45, UF + 1.9, -11.3, 0.5); roach(-6.0, UF, 20.5, 2, [-6.0, 20.5], [-5.2, 18.4], 0.9, 2); roach(1.4, UF + 2.43, -0.2, 2.6);
+  U.vermin = vermin;
+  // ======== Aunty-ji: a ginger auntie cat in a magenta saree, specs, bindi and a gajra, on the sofa with her chai. She has QUESTIONS ========
+  { const A = new THREE.Group(); A.userData.name = 'Aunty-ji'; A.position.set(XR - 1.6, UF + 1.4, zF + 5.85); A.rotation.y = -Math.PI / 2; root.add(A);
+    const GIN = 0xd98a3d, CRM = 0xf6e7cf, PNK = 0xe98a9a, GLD = 0xe8b830, SAR = 0xc2185b, STR = 0xa85a1e, sph = (r, w, h) => new THREE.SphereGeometry(r, w || 14, h || 10);
+    const P = (geo, kind, col, par, x, y, z) => { const m = put(geo, kind, col, par); m.position.set(x, y, z); return m; };
+    const body = new THREE.Group(); A.add(body);
+    P(sph(0.4, 18, 14), 'plain', GIN, body, 0, 0.42, 0).scale.set(1.05, 1.15, 1.0); P(sph(0.26), 'plain', CRM, body, 0, 0.52, 0.24).scale.set(1.1, 1.3, 0.7);
+    for (const s of [-1, 1]) P(sph(0.22), 'plain', GIN, body, s * 0.26, 0.2, -0.05).scale.set(0.9, 0.8, 1.3);
+    P(new THREE.CylinderGeometry(0.07, 0.08, 0.45, 10), 'plain', GIN, body, -0.14, 0.24, 0.3); P(sph(0.09), 'plain', CRM, body, -0.14, 0.04, 0.34);
+    for (let i = 0; i < 3; i++) P(new THREE.TorusGeometry(0.085, 0.016, 6, 14), 'shiny', GLD, body, -0.14, 0.12 + i * 0.045, 0.3).rotation.x = Math.PI / 2;   // gold bangles
+    { const sr = P(new THREE.TorusGeometry(0.43, 0.1, 8, 26), 'fabric', SAR, body, 0, 0.36, 0); sr.rotation.x = Math.PI / 2; sr.scale.set(1.02, 0.98, 1.3); }   // her saree, wrapped round...
+    for (const y of [0.24, 0.49]) P(new THREE.TorusGeometry(0.45, 0.02, 6, 26), 'shiny', GLD, body, 0, y, 0).rotation.x = Math.PI / 2;   // ...its gold border...
+    P(new THREE.BoxGeometry(0.26, 0.95, 0.07), 'fabric', SAR, body, 0.02, 0.62, 0.3).rotation.set(-0.25, 0, 0.75); P(new THREE.BoxGeometry(0.04, 0.96, 0.075), 'shiny', GLD, body, 0.11, 0.67, 0.31).rotation.set(-0.25, 0, 0.75);   // ...and the pallu over her shoulder
+    for (let k = 0; k < 9; k++) { const a = -1.1 + k * 0.275; P(sph(0.025, 6, 5), 'shiny', GLD, body, Math.sin(a) * 0.2, 0.82 - Math.cos(a) * 0.06, 0.13 + Math.cos(a) * 0.1); }   // a gold necklace
+    for (let i = 0; i < 10; i++) { const a = Math.PI - i * 0.25; P(sph(0.075 - i * 0.003, 8, 6), 'plain', i % 2 ? GIN : STR, body, Math.sin(a) * 0.47, 0.07, Math.cos(a) * 0.47); }   // her tail, curled round her paws
+    bakeKinds(body, scales);
+    const head = new THREE.Group(); head.position.set(0, 0.98, 0.08); A.add(head);
+    P(sph(0.3, 18, 14), 'plain', GIN, head, 0, 0, 0).scale.set(1.08, 0.95, 1.0);
+    for (const s of [-1, 1]) P(sph(0.13), 'plain', CRM, head, s * 0.13, -0.09, 0.19).scale.set(1.1, 0.8, 0.8);   // fluffy cheeks
+    P(sph(0.1), 'plain', CRM, head, 0, -0.11, 0.25); P(sph(0.035, 8, 6), 'plain', PNK, head, 0, -0.04, 0.33).scale.set(1.3, 0.8, 0.8);
+    for (const s of [-1, 1]) { P(new THREE.ConeGeometry(0.11, 0.24, 4), 'plain', GIN, head, s * 0.18, 0.27, -0.02).rotation.z = -s * 0.35; P(new THREE.ConeGeometry(0.065, 0.15, 4), 'plain', PNK, head, s * 0.175, 0.255, 0.02).rotation.z = -s * 0.35; }
+    for (let k = 0; k < 3; k++) P(new THREE.BoxGeometry(0.025, 0.1, 0.02), 'plain', STR, head, (k - 1) * 0.06, 0.19, 0.215).rotation.z = (k - 1) * 0.3;   // tabby stripes on her forehead
+    for (const s of [-1, 1]) { P(sph(0.06, 12, 10), 'shiny', 0x7ac943, head, s * 0.11, 0.05, 0.24); P(sph(0.022, 6, 6), 'plain', 0x111111, head, s * 0.11, 0.05, 0.295).scale.set(0.55, 1.7, 0.6); }   // green eyes
+    for (const s of [-1, 1]) { P(new THREE.TorusGeometry(0.085, 0.012, 6, 20), 'shiny', GLD, head, s * 0.11, 0.05, 0.315); P(new THREE.BoxGeometry(0.012, 0.012, 0.3), 'shiny', GLD, head, s * 0.2, 0.06, 0.16); }   // big round specs
+    P(new THREE.BoxGeometry(0.07, 0.014, 0.014), 'shiny', GLD, head, 0, 0.065, 0.32);
+    P(new THREE.CylinderGeometry(0.028, 0.028, 0.01, 12), 'plain', 0xd11a2a, head, 0, 0.16, 0.262).rotation.x = Math.PI / 2 - 0.6;   // bindi
+    P(new THREE.TorusGeometry(0.028, 0.006, 6, 12), 'shiny', GLD, head, 0.035, -0.08, 0.33);                 // nose ring
+    P(sph(0.1), 'plain', GIN, head, 0, 0.1, -0.27); for (let k = 0; k < 9; k++) { const a = -1.2 + k * 0.3; P(sph(0.032, 6, 5), 'plain', 0xfbfaf2, head, Math.sin(a) * 0.15, 0.1 + Math.cos(a) * 0.07, -0.3 - Math.cos(a) * 0.03); }   // her bun, a gajra of jasmine
+    for (const s of [-1, 1]) for (const k of [-1, 1]) { const w = P(new THREE.BoxGeometry(0.28, 0.006, 0.006), 'plain', 0xf4f4f4, head, s * 0.2, -0.1 + k * 0.025, 0.28); w.rotation.z = k * 0.12 * s; w.rotation.y = -s * 0.25; }
+    bakeKinds(head, scales);
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.022, 0.02), new THREE.MeshBasicMaterial({ color: 0x4a1a1a, fog: false })); mouth.position.set(0, -0.17, 0.335); mouth.userData.noWalk = true; head.add(mouth);
+    const arm = new THREE.Group(); arm.position.set(0.17, 0.66, 0.22); A.add(arm);                            // her right paw, and the chai in it
+    P(new THREE.CylinderGeometry(0.068, 0.075, 0.42, 10), 'plain', GIN, arm, 0, -0.21, 0); P(sph(0.085), 'plain', CRM, arm, 0, -0.43, 0.02);
+    P(new THREE.CylinderGeometry(0.075, 0.06, 0.2, 12), 'shiny', STEEL, arm, 0, -0.36, 0.11).rotation.x = 0.7; P(new THREE.CylinderGeometry(0.068, 0.068, 0.012, 12), 'plain', 0xa0703a, arm, 0, -0.29, 0.17).rotation.x = 0.7;
+    for (let i = 0; i < 2; i++) P(new THREE.TorusGeometry(0.08, 0.015, 6, 14), 'shiny', GLD, arm, 0, -0.33 + i * 0.045, 0).rotation.x = Math.PI / 2;
+    bakeKinds(arm, scales); arm.rotation.x = -0.7;
+    const bub = (name, col) => ({ name, col, visible: false, el: null });                        // (speech bubbles: drawn on screen, see drawBubble)
+    const L = auntyLines();
+    U.aunty = { g: A, head, arm, mouth, pos: A.position.clone(), bubA: bub('Aunty-ji', '#c2185b'), bubK: bub('Princess Kitty', '#7b3fa0'), queue: [], say: null, until: 0, cool: 0, headT: 0, swipeT: 0, first: 0, chatI: 0, script: '', lines: L,
+      order: [...L.chat.keys()].sort(() => Math.random() - 0.5) };
+    shadow(A.position.x, A.position.z, 1.0, 1.0, 0.3, UF + 1.43); }
   // ======== bake: solid things room by room (her feelers only test what's near her), the rest kind by kind ========
   { const parts = {};
     const key = o => { o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox, sx = (b.max.x - b.min.x) * o.scale.x, sz = (b.max.z - b.min.z) * o.scale.z;
@@ -5064,6 +5295,10 @@ function buildUpperFloor() {                                          // behind 
     const g = m.geometry.clone(), P = g.attributes.position, UV = g.attributes.uv;
     for (let i = 0; i < P.count; i++) { const lx = (THREE.MathUtils.clamp(px + P.getX(i) * sx, cx0, cx1) - px) / sx, ly = -(THREE.MathUtils.clamp(pz - P.getY(i) * sy, cz0, cz1) - pz) / sy; P.setXY(i, lx, ly); UV.setXY(i, lx + 0.5, ly + 0.5); }
     m.geometry = g; }
+  mergeQ(DEC, ph({ map: upTex('grime'), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }), 'Upstairs');   // all the grime: one mesh
+  { const m = mergeQ(DIRTQ, ph({ map: upTex('dirt'), vertexColors: false, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 'Upstairs', 5.5); m.renderOrder = -1; }   // a film of dirt over every floor
+  mergeQ(GLASS, new THREE.MeshPhongMaterial({ color: 0xd6e8f2, transparent: true, opacity: 0.16, shininess: 120, specular: 0xffffff, depthWrite: false, side: THREE.DoubleSide, fog: false }), 'Window').renderOrder = 2;
+  { const bt = blindsTex.clone(); bt.needsUpdate = true; bt.repeat.set(1, 1); mergeQ(BLIND, ph({ map: bt, vertexColors: false, side: THREE.DoubleSide }), 'Window blinds'); }
   // ======== things that move: the jhoola sways, the fan turns (its light on), the front door opens; and the flies ========
   { const jh = new THREE.Group(); jh.position.set(gx, CH, zF + 2.8); jh.userData.name = 'Jhoola'; root.add(jh); const drop = CH - (UF + 1.3);
     put(new THREE.BoxGeometry(3.2, 0.16, 1.3), 'wood', TEAK, jh).position.set(0, -drop, 0); put(new THREE.BoxGeometry(3.0, 0.14, 1.1), 'fabric', 0xe8b04a, jh).position.set(0, -drop + 0.15, 0.05);
@@ -5075,12 +5310,12 @@ function buildUpperFloor() {                                          // behind 
     for (let k = 0; k < 3; k++) { const a = k * 2.094, b = put(new THREE.BoxGeometry(2.3, 0.04, 0.42), 'wood', 0x6b4428, fan); b.position.set(Math.cos(a) * 1.3, -0.04, Math.sin(a) * 1.3); b.rotation.y = -a; }
     const bowl = put(new THREE.SphereGeometry(0.26, 14, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), 'glow', 0xfff1cf, fan); bowl.position.y = -0.1;   // (a frosted glass bowl under it, lit)
     bakeKinds(fan, scales); U.fan = fan; }
-  { const N = 16;                                                                                          // flies, buzzing round the kitchen mess
+  { const N = 34;                                                                                          // flies, buzzing round the kitchen mess
     const body = new THREE.InstancedMesh(new THREE.SphereGeometry(0.036, 6, 4), new THREE.MeshBasicMaterial({ color: 0x141414, fog: false }), N);
     const wing = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.004, 0.05), new THREE.MeshBasicMaterial({ color: 0xdde6ee, transparent: true, opacity: 0.55, depthWrite: false, fog: false }), N);
     for (const m of [body, wing]) { m.userData.noWalk = true; m.frustumCulled = false; root.add(m); }
-    const hot = [[(SX0 + SX1) / 2, T2 + 0.45, SM], [7.3, UF + 1.75, -7.2], [9.5, UF + 0.45, -10.9], [XR - 0.75, T2 + 0.75, K0 + 4.9], [11.5, T2 + 1.1, -6.75]];
-    U.flies = { body, wing, scatter: 0, buzzT: 0, cx: 10.0, cz: -9.5, list: Array.from({ length: N }, (_, i) => ({ h: hot[i % hot.length], r: 0.3 + Math.random() * 0.45, w: [1.6 + Math.random() * 2.2, 2.4 + Math.random() * 2.6, 1.3 + Math.random() * 2.4], ph: [Math.random() * 6.3, Math.random() * 6.3, Math.random() * 6.3], p: new THREE.Vector3() })) }; }
+    const hot = [[(SX0 + SX1) / 2, T2 + 0.45, SM], [7.3, UF + 1.75, -7.2], [9.5, UF + 0.45, -10.9], [XR - 0.75, T2 + 0.75, K0 + 4.9], [11.5, T2 + 1.1, -6.75], [-0.2, UF + 3.3, 0.3], [1.5, UF + 3.1, 0.3], [9.8, UF + 1.2, 2.6], [XR - 1.32, UF + 1.35, -2.2], [11.0, UF + 1.5, -5.0], [1.0, UF + 2.4, -10.8], [6.7, UF + 1.2, -8.0]];
+    U.flies = { body, wing, scatter: 0, buzzT: 0, centers: [[10, -9.5], [1.5, 0.3], [11.5, -3.6], [1, -10.8]], list: Array.from({ length: N }, (_, i) => ({ h: hot[i % hot.length], r: 0.3 + Math.random() * 0.45, w: [1.6 + Math.random() * 2.2, 2.4 + Math.random() * 2.6, 1.3 + Math.random() * 2.4], ph: [Math.random() * 6.3, Math.random() * 6.3, Math.random() * 6.3], p: new THREE.Vector3() })) }; }
   { const g = new THREE.Group(); g.position.set(dR, LH, zF + 0.06); g.userData.name = 'Front door'; povEndWall.add(g);   // our front door: dark, the storm door's glass on it, hinged on the right so it swings in
     yBox(g, U.dw - 0.06, U.dh - 0.04, 0.1, 0x2a2420, -U.dw / 2, U.dh / 2, 0); yBox(g, U.dw - 0.55, U.dh * 0.55, 0.04, 0x5d6b73, -U.dw / 2, U.dh * 0.62, -0.07);
     for (const sz of [-1, 1]) yBox(g, 0.13, 0.13, 0.13, BRASS, -U.dw + 0.32, U.dh * 0.46, sz * 0.1);
@@ -5090,8 +5325,87 @@ function upstairsView(c) { const U = UPPER; return inUpper(c.x, c.z) && (c.y > C
 function updateUpperLights() {                                        // the upstairs is only drawn (and its lamps only lit) when you could see it: you're up there or in the foyer, or out front looking in
   const U = UPPER; if (!U.root) return;
   const c = camera.position, p = walk.pos, see = walk.on && (upstairsView(c) || c.z < U.zF + 1.5 || upstairsView(p));
-  U.root.visible = see;                                               // (her feelers skip hidden things: it's always drawn while she's inside)
-  for (const L of U.lights) L.intensity = see ? L.userData.base : 0;    // (lights never come and go, so no shaders rebuild: they just go dark)
+  U.root.visible = walk.on && (see || !(inRoomXZ(c.x, c.z) && c.y < CEIL_H && c.z < ROOM.visDepth));   // (seen through every window now, from anywhere outside; never from the living room below)                                               // (her feelers skip hidden things: it's always drawn while she's inside)
+  for (const L of U.lights) L.intensity = see ? L.userData.base : 0;
+  if (!U.root.visible && U.aunty) hideBubbles(U.aunty);               // (Aunty-ji's chatter goes when the upstairs does)    // (lights never come and go, so no shaders rebuild: they just go dark)
+}
+function auntyLines() {                                               // what Aunty-ji has to say (a = her, k = Princess Kitty)
+  return {
+    first: [['a', "Arre! Who is this? Come, come, beta! Sit, sit!"], ['k', "Meow? I'm Princess Kitty. I live downstairs."], ['a', "Princess?! Hai Ram, so THIN! Are they not feeding you down there?"],
+      ['k', "I had a treat this morning..."], ['a', "ONE treat?! Sit. I'm making aloo parathas. Fourteen."], ['k', "Um... why is it so messy up here?"],
+      ['a', "Kamla bai is on leave since Diwali. It is not messy, beta. It is 'lived-in'."], ['k', "There's a fly in the lassi."], ['a', "Extra protein! No charge."],
+      ['a', "So... when are you getting married? Sharma-ji's cat has THREE kittens already."], ['k', "Aunty, I'm a cat. I'm two."], ['a', "Exactly! Time is running out!"]],
+    chat: [
+      [['a', "Sharma-ji's cat caught twelve mice AND became a doctor. What are YOU doing?"], ['k', "...napping?"]],
+      [['a', "Why the crown? Queen of England you think you are?"], ['k', "Princess, actually."], ['a', "Hmph. Princess of WHAT?"]],
+      [['a', "Chai? Just a little bit..."], ['a', "*fills it to the very top* Drink, drink!"]],
+      [['a', "The flies? They are family. Mr. Makkhi has lived here since 2019."]],
+      [['a', "The bathtub? That's the dishwasher, beta. Very efficient. Two in one!"]],
+      [['a', "Don't sit on the floor, it's dirty. ...Actually, everything is dirty. Sit anywhere."]],
+      [['a', "That dog next door barks the whole day. No manners."], ['k', "Porter's nice!"], ['a', "Nice?! He sniffs everybody's bottom!"], ['k', "...so do I."]],
+      [['a', "In my day we walked to the litter box. Uphill. Both ways. In the snow."]],
+      [['a', "Your mother called. She says you never call."], ['k', "I'm a cat. I don't have a phone."], ['a', "Excuses, excuses."]],
+      [['a', "Eat something! Why are you only looking? Looking won't fill your tummy."]],
+      [['a', "I am not gossiping. I am only SHARING information."], ['a', "...Mrs. Gupta's cat dyes her whiskers. Don't tell anyone."]],
+      [['a', "The lassi cart is VINTAGE, beta. Very authentic. Chotu the rat comes free."]],
+      [['a', "Take some food home. The Tupperware I want BACK."]],
+      [['a', "Put on a sweater, beta! You'll catch a cold!"], ['k', "I have fur, Aunty."], ['a', "Still!"]],
+      [['a', "Did you see the toilet? Somebody forgot to flush. Not me. I'm just saying."]],
+      [['a', "You should be a doctor. Or an engineer. Or at LEAST catch a mouse."]],
+      [['a', "When I was your age I had nine kittens and a full-time job chasing pigeons."]],
+      [['a', "Why is your fur so white? Too much milk. I'm telling your mother."]]],
+    bye: ["Arre, where are you going?! Eat something first!", "Call your mother!", "Go, go. Nobody listens to Aunty anyway...", "Come back soon! And bring the Tupperware!"],
+    head: [['a', "Arre! Get OFF my head! Is this how you treat your elders?!"], ['k', "Sorry, Aunty-ji!"]],
+    swipe: [['a', "Did you just SWIPE your Aunty?! Is this what they teach you in Canada?!"], ['k', "...sorry, Aunty-ji."], ['a', "Hmph. Have a paratha."]]
+  };
+}
+function drawBubble(b, text) {                                        // a speech bubble on screen, over whoever's talking: their name, what they said
+  if (!b.el) { const el = document.createElement('div'); b.el = el;
+    el.style.cssText = 'position:fixed;left:0;top:0;z-index:25;display:none;width:max-content;max-width:min(76vw,330px);padding:8px 14px 10px;border-radius:18px;background:rgba(255,255,255,.97);border:3px solid ' + b.col + ';font:700 15px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;color:#2a2a2a;box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:none;transform:translate(-50%,calc(-100% - 12px))';
+    el.innerHTML = '<div style="font-size:12px;letter-spacing:.02em;color:' + b.col + '"></div><div></div><div style="position:absolute;left:50%;bottom:-13px;margin-left:-10px;border-left:10px solid transparent;border-right:10px solid transparent;border-top:12px solid ' + b.col + '"></div>';
+    el.children[0].textContent = b.name; document.body.appendChild(el); }
+  b.el.children[1].textContent = text;
+}
+const _bp = new THREE.Vector3(), _aP2 = new THREE.Vector3();
+function placeBubble(b, pos, atBottom) {                              // over the speaker's head (kept on screen); in her-eyes view, Princess Kitty's own lines sit at the bottom
+  if (!b.el) return; if (!b.visible) { b.el.style.display = 'none'; return; }
+  const r = renderer.domElement.getBoundingClientRect(); let x, y;
+  if (atBottom) { x = r.left + r.width / 2; y = r.bottom - 70; }
+  else { _bp.copy(pos).project(camera); if (_bp.z > 1) { b.el.style.display = 'none'; return; } x = r.left + (_bp.x + 1) / 2 * r.width; y = r.top + (1 - _bp.y) / 2 * r.height; }
+  b.el.style.display = 'block'; const w = b.el.offsetWidth, h = b.el.offsetHeight;
+  b.el.style.left = THREE.MathUtils.clamp(x, r.left + w / 2 + 8, r.right - w / 2 - 8) + 'px'; b.el.style.top = THREE.MathUtils.clamp(y, r.top + h + 20, r.bottom - 8) + 'px';
+}
+function hideBubbles(A) { for (const b of [A.bubA, A.bubK]) if (b.el) b.el.style.display = 'none'; }
+function chatBlips(aunty, n) { for (let i = 0, k = Math.min(9, 3 + (n / 12 | 0)); i < k; i++) { const f = aunty ? 300 + Math.random() * 170 : 640 + Math.random() * 260; tone(f, f * 0.9, 0.06, 'triangle', 0.02, i * 0.085); } }   // (animal-crossing style chatter)
+function auntySay(lines, script) { const A = UPPER.aunty; if (!A) return; if (A.first === 1 && script !== 'first') A.first = 0; A.queue = lines.slice(); A.say = null; A.script = script; }
+const _aP = new THREE.Vector3();
+function updateAunty(dt) {                                            // Aunty-ji: watches her, sips her chai, and talks (a lot) when Princess Kitty comes close
+  const A = UPPER.aunty; if (!A) return; if (!UPPER.root.visible) { hideBubbles(A); return; }
+  const t = clock, p = walk.pos, up = walk.on && upstairsView(p) && p.y > UPPER.UF - 0.5, d = up ? Math.hypot(p.x - A.pos.x, p.z - A.pos.z) : 99;
+  let want = 0; if (d < 8) { const a = Math.atan2(p.x - A.pos.x, p.z - A.pos.z) - A.g.rotation.y; want = THREE.MathUtils.clamp(Math.atan2(Math.sin(a), Math.cos(a)), -1.2, 1.2); }
+  A.head.rotation.y += (want - A.head.rotation.y) * Math.min(1, dt * 4);
+  const talk = A.say && A.say[0] === 'a'; A.head.rotation.x = talk ? Math.sin(t * 9) * 0.07 : A.head.rotation.x * 0.9; A.mouth.scale.y = talk ? 1 + Math.abs(Math.sin(t * 15)) * 3 : 1;
+  A.arm.rotation.x += ((!A.say && t % 9 > 7.4 ? -1.9 : -0.7) - A.arm.rotation.x) * Math.min(1, dt * 5);   // (a sip of chai now and then)
+  if (state !== 'playing') { hideBubbles(A); return; }
+  if (up && walk.grounded && t > A.headT) for (let q = walk.hitObj; q; q = q.parent) if (q === A.g) { A.headT = t + 8; auntySay(A.lines.head, 'head'); break; }   // standing on her
+  if ((A.say || A.queue.length) && d > 7.5 && A.script !== 'bye') auntySay([['a', A.lines.bye[Math.random() * A.lines.bye.length | 0]]], 'bye');   // walking off mid-sentence
+  if (A.say && t > A.until) { A.say = null; if (!A.queue.length) { A.bubA.visible = A.bubK.visible = false; A.cool = t + 9; if (A.script === 'first') { A.first = 2; unlock('auntyJi'); } } }
+  if (!A.say && A.queue.length) { A.say = A.queue.shift(); A.until = t + THREE.MathUtils.clamp(1.3 + A.say[1].length * 0.055, 2.4, 6); const me = A.say[0] === 'a' ? A.bubA : A.bubK;
+    drawBubble(me, A.say[1]); A.bubA.visible = me === A.bubA; A.bubK.visible = me === A.bubK; chatBlips(me === A.bubA, A.say[1].length); }
+  if (!A.say && !A.queue.length && d < 4.2 && t > A.cool) { if (!A.first) { A.first = 1; auntySay(A.lines.first, 'first'); } else auntySay(A.lines.chat[A.order[A.chatI++ % A.order.length]], 'chat'); }
+  A.head.getWorldPosition(_aP); _aP.y += 0.45; placeBubble(A.bubA, _aP); placeBubble(A.bubK, _aP2.set(p.x, p.y + 0.95, p.z), walk.fp);
+}
+function auntySwipe(paw) {                                            // she swipes at Aunty-ji. Aunty-ji has OPINIONS about that
+  const A = UPPER.aunty; if (!A || !walk.on || !UPPER.root.visible) return false;
+  if (Math.hypot(paw.x - A.pos.x, paw.z - A.pos.z) > 1.35 || Math.abs(paw.y - (A.pos.y + 0.6)) > 1.6) return false;   // (from the sofa, or the floor in front of it)
+  if (clock > A.swipeT) { A.swipeT = clock + 5; auntySay(A.lines.swipe, 'swipe'); noise(0.08, 0.05, 900); }
+  return true;
+}
+function updateVermin(dt) {                                           // Chotu the rat sniffs about under the cart; a couple of the cockroaches scuttle
+  const V = UPPER.vermin; if (!V || !UPPER.root.visible) return; const t = clock;
+  V.ratHead.rotation.x = Math.sin(t * 13) * 0.08; V.ratHead.rotation.y = Math.sin(t * 1.7) * 0.4; V.ratTail.rotation.y = Math.sin(t * 2.3) * 0.5;
+  for (const r of V.roaches) if (r.a) { const ph = t * r.sp + r.ph, k = 0.5 - 0.5 * Math.cos(ph), dir = Math.sin(ph) >= 0 ? 1 : -1;
+    r.g.position.x = r.a[0] + (r.b[0] - r.a[0]) * k; r.g.position.z = r.a[1] + (r.b[1] - r.a[1]) * k; r.g.rotation.y = Math.atan2((r.b[0] - r.a[0]) * dir, (r.b[1] - r.a[1]) * dir); }
 }
 const _flyM = new THREE.Matrix4(), _flyQ = new THREE.Quaternion(), _flyS = new THREE.Vector3(), _flyE = new THREE.Euler(), _flyP = new THREE.Vector3();
 function updateFlies(dt) {                                            // the kitchen flies: erratic loops round the mess; a swipe scatters them for a bit
@@ -5106,7 +5420,7 @@ function updateFlies(dt) {                                            // the kit
   });
   F.body.instanceMatrix.needsUpdate = F.wing.instanceMatrix.needsUpdate = true;
   if (walk.on && state === 'playing' && inUpper(walk.pos.x, walk.pos.z) && walk.pos.y > UPPER.UF - 0.3 && clock > F.buzzT) {   // bzzz, louder the closer she gets
-    const d = Math.hypot(walk.pos.x - F.cx, walk.pos.z - F.cz); if (d < 8) { F.buzzT = clock + 0.16; tone(205 + Math.random() * 30, 200 + Math.random() * 30, 0.2, 'sawtooth', 0.001 + 0.004 * (1 - d / 8)); }
+    const d = Math.min(...F.centers.map(([x, z]) => Math.hypot(walk.pos.x - x, walk.pos.z - z))); if (d < 8) { F.buzzT = clock + 0.16; tone(205 + Math.random() * 30, 200 + Math.random() * 30, 0.2, 'sawtooth', 0.001 + 0.004 * (1 - d / 8)); }
   }
 }
 function flySwipe(paw) {                                              // she bats at the flies: they scatter (and soon come straight back)
@@ -5120,7 +5434,7 @@ function knockDoor(paw) {                                             // she swi
   showWalkName('🚪 Knock knock...'); D.want = 1; D.openAt = clock + 1.1; return true;
 }
 function updateFrontDoor(dt) {                                        // the door swings in once she's knocked; the jhoola sways; the fan turns
-  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 2.2; updateFlies(dt);
+  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 2.2; updateFlies(dt); updateAunty(dt); updateVermin(dt);
   const D = frontDoor; if (!D) return;
   const go = D.want && clock > D.openAt;
   if (go && !D.said) { D.said = true; tone(260, 185, 0.55, 'sawtooth', 0.02); noise(0.35, 0.03, 500); showWalkName('🚪 ...the door creaks open. Come on in!'); }
@@ -6217,6 +6531,7 @@ const ACHIEVEMENTS = [
     ['notAGlitch', '👾', 'This is not a glitch', 'In Free roam, climb high enough in the backyard to hop the fence... and wander off'],
     ['indestructible', '💥', 'Indestructible', 'In Free roam, touch a car. The car loses'],
     ['knockKnock', '🚪', 'Knock knock', 'In Free roam, knock on the front door and head upstairs'],
+    ['auntyJi', '☕', 'Aunty-ji', 'In Free roam, sit through all of Aunty-ji’s questions upstairs'],
     ['chippy', '🐰', 'Wind-up warrior', 'Swipe Chippy the wind-up bunny off the credenza and let it loose on the mice'],
     ['chippyNo', '💥', 'Rest in fluff', 'Find out what happens when Chippy gets carried away'],
     ['blanketGhost', '👻', 'Blanket ghost', 'In Free roam, get caught under a blanket, then swipe it off'],
@@ -6240,7 +6555,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-28 18:33';                                              // stamped when the site is published
+const BUILD = '2026-09-28 19:48';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -9802,7 +10117,8 @@ function walkSwipe() {                                               // swipe at
   if (gunRig.state === 'cat') { fireGun(); return; }                 // armed: the swipe pulls the trigger
   if (coonSwipe(paw)) return;                                        // the raccoon at the slider: whack the glass right in front of it
   if (dogSwipe(paw)) return;                                         // the Doberman out in the yard
-  if (knockDoor(paw)) return;                                        // our front door: knock knock
+  if (knockDoor(paw)) return;
+  if (auntySwipe(paw)) return;                                       // Aunty-ji (she will have something to say)                                        // our front door: knock knock
   if (flySwipe(paw)) return;                                         // the kitchen flies: shoo!
   if (laundrySwipe(paw)) return;
   if (weedSwipe(paw)) return;                                        // a weed in the lawn
@@ -10480,7 +10796,7 @@ function freeMesh(m) {                                               // take a o
 function resetSliderScene() {                                         // a fresh Free walk: new glass, no mess, the raccoon's back to its old tricks
   dog.state = 'hidden'; dog.match = false; dog.meowAt = 0; if (dog.rig) dog.rig.g.visible = false;     // (and the Doberman's back over its own fence)
   resetCars();
-  if (frontDoor) { Object.assign(frontDoor, { open: 0, want: 0, openAt: 0, said: false, inside: false }); frontDoor.g.rotation.y = 0; }   // (the front door, shut)
+  if (frontDoor) { Object.assign(frontDoor, { open: 0, want: 0, openAt: 0, said: false, inside: false }); frontDoor.g.rotation.y = 0; }   if (UPPER.aunty) { const A = UPPER.aunty; A.queue = []; A.say = null; A.bubA.visible = A.bubK.visible = false; hideBubbles(A); if (A.first === 1) A.first = 0; }   // (the front door, shut)
   if (yardGate) { Object.assign(yardGate, { open: 0, want: 0, stay: 0, said: false, hint: false }); yardGate.hinge.rotation.y = yardGate.base; }   // (the side gate, shut)
   sliderGlass.forEach(g => { g.visible = true; }); shards.forEach(s2 => freeMesh(s2.m)); shards.length = 0;
   if (mosaicArt) { const MA = mosaicArt; MA.bits.forEach(b => freeMesh(b.m)); MA.bits = []; MA.state = 'wall'; MA.g.visible = true; MA.g.position.copy(MA.home); MA.g.rotation.set(0, Math.PI, 0); }
