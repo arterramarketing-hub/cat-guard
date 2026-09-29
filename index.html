@@ -8050,7 +8050,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 17:44';                                              // stamped when the site is published
+const BUILD = '2026-09-29 17:58';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -11820,7 +11820,9 @@ function updateRaccoon(dt) {
     if (coon.dead) return;                                             // (it's not coming back)
     const atWin = walk.pos.z > SLIDER.VD - 3.2 && walk.pos.z < SLIDER.VD + 1.5 && Math.abs(walk.pos.x - SLIDER.DX) < 3.5 && walk.pos.y < CEIL_H;   // she's come up to the slider...
     if (atWin && !coon.atWin && clock > (coon.cool || 0)) coon.next = Math.random() < 0.45 ? 0.8 + Math.random() * 1.4 : Infinity;   // ...and now and then (not every time) out it pops
-    if (!atWin) coon.next = Infinity; coon.atWin = atWin;                 // (never off on its own: only ever while she's there at the glass)
+    if (!atWin) coon.next = Infinity; coon.atWin = atWin;
+    if (!coon.firstDone && walk.pos.z > DOOR2_Z && inRoomXZ(walk.pos.x, walk.pos.z) && walk.pos.y < CEIL_H) { coon.firstDone = true; coon.firstAt = clock + 0.8; }
+    if (coon.firstAt && clock >= coon.firstAt) { coon.firstAt = 0; coon.next = 0; }   /* (its first visit: the moment she's past the room's second doorway) */                 // (never off on its own: only ever while she's there at the glass)
     coon.next -= dt; if (coon.next > 0) return;
     coon.from.set(home.x + 5.5, home.y, home.z + 2.4); coon.to.copy(home); coon.sawGun = false; pos.copy(coon.from); g.visible = true; coon.swipes = 0; coonSet('arrive'); chitter(3);
   }
@@ -12361,7 +12363,7 @@ function resetSliderScene() {                                         // a fresh
   if (mosaicArt) { const MA = mosaicArt; MA.bits.forEach(b => freeMesh(b.m)); MA.bits = []; MA.state = 'wall'; MA.g.visible = true; MA.g.position.copy(MA.home); MA.g.rotation.set(0, Math.PI, 0); }
   for (const w of yardWeeds) { w.g.visible = true; w.pull = 0; w.g.position.y = 0; w.g.rotation.z = 0; w.g.scale.setScalar(1); } walk.weeds = 0;   // (the weeds grow back for a fresh Free roam)
   if (bbqRig) { const B = bbqRig; B.g.rotation.set(0, 0, 0); B.g.position.copy(B.home); B.lid.position.copy(B.lidHome); B.lid.rotation.set(0, 0, 0); B.crashed = false; B.hit = false; B.spill.visible = false; B.shadow.position.z = B.home.z; B.shadow.scale.set(1.35, 1.35, 1); }   // (the BBQ back on its feet)
-  coon.dead = false; coon.next = Infinity; coon.atWin = false; coon.cool = clock + 20;   /* (not in the first 20 seconds) */ if (coon.rig && coon.rig.halo) coon.rig.halo.visible = false; if (coon.pool) { freeMesh(coon.pool); coon.pool = null; } cops.at = 0; cops.t = -1; if (cops.rig) cops.rig.visible = false;
+  coon.dead = false; coon.next = Infinity; coon.atWin = false; coon.firstDone = false; coon.firstAt = 0; coon.cool = clock + 20;   /* (not in the first 20 seconds) */ if (coon.rig && coon.rig.halo) coon.rig.halo.visible = false; if (coon.pool) { freeMesh(coon.pool); coon.pool = null; } cops.at = 0; cops.t = -1; if (cops.rig) cops.rig.visible = false;
 }
 function duckSqueak(pitch) { const f = pitch || 1300 + Math.random() * 500; tone(f, f * 0.72, 0.09, 'square', 0.028); tone(f * 1.5, f * 1.1, 0.06, 'sine', 0.02, 0.02); }
 function knockDuck(d, dx, dz, power) {                                // batted off: flies, spins, squeaks
