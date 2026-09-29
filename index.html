@@ -7301,6 +7301,11 @@ function zombieSwipe(paw) {
 function updateZombies(dt) {
   if (!walk.on || state !== 'playing') { if (ZN && ZN.hud) ZN.hud.hidden = true; return; }
   if (!ZN) ZN = { on: false, cool: false };
+  { const q = walk.pos, onT = !ZN.on && SLIDER && TOD && walk.grounded && Math.hypot(q.x - (SLIDER.DX - 4.6), q.z - (SLIDER.VD + 3.6)) < 0.85 && q.y > 1.3 && q.y < 2;   /* the secret: sit on the patio table for 10 seconds and zombie night comes, rain or shine */
+    const was = ZN.sitT || 0; ZN.sitT = onT ? was + dt : 0;
+    if (was < 4 && ZN.sitT >= 4) showWalkName('👀 Princess Kitty stares out into the dark lawn...');
+    if (was < 10 && ZN.sitT >= 10) { ZN.sitT = -999; TOD.i = TOD_P.findIndex(x => x.n === 'night'); TOD.t = 0; TOD.nightF = 1; TOD.wx = null; todWeather('rain'); TOD.W = 1; TOD.wxLeft = 240; TOD.flash = 0.35;
+      noise(1.8, 0.22, 110); noise(0.9, 0.12, 260); ZN.cool = false; zStart(); showWalkName('🌩️ The sky turns black... she has summoned ZOMBIE NIGHT! Pounce on them or swipe them!'); } }
   const p = walk.pos, ok = zombieOK();
   if (!ok) ZN.cool = false;                                           // (one rising per rainy night)
   if (!ZN.on && ok && !ZN.cool && inOurYard(p.x, p.z) && p.z > ROOM.visDepth + 2) zStart();
@@ -8403,7 +8408,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 19:20';                                              // stamped when the site is published
+const BUILD = '2026-09-29 19:52';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
