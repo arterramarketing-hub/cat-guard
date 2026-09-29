@@ -3464,7 +3464,8 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         const winAt = (x, y, w, h, glass, see) => {                                                                    // a white-framed window: frame, glass, a mullion and transom, a sill
           if (see) for (const s of [-1, 1]) { yBox(hd, w + 0.3, 0.15, 0.06, 0xf7f5f0, x, y + s * (h / 2 + 0.075), WZ + 0.08); yBox(hd, 0.15, h, 0.06, 0xf7f5f0, x + s * (w / 2 + 0.075), y, WZ + 0.08); }   // (ours upstairs: a frame round a real hole)
           else { yBox(hd, w + 0.3, h + 0.3, 0.06, 0xf7f5f0, x, y, WZ + 0.08); yBox(hd, w, h, 0.05, glass || 0x34414f, x, y, WZ + 0.12); }
-          yBox(hd, 0.08, h, 0.04, 0xf7f5f0, x, y, WZ + 0.15); yBox(hd, w, 0.07, 0.04, 0xf7f5f0, x, y + h * 0.22, WZ + 0.15);
+          if (see) { yBox(hd, 0.08, h / 2, 0.04, 0xf7f5f0, x, y + h / 4, WZ + 0.15); yBox(hd, w, 0.08, 0.04, 0xf7f5f0, x, y, WZ + 0.15); }   // (ours upstairs are open: the bottom sash pushed up, its meeting rail halfway, the bottom half clear)
+          else { yBox(hd, 0.08, h, 0.04, 0xf7f5f0, x, y, WZ + 0.15); yBox(hd, w, 0.07, 0.04, 0xf7f5f0, x, y + h * 0.22, WZ + 0.15); }
           yBox(hd, w + 0.5, 0.12, 0.3, 0xf7f5f0, x, y - h / 2 - 0.2, WZ + 0.2);
         };
         upWins.forEach((wx, i) => winAt(wx, winY, winW, winH, null, i < 3));
@@ -3590,20 +3591,18 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
             if (half) {                                                                                            // next door's: seven straight steps the full width of it, white railings
               for (let k = 0; k < 7; k++) { const h = LH - (k + 1) * LH / 8; yBox(steps, SWD, h, 0.62, 0xb0aca4, ex, h / 2, zF - 1.91 - k * 0.62); }
               for (const s of [-1, 1]) { const rx = ex + s * (SWD / 2 - 0.1); rail([[rx, LH, zF - 0.12], [rx, LH, zF - 1.6], [rx, LH / 8, zF - 5.94]], [[0, LH], [1, LH], [2, LH / 8]]); }
-            } else {                                                                                               // ours (the Street View photo): seven steps that sweep round in a curve on the driveway side, the cream railing curving down with them
-              const xL = ex - SWD / 2, xR0 = ex + SWD / 2, zc = zF - 1.6, AX = 1.5, xc = xR0 - AX, SEG = 12;
-              const rX = k => AX + 0.1 * (k + 1), rZ = k => 0.62 * (k + 1), hK = k => LH - (k + 1) * LH / 8;
-              const edge = k => Array.from({ length: SEG + 1 }, (_, i) => { const a = -i / SEG * Math.PI / 2; return [xc + Math.cos(a) * rX(k), zc + Math.sin(a) * rZ(k)]; });   // (step k's rounded corner: from its side round to its front)
-              for (let k = 0; k < 7; k++) {                                                                        // each tread: the band between its edge and the one above (no faces shared, so nothing flickers)
-                const P = [...edge(k), [xL, zc - rZ(k)], ...(k ? [[xL, zc - rZ(k - 1)], ...edge(k - 1).reverse()] : [[xL, zc]])];
+            } else {                                                                                               // ours (the Street View photo): down off the landing, then turning left toward the driveway, the steps fanning round
+              const cx = ex + SWD / 2, cz = zF - 1.6, RI = 0.32, RO = SWD, N = 7, DA = Math.PI / 2 / N, SEG = 6;       // the landing's corner (winders, like a spiral stair's quarter turn); a long cream railing round the outside
+              const hK = k => LH - (k + 1) * LH / 8, pt = (r, a) => [cx - Math.cos(a) * r, cz - Math.sin(a) * r];      // of the turn, a short steep one round the inside. (a: 0 along the landing's front edge, round to π/2: facing the driveway)
+              for (let k = 0; k < N; k++) {                                                                        // each step a wedge between the pier and the outside arc
+                const P = []; for (let i = 0; i <= SEG; i++) P.push(pt(RO, (k + i / SEG) * DA)); for (let i = SEG; i >= 0; i--) P.push(pt(RI, (k + i / SEG) * DA));
                 const g = new THREE.ExtrudeGeometry(new THREE.Shape(P.map(([x, z]) => new THREE.Vector2(x, -z))), { depth: hK(k), bevelEnabled: false });
                 const m = new THREE.Mesh(g, yMat(k % 2 ? 0xb0aca4 : 0xaaa69e)); m.rotation.x = -Math.PI / 2; steps.add(m); }
-              rail([[xL + 0.1, LH, zF - 0.12], [xL + 0.1, LH, zc], [xL + 0.1, hK(6), zc - rZ(6) + 0.3]], [[0, LH], [1, LH], [2, hK(6)]]);   // the lawn side: straight down
-              { const pts = [[xR0 - 0.1, LH, zF - 0.12], [xR0 - 0.1, LH, zc]];                                    // the driveway side: along the landing, then curving down round the steps
-                for (let k = 1; k < 7; k++) { const a = -(18 + (k - 1) / 5 * 44) * Math.PI / 180; pts.push([xc + Math.cos(a) * (rX(k) - 0.15), 0, zc + Math.sin(a) * (rZ(k) - 0.3)]); }
-                let tot = 0; const d = [0]; for (let i = 2; i < pts.length; i++) { tot += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][2] - pts[i - 1][2]); d.push(tot); }
-                for (let i = 2; i < pts.length; i++) pts[i][1] = LH - (LH - hK(6)) * d[i - 1] / tot;                 // (an even slope down its length, never dipping into a step)
-                rail(pts, [[0, LH], [1, LH], [4, hK(3)], [7, hK(6)]]); }
+              yCyl(steps, RI, RI, LH + 0.02, 0xa39f97, cx, (LH + 0.02) / 2, cz, 16);                              // (a round pier at the corner they turn about)
+              const foot = a => hK(Math.min(N - 1, Math.floor(a / DA + 1e-6)));
+              const arc = (r, n) => Array.from({ length: n }, (_, i) => { const a = (i + 1) / n * Math.PI / 2, [x, z] = pt(r, a); return [x, LH - (LH - hK(N - 1)) * a / (Math.PI / 2), z, foot(Math.min(a, Math.PI / 2 - 1e-3))]; });   // (an even slope all the way round: never below a step)
+              { const o = arc(RO - 0.12, 12); rail([[ex - SWD / 2 + 0.1, LH, zF - 0.12], [ex - SWD / 2 + 0.1, LH, cz], ...o.map(p => p.slice(0, 3))], [[0, LH], [1, LH], [7, o[5][3]], [13, o[11][3]]]); }   // the outside of the turn: the landing's lawn side, then round the long way
+              { const o = arc(RI + 0.14, 4); rail([[cx - 0.1, LH, zF - 0.12], [cx - 0.1, LH, cz + 0.02], ...o.map(p => p.slice(0, 3))], [[0, LH], [1, LH], [5, o[3][3]]]); }   // the inside: short and steep, from the side-door end of the landing
               yCyl(hd, 0.26, 0.2, 0.42, 0x8a5a3a, ex - 2.45, LH + 0.21, zF - 1.38, 12); yBlob(hd, 0.32, 0x4f7a3a, ex - 2.45, LH + 0.62, zF - 1.38, 0.8); }   // (a potted plant on the landing)
           }
           bakeYard(steps);
@@ -4949,9 +4948,12 @@ function buildUpperFloor() {                                          // behind 
   const floor = (x0, x1, z0, z1, kind, tile, y) => { const t = upTex(kind).clone(); t.needsUpdate = true; t.repeat.set((x1 - x0) / tile, (z1 - z0) / tile);
     const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, z1 - z0), ph({ map: t, vertexColors: false, color: { marble: 0xbdb8b0, bathTile: 0xb4bcc2, planks: 0xdcd6ce, kitchenTile: 0xcfc9c0, terracotta: 0xd8d2ca }[kind] || 0xd0d0d0 }, kind === 'marble' || kind === 'bathTile' ? 0x333333 : 0x1a1a1a, kind === 'marble' ? 60 : 24));
     m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, y === undefined ? UF : y, (z0 + z1) / 2); flat.add(m); if (kind === 'planks') quad(DIRTQ, x1 - x0, z1 - z0, (x0 + x1) / 2, (y === undefined ? UF : y) + 0.003, (z0 + z1) / 2, 0, -Math.PI / 2); return m; };
-  const picture = (w, h, tex, x, y, z, ry, rx) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), ph({ map: tex, vertexColors: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, 0, 'YXZ'); pics.add(m); if (rx === -Math.PI / 2 && Math.abs(y - UF) < 0.05) U.floorFx.push(m); return m; };   // (a rug upstairs: one of the floor's flat things)
+  const picture = (w, h, tex, x, y, z, ry, rx) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), ph({ map: tex, vertexColors: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, 0, 'YXZ'); pics.add(m); if (rx === -Math.PI / 2 && Math.abs(y - UF) < 0.05) { U.floorFx.push(m); m.material.polygonOffsetFactor = m.material.polygonOffsetUnits = -1; } return m; };   /* (a rug: a lighter depth nudge than the shadows over it, so they never fight) */   // (a rug upstairs: one of the floor's flat things)
   U.floorFx = [];                                                               // (the things lying flat on the floor: see updateUpperLights)
-  const shadow = (x, z, w, d, op, y) => { const m = rectShadow(root, x, z, w, d, 0, op || 0.28, y === undefined ? UF + 0.016 : y); if (y === undefined) U.floorFx.push(m); return m; };   // (soft contact shadows, over the rugs)
+  const shadow = (x, z, w, d, op, y) => { const m = rectShadow(root, x, z, w, d, 0, op || 0.28, y === undefined ? UF + 0.022 : y); if (y === undefined) U.floorFx.push(m); return m; };   // (soft contact shadows, over the rugs)
+  U.props = [];
+  const upProp = (build, x, y, z, r, h, kind, food, yaw) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = yaw === undefined ? (x * 7.3 + z * 3.1) % 6.28 : yaw; g.userData.name = kind === 'soft' ? 'Upstairs' : 'Tableware'; g.userData.noWalk = true; root.add(g); build(g); bakeKinds(g, scales);
+    const q = { g, home: g.position.clone(), homeRy: g.rotation.y, v: new THREE.Vector3(), w: new THREE.Vector3(), state: 'rest', r, h, kind, food, top: y, inner: g.userData.inner }; U.props.push(q); return q; };   // (a loose thing: see updateUpProps)
   const garland = (x0, z0, x1, z1, y, sag, n) => { for (let i = 0; i <= n; i++) { const t = i / n; S(0.08, i % 2 ? 0xffa21f : 0xffd23a, x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * sag, z0 + (z1 - z0) * t); } };   // a marigold toran
   const PLASTER = 0xe9dcc0, TEAK = 0x8a5a2e, DARK = 0x4e3020, BRASS = 0xd4a93a, STEEL = 0xcdd3d8, WHITE = 0xfaf8f2;
   const RISE = (UF - LH) / 14, SW = zF + 2 + 13 * 0.62, dL = U.dx - U.dw / 2, dR = U.dx + U.dw / 2, dT = LH + U.dh, gx = XR - 5.8, winY = FT(12.5), wx0 = gx - 3.45, wx1 = gx + 3.45, wy0 = 7.0, wy1 = 11.1;
@@ -5028,8 +5030,9 @@ function buildUpperFloor() {                                          // behind 
     WB(north, u0, u0 + r, y0 + r, y1 - r, -0.01, dI, WHITE, 'plaster'); WB(north, u1 - r, u1, y0 + r, y1 - r, -0.01, dI, WHITE, 'plaster');
     WB(north, u0 - 0.12, u1 + 0.12, y1, y1 + 0.12, dI, dI + 0.04, WHITE, 'wood'); WB(north, u0 - 0.12, u0, y0, y1, dI, dI + 0.04, WHITE, 'wood'); WB(north, u1, u1 + 0.12, y0, y1, dI, dI + 0.04, WHITE, 'wood');   // ...a casing...
     WB(north, u0 - 0.2, u1 + 0.2, y0 - 0.1, y0 + r + 0.01, dI - 0.02, dI + 0.28, WHITE, 'wood');   // ...a sill
-    { const [x, y, z] = at(0.05, uc, yc); quad(GLASS, gw, gh, x, y, z, ry); }                                // the glass
-    const bh = gh * [0.3, 0.55, 0.2, 0.75, 0.4][wk++ % 5]; { const [x, y, z] = at(dI - 0.03, uc, y1 - r - bh / 2); quad(BLIND, gw - 0.04, bh, x, y, z, ry, 0, 0, [0, 0, 1, bh / 0.22]); }
+    if (north) { const [x, y, z] = at(0.05, uc, yc); quad(GLASS, gw, gh, x, y, z, ry); }                    // the glass...
+    else { for (const d of [0.05, 0.1]) { const [x, y, z] = at(d, uc, yc + gh / 4); quad(GLASS, gw, gh / 2, x, y, z, ry); } const [, , z] = at(0.1, uc, yc); B(uc - gw / 2, uc + gw / 2, yc - 0.04, yc + 0.04, z - 0.03, z + 0.03, WHITE, 'plain', dec); }   // ...the back ones open, the bottom sash pushed right up (a way out)
+    const bh = gh * (north ? [0.3, 0.55, 0.2, 0.75, 0.4][wk % 5] : 0.1); wk++; { const [x, y, z] = at(dI - 0.03, uc, y1 - r - bh / 2); quad(BLIND, gw - 0.04, bh, x, y, z, ry, 0, 0, [0, 0, 1, bh / 0.22]); }
     { const [x, y, z] = at(dI - 0.03, uc, y1 - r - bh - 0.035); if (north) B(x - 0.02, x + 0.02, y - 0.035, y + 0.035, uc - gw / 2, uc + gw / 2, 0xe8e2d4, 'plain', dec); else B(uc - gw / 2, uc + gw / 2, y - 0.035, y + 0.035, z - 0.02, z + 0.02, 0xe8e2d4, 'plain', dec); } }
   // ======== the lights: warm lamps in every room (lit only when you're up here or out front), and the fittings you can see ========
   U.lights = [];
@@ -5075,13 +5078,14 @@ function buildUpperFloor() {                                          // behind 
   B(-0.3, 1.0, UF, UF + 1.5, zF + 3.4, zF + 8.6, TEAK, 'wood'); for (let i = 0; i < 3; i++) B(1.0, 1.05, UF + 0.25, UF + 1.25, zF + 3.6 + i * 1.7, zF + 4.9 + i * 1.7, 0x6b4428, 'wood', dec);   // a carved teak console...
   for (let i = 0; i < 3; i++) C(0.05, 0.05, 0.06, BRASS, 1.07, UF + 0.72, zF + 4.25 + i * 1.7, 8, 'shiny', dec).rotation.z = Math.PI / 2;
   B(-0.3, -0.12, UF + 2.2, UF + 4.9, zF + 4.1, zF + 7.9, 0x111111, 'shiny'); B(-0.12, -0.1, UF + 2.35, UF + 4.75, zF + 4.25, zF + 7.75, 0x1d2733, 'shiny', dec);   // ...the TV over it
-  S(0.2, 0x2e8b3a, 0.5, UF + 1.75, zF + 8.2, 1.2); C(0.14, 0.11, 0.25, 0xb5552b, 0.5, UF + 1.5, zF + 8.2, 10);
+  { const pp = upProp(g => { put(new THREE.CylinderGeometry(0.14, 0.11, 0.25, 10), 'plain', 0xb5552b, g).position.y = 0.125; const f = put(new THREE.SphereGeometry(0.2, 10, 8), 'plain', 0x2e8b3a, g); f.position.y = 0.25; f.scale.y = 1.2; }, 0.5, UF + 1.5, zF + 8.2, 0.2, 0.5, 'jug', 0x4a3a28, 0);   // a little plant on it (loose)
+    pp.cols = [0xb5552b, 0x2e8b3a, 0x4a3a28]; pp.splash = 0.8; }
   shadow(0.35, zF + 6, 1.6, 5.6, 0.28);
   { const cx = 6.2, cz = zF + 6.2; B(cx - 1.6, cx + 1.6, UF + 0.95, UF + 1.15, cz - 1.0, cz + 1.0, TEAK, 'wood');   // the coffee table...
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) B(cx + sx * 1.45 - 0.12, cx + sx * 1.45 + 0.12, UF, UF + 0.95, cz + sz * 0.85 - 0.12, cz + sz * 0.85 + 0.12, DARK, 'wood');
-    C(0.75, 0.75, 0.05, BRASS, cx, UF + 1.15, cz, 22, 'shiny');                                              // ...a brass tray: the chai set
-    for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.4; C(0.09, 0.075, 0.26, 0x8b5a2b, cx + Math.cos(a) * 0.45, UF + 1.2, cz + Math.sin(a) * 0.45, 10, 'shiny'); }
-    C(0.18, 0.14, 0.34, BRASS, cx, UF + 1.2, cz, 12, 'shiny'); C(0.05, 0.05, 0.14, BRASS, cx, UF + 1.54, cz, 6, 'shiny');
+    const tray = upProp(g => { put(new THREE.CylinderGeometry(0.75, 0.75, 0.05, 22), 'shiny', BRASS, g).position.y = 0.025; }, cx, UF + 1.15, cz, 0.75, 0.05, 'steel', undefined, 0); tray.kids = [];   // ...a brass tray: the chai set, all of it loose
+    for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.4, gl = upProp(g => { put(new THREE.CylinderGeometry(0.09, 0.075, 0.26, 10), 'shiny', 0x8b5a2b, g).position.y = 0.13; }, cx + Math.cos(a) * 0.45, UF + 1.2, cz + Math.sin(a) * 0.45, 0.09, 0.26, 'glass', 0xc8a27a, 0); gl.cols = [0x8b5a2b, 0xd9c7a8]; gl.dy = 0.05; tray.kids.push(gl); }
+    { const kt = upProp(g => { put(new THREE.CylinderGeometry(0.18, 0.14, 0.34, 12), 'shiny', BRASS, g).position.y = 0.17; put(new THREE.CylinderGeometry(0.05, 0.05, 0.14, 6), 'shiny', BRASS, g).position.y = 0.41; }, cx, UF + 1.2, cz, 0.18, 0.48, 'steel', 0xc8a27a, 0); kt.dy = 0.05; kt.splash = 1.1; tray.kids.push(kt); }   // (the kettle's full of chai)
     shadow(cx, cz, 3.4, 2.2, 0.3); }
   [[3.3, zF + 4.3, 0xd63384], [3.3, zF + 8.1, 0x1fa4a0], [9.6, zF + 9.6, 0xe8b04a]].forEach(([x, z, c]) => { C(0.6, 0.62, 0.95, c, x, UF, z, 16, 'fabric'); C(0.62, 0.62, 0.05, 0xd4a93a, x, UF + 0.93, z, 16, 'shiny', dec);   // embroidered poufs, mirror-work round them
     for (let k = 0; k < 8; k++) { const a = k * 0.785; B(x + Math.cos(a) * 0.61 - 0.05, x + Math.cos(a) * 0.61 + 0.05, UF + 0.4, UF + 0.52, z + Math.sin(a) * 0.61 - 0.05, z + Math.sin(a) * 0.61 + 0.05, 0xf4f4f4, 'shiny'); }
@@ -5109,9 +5113,6 @@ function buildUpperFloor() {                                          // behind 
   shadow(HL + 0.75, -8.2, 1.3, 2.6, 0.3);
   picture(3.0, 2.25, upTex('madhubani'), HL + 0.17, UF + 3.4, -1.2, Math.PI / 2);
   const tableSet = [], BOWL = [[0.001, 0], [0.08, 0], [0.1, 0.02], [0.115, 0.09], [0.103, 0.09], [0.088, 0.03], [0.001, 0.028]].map(([r, y]) => new THREE.Vector2(r, y));   // (a katori, turned: hollow, so you see the food in it)
-  U.props = [];
-  const upProp = (build, x, y, z, r, h, kind, food, yaw) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = yaw === undefined ? (x * 7.3 + z * 3.1) % 6.28 : yaw; g.userData.name = kind === 'soft' ? 'Upstairs' : 'Tableware'; g.userData.noWalk = true; root.add(g); build(g); bakeKinds(g, scales);
-    const q = { g, home: g.position.clone(), homeRy: g.rotation.y, v: new THREE.Vector3(), w: new THREE.Vector3(), state: 'rest', r, h, kind, food, top: y, inner: g.userData.inner }; U.props.push(q); return q; };   // (a loose thing: see updateUpProps)
   // ======== the dining room: a sheesham table set with the good china (all of it loose), two brass pendants over it ========
   { const tx = 1.0, tz = -10.8, TOP = UF + 1.85;
     B(tx - 2.6, tx + 2.6, TOP - 0.14, TOP, tz - 1.2, tz + 1.2, 0x6b3f22, 'wood');
@@ -5183,10 +5184,12 @@ function buildUpperFloor() {                                          // behind 
     for (let k = 0; k < 28; k++) { const x = 8.2 + rn() * 2.4, z = -12.8 + rn() * 2.2; B(x, x + 0.05, UF, UF + 0.02, z, z + 0.03, 0xfaf6ee, 'decal', dec).rotation.y = rn() * 3; }   // rice everywhere
     C(0.24, 0.24, 0.02, 0xc9a06a, 7.6, UF, -12.4, 14, 'decal');                                              // a dropped roti
     B(10.6, 11.3, UF, UF + 0.02, -9.4, -8.9, 0xb03a2e, 'fabric', dec).rotation.y = 0.5;                       // a dish towel
-    { const bx = 7.3, bz = -7.2; C(0.42, 0.36, 1.2, 0xb8bec6, bx, UF, bz, 14, 'shiny'); const lid = C(0.44, 0.44, 0.06, 0x9aa2a8, bx - 0.3, UF + 1.3, bz, 14, 'shiny', dec); lid.rotation.z = -1.1;   // the bin, overflowing
-      [[0xe3a33c, 0.2], [0x6b8e23, 0.18], [0xf4f1e6, 0.17], [0x8b5a2b, 0.16], [0xd9480f, 0.15]].forEach(([c, r], i) => S(r, c, bx + Math.cos(i * 1.3) * 0.16, UF + 1.3 + (i % 2) * 0.12, bz + Math.sin(i * 1.3) * 0.16, 0.8));
+    { const bx = 7.3, bz = -7.2, bg = new THREE.Group(); bg.position.set(bx, UF, bz); bg.userData.name = 'Kitchen bin'; bg.userData.noWalk = true; root.add(bg);   // the bin, overflowing (on its own: bump it and over it goes)
+      put(new THREE.CylinderGeometry(0.42, 0.36, 1.2, 14), 'shiny', 0xb8bec6, bg).position.y = 0.6; const lid = put(new THREE.CylinderGeometry(0.44, 0.44, 0.06, 14), 'shiny', 0x9aa2a8, bg); lid.position.set(-0.3, 1.33, 0); lid.rotation.z = -1.1;
+      [[0xe3a33c, 0.2], [0x6b8e23, 0.18], [0xf4f1e6, 0.17], [0x8b5a2b, 0.16], [0xd9480f, 0.15]].forEach(([c, r], i) => { const b = put(new THREE.SphereGeometry(r, 8, 6), 'plain', c, bg); b.position.set(Math.cos(i * 1.3) * 0.16, 1.3 + (i % 2) * 0.12, Math.sin(i * 1.3) * 0.16); b.scale.y = 0.8; });
+      bakeKinds(bg, scales); U.bin = { g: bg, x: bx, z: bz, r: 0.42, state: 'up', t: 0, dir: new THREE.Vector3(), axis: new THREE.Vector3(), sh: null };
       B(bx - 0.95, bx - 0.55, UF, UF + 0.03, bz - 0.45, bz - 0.32, 0xf2d43d, 'decal', dec).rotation.y = 0.8; S(0.06, 0xf8f4ec, bx - 0.6, UF + 0.04, bz - 0.8, 0.6); S(0.06, 0xf8f4ec, bx - 0.45, UF + 0.04, bz - 0.95, 0.6);   // (a banana peel, eggshells)
-      shadow(bx, bz, 1.0, 1.0, 0.3); }
+      U.bin.sh = shadow(bx, bz, 1.0, 1.0, 0.3); }
     { const ab = B(11.4, 12.05, UF, UF + 0.9, -8.6, -8.1, 0xe8dcc0, 'fabric'); ab.rotation.z = 0.15; B(11.0, 12.2, UF, UF + 0.012, -9.1, -8.6, 0xf6f1e6, 'decal', dec); }   // an atta bag slumped over, flour on the floor
     { const z0 = K0 + 0.15 + 2 * 1.6, dh = CT - UF - 0.45, hy = UF + 0.3 + dh / 2, hg = new THREE.Group(); hg.position.set(KX0 - 0.02, hy, z0); hg.userData.name = 'Cupboard door'; hg.userData.noWalk = true; root.add(hg);   // the open cupboard's door: the mouse in there
       put(new THREE.BoxGeometry(0.04, dh, 1.45), 'wood', 0xd8ccb4, hg).position.set(0, 0, 0.725); put(new THREE.BoxGeometry(0.04, 0.06, 0.45), 'shiny', STEEL, hg).position.set(-0.04, CT - 0.37 - hy, 0.725);   // pushes it open to peek out,
@@ -5197,7 +5200,7 @@ function buildUpperFloor() {                                          // behind 
       put(new THREE.CylinderGeometry(0.03, 0.05, 0.2, 6), 'plain', 0x222222, g).position.y = 0.6; }, XR - 0.75, T2 + 0.11, K0 + 4.1, 0.3, 0.7, 'steel', undefined, 0);   // the pressure cooker (it whistles when it goes)
     cook.whistle = true;
     const kd = upProp(g => { put(new THREE.CylinderGeometry(0.42, 0.24, 0.28, 18), 'shiny', 0x3a3a3a, g).position.y = 0.14; for (const s of [-1, 1]) { const h = put(new THREE.TorusGeometry(0.08, 0.02, 6, 10), 'shiny', 0x3a3a3a, g); h.position.set(s * 0.44, 0.24, 0); h.rotation.y = Math.PI / 2; }
-      const cu = new THREE.Mesh(new THREE.CircleGeometry(0.38, 18), new THREE.MeshPhongMaterial({ color: 0xc85a1e, shininess: 40, fog: false })); cu.rotation.x = -Math.PI / 2; cu.position.y = 0.25; g.add(cu); g.userData.inner = cu; },
+      const cu = new THREE.Mesh(new THREE.CircleGeometry(0.4, 18), new THREE.MeshPhongMaterial({ color: 0xc85a1e, shininess: 40, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); cu.rotation.x = -Math.PI / 2; cu.position.y = 0.292; g.add(cu); g.userData.inner = cu; },
       XR - 0.75, T2 + 0.11, K0 + 4.9, 0.42, 0.3, 'steel', 0xc85a1e, 0); kd.splash = 1.9;                 // a kadai of curry
     const md = upProp(g => { put(new THREE.CylinderGeometry(0.48, 0.48, 0.14, 20), 'shiny', STEEL, g).position.y = 0.07;
       [0xe8b31c, 0xc2261f, 0x7a5a36, 0x2d2520, 0x9a8a4a, 0x6e3b1f, 0xc7a23a].forEach((c, i) => { const a = i * 1.05, r = i ? 0.29 : 0; put(new THREE.CylinderGeometry(0.12, 0.12, 0.03, 10), 'plain', c, g).position.set(Math.cos(a) * r, 0.145, Math.sin(a) * r); }); },
@@ -5233,7 +5236,7 @@ function buildUpperFloor() {                                          // behind 
       bakeKinds(pg, scales);
       const disc = (col, op, y, map) => { const m = new THREE.Mesh(new THREE.CircleGeometry(0.19, 28), new THREE.MeshPhongMaterial({ color: col, map: map || null, transparent: true, opacity: op, depthWrite: false, shininess: 90, specular: 0xffffff, fog: false }));
         m.rotation.x = -Math.PI / 2; m.scale.x = E; m.position.set(lx, WLv + y, lz); m.visible = false; m.userData.noWalk = true; root.add(m); return m; };
-      U.loo = { poop: pg, py: WLv, clean: disc(0xcfe3ea, 0.92, 0.002), swirl: disc(0xffffff, 0.85, 0.004, swirlTex()), x0: lx - 0.65, x1: XR - 0.17, z: lz, hz: 0.62, y0: UF + 0.45, t: 0, on: false }; }   // (fresh water once it's flushed; a swirl while it goes)
+      U.loo = { poop: pg, py: WLv, clean: disc(0xcfe3ea, 0.92, 0.002), swirl: disc(0xffffff, 0.85, 0.004, swirlTex()), x0: XR - 0.72, x1: XR - 0.17, z: lz, hz: 0.64, y0: UF + 2.3, t: 0, on: false }; }   // (fresh water once it's flushed; a swirl while it goes)
     { const seat = put(new THREE.TorusGeometry(0.395, 0.05, 8, 30), 'porcelain', 0xf4f0e6, solid); seat.position.set(lx, UF + 1.06, lz); seat.rotation.x = Math.PI / 2; seat.scale.set(E, 1, 0.7); }
     { const lid = put(new THREE.CylinderGeometry(0.44, 0.44, 0.05, 28), 'porcelain', 0xf4f0e6, solid); lid.scale.set(E, 1, 1); lid.position.set(lx + 0.55, UF + 1.55, lz); lid.rotation.z = Math.PI / 2 - 0.12; }
     B(XR - 0.62, XR - 0.17, UF + 1.25, UF + 2.45, lz - 0.55, lz + 0.55, WHITE, 'shiny'); B(XR - 0.66, XR - 0.17, UF + 2.45, UF + 2.53, lz - 0.6, lz + 0.6, WHITE, 'shiny'); C(0.06, 0.06, 0.03, STEEL, XR - 0.4, UF + 2.53, lz, 12, 'shiny');   // the cistern, its flush button (unpressed)
@@ -5247,12 +5250,14 @@ function buildUpperFloor() {                                          // behind 
     B(X0, X1, UF, TH, Z1 - 0.2, Z1, WHITE, 'shiny'); B(X0, X1, UF, TH, Z0, Z0 + 0.2, WHITE, 'shiny'); B(X0, X0 + 0.2, UF, TH, Z0 + 0.2, Z1 - 0.2, WHITE, 'shiny'); B(X1 - 0.2, X1, UF, TH, Z0 + 0.2, Z1 - 0.2, WHITE, 'shiny');
     B(X0 - 0.04, X1, TH, TH + 0.05, Z1 - 0.24, Z1 + 0.04, WHITE, 'shiny');
     B(X0 + 0.2, X1 - 0.2, UF, WL, Z0 + 0.2, Z1 - 0.2, 0x8e8a62, 'shiny');                                    // ...full of grey dishwater...
-    let ds = 5; const dr = () => (ds = (ds * 16807) % 2147483647) / 2147483647;
-    for (let i = 0; i < 18; i++) { const pl = C(0.34, 0.34, 0.03, i % 4 ? STEEL : 0xe8e0d0, X0 + 0.55 + dr() * (X1 - X0 - 1.1), WL, Z0 + 0.5 + dr() * (Z1 - Z0 - 1.0), 18, 'shiny', dec); pl.position.y = WL + 0.02 + dr() * 0.12; pl.rotation.set(1.1 + dr() * 0.7, dr() * 3, (dr() - 0.5) * 0.6); }   // ...and every dish in the house
+    let ds = 5; const dr = () => (ds = (ds * 16807) % 2147483647) / 2147483647, tubG = grp();               // (the dishes on their own: jump in and they're gone)
+    U.tub = { g: tubG, x0: X0 + 0.25, x1: X1 - 0.25, z0: Z0 + 0.25, z1: Z1 - 0.25, wl: WL, on: false, smashed: false, t: 0 };
+    for (let i = 0; i < 18; i++) { const pl = C(0.34, 0.34, 0.03, i % 4 ? STEEL : 0xe8e0d0, X0 + 0.55 + dr() * (X1 - X0 - 1.1), WL, Z0 + 0.5 + dr() * (Z1 - Z0 - 1.0), 18, 'shiny', tubG); pl.position.y = WL + 0.02 + dr() * 0.12; pl.rotation.set(1.1 + dr() * 0.7, dr() * 3, (dr() - 0.5) * 0.6); }   // ...and every dish in the house
     { const pot = C(0.4, 0.34, 0.5, 0x9aa0a4, X0 + 1.2, WL - 0.3, -5.0, 16, 'shiny'); pot.rotation.z = 0.35; const kd = C(0.52, 0.28, 0.28, 0x3a3a3a, X1 - 1.0, WL - 0.12, -4.9, 18, 'shiny'); kd.rotation.x = -0.3;
       const ck = C(0.3, 0.3, 0.5, STEEL, 11.4, WL - 0.1, -5.25, 16, 'shiny'); ck.rotation.z = 1.3; }
-    for (let i = 0; i < 5; i++) { const gl = C(0.09, 0.075, 0.26, STEEL, X0 + 0.6 + i * 0.75, WL - 0.08, -4.5 - (i % 2) * 0.5, 10, 'shiny', dec); gl.rotation.set(0.5 + i * 0.3, i, 0.4); }
-    { const ld = B(0, 0.05, 0, 0.05, 0, 1.2, STEEL, 'shiny', dec); ld.position.set(10.6, WL + 0.2, -4.8); ld.rotation.set(0.5, 0.9, 0); }   // a ladle
+    for (let i = 0; i < 5; i++) { const gl = C(0.09, 0.075, 0.26, STEEL, X0 + 0.6 + i * 0.75, WL - 0.08, -4.5 - (i % 2) * 0.5, 10, 'shiny', tubG); gl.rotation.set(0.5 + i * 0.3, i, 0.4); }
+    { const ld = B(0, 0.05, 0, 0.05, 0, 1.2, STEEL, 'shiny', tubG); ld.position.set(10.6, WL + 0.2, -4.8); ld.rotation.set(0.5, 0.9, 0); }   // a ladle
+    bakeKinds(tubG, scales);
     for (let i = 0; i < 26; i++) S(0.06 + dr() * 0.09, 0xf8f8f2, X0 + 0.4 + dr() * (X1 - X0 - 0.8), WL + 0.02, Z0 + 0.4 + dr() * (Z1 - Z0 - 0.8), 0.55);   // suds
     { const dx = X1 - 0.8, dz = -4.55; S(0.14, 0xffd23a, dx, WL + 0.07, dz, 0.8); S(0.09, 0xffd23a, dx - 0.1, WL + 0.22, dz); { const bk = put(new THREE.ConeGeometry(0.035, 0.08, 8), 'plain', 0xe8741a, dec); bk.position.set(dx - 0.2, WL + 0.21, dz); bk.rotation.z = Math.PI / 2; } for (const s of [-1, 1]) S(0.014, 0x111111, dx - 0.16, WL + 0.25, dz + s * 0.04); }   // a rubber duck, supervising
     B(X0 + 0.25, X0 + 0.55, TH + 0.05, TH + 0.12, Z1 - 0.2, Z1 - 0.05, 0xf2d43d, 'fabric', dec); B(X0 + 0.25, X0 + 0.55, TH + 0.12, TH + 0.15, Z1 - 0.2, Z1 - 0.05, 0x3f9a2a, 'fabric', dec);   // a scrubber
@@ -5286,11 +5291,11 @@ function buildUpperFloor() {                                          // behind 
     const DR = [0xd9d0a8, 0xb86a78, 0xc98a2e, 0x6b7a3a, 0xc4bd86, 0x6e5234];   // (none of them quite the colour they should be)
     DR.forEach((c, i) => { const x = cx - 2.2 + i * 0.88, z = cz + 0.3;                                    // the big steel buckets: loose on the cart (knock one off and the lot goes over the floor)
       const bq = upProp(g => { put(new THREE.CylinderGeometry(0.38, 0.3, 0.56, 16), 'shiny', STEEL, g).position.y = 0.28;
-        const dk = new THREE.Mesh(new THREE.CircleGeometry(0.36, 16), new THREE.MeshPhongMaterial({ color: c, shininess: 50, fog: false })); dk.rotation.x = -Math.PI / 2; dk.position.y = 0.565; g.add(dk); g.userData.inner = dk;
+        const dk = new THREE.Mesh(new THREE.CircleGeometry(0.36, 16), new THREE.MeshPhongMaterial({ color: c, shininess: 50, fog: false })); dk.material.polygonOffset = true; dk.material.polygonOffsetFactor = dk.material.polygonOffsetUnits = -2; dk.rotation.x = -Math.PI / 2; dk.position.y = 0.575; g.add(dk); g.userData.inner = dk;
         const ld = put(new THREE.CylinderGeometry(0.025, 0.025, 1.0, 6), 'shiny', STEEL, g); ld.position.set(0.14, 0.95, 0.05); ld.rotation.z = -0.35; put(new THREE.SphereGeometry(0.08, 8, 6), 'shiny', STEEL, g).position.set(-0.02, 0.55, 0.05);
-        for (let q = 0; q < 4; q++) put(new THREE.CylinderGeometry(0.03 + (q % 2) * 0.03, 0.03 + (q % 2) * 0.03, 0.008, 8), 'plain', i === 3 ? 0x2e3a1e : 0x4a3a24, g).position.set(Math.cos(q * 1.9 + i) * 0.2, 0.575, Math.sin(q * 1.9 + i) * 0.2);   // a scum on every one...
-        if (i === 3) for (let q = 0; q < 7; q++) { const f = put(new THREE.SphereGeometry(0.05, 6, 4), 'plain', q % 2 ? 0xc8d8a0 : 0x6a8a3a, g); f.position.set(Math.cos(q) * 0.18, 0.58, Math.sin(q * 1.3) * 0.18); f.scale.y = 0.3; }   // ...green fuzz on the jaljeera...
-        if (i === 0) { const fl = put(new THREE.SphereGeometry(0.035, 6, 4), 'plain', 0x111111, g); fl.position.set(-0.08, 0.585, -0.08); fl.scale.y = 0.7; for (const s of [-1, 1]) put(new THREE.BoxGeometry(0.06, 0.005, 0.04), 'plain', 0xdde6ee, g).position.set(-0.08 + s * 0.05, 0.6, -0.08); } },   // ...and a fly doing the backstroke in the lassi
+        for (let q = 0; q < 4; q++) put(new THREE.CylinderGeometry(0.03 + (q % 2) * 0.03, 0.03 + (q % 2) * 0.03, 0.008, 8), 'plain', i === 3 ? 0x2e3a1e : 0x4a3a24, g).position.set(Math.cos(q * 1.9 + i) * 0.2, 0.585, Math.sin(q * 1.9 + i) * 0.2);   // a scum on every one...
+        if (i === 3) for (let q = 0; q < 7; q++) { const f = put(new THREE.SphereGeometry(0.05, 6, 4), 'plain', q % 2 ? 0xc8d8a0 : 0x6a8a3a, g); f.position.set(Math.cos(q) * 0.18, 0.595, Math.sin(q * 1.3) * 0.18); f.scale.y = 0.3; }   // ...green fuzz on the jaljeera...
+        if (i === 0) { const fl = put(new THREE.SphereGeometry(0.035, 6, 4), 'plain', 0x111111, g); fl.position.set(-0.08, 0.6, -0.08); fl.scale.y = 0.7; for (const s of [-1, 1]) put(new THREE.BoxGeometry(0.06, 0.005, 0.04), 'plain', 0xdde6ee, g).position.set(-0.08 + s * 0.05, 0.615, -0.08); } },   // ...and a fly doing the backstroke in the lassi
         x, T3, z, 0.38, 0.6, 'steel', c, 0); bq.splash = 2.6; });
     for (let r = 0; r < 2; r++) for (let i = 0; i < 8; i++) { const x = cx - 2.3 + i * 0.64, z = cz - 0.5 - r * 0.33, c = DR[(i + r * 3) % 6], full = (i + r) % 3;   // rows of glasses, some poured
       const gl = upProp(g => { if (full) { put(new THREE.CylinderGeometry(0.1, 0.085, 0.32, 10), 'shiny', c, g).position.y = 0.16; put(new THREE.CylinderGeometry(0.105, 0.1, 0.07, 10), 'shiny', 0xe6f0f4, g).position.y = 0.355; }
@@ -5318,8 +5323,8 @@ function buildUpperFloor() {                                          // behind 
     for (const z of [12.5, 16.6]) { const bo = C(0.28, 0.28, 2.2, 0x1fa4a0, HL + 1.37, UF + 1.5, z, 12, 'fabric'); bo.position.y = UF + 1.74; bo.rotation.z = Math.PI / 2; }
     shadow(HL + 1.4, 14.6, 2.8, 6.0, 0.32);
     B(-5.2, -2.4, UF + 1.9, UF + 2.05, 21.6, zB - 0.2, TEAK, 'wood'); for (const x of [-5.1, -2.5]) B(x - 0.08, x + 0.08, UF, UF + 1.9, 21.7, zB - 0.3, DARK, 'wood');   // the desk...
-    B(-4.4, -3.2, UF + 2.05, UF + 2.1, 22.1, 22.9, 0x2a2a2e, 'shiny', dec); B(-4.3, -3.3, UF + 2.1, UF + 2.105, 22.2, 22.75, 0x55555a, 'plain', dec);   // ...a laptop...
-    { const a = 0.25, ly = UF + 2.1 + 0.4 * Math.cos(a), lz = 22.9 + 0.4 * Math.sin(a), lid = B(-4.4, -3.2, -0.4, 0.4, -0.02, 0.02, 0x2a2a2e, 'shiny', dec); lid.position.set(-3.8, ly, lz); lid.rotation.x = a;
+    B(-4.4, -3.2, UF + 2.05, UF + 2.1, 21.7, 22.5, 0x2a2a2e, 'shiny', dec); B(-4.3, -3.3, UF + 2.1, UF + 2.105, 21.8, 22.35, 0x55555a, 'plain', dec);   // ...a laptop (well forward: its lid clear of the window)...
+    { const a = 0.22, ly = UF + 2.1 + 0.4 * Math.cos(a), lz = 22.5 + 0.4 * Math.sin(a), lid = B(-4.4, -3.2, -0.4, 0.4, -0.02, 0.02, 0x2a2a2e, 'shiny', dec); lid.position.set(-3.8, ly, lz); lid.rotation.x = a;
       const scr = new THREE.Mesh(new THREE.PlaneGeometry(1.08, 0.7), new THREE.MeshBasicMaterial({ map: upTex('email'), fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); scr.position.set(-3.8, ly + 0.021 * Math.sin(a), lz - 0.021 * Math.cos(a)); scr.rotation.set(-a, Math.PI, 0, 'YXZ'); scr.userData.name = 'Laptop'; pics.add(scr); }   // ...open on an email to the landlord
     C(0.08, 0.2, 0.05, DARK, -2.8, UF + 2.05, 22.7, 8, 'plain', dec); C(0.02, 0.02, 0.6, DARK, -2.8, UF + 2.1, 22.7, 4, 'plain', dec); C(0.1, 0.22, 0.2, 0xfff0c0, -2.8, UF + 2.7, 22.7, 10, 'glow', glow);   // a desk lamp, on
     B(-4.3, -3.3, UF + 1.1, UF + 1.2, 20.6, 21.5, 0x2a4a7a, 'fabric'); B(-4.3, -3.3, UF + 1.2, UF + 2.8, 20.5, 20.62, 0x2a4a7a, 'fabric'); for (const x of [-4.2, -3.4]) for (const z of [20.6, 21.4]) B(x - 0.05, x + 0.05, UF, UF + 1.1, z - 0.05, z + 0.05, 0x333333, 'shiny');   // its chair
@@ -5387,7 +5392,7 @@ function buildUpperFloor() {                                          // behind 
   for (let k = 0; k < 7; k++) B(1.15, 1.95, UF + k * 0.06, UF + 0.05 + k * 0.06, zF + 9.0, zF + 9.9, k % 2 ? 0xe8e4d8 : 0xd8d2c0, 'plain', dec).rotation.y = (k % 3) * 0.1;   // old newspapers, stacked
   for (let k = 0; k < 10; k++) S(0.09 + gr() * 0.06, 0x9a948a, HL + 0.4 + gr() * 0.4, UF + 0.05, SW + 1 + k * 2.1, 0.55);   // dust bunnies
   for (let k = 0; k < 20; k++) S(0.03, [0xc9a06a, 0xfaf6ee, 0xe8b31c][k % 3], -1 + gr() * 4, UF + 0.02, -12.4 + gr() * 3.2, 0.5);   // crumbs under the table
-  { const binBag = (x, z, r, h, ry, lean) => { const g = new THREE.Group(); g.position.set(x, UF, z); g.rotation.set(0, ry, lean); g.userData.name = 'Bin bag'; g.userData.noWalk = true; root.add(g);   // bin bags: lumpy glossy black sacks,
+  U.bags = []; { const binBag = (x, z, r, h, ry, lean) => { const g = new THREE.Group(); g.position.set(x, UF, z); g.rotation.set(0, ry, lean); g.userData.name = 'Bin bag'; g.userData.noWalk = true; root.add(g); U.bags.push({ g, x, z, r, h, popped: false });   // bin bags: lumpy glossy black sacks (touch one: pop),
       const prof = [[0.001, 0], [0.55, 0.02], [0.85, 0.12], [0.98, 0.35], [0.95, 0.6], [0.78, 0.82], [0.42, 0.95], [0.14, 1.02], [0.1, 1.1], [0.16, 1.2], [0.001, 1.24]].map(([a, b]) => new THREE.Vector2(a * r, b * h));   // necks gathered and knotted,
       const geo = new THREE.LatheGeometry(prof, 22), P = geo.attributes.position;                                                      // the knot's ears flopped over
       for (let i = 0; i < P.count; i++) { const px = P.getX(i), py = P.getY(i), pz = P.getZ(i), a = Math.atan2(pz, px), k = py / h, b = 1 + 0.1 * Math.sin(a * 3 + k * 5 + x) + 0.06 * Math.sin(a * 7 - k * 9 + z) - (k < 0.9 ? 0.05 * Math.max(0, Math.sin(a * 11 + k * 23)) : 0);
@@ -5403,22 +5408,23 @@ function buildUpperFloor() {                                          // behind 
   for (const s of [-1, 1]) B(-4.72 + s * 0.02, -4.7 + s * 0.02, UF + 2.2, UF + 2.24, 22.2, 22.8, 0xd9b98a, 'wood', dec).rotation.x = 0.6;   // ...chopsticks in it
   for (let k = 0; k < 7; k++) S(0.09, 0xf4f1ea, -5.2 + gr() * 3, UF + 0.08, 20.2 + gr() * 2.2, 0.9);             // crumpled paper
   for (let k = 0; k < 3; k++) S(0.55, 0xe0457b, HL + 1.2 + k * 0.2, UF + 1.55, 13 + k * 1.3, 0.3, 'fabric');     // a rumpled blanket
-  { const px = 9.3, pz = 15.9, py = UF + 1.58, S2 = 0.65;                                                // a pizza box on the bed: open, three slices gone (one of them's on the bedspread)
-    B(px - S2, px + S2, py, py + 0.035, pz - S2, pz + S2, 0xc4955c, 'plain');
-    for (const [x0, x1, z0, z1] of [[px - S2, px + S2, pz - S2, pz - S2 + 0.03], [px - S2, px + S2, pz + S2 - 0.03, pz + S2], [px - S2, px - S2 + 0.03, pz - S2 + 0.03, pz + S2 - 0.03], [px + S2 - 0.03, px + S2, pz - S2 + 0.03, pz + S2 - 0.03]]) B(x0, x1, py + 0.035, py + 0.16, z0, z1, 0xc4955c, 'plain', dec);
+  { const px = 9.3, pz = 15.9, py = UF + 1.58, S2 = 0.65;                                                // a pizza box on the bed: open, three slices gone (one of them's on the bedspread). Loose: knock it off and it's pizza everywhere
     const pie = (par, a0, al, n, seg) => { put(new THREE.CylinderGeometry(0.56, 0.56, 0.03, seg, 1, false, a0, al), 'plain', 0xd9892a, par).position.y = 0.015; put(new THREE.CylinderGeometry(0.5, 0.5, 0.036, seg, 1, false, a0 + 0.02, al - 0.04), 'plain', 0xf2c64e, par).position.y = 0.02;   // sauce, cheese...
       const cr = put(new THREE.TorusGeometry(0.53, 0.045, 6, Math.max(4, seg - 6), al), 'plain', 0xc98a3e, par); cr.position.y = 0.032; cr.rotation.set(-Math.PI / 2, a0 - Math.PI / 2, 0, 'YXZ');   // ...the crust...
       for (const a of [a0, a0 + al]) { const cut = put(new THREE.BoxGeometry(0.008, 0.036, 0.52), 'plain', 0xe8a93a, par); cut.position.set(Math.sin(a) * 0.26, 0.02, Math.cos(a) * 0.26); cut.rotation.y = a; }   // (the cut edges, filled in)
       for (let k = 0; k < n; k++) { const a = a0 + 0.3 + (k * 0.61) % Math.max(0.05, al - 0.6), rr = 0.2 + ((k * 0.37) % 0.25); put(new THREE.CylinderGeometry(0.055, 0.055, 0.012, 12), 'plain', 0xb3262f, par).position.set(Math.sin(a) * rr, 0.043, Math.cos(a) * rr);   // ...pepperoni...
         if (al > 1) { const gp = put(new THREE.BoxGeometry(0.07, 0.012, 0.025), 'plain', 0x3f9a2a, par); const b = a0 + 0.3 + ((k * 0.61 + 0.3) % (al - 0.6)), br = 0.2 + ((k * 0.29) % 0.24); gp.position.set(Math.sin(b) * br, 0.045, Math.cos(b) * br); gp.rotation.y = k; } } };   // ...green chillies
-    { const P = new THREE.Group(); P.position.set(px, py + 0.035, pz); dec.add(P); pie(P, 0.6, Math.PI * 2 * 5 / 8, 11, 36); }
-    { const P = new THREE.Group(); P.position.set(8.75, py + 0.004, 14.05); P.rotation.y = 2.4; dec.add(P); pie(P, 0, Math.PI / 4, 2, 8); }
-    onFloor(0, 8.95, 14.35, 0.8, 0.6, 0.4, 0x8a6a3a, py + 0.004);                                           // (a grease stain on the bedspread)
-    const lid = new THREE.Group(); lid.position.set(px + S2, py + 0.16, pz); lid.rotation.z = -1.95; lid.userData.name = 'Pizza box'; root.add(lid);   // the lid, flipped open
     const PM = o => new THREE.MeshPhongMaterial(Object.assign({ shininess: 4, specular: 0, fog: false }, o));
-    const lb = new THREE.Mesh(new THREE.BoxGeometry(2 * S2, 0.03, 2 * S2), PM({ color: 0xc4955c })); lb.position.set(-S2, 0, 0); lid.add(lb);
-    const lo = new THREE.Mesh(new THREE.PlaneGeometry(2 * S2 - 0.04, 2 * S2 - 0.04), PM({ map: upTex('pizzaLid') })); lo.rotation.set(-Math.PI / 2, 0, Math.PI / 2); lo.position.set(-S2, 0.016, 0); lid.add(lo);
-    const li = new THREE.Mesh(new THREE.PlaneGeometry(2 * S2 - 0.04, 2 * S2 - 0.04), PM({ map: upTex('pizzaIn') })); li.rotation.x = Math.PI / 2; li.position.set(-S2, -0.016, 0); lid.add(li); }
+    const box = upProp(g => { put(new THREE.BoxGeometry(2 * S2, 0.035, 2 * S2), 'plain', 0xc4955c, g).position.y = 0.0175;
+        for (const [x, z, w, d] of [[0, -S2 + 0.015, 2 * S2, 0.03], [0, S2 - 0.015, 2 * S2, 0.03], [-S2 + 0.015, 0, 0.03, 2 * S2 - 0.06], [S2 - 0.015, 0, 0.03, 2 * S2 - 0.06]]) put(new THREE.BoxGeometry(w, 0.125, d), 'plain', 0xc4955c, g).position.set(x, 0.0975, z);
+        const P = new THREE.Group(); P.position.y = 0.035; g.add(P); pie(P, 0.6, Math.PI * 2 * 5 / 8, 11, 36);
+        const lid = new THREE.Group(); lid.position.set(S2, 0.16, 0); lid.rotation.z = -1.95; g.add(lid);                                  // the lid, flipped open
+        const lb = new THREE.Mesh(new THREE.BoxGeometry(2 * S2, 0.03, 2 * S2), PM({ color: 0xc4955c })); lb.position.set(-S2, 0, 0); lid.add(lb);
+        const lo = new THREE.Mesh(new THREE.PlaneGeometry(2 * S2 - 0.04, 2 * S2 - 0.04), PM({ map: upTex('pizzaLid') })); lo.rotation.set(-Math.PI / 2, 0, Math.PI / 2); lo.position.set(-S2, 0.016, 0); lid.add(lo);
+        const li = new THREE.Mesh(new THREE.PlaneGeometry(2 * S2 - 0.04, 2 * S2 - 0.04), PM({ map: upTex('pizzaIn') })); li.rotation.x = Math.PI / 2; li.position.set(-S2, -0.016, 0); lid.add(li); },
+      px, py, pz, S2, 0.2, 'pizza', 0xd9892a, 0); box.cols = [0xc4955c, 0xf2c64e, 0xb3262f, 0xd9892a, 0xc98a3e]; box.splash = 1.6;
+    const sl = upProp(g => { const P = new THREE.Group(); P.position.y = 0.004; g.add(P); pie(P, 0, Math.PI / 4, 2, 8); }, 8.75, py, 14.05, 0.3, 0.06, 'pizza', 0xd9892a, 2.4); sl.cols = [0xf2c64e, 0xb3262f, 0xc98a3e]; sl.splash = 0.6;
+    onFloor(0, 8.95, 14.35, 0.8, 0.6, 0.4, 0x8a6a3a, py + 0.004); }                                         // (a grease stain on the bedspread)
   for (let k = 0; k < 4; k++) { const b = C(0.08, 0.08, 0.45, 0xbfe0f0, 7.0 + k * 0.4, UF, 17.8 + (k % 2) * 0.3, 10, 'shiny'); if (k % 2) { b.rotation.z = Math.PI / 2; b.position.y = UF + 0.08; } }   // empty water bottles
   C(0.45, 0.38, 0.9, 0x8a6a4a, 4.2, UF, 20.8, 14, 'wood'); for (let k = 0; k < 5; k++) S(0.28, [0x2a4a7a, 0xf4efe6, 0xc0392b, 0x2e8b3a, 0x7b3fa0][k], 4.2 + Math.cos(k * 1.3) * 0.2, UF + 0.95 + (k % 2) * 0.12, 20.8 + Math.sin(k * 1.3) * 0.2, 0.6, 'fabric');   // the laundry basket, overflowing
   S(0.3, 0xf4efe6, 4.9, UF + 0.08, 21.2, 0.3, 'fabric'); S(0.32, 0x2a4a7a, 7.5, UF + 1.4, zB - 1.9, 0.45, 'fabric');
@@ -5596,6 +5602,8 @@ function auntyLines() {                                               // what Au
     breaks: ["ARRE! My GOOD plates!!", "That was a WEDDING present! ...From your uncle's side. Okay, it's fine.", "Hai Ram! Who is paying for that?!", "Break one more and no parathas for you!"],
     bye: ["Arre, where are you going?! Eat something first!", "Call your mother!", "Go, go. Nobody listens to Aunty anyway...", "Come back soon! And bring the Tupperware!"],
     head: [['a', "Arre! Get OFF my head! Is this how you treat your elders?!"], ['k', "Sorry, Aunty-ji!"]],
+    bins: ["Chhi chhi chhi! Who is going to pick THAT up?!", "The rubbish goes out on TUESDAY. Today is not Tuesday!", "Beta, I did not raise you in a bin! ...I did not raise you at all. Still!"],
+    fan: ["Arre! Mind the PANKHA! It's on speed three!", "That fan was put up by your uncle. It will NOT stop. Nothing stops it."],
     flush: ["Wah! Somebody finally FLUSHED! Shabash, beta!", "See? THAT is how you use a toilet. Tell your uncle.", "Thank God. It was sitting there since Tuesday."],
     swipe: [['a', "Did you just SWIPE your Aunty?! Is this what they teach you in Canada?!"], ['k', "...sorry, Aunty-ji."], ['a', "Hmph. Have a paratha."]]
   };
@@ -5677,7 +5685,7 @@ function updateAunty(dt) {                                            // Aunty-j
     if (!upstairs && up && A.node === 'H0' && !A.path.length && !A.stairSaid && !A.say && !A.queue.length) { A.stairSaid = true; auntySay([['a', A.lines.stairs[Math.random() * A.lines.stairs.length | 0]]], 'stairs'); }   // (she stops at the top of the stairs)
     if (upstairs) A.stairSaid = false;
   }
-  if (A.shadow) A.shadow.position.set(g.position.x, (A.mode === 'sofa' ? U.UF + 1.43 : U.UF + 0.016) + 0.006, g.position.z);
+  if (A.shadow) A.shadow.position.set(g.position.x, (A.mode === 'sofa' ? U.UF + 1.43 : U.UF + 0.016) + 0.014, g.position.z);
   let want = 0; if (d < 8) { const a = Math.atan2(p.x - g.position.x, p.z - g.position.z) - g.rotation.y; want = THREE.MathUtils.clamp(Math.atan2(Math.sin(a), Math.cos(a)), -1.2, 1.2); }
   A.head.rotation.y += (want - A.head.rotation.y) * Math.min(1, dt * 4);                                         // her head follows Princess Kitty
   const talk = A.say && A.say[0] === 'a'; A.head.rotation.x = talk ? Math.sin(t * 9) * 0.07 : A.head.rotation.x * 0.9; A.mouth.scale.y = talk ? 1 + Math.abs(Math.sin(t * 15)) * 3 : 1;
@@ -5689,7 +5697,7 @@ function updateAunty(dt) {                                            // Aunty-j
   if (!A.say && A.queue.length) { A.say = A.queue.shift(); A.until = t + THREE.MathUtils.clamp(1.3 + A.say[1].length * 0.055, 2.4, 6); const me = A.say[0] === 'a' ? A.bubA : A.bubK;
     drawBubble(me, A.say[1]); A.bubA.visible = me === A.bubA; A.bubK.visible = me === A.bubK; chatBlips(me === A.bubA, A.say[1].length); }
   if (!A.say && !A.queue.length && d < (A.mode === 'follow' ? 5 : 4.2) && t > A.cool) { if (!A.first) { A.first = 1; auntySay(A.lines.first, 'first'); } else auntySay(A.lines.chat[A.order[A.chatI++ % A.order.length]], 'chat'); }
-  if (A.mode === 'sofa' && A.first === 2 && d < 4.5 && !A.say && !A.queue.length) { A.mode = 'hop'; A.hopT = t; let far = -1;   // (they've met: up she gets, landing clear of Princess Kitty)
+  if (A.mode === 'sofa' && A.first >= 1 && d < 4.5) { A.mode = 'hop'; A.hopT = t; let far = -1;   // (they've met: up she gets, landing clear of Princess Kitty)
     for (const dz of [0, 1.6, -1.6, -3.2]) { const lz = A.home.z + dz, dd = Math.hypot(10.3 - p.x, lz - p.z); if (lz > U.zF + 2.3 && lz < U.zF + 9.3 && dd > far) { far = dd; A.land.set(10.3, U.UF, lz); } } }
   if (up && (A.bubA.visible || A.bubK.visible)) placeBubble(A.bubA.visible ? A.bubA : A.bubK); else hideBubbles(A);   // (subtitles: only while she's up here to hear it)
 }
@@ -5719,10 +5727,84 @@ function flushLoo() {                                                 // she's u
   showWalkName(had ? '🚽 FLUSH! ...finally.' : '🚽 Flush!');
   const A = UPPER.aunty; if (had && A && A.first === 2 && Math.hypot(A.g.position.x - walk.pos.x, A.g.position.z - walk.pos.z) < 14) auntySay([['a', A.lines.flush[Math.random() * A.lines.flush.length | 0]]], 'flush');
 }
-function updateLoo(dt) {                                              // jump up on the loo and it flushes: the water swirls, the poop spins away
+function popBag(b) {                                                  // a bin bag bursts: it slumps flat, rubbish everywhere, a waft of something awful
+  const U = UPPER, at = new THREE.Vector3(b.x, U.UF, b.z), cols = [0xe3c23c, 0xf4f1e6, 0xbfc5c9, 0x8b5a2b, 0x6b8e23, 0xd9480f, 0xe8e0d0, 0x2a4a7a, 0xc0392b];
+  b.popped = true; b.g.scale.set(1.3, 0.3, 1.3);
+  while (upBits.length > 170) dropBit(upBits.shift());
+  for (let i = 0; i < 16; i++) { const m = new THREE.Mesh(i % 3 ? _shardGeo : _dropGeo, bitMat(cols[i % cols.length])); const s = 1.2 + Math.random() * 1.6; m.scale.set(s, s * 0.5, s); m.position.set(b.x, U.UF + b.h * 0.4, b.z); m.rotation.set(Math.random() * 6, Math.random() * 6, 0); m.userData.noWalk = true; U.root.add(m);
+    const a = Math.random() * 6.28, sp = 0.8 + Math.random() * 2.4; upBits.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, 1.5 + Math.random() * 2.5, Math.sin(a) * sp), spin: (Math.random() - 0.5) * 16, down: false, gy: U.UF, ox: b.x, oz: b.z }); }   // (peels, tins, eggshells, a tea bag...)
+  splashUp(at, U.UF, 0x3a3020, 0.9);                                                                      // (and whatever's been leaking out of it)
+  noise(0.2, 0.14, 650); tone(170, 55, 0.22, 'sine', 0.09); noise(0.5, 0.04, 2400);                      // POP, and the rustle of it all coming out
+  burst(at.clone().setY(U.UF + 0.9), 0x9ab04a, 14, 1.4, 1.2, 0.7);                                        // a green waft of stink
+  if (U.flies) U.flies.scatter = 1.5; showWalkName('🗑️ Ewwww! The bag burst!');
+  const A = U.aunty; if (A && A.first === 2 && clock > (A.breakT || 0) && Math.hypot(A.g.position.x - b.x, A.g.position.z - b.z) < 12) { A.breakT = clock + 8; auntySay([['a', A.lines.bins[Math.random() * A.lines.bins.length | 0]]], 'break'); }
+}
+function tipBin(dx, dz) {                                             // the kitchen bin goes over: it tips about its bottom edge, the lid clatters off, the rubbish slides out
+  const T = UPPER.bin; if (!T || T.state !== 'up') return; const l = Math.hypot(dx, dz) || 1;
+  T.state = 'tip'; T.t = 0; T.dir.set(dx / l, 0, dz / l); T.axis.set(dz / l, 0, -dx / l); tone(700, 520, 0.12, 'triangle', 0.03);
+}
+const _binQ = new THREE.Quaternion(), _binV = new THREE.Vector3();
+function updateBins(dt) {                                             // the kitchen's bin and the bin bags beside it: bumped or swiped, over they go / pop they go
+  const U = UPPER; if (!U.bin || !U.root.visible) return; const p = walk.pos, live = walk.on && state === 'playing' && upstairsView(p), T = U.bin;
+  if (live) {
+    for (const b of U.bags) if (!b.popped && p.y < U.UF + b.h + 0.4 && Math.hypot(p.x - b.x, p.z - b.z) < b.r + 0.4) popBag(b);   // (walked into, or jumped on)
+    if (T.state === 'up' && p.y < U.UF + 1.4 && Math.hypot(p.x - T.x, p.z - T.z) < T.r + 0.42) tipBin(T.x - p.x, T.z - p.z);
+  }
+  if (T.state !== 'tip') return;
+  T.t += dt; const k = Math.min(1, T.t / 0.55), th = Math.PI / 2 * k * k;                                // (slow to start, then down it crashes)
+  _binQ.setFromAxisAngle(T.axis, th); T.g.quaternion.copy(_binQ);
+  const e = _binV.copy(T.dir).multiplyScalar(T.r); T.g.position.set(T.x + e.x - T.dir.x * T.r * Math.cos(th), U.UF + T.r * Math.sin(th), T.z + e.z - T.dir.z * T.r * Math.cos(th));   // (rolling over its bottom edge)
+  T.sh.position.set(T.x + T.dir.x * 0.6 * k, T.sh.position.y, T.z + T.dir.z * 0.6 * k);
+  if (k >= 1) { T.state = 'down'; const m = new THREE.Vector3(T.x + T.dir.x * 1.35, U.UF, T.z + T.dir.z * 1.35);   // CLANG: and out it all slides
+    noise(0.3, 0.16, 1400); tone(420, 260, 0.35, 'square', 0.035); tone(980, 900, 0.5, 'triangle', 0.025, 0.05); for (let i = 0; i < 4; i++) tone(700 - i * 90, 600 - i * 90, 0.06, 'triangle', 0.02, 0.25 + i * 0.12);   // (the lid, rattling to a stop)
+    splashUp(m, U.UF, [0x3a3020, 0x6b8e23, 0xe3a33c], 1.3, T.dir); if (U.flies) U.flies.scatter = 1.5; showWalkName('🗑️ CRASH! Over goes the bin');
+    const A = U.aunty; if (A && A.first === 2 && clock > (A.breakT || 0)) { A.breakT = clock + 8; auntySay([['a', A.lines.bins[Math.random() * A.lines.bins.length | 0]]], 'break'); } }
+}
+function bagSwipe(paw) {                                              // a swipe at a bin bag (pop) or the bin (over)
+  const U = UPPER; if (!U.bin || !walk.on || !U.root.visible) return false;
+  for (const b of U.bags) if (!b.popped && Math.hypot(paw.x - b.x, paw.z - b.z) < b.r + 0.45 && paw.y < U.UF + b.h + 0.6) { popBag(b); return true; }
+  const T = U.bin; if (T.state === 'up' && Math.hypot(paw.x - T.x, paw.z - T.z) < T.r + 0.5 && paw.y < U.UF + 1.6) { tipBin(T.x - walk.pos.x, T.z - walk.pos.z); return true; }
+  return false;
+}
+function updateTub() {                                                // the bathtub of dishes: jump in and SPLOOSH (the first time, the dishes go too)
+  const T = UPPER.tub; if (!T) return; const p = walk.pos;
+  const on = walk.on && state === 'playing' && walk.grounded && p.x > T.x0 && p.x < T.x1 && p.z > T.z0 && p.z < T.z1 && p.y > T.wl - 0.15 && p.y < T.wl + 0.7;
+  if (on && !T.on && clock > T.t) { T.t = clock + 0.5; const U = UPPER, at = p.clone();
+    for (let i = 0; i < 16; i++) { const m = new THREE.Mesh(_dropGeo, bitMat(i % 3 ? 0x9fb3b8 : 0xe6eef0)); m.position.set(at.x, T.wl + 0.1, at.z); m.userData.noWalk = true; U.root.add(m);   // water, everywhere
+      const a = Math.random() * 6.28, sp = 1 + Math.random() * 2.2; upBits.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, 2.5 + Math.random() * 2.5, Math.sin(a) * sp), spin: 0, down: false, gy: U.UF, ox: at.x, oz: at.z, drop: true }); }
+    splashUp(new THREE.Vector3(at.x, U.UF, T.z1 + 0.9), U.UF, 0x9fb8c0, 1.6);                             // (a lake on the bathroom floor)
+    noise(0.45, 0.16, 1300); tone(320, 110, 0.3, 'sine', 0.06);                                            // SPLOOSH
+    if (!T.smashed) { T.smashed = true; T.g.visible = false;                                               // ...and every dish in there breaks
+      for (let i = 0; i < 18; i++) { const m = new THREE.Mesh(_shardGeo, bitMat([0xe8e0d0, 0xc9ccd1, 0x2f6fb0][i % 3])); const s = 0.6 + Math.random() * 0.9; m.scale.set(s, 0.3, s); m.position.set(at.x, T.wl + 0.05, at.z); m.userData.noWalk = true; U.root.add(m);
+        const a = Math.random() * 6.28, sp = 0.6 + Math.random() * 1.8; upBits.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, 1 + Math.random() * 2, Math.sin(a) * sp), spin: (Math.random() - 0.5) * 20, down: false, gy: T.wl, ox: at.x, oz: at.z }); }
+      noise(0.3, 0.1, 3600); tone(2300, 1400, 0.09, 'triangle', 0.04, 0.05); tone(1800, 1100, 0.1, 'triangle', 0.035, 0.12); showWalkName('💦 SPLOOSH! ...and CRASH. So much for the dishes');
+      const A = UPPER.aunty; if (A && A.first === 2 && clock > (A.breakT || 0)) { A.breakT = clock + 8; auntySay([['a', A.lines.breaks[Math.random() * A.lines.breaks.length | 0]]], 'break'); } }
+    else showWalkName('💦 SPLOOSH!');
+    while (upBits.length > 170) dropBit(upBits.shift()); }
+  T.on = on;
+}
+function updateFanHit() {                                             // the living room's ceiling fan: jump into the blades and WHAP, she's flung across the room
+  const F = UPPER.fan; if (!F || !walk.on || state !== 'playing') return; const p = walk.pos, fy = F.position.y - 0.04, dx = p.x - F.position.x, dz = p.z - F.position.z, d = Math.hypot(dx, dz);
+  if (d > 2.5 || p.y > fy + 0.1 || p.y + 0.85 < fy - 0.1 || clock < (walk.fanT || 0)) return;
+  walk.fanT = clock + 1.2; const tx = dz / (d || 1), tz = -dx / (d || 1), ox = dx / (d || 1), oz = dz / (d || 1), sp = 7.5 + Math.random() * 2;   // (the way the blades are sweeping there, and outward)
+  walk.vel.set((tx * 0.8 + ox * 0.6) * sp, 0, (tz * 0.8 + oz * 0.6) * sp); walk.vy = 2.2; walk.grounded = false; walk.flingT = clock + 0.75; walk.squash = 1;
+  if (p.y > fy - 0.95) p.y = Math.max(UPPER.UF, fy - 0.95);                                              // (knocked down out of the blades)
+  noise(0.09, 0.3, 900); tone(230, 110, 0.12, 'square', 0.06); tone(900, 1700, 0.18, 'sawtooth', 0.03, 0.05);   // WHAP, and a yowl
+  burst(p.clone().setY(p.y + 0.5), 0xf2ede4, 12, 2.5, 1.5, 0.4); showWalkName('🌀 WHAP! The ceiling fan got her!');
+  const A = UPPER.aunty; if (A && A.first === 2 && clock > (A.fanT || 0)) { A.fanT = clock + 10; auntySay([['a', A.lines.fan[Math.random() * A.lines.fan.length | 0]]], 'fan'); }
+}
+function updateEscape() {                                             // out of an upstairs back window: the great escape
+  if (!walk.on || state !== 'playing') return; const p = walk.pos, U = UPPER;
+  if (p.z < U.zB - 0.5 && p.y > U.UF - 0.6) walk.upstairsAt = clock;                                     // (she was up there)
+  if (p.z > U.zB + 0.35 && p.z < U.zB + 3 && p.y > U.UF - 2 && clock - (walk.upstairsAt || -9) < 3 && clock > (walk.escT || 0)) {
+    walk.escT = clock + 6; const fresh = !achDone.catscape; unlock('catscape');
+    showWalkName(fresh ? '🪟 The Great Catscape! (from inside: "BETA! That is the SECOND FLOOR!")' : '🪟 Out the window again! Aunty-ji has given up');
+    tone(880, 1320, 0.18, 'triangle', 0.04); tone(1320, 1760, 0.2, 'triangle', 0.035, 0.12); }
+}
+function updateLoo(dt) {                                              // jump up on the loo's tank and it flushes: the water swirls, the poop spins away
   const L = UPPER.loo; if (!L) return; const p = walk.pos;
   const on = walk.on && state === 'playing' && walk.grounded && p.x > L.x0 && p.x < L.x1 && Math.abs(p.z - L.z) < L.hz && p.y > L.y0 && p.y < L.y0 + 2;
-  if (on && !L.on && !L.t) flushLoo(); L.on = on;                                                        // (up on the seat, the lid or the cistern: once per jump)
+  if (on && !L.on && !L.t) flushLoo(); L.on = on;                                                        // (up on the tank: once per jump)
   if (!L.t) return; const k = (clock - L.t) / 3.2;
   if (k >= 1 || k < 0) { L.t = 0; L.swirl.visible = false; L.clean.visible = true; L.poop.visible = false; return; }
   L.swirl.visible = k > 0.05 && k < 0.85; L.swirl.rotation.z -= dt * (6 + 12 * Math.sin(Math.min(1, k * 1.6) * Math.PI)); L.swirl.material.opacity = 0.85 * Math.sin(Math.min(1, k / 0.85) * Math.PI);
@@ -5782,7 +5864,7 @@ function splashUp(at, gy, col, size, dir) {                           // a drink
   while (upBits.length > 170) dropBit(upBits.shift());
   for (let i = 0, n = Math.max(3, Math.round(3 * size)); i < n; i++) {                                    // (overlapping blobs, spread out the way it was going)
     const c = cols[i % cols.length], r = (0.16 + Math.random() * 0.14) * Math.sqrt(size), a = Math.random() * 6.28, off = Math.random() * 0.22 * size;
-    const m = new THREE.Mesh(new THREE.CircleGeometry(r, 14), new THREE.MeshPhongMaterial({ color: c, shininess: 60, specular: 0x444444, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    const m = new THREE.Mesh(new THREE.CircleGeometry(r, 14), new THREE.MeshPhongMaterial({ color: c, shininess: 60, specular: 0x444444, fog: false, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 })); m.renderOrder = 3 + (upSplatN % 5000) * 0.0001;   /* (drawn in order, never depth-fighting) */
     m.rotation.set(-Math.PI / 2, 0, Math.random() * 6); m.scale.set(1, 0.6 + Math.random() * 0.7, 1); m.userData.noWalk = true;
     m.position.set(THREE.MathUtils.clamp(at.x + Math.cos(a) * off + (dir ? dir.x * off : 0), YARD.HL + 0.3, YARD.XR - 0.3), gy + 0.009 + (upSplatN++ % 6) * 0.0025, THREE.MathUtils.clamp(at.z + Math.sin(a) * off + (dir ? dir.z * off : 0), U.zF + 0.3, U.zB - 0.3));
     U.root.add(m); upBits.push({ m, down: true, splat: true }); }
@@ -5808,12 +5890,12 @@ function knockUp(q, nx, nz, sp) {                                     // sent fl
   if (q.state === 'fly' || q.state === 'broken') return;
   q.state = 'fly'; q.top = q.g.position.y; q.v.set(nx * sp, 1.6 + Math.random() * 1.4, nz * sp); q.w.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 14);
   tone(650 + Math.random() * 350, 480, 0.05, 'square', 0.014); if (q.whistle && clock > (q.whT || 0)) { q.whT = clock + 6; cookerWhistle(); }
-  if (q.kids) for (const k of q.kids) if ((k.state === 'rest' || k.state === 'down') && Math.hypot(k.g.position.x - q.g.position.x, k.g.position.z - q.g.position.z) < 0.45 && Math.abs(k.g.position.y - q.g.position.y - (k.dy || 0.035)) < 0.06)
+  if (q.kids) for (const k of q.kids) if ((k.state === 'rest' || k.state === 'down') && Math.hypot(k.g.position.x - q.g.position.x, k.g.position.z - q.g.position.z) < Math.max(0.45, q.r + 0.02) && Math.abs(k.g.position.y - q.g.position.y - (k.dy || 0.035)) < 0.06)
     knockUp(k, nx + (Math.random() - 0.5) * 0.5, nz + (Math.random() - 0.5) * 0.5, sp * (0.8 + Math.random() * 0.35));   // (a plate takes the katoris on it along)
 }
 function breakUp(q) {                                                  // smash: shards everywhere, the food splatted, Aunty-ji NOT happy
   const at = q.g.position, U = UPPER; q.state = 'broken'; q.g.visible = false;
-  noise(0.28, 0.09, 3600); tone(2300, 1400, 0.09, 'triangle', 0.04); tone(1800, 1100, 0.1, 'triangle', 0.035, 0.06); tone(2700, 1900, 0.07, 'triangle', 0.03, 0.12);
+  if (q.kind === 'pizza') { noise(0.2, 0.12, 500); tone(170, 80, 0.16, 'sine', 0.07); } else { noise(0.28, 0.09, 3600); tone(2300, 1400, 0.09, 'triangle', 0.04); tone(1800, 1100, 0.1, 'triangle', 0.035, 0.06); tone(2700, 1900, 0.07, 'triangle', 0.03, 0.12); }   // (a pizza box: splat, not smash)
   const cols = q.cols || (q.kind === 'plate' ? [0xf4f1ea, 0xf4f1ea, 0x2f6fb0] : q.kind === 'jug' ? [0xb5552b, 0x9a4222] : q.kind === 'glass' ? [0xcfe3ea] : [0xf4f1ea]);
   while (upBits.length > 170) dropBit(upBits.shift());
   const gyB = propGround(at.x, at.z, at.y + 0.1);
@@ -5857,6 +5939,9 @@ function resetUpProps() {                                             // a new F
   const U = UPPER; if (!U.props) return;
   for (const q of U.props) { q.state = 'rest'; q.spilled = false; if (q.inner) q.inner.visible = true; q.v.set(0, 0, 0); q.g.visible = true; q.g.position.copy(q.home); q.g.rotation.set(0, q.homeRy, 0); }
   for (const b of upBits) dropBit(b); upBits.length = 0;
+  if (U.bags) for (const b of U.bags) { b.popped = false; b.g.scale.set(1, 1, 1); }                      // (fresh bin bags, the bin back up, the dishes back in the tub)
+  if (U.bin) { const T = U.bin; T.state = 'up'; T.g.quaternion.identity(); T.g.position.set(T.x, U.UF, T.z); if (T.sh) T.sh.position.set(T.x, T.sh.position.y, T.z); }
+  if (U.tub) { U.tub.g.visible = true; U.tub.smashed = false; U.tub.on = false; }
   if (U.mouse) { U.mouse.st = null; U.mouse.out = 0; if (U.cupDoor) U.cupDoor.rotation.y = 0; }   // (the mouse back in its cupboard, the door shut)
   const L = U.loo; if (L) { L.t = 0; L.on = false; L.poop.visible = true; L.poop.position.y = L.py; L.poop.rotation.y = 0; L.poop.scale.setScalar(1); L.clean.visible = L.swirl.visible = false; }   // (and the loo unflushed again)
 }
@@ -5884,7 +5969,7 @@ function knockDoor(paw) {                                             // she swi
   showWalkName('🚪 Knock knock...'); D.want = 1; D.openAt = clock + 1.1; return true;
 }
 function updateFrontDoor(dt) {                                        // the door swings in once she's knocked; the jhoola sways; the fan turns
-  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 2.2; updateFlies(dt); updateAunty(dt); updateVermin(dt); updateUpProps(dt); updateLoo(dt);
+  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 7; updateFlies(dt); updateAunty(dt); updateVermin(dt); updateUpProps(dt); updateLoo(dt); updateBins(dt); updateTub(); updateFanHit(); updateEscape();
   const D = frontDoor; if (!D) return;
   const go = D.want && clock > D.openAt;
   if (go && !D.said) { D.said = true; tone(260, 185, 0.55, 'sawtooth', 0.02); noise(0.35, 0.03, 500); showWalkName('🚪 ...the door creaks open. Come on in!'); }
@@ -6733,7 +6818,8 @@ function endBikeGame() {                                              // back in
 }
 function indoorsOK(x, z) {                                            // inside our front door (the foyer, the stairs, the second level: their walls are solid) or in the doorway itself
   const U = UPPER, y = walk.pos.y;                                    // (only at those heights: the ground floor behind the walls isn't anywhere to be)
-  return (x > YARD.HL + 0.15 && x < YARD.XR - 0.15 && z > U.zF + 0.1 && z < U.zB - 0.1 && (y > U.UF - 0.6 || (z < U.SW + 0.2 && x < -0.2 && y > U.LH - 0.6))) || (Math.abs(x - U.dx) < U.dw / 2 - 0.1 && z > U.zF - 0.9 && z <= U.zF + 0.1) || garageOK(x, z);
+  return (x > YARD.HL + 0.15 && x < YARD.XR - 0.15 && z > U.zF + 0.1 && z < U.zB - 0.1 && (y > U.UF - 0.6 || (z < U.SW + 0.2 && x < -0.2 && y > U.LH - 0.6))) || (Math.abs(x - U.dx) < U.dw / 2 - 0.1 && z > U.zF - 0.9 && z <= U.zF + 0.1) || garageOK(x, z)
+    || (y > U.winY - 1.3 && y < U.winY + 0.3 && z > U.zB - 0.25 && z < U.zB + 0.75 && U.winB.some(([c, w]) => Math.abs(x - c) < w / 2 - 0.22));   // (out through an open back window)
 }
 function yardShadowMat() {                                            // a soft round contact shadow on the grass
   if (yardShadowMat.m) return yardShadowMat.m;
@@ -7809,6 +7895,7 @@ const ACHIEVEMENTS = [
     ['duckArmy', '🦆', 'Duck-pocalypse', 'In Free roam, knock the whole rubber duck army off the table'],
     ['mosaicSmash', '🪞', 'Seven years bad luck', 'In Free roam, leap into the mosaic mirror art and bring it crashing down'],
     ['coonShot', '🎯', 'Trash panda down', 'In Free roam, shoot the raccoon taunting you at the slider'],
+    ['catscape', '🪟', 'The Great Catscape', 'In Free roam, leap out of an upstairs back window. Aunty-ji is already calling your mother'],
     ['glassBreak', '💥', 'Slider smasher', 'Shatter the sliding glass door'],
     ['copsCalled', '🚨', 'Someone called the cops', 'Stick around until the sirens show up after the raccoon incident'],
     ['laundryMess', '🧺', 'Laundry day', 'In Free roam, swipe the folded laundry off the armchair'],
@@ -7843,7 +7930,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 16:02';                                              // stamped when the site is published
+const BUILD = '2026-09-29 16:57';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -11028,7 +11115,7 @@ function updateWalk(dt) {
   const yaw = fc.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);   // stick up = away from the camera
   _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * nipK().walk * (!inRoomXZ(p.x, p.z) && !upstairsView(p) ? 1.9 : 1));   // (outdoors, back or front, she tears about; indoors upstairs, she walks)   // catnip: zoomies / a floaty drift / a slow zen amble
   if (yardOpen() && inBush(p.x, p.z, p.y)) { _wv.multiplyScalar(0.6); if (_wv.lengthSq() > 1 && clock > (walk.rustleT || 0)) { walk.rustleT = clock + 0.32; noise(0.16, 0.05, 1300 + Math.random() * 600); } }   // (pushing through a bush: slower, and rustling)
-  walk.vel.lerp(_wv, 1 - Math.exp(-dt * (walk.grounded ? 12 : 8)));
+  if (clock > (walk.flingT || 0)) walk.vel.lerp(_wv, 1 - Math.exp(-dt * (walk.grounded ? 12 : 8)));   // (flung by the fan: no steering out of it for a moment)
   if (walk.jumpQ > 0 && clock - walk.jumpQ < 0.2 && walk.grounded) {   // (a press just before landing still counts)
     walk.vy = WALK.jumpV * nipK().jump; walk.grounded = false; walk.jumpQ = -1; tone(520, 940, 0.11, 'triangle', 0.035);
   }
@@ -11168,7 +11255,7 @@ function updateWalk(dt) {
     W.peepers.forEach(e => { e.visible = k < 0.5; }); W.lids.forEach(l => { l.visible = k >= 0.5; });
   } else if (W.lids[0].visible) { W.peepers.forEach(e => { e.visible = true; }); W.lids.forEach(l => { l.visible = false; }); }
   const gy = surfaceTop(p.x, p.z, p.y + 0.05), hgt = p.y - gy;
-  W.shadow.position.set(p.x, gy + 0.012, p.z); W.shadow.rotation.z = walk.face; W.shadow.scale.set(0.9, 1.45, 1).multiplyScalar(1 / (1 + hgt * 0.55)); W.shadow.material.opacity = 0.5 / (1 + hgt * 0.6);   // (lined up with her; smaller and fainter the higher she jumps)
+  W.shadow.position.set(p.x, gy + 0.03, p.z); W.shadow.rotation.z = walk.face; W.shadow.scale.set(0.9, 1.45, 1).multiplyScalar(1 / (1 + hgt * 0.55)); W.shadow.material.opacity = 0.5 / (1 + hgt * 0.6);   // (lined up with her; smaller and fainter the higher she jumps)
   W.shadow.visible = !walk.fp;
   if (walk.free && !walk.farSaid && Math.hypot(p.x - 8, p.z - (ROOM.visDepth - 25)) > 80) { walk.farSaid = true; showWalkName('🐾 Princess has left the level. Byeee!'); }
   fc.focus.set(p.x, p.y + 0.55, p.z);
@@ -11443,6 +11530,7 @@ function walkSwipe() {                                               // swipe at
   if (garageSwipe(paw)) return;                                      // our garage door: up it goes
   if (bikeSwipe(paw)) return;                                        // the motorcycle in there: ride!
   if (auntySwipe(paw)) return;
+  if (bagSwipe(paw)) return;                                          // a bin bag (pop) or the kitchen bin (over)
   if (upPropSwipe(paw)) return;                                      // the dining table's things                                       // Aunty-ji (she will have something to say)                                        // our front door: knock knock
   if (flySwipe(paw)) return;                                         // the kitchen flies: shoo!
   if (laundrySwipe(paw)) return;
