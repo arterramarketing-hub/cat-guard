@@ -4669,7 +4669,7 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     yCyl(bs, 0.28, 0.34, 0.06, 0x2b2d30, 0, 0.03, 0); yCyl(bs, 0.05, 0.05, 1.5, 0x2b2d30, 0, 0.8, 0, 8); yCyl(bs, 0.72, 0.72, 0.06, 0x2b2d30, 0, 1.56, 0, 20); yCyl(bs, 0.66, 0.66, 0.02, 0x3a7fa0, 0, 1.6, 0, 20);
     for (const sx of [-1, 1]) { const ch = new THREE.Group(); ch.position.set(sx * 1.05, 0, 0.1); ch.rotation.y = sx * Math.PI / 2; bs.add(ch);
       yCyl(ch, 0.36, 0.36, 0.05, 0x2b2d30, 0, 1.02, 0, 16); for (const [lx, lz] of [[-0.24, -0.24], [0.24, -0.24], [-0.24, 0.24], [0.24, 0.24]]) yCyl(ch, 0.025, 0.025, 1.0, 0x2b2d30, lx, 0.5, lz, 6);
-      const back = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.03, 6, 16, Math.PI), yMat(0x2b2d30)); back.position.set(0, 1.2, 0.33); ch.add(back); }
+      const back = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.03, 6, 16, Math.PI), yMat(0x2b2d30)); back.position.set(0, 1.34, 0.33); ch.add(back); for (const s of [-1, 1]) yCyl(ch, 0.03, 0.03, 0.32, 0x2b2d30, s * 0.3, 1.19, 0.33, 6); }   // (its hoop back, on two uprights from the seat)
     bakeYard(bs); shadow(BXp, BZ, 1.7, 1.0); block(BXp - 1.6, BXp + 1.6, BZ - 0.8, BZ + 0.9);
     const pots = grp('Potted plants', true);
     for (const sx of [-1, 1]) { const px = DX + sx * (DW / 2 + 0.75), pz = VD + 0.95;
@@ -5356,13 +5356,13 @@ function buildUpperFloor() {                                          // behind 
   // ======== and it's all FILTHY: nobody's cleaned since Diwali (Kamla bai is on leave). Stains, streaks, scuffs, mould, cracks, cobwebs, dust, muddy paw prints, clutter ========
   let gs = 91; const gr = () => (gs = (gs * 16807) % 2147483647) / 2147483647;
   const TEA = 0x8a6a3a, GRY = 0x6f675c, YEL = 0xb09a4a, GRN = 0x5c6a3c, BRN = 0x5e4630, ALL = 99;
-  const scatter = (at, ry, a0, a1, fy, n, holes) => { for (let i = 0; i < n; i++) { const r = gr(); let cell, w, h, y, tint = 0xffffff, spin = (gr() - 0.5) * 1.2;
+  const scatter = (at, ry, a0, a1, fy, n, holes, top) => { const TOP = top || CH - 0.26; /* (top: the ceiling, or the cornice under it) */ for (let i = 0; i < n; i++) { const r = gr(); let cell, w, h, y, tint = 0xffffff, spin = (gr() - 0.5) * 1.2;
       if (r < 0.3) { cell = 0; w = h = 0.6 + gr() * 1.1; y = fy + 0.8 + gr() * (CH - fy - 1.6); tint = [TEA, GRY, YEL, BRN][i % 4]; }
-      else if (r < 0.45) { cell = 1; w = 0.9 + gr() * 0.9; h = 1.2 + gr() * 1.4; y = CH - 0.27 - h / 2; spin = 0; }
+      else if (r < 0.45) { cell = 1; w = 0.9 + gr() * 0.9; h = 1.2 + gr() * 1.4; y = TOP - h / 2 + h * 0.05; spin = 0; }   // (streaks from right up at the top: the atlas cell's margin taken up)
       else if (r < 0.62) { cell = 7; w = 1.0 + gr() * 1.2; h = 0.35; y = fy + 0.5 + gr() * 0.6; spin *= 0.1; }
       else if (r < 0.72) { cell = 8; w = h = 0.45 + gr() * 0.2; y = fy + 1.8 + gr() * 1.2; }
       else if (r < 0.82) { cell = 6; w = h = 0.8 + gr() * 0.8; y = fy + 1 + gr() * (CH - fy - 2); }
-      else if (r < 0.92) { cell = 11; w = 0.5 + gr() * 0.4; h = 1.4 + gr() * 1.2; y = CH - 0.27 - h / 2; tint = [TEA, BRN, GRN][i % 3]; spin = 0; }
+      else if (r < 0.92) { cell = 11; w = 0.5 + gr() * 0.4; h = 1.4 + gr() * 1.2; y = TOP - h / 2 + h * 0.05; tint = [TEA, BRN, GRN][i % 3]; spin = 0; }
       else { cell = 4; w = h = 0.7 + gr() * 0.9; y = gr() < 0.5 ? CH - 0.3 - h / 2 : fy + 0.35 + h / 2; }
       if (a1 - a0 < w + 0.1) continue; const a = a0 + w / 2 + gr() * (a1 - a0 - w);
       if (holes && holes.some(([h0, h1, hy0, hy1]) => a + w / 2 > h0 - 0.1 && a - w / 2 < h1 + 0.1 && y + h / 2 > hy0 - 0.1 && y - h / 2 < hy1 + 0.1)) continue;
@@ -5371,11 +5371,11 @@ function buildUpperFloor() {                                          // behind 
   scatter(aX(HL + 0.145), Math.PI / 2, SW + 0.2, zB - 0.2, UF, 30, NW); scatter(aX(HL + 0.145), Math.PI / 2, zF + 0.2, SW - 0.2, LH, 7, NW);   // the north wall (and the foyer's)
   scatter(aX(XR - 0.145), -Math.PI / 2, zF + 0.2, zB - 0.2, UF, 28);                                     // the party wall
   scatter(aZ(zB - 0.145), Math.PI, HL + 0.2, XR - 0.2, UF, 12, BW.concat([[2.7, 3.3, -ALL, ALL]]));      // the back wall
-  scatter(aZ(zF + 0.145), 0, -0.2, XR - 0.2, UF, 7, [[wx0 - 0.4, wx1 + 0.4, wy0 - 0.4, wy1 + 0.4]]); scatter(aZ(zF + 0.145), 0, HL + 0.2, dL - 0.3, LH, 3, [[-5.1, -4.2, -ALL, ALL]]);   // the front
-  scatter(aX(-0.425), -Math.PI / 2, zF + 0.2, SW - 0.2, LH, 6); scatter(aX(-0.295), Math.PI / 2, zF + 0.2, SW - 0.2, UF, 4);
-  scatter(aZ(5.935), Math.PI, HL + 0.2, XR - 0.2, UF, 9, DOORS); scatter(aZ(6.065), 0, HL + 0.2, XR - 0.2, UF, 7, DOORS.concat([[2.7, 3.3, -ALL, ALL]]));
-  scatter(aX(2.935), -Math.PI / 2, 6.3, zB - 0.3, UF, 3); scatter(aX(3.065), Math.PI / 2, 6.3, zB - 0.3, UF, 3);
-  scatter(aX(7.935), -Math.PI / 2, -5.9, 1.4, UF, 4, [[-3.6, -0.6, -ALL, ALL]]); scatter(aZ(1.565), 0, 8.2, XR - 0.2, UF, 3);
+  scatter(aZ(zF + 0.145), 0, -0.2, XR - 0.2, UF, 7, [[wx0 - 0.4, wx1 + 0.4, wy0 - 0.4, wy1 + 0.4]]); scatter(aZ(zF + 0.145), 0, HL + 0.2, dL - 0.3, LH, 3, [[-5.1, -4.2, -ALL, ALL]], CH);   // the front
+  scatter(aX(-0.425), -Math.PI / 2, zF + 0.2, SW - 0.2, LH, 6, null, CH); scatter(aX(-0.295), Math.PI / 2, zF + 0.2, SW - 0.2, UF, 4, null, CH);   // (the inside walls: no cornice)
+  scatter(aZ(5.935), Math.PI, HL + 0.2, XR - 0.2, UF, 9, DOORS, CH); scatter(aZ(6.065), 0, HL + 0.2, XR - 0.2, UF, 7, DOORS.concat([[2.7, 3.3, -ALL, ALL]]), CH);
+  scatter(aX(2.935), -Math.PI / 2, 6.3, zB - 0.3, UF, 3, null, CH); scatter(aX(3.065), Math.PI / 2, 6.3, zB - 0.3, UF, 3, null, CH);
+  scatter(aX(7.935), -Math.PI / 2, -5.9, 1.4, UF, 4, [[-3.6, -0.6, -ALL, ALL]], CH); scatter(aZ(1.565), 0, 8.2, XR - 0.2, UF, 3, null, CH);
   for (let k = 0; k < 10; k++) decal(2, XR - 0.176, T2 + 0.25 + gr() * 1.1, K0 + 2.8 + gr() * 3.6, 0.35 + gr() * 0.4, 0.35 + gr() * 0.4, -Math.PI / 2, 0, gr() * 6, [0xc8742a, 0x8b5a2b, 0xd9a520, 0x7a3a1a][k % 4]);   // curry up the tiles
   for (let k = 0; k < 5; k++) decal(2, 10.3 + gr() * 1.8, T2 + 0.3 + gr() * 1.0, -6.105, 0.3 + gr() * 0.3, 0.3 + gr() * 0.3, Math.PI, 0, gr() * 6, [0xc8742a, 0x8b5a2b][k % 2]);
   onCeil(0, XR - 0.8, K0 + 4.5, 2.6, 2.6, 0.3, 0x3a3228); onCeil(0, 10.8, -2.2, 3.2, 2.6, 1.1, YEL); onCeil(0, 6.2, zF + 6.2, 2.2, 2.2, 0, GRY); onCeil(0, 4.0, 3.2, 1.6, 1.6, 0.5, GRY); onCeil(0, -3.5, 12, 2.4, 1.8, 2, YEL); onCeil(6, 1.0, -3.0, 1.8, 1.8, 0.7);   // soot over the stove, a leak over the bathroom, grime round the fan and the lamps, a crack
@@ -5523,7 +5523,7 @@ function buildUpperFloor() {                                          // behind 
     for (let i = 0; i < P.count; i++) { const lx = (THREE.MathUtils.clamp(px + P.getX(i) * sx, cx0, cx1) - px) / sx, ly = -(THREE.MathUtils.clamp(pz - P.getY(i) * sy, cz0, cz1) - pz) / sy; P.setXY(i, lx, ly); UV.setXY(i, lx + 0.5, ly + 0.5); }
     m.geometry = g; }
   { const gm = ph({ map: upTex('grime'), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide });
-    mergeQ(DEC, gm, 'Upstairs'); const f = mergeQ(DECF, gm, 'Upstairs'); if (f) U.floorFx.push(f); }                              // all the grime: one mesh (and one for the floor's)
+    const gw = gm.clone(); gw.opacity = 0.6; mergeQ(DEC, gw, 'Upstairs'); const f = mergeQ(DECF, gm, 'Upstairs'); if (f) U.floorFx.push(f); }   // (the walls' damage a touch fainter)                              // all the grime: one mesh (and one for the floor's)
   { const m = mergeQ(DIRTQ, ph({ map: upTex('dirt'), vertexColors: false, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 'Upstairs', 5.5); m.renderOrder = -1; U.floorFx.push(m); }   // a film of dirt over every floor
   mergeQ(GLASS, new THREE.MeshPhongMaterial({ color: 0xd6e8f2, transparent: true, opacity: 0.16, shininess: 120, specular: 0xffffff, depthWrite: false, side: THREE.DoubleSide, fog: false }), 'Window').renderOrder = 2;
   { const bt = blindsTex.clone(); bt.needsUpdate = true; bt.repeat.set(1, 1); mergeQ(BLIND, ph({ map: bt, vertexColors: false, side: THREE.DoubleSide }), 'Window blinds'); }
@@ -5971,12 +5971,17 @@ function updateUpProps(dt) {                                          // the din
     const y0 = o.position.y; q.v.y -= 20 * dt; if (propWall(o.position, q.v, dt, q.r * 0.5)) { q.v.x *= -0.35; q.v.z *= -0.35; }   // (off the walls and the furniture's sides)
     o.position.addScaledVector(q.v, dt); o.rotation.x += q.w.x * dt; o.rotation.y += q.w.y * dt; o.rotation.z += q.w.z * dt; q.top = Math.max(q.top, o.position.y);
     o.position.x = THREE.MathUtils.clamp(o.position.x, YARD.HL + 0.4, YARD.XR - 0.4); o.position.z = THREE.MathUtils.clamp(o.position.z, U.zF + 0.4, U.zB - 0.4);
+    for (const k of P) { if (k === q || k.state === 'broken' || k.state === 'fly' || clock < (k.hitT || 0)) continue;   // (flying into the others: they go too, and it bounces off)
+      const ko = k.g.position, dx = ko.x - o.position.x, dz = ko.z - o.position.z, d = Math.hypot(dx, dz);
+      if (d < (q.r + k.r) * 0.85 && o.position.y < ko.y + k.h && o.position.y + q.h > ko.y) { k.hitT = clock + 0.3; const hs = Math.hypot(q.v.x, q.v.z); knockUp(k, dx / (d || 1), dz / (d || 1), Math.max(1.6, hs * 0.75)); q.v.x *= -0.3; q.v.z *= -0.3; tone(1200 + Math.random() * 500, 900, 0.05, 'triangle', 0.02); } }
     const gy = propGround(o.position.x, o.position.z, Math.max(y0, o.position.y));
     if (o.position.y <= gy && q.v.y < 0) {
       o.position.y = gy;
       if (q.kind !== 'soft' && q.top - gy > 0.9) { if (q.kind === 'steel' || q.kind === 'wood') clangUp(q, gy); else { breakUp(q); continue; } }   // off the table and onto the floor: smash (or clang, and splosh)
+      if (q.kind === 'glass' && !q.tipRoll) { q.tipRoll = true; if (Math.random() < 0.5) { breakUp(q); continue; } }   // (knocked over, even on the cart: half the time a glass breaks)
       if (q.v.y < -3) { q.v.y *= -0.3; q.v.x *= 0.5; q.v.z *= 0.5; tone(900 + Math.random() * 400, 700, 0.04, 'triangle', 0.02); }
-      else { q.state = 'down'; q.v.set(0, 0, 0); o.rotation.x = 0; o.rotation.z = 0; if (q.spilled && q.kind === 'steel' && q.r > 0.2) { o.rotation.z = Math.PI / 2; o.position.y = gy + q.r * 0.92; } }   // (an emptied bucket lies on its side)
+      else { q.state = 'down'; q.v.set(0, 0, 0); o.rotation.x = 0; o.rotation.z = 0; if (q.kind === 'glass') { o.rotation.z = Math.PI / 2; o.position.y = gy + q.r * 0.9; if (q.food !== undefined && !q.spilled) { q.spilled = true; splashUp(o.position, gy, q.food, 0.35); } }   // (the rest lie on their sides, drink everywhere)
+        if (q.spilled && q.kind === 'steel' && q.r > 0.2) { o.rotation.z = Math.PI / 2; o.position.y = gy + q.r * 0.92; } }   // (an emptied bucket lies on its side)
     }
   }
   for (const b of upBits) { if (b.down) continue; b.v.y -= 20 * dt; b.m.position.addScaledVector(b.v, dt); b.m.rotation.x += b.spin * dt; b.m.rotation.y += b.spin * 0.7 * dt;
@@ -5990,7 +5995,7 @@ function upPropSwipe(paw) {                                           // a swipe
 }
 function resetUpProps() {                                             // a new Free roam: the table set again, the mess swept up
   const U = UPPER; if (!U.props) return;
-  for (const q of U.props) { q.state = 'rest'; q.spilled = false; if (q.inner) q.inner.visible = true; q.v.set(0, 0, 0); q.g.visible = true; q.g.position.copy(q.home); q.g.rotation.set(0, q.homeRy, 0); }
+  for (const q of U.props) { q.state = 'rest'; q.spilled = false; q.tipRoll = false; q.hitT = 0; if (q.inner) q.inner.visible = true; q.v.set(0, 0, 0); q.g.visible = true; q.g.position.copy(q.home); q.g.rotation.set(0, q.homeRy, 0); }
   for (const b of upBits) dropBit(b); upBits.length = 0;
   if (U.bags) for (const b of U.bags) { b.popped = false; b.g.scale.set(1, 1, 1); }                      // (fresh bin bags, the bin back up, the dishes back in the tub)
   if (U.bin) { const T = U.bin; T.state = 'up'; T.v.set(0, 0, 0); T.roll = 0; T.g.quaternion.identity(); T.g.position.set(T.x, U.UF, T.z); if (T.sh) T.sh.position.set(T.x, T.sh.position.y, T.z); }
@@ -6408,7 +6413,7 @@ function bikeSfx(n) {
     else if (n === 'swish') bikeHit(0, 0.12, 0.04, 2500, 'bandpass', 0.8);
     else if (n === 'tuck') tone(420, 220, 0.1, 'triangle', 0.03);
     else if (n === 'stumble') { tone(320, 140, 0.18, 'square', 0.035); bikeHit(0, 0.18, 0.1, 700, 'lowpass'); }
-    else if (n === 'crash') { bikeHit(0, 0.6, 0.3, 800, 'lowpass'); tone(180, 38, 0.55, 'sine', 0.2); bikeHit(0.08, 1.1, 0.07, 3200, 'bandpass', 1.2);   // bang, then metal scraping along the road...
+    else if (n === 'crash') { bikeHit(0, 0.6, 0.18, 800, 'lowpass'); tone(180, 38, 0.55, 'sine', 0.12); bikeHit(0.08, 1.1, 0.045, 3200, 'bandpass', 1.2);   // bang, then metal scraping along the road...
       for (let i = 0; i < 5; i++) { const f = 900 + Math.random() * 1600; tone(f, f * 0.97, 0.25, 'triangle', 0.018, 0.15 + i * 0.17); }   // ...bits of bike tinkling after it
       tone(820, 420, 0.35, 'triangle', 0.04, 0.35); }                                                            // (and a startled mrrow)
     else if (n === 'bonk') { tone(600, 180, 0.12, 'square', 0.03); bikeHit(0, 0.1, 0.09, 1200, 'bandpass'); }
@@ -6428,9 +6433,9 @@ function bikeEngineOn() {                                             // a prope
     e.a = actx.createOscillator(); e.a.setPeriodicWave(BIKE.wave); e.a.frequency.value = 20;                         // the firing pulse (its harmonics are the growl)
     e.b = actx.createOscillator(); e.b.type = 'sawtooth'; e.b.frequency.value = 10; e.bg = actx.createGain(); e.bg.gain.value = 0.55;   // (half as fast: the lope of the uneven twin)
     e.sh = actx.createWaveShaper(); e.sh.curve = BIKE.curve; e.lp = actx.createBiquadFilter(); e.lp.type = 'lowpass'; e.lp.frequency.value = 600; e.lp.Q.value = 2.2;
-    e.g = actx.createGain(); e.g.gain.setValueAtTime(0, t); e.g.gain.linearRampToValueAtTime(0.03, t + 0.5);
+    e.g = actx.createGain(); e.g.gain.setValueAtTime(0, t); e.g.gain.linearRampToValueAtTime(0.014, t + 0.5);
     e.n = actx.createBufferSource(); e.n.buffer = bikeNoiseBuf(); e.n.loop = true; e.nbp = actx.createBiquadFilter(); e.nbp.type = 'bandpass'; e.nbp.frequency.value = 420; e.nbp.Q.value = 0.9;
-    e.ng = actx.createGain(); e.ng.gain.value = 0.012; e.mod = actx.createOscillator(); e.mod.type = 'square'; e.mod.frequency.value = 20; e.mg = actx.createGain(); e.mg.gain.value = 0.012;   // the exhaust: noise, pulsed on each firing
+    e.ng = actx.createGain(); e.ng.gain.value = 0.006; e.mod = actx.createOscillator(); e.mod.type = 'square'; e.mod.frequency.value = 20; e.mg = actx.createGain(); e.mg.gain.value = 0.006;   // the exhaust: noise, pulsed on each firing
     e.wbp = actx.createBiquadFilter(); e.wbp.type = 'bandpass'; e.wbp.frequency.value = 1400; e.wbp.Q.value = 0.4; e.wg = actx.createGain(); e.wg.gain.value = 0;   // the wind
     e.a.connect(e.sh); e.b.connect(e.bg); e.bg.connect(e.sh); e.sh.connect(e.lp); e.lp.connect(e.g); e.g.connect(actx.destination);
     e.n.connect(e.nbp); e.nbp.connect(e.ng); e.ng.connect(actx.destination); e.mod.connect(e.mg); e.mg.connect(e.ng.gain);
@@ -6446,12 +6451,12 @@ function bikeEngineSet(s) {   // revs follow the road speed through five gears (
     let gear = 0; while (s >= BANDS[gear + 1]) gear++;
     let rpm = riding ? 3200 + (s - BANDS[gear]) / Math.max(1, Math.min(BANDS[gear + 1], 34) - BANDS[gear]) * 4200 : 1150;
     B.rev = Math.max(0, (B.rev || 0) - 0.1); rpm += (B.air ? 1800 : 0) + B.rev * 2600;                              // (in the air, or a blip)
-    const f = rpm / 60, hid = document.hidden, v = hid ? 0 : 0.026 + (riding ? 0.012 : 0);
+    const f = rpm / 60, hid = document.hidden, v = hid ? 0 : 0.012 + (riding ? 0.006 : 0);
     if (riding && gear !== e.gear) { if (gear > e.gear) { e.g.gain.setValueAtTime(v * 0.35, t); bikeHit(0, 0.06, 0.05, 500, 'lowpass'); } e.gear = gear; }   // a change up: the throttle cuts, clunk
     e.a.frequency.setTargetAtTime(f, t, 0.07); e.b.frequency.setTargetAtTime(f / 2, t, 0.07); e.mod.frequency.setTargetAtTime(f, t, 0.07);
     e.lp.frequency.setTargetAtTime(480 + rpm * 0.16, t, 0.1); e.nbp.frequency.setTargetAtTime(300 + rpm * 0.05, t, 0.1);
-    e.g.gain.setTargetAtTime(v, t, 0.12); e.ng.gain.setTargetAtTime(hid ? 0 : 0.012, t, 0.1); e.mg.gain.setTargetAtTime(hid ? 0 : 0.012, t, 0.1);
-    e.wg.gain.setTargetAtTime(hid || !riding ? 0 : Math.min(0.028, 0.00004 * s * s), t, 0.2);
+    e.g.gain.setTargetAtTime(v, t, 0.12); e.ng.gain.setTargetAtTime(hid ? 0 : 0.006, t, 0.1); e.mg.gain.setTargetAtTime(hid ? 0 : 0.006, t, 0.1);
+    e.wg.gain.setTargetAtTime(hid || !riding ? 0 : Math.min(0.012, 0.000018 * s * s), t, 0.2);
   } catch (err) {}
 }
 function bikeEngineOff() {
@@ -6468,11 +6473,11 @@ function bikeBeat(dt) {   // a driving little track under the engine: kick on ev
     const now = actx.currentTime, six = 60 / 124 / 4; if (!B.beatNext || B.beatNext < now) B.beatNext = now + 0.05;
     while (B.beatNext < now + 0.2) {
       const d = B.beatNext - now, n = B.beatN++, st = n % 16, bar = (n >> 4) % 4, root = [57, 53, 48, 55][bar], third = bar === 0 ? 3 : 4;
-      if (st % 4 === 0) tone(150, 42, 0.18, 'sine', 0.08, d);                                                                 // kick
-      if (st === 4 || st === 12) { bikeHit(d, 0.12, 0.05, 1600, 'bandpass', 0.9); bikeHit(d + 0.012, 0.1, 0.035, 1900, 'bandpass', 1); }   // clap
-      if (st % 2 === 1) bikeHit(d, 0.035, st % 4 === 3 ? 0.02 : 0.012, 8000);                                                   // hats
-      if (st % 2 === 0) { const m = root - 24 + (st % 8 === 6 ? 12 : 0), f = 440 * Math.pow(2, (m - 69) / 12); tone(f, f, six * 1.7, 'sawtooth', 0.02, d); }   // bass
-      if (st % 2 === 1 && n >= 32) { const m = root + 12 + [0, third, 7, 12][(st >> 1) % 4], f = 440 * Math.pow(2, (m - 69) / 12); tone(f, f, six * 0.9, 'square', 0.009, d); }   // (the arpeggio joins on the third bar)
+      if (st % 4 === 0) tone(150, 42, 0.18, 'sine', 0.05, d);                                                                 // kick
+      if (st === 4 || st === 12) { bikeHit(d, 0.12, 0.03, 1600, 'bandpass', 0.9); bikeHit(d + 0.012, 0.1, 0.02, 1900, 'bandpass', 1); }   // clap
+      if (st % 2 === 1) bikeHit(d, 0.035, st % 4 === 3 ? 0.012 : 0.008, 8000);                                                   // hats
+      if (st % 2 === 0) { const m = root - 24 + (st % 8 === 6 ? 12 : 0), f = 440 * Math.pow(2, (m - 69) / 12); tone(f, f, six * 1.7, 'sawtooth', 0.013, d); }   // bass
+      if (st % 2 === 1 && n >= 32) { const m = root + 12 + [0, third, 7, 12][(st >> 1) % 4], f = 440 * Math.pow(2, (m - 69) / 12); tone(f, f, six * 0.9, 'square', 0.006, d); }   // (the arpeggio joins on the third bar)
       B.beatNext += six;
     }
   } catch (e) {}
@@ -8045,7 +8050,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 17:28';                                              // stamped when the site is published
+const BUILD = '2026-09-29 17:44';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -10662,41 +10667,49 @@ function scheduleMusic() {
     musicNext += eighth; musicStep++;
   }
 }
-// ---- upstairs: Aunty-ji's place has its own soundtrack. Bhangra: the dhol's galloping chaal, a tumbi twanging a hook, a harmonium drone, a shehnai singing over it ----
+// ---- upstairs: Aunty-ji's place has its own soundtrack, an old Bollywood film song. A dholak's lilting keherwa, a harmonium pumping the chords, the string section
+//      swooping in, a bansuri flute singing the tune, mandolin trembling through the chorus. (A minor, the filmi way: Am, G, F and an E major that tugs back home) ----
 let musicTrk = '';
-const DESI = { SA: 62, TUMBI: [81, 81, -1, 81, 83, 81, -1, 78, -1, 76, 78, -1,  74, -1, 74, 76, 78, -1, 76, -1, 74, -1, -1, -1,  81, 81, -1, 81, 83, 84, -1, 83, -1, 81, 83, -1,  81, -1, 79, 78, 76, -1, 74, -1, 74, -1, -1, -1],
-               SHEH: [74, 76, 78, 79, 81, 79, 78, 76, 78, -1, 74, -1,  76, 78, 79, 81, 83, 81, 79, 78, 79, -1, 76, -1] };   // (D Mixolydian, near enough Khamaj: very Punjabi)
+const DESI = { CH: [[57, 60, 64], [55, 59, 62], [53, 57, 60], [52, 56, 59]],
+  MEL: [76, -1, 76, 74, 72, -1, 71, 72,  74, -1, 74, 72, 71, -1, 69, 71,  72, -1, 72, 71, 69, -1, 68, 69,  71, -1, -1, 68, 64, -1, -1, -1],
+  HOOK: [81, -1, 79, 77, 76, -1, 77, 79,  79, -1, 77, 76, 74, -1, 76, 77,  77, -1, 76, 74, 72, -1, 71, 72,  71, -1, 72, 71, 68, -1, -1, -1] };
 function kittyUpstairs() { const p = walk.pos, U = UPPER; return walk.on && inUpper(p.x, p.z) && (p.y > U.UF - 0.6 || (p.x < -0.2 && p.z < U.SW + 0.2 && p.y > U.LH - 0.6)); }   // (up there, or in the foyer on the way)
 function dDrum(t, f0, f1, dur, vol, type) { const o = actx.createOscillator(), g = actx.createGain(); o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + dur + 0.02); }
-function dTumbi(midi, t, vol) {                                       // the tumbi: one high steel string, plucked hard, nasal, a flick of pitch as it's struck
-  const f = mtof(midi), o = actx.createOscillator(), bp = actx.createBiquadFilter(), g = actx.createGain(); o.type = 'square';
-  o.frequency.setValueAtTime(f * 1.04, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.03); bp.type = 'bandpass'; bp.frequency.value = f * 2.2; bp.Q.value = 3;
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
-  o.connect(bp); bp.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.25);
+function dVoice(midi, t, dur, vol, from, cfg) {                        // one sustained voice (flute, strings, harmonium): oscillators through a filter, sliding in from the last note, a vibrato
+  const f = mtof(midi), g = actx.createGain(), lp = actx.createBiquadFilter(), lfo = actx.createOscillator(), lg = actx.createGain(), os = [];
+  lp.type = 'lowpass'; lp.frequency.value = cfg.cut; lfo.frequency.value = cfg.vib || 5.5; lg.gain.value = f * (cfg.depth || 0.006); lfo.connect(lg);
+  for (const [type, det] of cfg.osc) { const o = actx.createOscillator(); o.type = type; o.detune.value = det;
+    if (from) { o.frequency.setValueAtTime(mtof(from), t); o.frequency.exponentialRampToValueAtTime(f, t + (cfg.glide || 0.08)); } else o.frequency.value = f;
+    lg.connect(o.frequency); o.connect(lp); os.push(o); }
+  const at = cfg.att || 0.05; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + at); g.gain.setValueAtTime(vol, t + Math.max(at, dur * 0.75)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  lp.connect(g); g.connect(musicBus); for (const o of [...os, lfo]) { o.start(t); o.stop(t + dur + 0.05); }
 }
-function dShehnai(midi, t, dur, vol, from) {                          // the shehnai: a reedy, nasal double-reed, sliding into its notes, a little vibrato
-  const f = mtof(midi), o = actx.createOscillator(), o2 = actx.createOscillator(), bp = actx.createBiquadFilter(), g = actx.createGain(), lfo = actx.createOscillator(), lg = actx.createGain();
-  o.type = 'sawtooth'; o2.type = 'square'; o2.detune.value = 7;
-  for (const x of [o, o2]) { if (from) { x.frequency.setValueAtTime(mtof(from), t); x.frequency.exponentialRampToValueAtTime(f, t + 0.09); } else x.frequency.value = f; }   // (meend: gliding up from the last note)
-  lfo.frequency.value = 5.5; lg.gain.value = f * 0.012; lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
-  bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 1.4;
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.05); g.gain.setValueAtTime(vol, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(bp); o2.connect(bp); bp.connect(g); g.connect(musicBus); for (const x of [o, o2, lfo]) { x.start(t); x.stop(t + dur + 0.05); }
+const D_FLUTE = { osc: [['sine', 0], ['triangle', 4]], cut: 3200, vib: 5.2, depth: 0.007, att: 0.06, glide: 0.1 };            // the bansuri
+const D_STR = { osc: [['sawtooth', -9], ['sawtooth', 0], ['sawtooth', 10]], cut: 2400, vib: 5.8, depth: 0.005, att: 0.14, glide: 0.35 };   // the violins (they swoop)
+const D_HARM = { osc: [['sawtooth', 0], ['square', -12]], cut: 1500, vib: 0.1, depth: 0, att: 0.04 };                            // the harmonium's reeds
+function dPluck(midi, t, vol) {                                       // the mandolin: a bright little pluck (played as a tremolo, it shimmers)
+  const f = mtof(midi), o = actx.createOscillator(), bp = actx.createBiquadFilter(), g = actx.createGain(); o.type = 'sawtooth'; o.frequency.value = f; bp.type = 'bandpass'; bp.frequency.value = f * 2.5; bp.Q.value = 1.5;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09); o.connect(bp); bp.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.1);
 }
-function scheduleDesi() {                                            // 104 bpm in a triplet swing (12 steps a bar): the dhol under everything, the tumbi hook, the shehnai answering it
-  const step = 60 / 104 / 3, SA = DESI.SA;
+function scheduleDesi() {                                            // 92 bpm, swung eighths; four-bar sections: strings swoop in, the flute's verse, the strings-and-mandolin chorus, the verse again
+  const e8 = 60 / 92 / 2;
   if (musicNext < actx.currentTime) musicNext = actx.currentTime + 0.05;
   while (musicNext < actx.currentTime + 0.3) {
-    const t = musicNext, n = musicStep, st = n % 12, bar = Math.floor(n / 12), sec = Math.floor(bar / 4) % 4;   // (four-bar sections: dhol in, + tumbi, + shehnai, all together)
-    if (st === 0 && bar % 2 === 0) { cPad(SA - 12, t, step * 24, 0.02); cPad(SA - 5, t, step * 24, 0.016); cPad(SA, t, step * 24, 0.012); }   // the harmonium, pumping out Sa and Pa
-    if (st === 0 || st === 6) { dDrum(t, 115, 52, 0.32, 0.3); rNoise(t, 0.08, 0.1, 'lowpass', 260); }        // the dhol's bass side (dagga): BOOM
-    if (st === 3 || st === 9 && bar % 2) dDrum(t, 95, 60, 0.2, 0.14);                                          // (a lighter one, pushing it along)
-    if (st === 2 || st === 4 || st === 5 || st === 8 || st === 10 || st === 11) { rNoise(t, 0.055, st === 5 || st === 11 ? 0.11 : 0.07, 'bandpass', 3000, 1.6); dDrum(t, 820, 640, 0.05, 0.03, 'triangle'); }   // the treble side (tihli): tak-tak
-    if (bar % 4 === 3 && st >= 6) rNoise(t + step / 2, 0.04, 0.05, 'bandpass', 3400, 1.6);                     // (a roll into the next section)
-    if (sec >= 1 && sec !== 2) { const m = DESI.TUMBI[n % 48]; if (m > 0) dTumbi(m, t, 0.05); }
-    if (sec >= 2 && st % 3 === 0) { const i = Math.floor(n / 3) % 24, m = DESI.SHEH[i]; if (m > 0) { let len = 1; while (DESI.SHEH[(i + len) % 24] < 0 && len < 3) len++; dShehnai(m, t, step * 3 * len * 0.95, 0.03, i && DESI.SHEH[i - 1] > 0 ? DESI.SHEH[i - 1] : 0); } }
-    musicNext += step; musicStep++;
+    const n = musicStep, st = n % 8, bar = Math.floor(n / 8), sec = Math.floor(bar / 4) % 4, t = musicNext + (st % 2 ? e8 * 0.14 : 0), ch = DESI.CH[bar % 4], i = (bar % 4) * 8 + st;
+    if (st === 0 || st === 4) ch.forEach((m, k) => dVoice(m, t, e8 * 3.6, k ? 0.007 : 0.009, 0, D_HARM));                          // the harmonium, pumping on 1 and 3
+    if (st === 0 || st === 6) { dDrum(t, 150, 70, 0.3, 0.2); dDrum(t, 900, 860, 0.1, 0.05); }                                       // the dholak: dha / dhi (both heads)
+    if (st === 1) dDrum(t, 92, 150, 0.26, 0.13);                                                                                    // ...ge: the bass head, the heel sliding it up (that dholak "boing")
+    if (st === 2 || st === 4 || st === 7) { dDrum(t, 880, 850, 0.1, 0.05); rNoise(t, 0.025, 0.035, 'bandpass', 3600, 2); }        // ...na: the treble head's ring
+    if (st === 3 || st === 5) rNoise(t, 0.04, 0.06, 'bandpass', 2300, 1.2);                                                        // ...ti, ka: slaps
+    const line = sec === 2 ? DESI.HOOK : DESI.MEL, m = line[i];
+    if (sec === 0 && st === 0 && bar % 4 === 0) dVoice(69, t, e8 * 14, 0.016, 57, D_STR);                                            // the intro: the strings swoop up an octave...
+    if (sec === 0 && st === 0 && bar % 4 === 2) dVoice(76, t, e8 * 14, 0.014, 64, D_STR);                                            // ...and again
+    if (sec !== 0 && m > 0) { let len = 1; while (line[(i + len) % 32] < 0 && len < 4) len++; const prev = i ? line[i - 1] : 0, from = prev > 0 && Math.random() < 0.6 ? prev : 0;
+      if (sec === 2) { dVoice(m, t, e8 * len * 0.98, 0.012, from, D_STR); for (let k = 0; k < len * 2; k++) dPluck(m - 12, t + k * e8 / 2, 0.018); }   // the chorus: strings on the tune, a mandolin tremolo under them
+      else dVoice(m, t, e8 * len * 0.95, 0.034, from, D_FLUTE); }                                                                  // the verse: the bansuri
+    if (sec === 3 && st === 0) dVoice(ch[0] + 12, t, e8 * 7.8, 0.006, 0, D_STR);                                                   // (the strings holding the chord under the second verse)
+    musicNext += e8; musicStep++;
   }
 }
 
