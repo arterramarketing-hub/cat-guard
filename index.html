@@ -4030,9 +4030,9 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const soffitTex = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#e3dac2'; c.fillRect(0, 0, w, h); for (let i = 0; i < 26; i++) { const x = Math.random() * w, y = Math.random() * h, r = 6 + Math.random() * 22, gr = c.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(150,135,100,.22)'); gr.addColorStop(1, 'rgba(150,135,100,0)'); c.fillStyle = gr; c.fillRect(x - r, y - r, r * 2, r * 2); } }, 2, 2);   // water stains
       const SW = FT(7), SD = FT(6.2), SY = FT(7.3), ST2 = IN(8), SX = DX;   // just big enough to cover the concrete pads
       const slab = new THREE.Mesh(new THREE.BoxGeometry(SW, ST2, SD), [OB(0xd9d0b9), OB(0xd9d0b9), OB(0xe6dfcb), new THREE.MeshBasicMaterial({ map: soffitTex, color: 0xf2eee4, fog: false }), OB(0xe9e2cf), OB(0xcfc6ae)]);
-      slab.position.set(SX, SY + ST2 / 2, VD + 0.08 + SD / 2); slab.userData.name = 'Balcony above'; yard.add(slab);   // (just clear of the house wall, so the two don't flicker through each other)
+      slab.position.set(SX, SY + ST2 / 2, VD + 0.08 + SD / 2); slab.userData.name = 'Balcony above'; povEndWall.add(slab);   /* (solid: out of a back window, she can land on it) */   // (just clear of the house wall, so the two don't flicker through each other)
       const beam = new THREE.Mesh(new THREE.BoxGeometry(SW, IN(6), IN(7)), [OB(0xd3cab3), OB(0xd3cab3), OB(0xe6dfcb), OB(0xc9c0a8), OB(0xeee8d8), OB(0xe2dac6)]);
-      beam.position.set(SX, SY - IN(3), VD + SD - IN(3.5)); beam.userData.name = 'Balcony beam'; yard.add(beam);
+      beam.position.set(SX, SY - IN(3), VD + SD - IN(3.5)); beam.userData.name = 'Balcony beam'; povEndWall.add(beam);
       for (const px of [SX - SW / 2 + IN(5), SX + SW / 2 - IN(5)]) {
         const ph = SY - IN(6), col = new THREE.Mesh(new THREE.BoxGeometry(IN(8), ph, IN(8)), [OB(0xdcd8d0), OB(0xe4e0d8), OB(0xf4f1ec), OB(0xf4f1ec), OB(0xe8e4dc), OB(0xf3f0ea)]);
         col.position.set(px, ph / 2, VD + SD - IN(3.5)); col.userData.name = 'Patio post'; povEndWall.add(col);   // (solid)
@@ -5188,7 +5188,7 @@ function buildUpperFloor() {                                          // behind 
     { const bx = 7.3, bz = -7.2, bg = new THREE.Group(); bg.position.set(bx, UF, bz); bg.userData.name = 'Kitchen bin'; bg.userData.noWalk = true; root.add(bg);   // the bin, overflowing (on its own: bump it and over it goes)
       put(new THREE.CylinderGeometry(0.42, 0.36, 1.2, 14), 'shiny', 0xb8bec6, bg).position.y = 0.6; const lid = put(new THREE.CylinderGeometry(0.44, 0.44, 0.06, 14), 'shiny', 0x9aa2a8, bg); lid.position.set(-0.3, 1.33, 0); lid.rotation.z = -1.1;
       [[0xe3a33c, 0.2], [0x6b8e23, 0.18], [0xf4f1e6, 0.17], [0x8b5a2b, 0.16], [0xd9480f, 0.15]].forEach(([c, r], i) => { const b = put(new THREE.SphereGeometry(r, 8, 6), 'plain', c, bg); b.position.set(Math.cos(i * 1.3) * 0.16, 1.3 + (i % 2) * 0.12, Math.sin(i * 1.3) * 0.16); b.scale.y = 0.8; });
-      bakeKinds(bg, scales); U.bin = { g: bg, x: bx, z: bz, r: 0.42, state: 'up', t: 0, dir: new THREE.Vector3(), axis: new THREE.Vector3(), sh: null };
+      bakeKinds(bg, scales); U.bin = { g: bg, x: bx, z: bz, r: 0.42, state: 'up', t: 0, dir: new THREE.Vector3(), axis: new THREE.Vector3(), sh: null, p: new THREE.Vector3(), v: new THREE.Vector3(), q0: new THREE.Quaternion(), roll: 0 };
       B(bx - 0.95, bx - 0.55, UF, UF + 0.03, bz - 0.45, bz - 0.32, 0xf2d43d, 'decal', dec).rotation.y = 0.8; S(0.06, 0xf8f4ec, bx - 0.6, UF + 0.04, bz - 0.8, 0.6); S(0.06, 0xf8f4ec, bx - 0.45, UF + 0.04, bz - 0.95, 0.6);   // (a banana peel, eggshells)
       U.bin.sh = shadow(bx, bz, 1.0, 1.0, 0.3); }
     { const ab = B(11.4, 12.05, UF, UF + 0.9, -8.6, -8.1, 0xe8dcc0, 'fabric'); ab.rotation.z = 0.15; B(11.0, 12.2, UF, UF + 0.012, -9.1, -8.6, 0xf6f1e6, 'decal', dec); }   // an atta bag slumped over, flour on the floor
@@ -5250,12 +5250,15 @@ function buildUpperFloor() {                                          // behind 
     const X0 = 9.2, X1 = XR - 0.17, Z0 = -5.91, Z1 = -4.1, TH = UF + 1.4, WL = UF + 0.95;                   // the bathtub...
     B(X0, X1, UF, TH, Z1 - 0.2, Z1, WHITE, 'shiny'); B(X0, X1, UF, TH, Z0, Z0 + 0.2, WHITE, 'shiny'); B(X0, X0 + 0.2, UF, TH, Z0 + 0.2, Z1 - 0.2, WHITE, 'shiny'); B(X1 - 0.2, X1, UF, TH, Z0 + 0.2, Z1 - 0.2, WHITE, 'shiny');
     B(X0 - 0.04, X1, TH, TH + 0.05, Z1 - 0.24, Z1 + 0.04, WHITE, 'shiny');
-    B(X0 + 0.2, X1 - 0.2, UF, WL, Z0 + 0.2, Z1 - 0.2, 0x8e8a62, 'shiny');                                    // ...full of grey dishwater...
+    B(X0 + 0.2, X1 - 0.2, UF, UF + 0.45, Z0 + 0.2, Z1 - 0.2, 0x5f6553, 'plain');                             // ...its (murky) bottom...
+    { const wg = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0 - 0.4, Z1 - Z0 - 0.4), new THREE.MeshPhongMaterial({ color: 0x9aa38c, map: waterTex(), transparent: true, opacity: 0.82, shininess: 120, specular: 0xffffff, depthWrite: false, fog: false }));   // ...and real grey dishwater in it,
+      wg.rotation.x = -Math.PI / 2; wg.position.set((X0 + X1) / 2, WL, (Z0 + Z1) / 2); wg.renderOrder = 2; wg.userData.noWalk = true; root.add(wg); U.tubWater = wg; }                                         // belly-deep on a cat
     let ds = 5; const dr = () => (ds = (ds * 16807) % 2147483647) / 2147483647, tubG = grp();               // (the dishes on their own: jump in and they're gone)
-    U.tub = { g: tubG, x0: X0 + 0.25, x1: X1 - 0.25, z0: Z0 + 0.25, z1: Z1 - 0.25, wl: WL, on: false, smashed: false, t: 0 };
-    for (let i = 0; i < 18; i++) { const pl = C(0.34, 0.34, 0.03, i % 4 ? STEEL : 0xe8e0d0, X0 + 0.55 + dr() * (X1 - X0 - 1.1), WL, Z0 + 0.5 + dr() * (Z1 - Z0 - 1.0), 18, 'shiny', tubG); pl.position.y = WL + 0.02 + dr() * 0.12; pl.rotation.set(1.1 + dr() * 0.7, dr() * 3, (dr() - 0.5) * 0.6); }   // ...and every dish in the house
-    { const pot = C(0.4, 0.34, 0.5, 0x9aa0a4, X0 + 1.2, WL - 0.3, -5.0, 16, 'shiny'); pot.rotation.z = 0.35; const kd = C(0.52, 0.28, 0.28, 0x3a3a3a, X1 - 1.0, WL - 0.12, -4.9, 18, 'shiny'); kd.rotation.x = -0.3;
-      const ck = C(0.3, 0.3, 0.5, STEEL, 11.4, WL - 0.1, -5.25, 16, 'shiny'); ck.rotation.z = 1.3; }
+    U.tub = { g: tubG, x0: X0 + 0.25, x1: X1 - 0.25, z0: Z0 + 0.25, z1: Z1 - 0.25, wl: WL, smashed: false, slosh: 0, rings: [], drops: [], col: null };
+    { const cm = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.34, 1, 14, 1, true), new THREE.MeshBasicMaterial({ color: 0xf2f8fa, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, fog: false })); cm.geometry.translate(0, 0.5, 0); cm.visible = false; cm.userData.noWalk = true; root.add(cm); U.tub.col = { m: cm, t: 0, s: 0 }; }   // (the splash's white column)
+    for (let i = 0; i < 18; i++) { const pl = C(0.34, 0.34, 0.03, i % 4 ? STEEL : 0xe8e0d0, X0 + 0.55 + dr() * (X1 - X0 - 1.1), WL, Z0 + 0.5 + dr() * (Z1 - Z0 - 1.0), 18, 'shiny', tubG); pl.position.y = WL - 0.3 + dr() * 0.36; pl.rotation.set(1.1 + dr() * 0.7, dr() * 3, (dr() - 0.5) * 0.6); }   // ...and every dish in the house
+    { const pot = C(0.4, 0.34, 0.5, 0x9aa0a4, X0 + 1.2, WL - 0.42, -5.0, 16, 'shiny', dec); pot.rotation.z = 0.35; const kd = C(0.52, 0.28, 0.28, 0x3a3a3a, X1 - 1.0, WL - 0.2, -4.9, 18, 'shiny', dec); kd.rotation.x = -0.3;   // (sunk in it: she wades between them)
+      const ck = C(0.3, 0.3, 0.5, STEEL, 11.4, WL - 0.25, -5.25, 16, 'shiny', dec); ck.rotation.z = 1.3; }
     for (let i = 0; i < 5; i++) { const gl = C(0.09, 0.075, 0.26, STEEL, X0 + 0.6 + i * 0.75, WL - 0.08, -4.5 - (i % 2) * 0.5, 10, 'shiny', tubG); gl.rotation.set(0.5 + i * 0.3, i, 0.4); }
     { const ld = B(0, 0.05, 0, 0.05, 0, 1.2, STEEL, 'shiny', tubG); ld.position.set(10.6, WL + 0.2, -4.8); ld.rotation.set(0.5, 0.9, 0); }   // a ladle
     bakeKinds(tubG, scales);
@@ -5751,12 +5754,27 @@ function updateBins(dt) {                                             // the kit
     for (const b of U.bags) if (!b.popped && p.y < U.UF + b.h + 0.4 && Math.hypot(p.x - b.x, p.z - b.z) < b.r + 0.4) popBag(b);   // (walked into, or jumped on)
     if (T.state === 'up' && p.y < U.UF + 1.4 && Math.hypot(p.x - T.x, p.z - T.z) < T.r + 0.42) tipBin(T.x - p.x, T.z - p.z);
   }
+  if (T.state === 'down') {                                           // knocked over, it can still be shoved about: rolling if she pushes it side-on, sliding if end-on
+    if (live && p.y < U.UF + 1.0 && clock > (T.pushT || 0)) {
+      const ax = T.p.x, az = T.p.z, dx = T.dir.x, dz = T.dir.z, s = THREE.MathUtils.clamp((p.x - ax) * dx + (p.z - az) * dz, 0, 1.2), cxp = ax + dx * s, czp = az + dz * s, ox = cxp - p.x, oz = czp - p.z, d = Math.hypot(ox, oz);
+      if (d < T.r + 0.38) { T.pushT = clock + 0.2; const sp = Math.max(3.4, Math.hypot(walk.vel.x, walk.vel.z) * 1.3); T.v.x += ox / (d || 1) * sp; T.v.z += oz / (d || 1) * sp;
+        const vl = Math.hypot(T.v.x, T.v.z); if (vl > 4.5) T.v.multiplyScalar(4.5 / vl); tone(300, 200, 0.08, 'triangle', 0.03); noise(0.08, 0.06, 500); }   // (a hollow bonk)
+    }
+    const vl = Math.hypot(T.v.x, T.v.z); if (vl < 0.02) return;
+    const c = _binV.set(T.p.x + T.dir.x * 0.6, U.UF + T.r, T.p.z + T.dir.z * 0.6); _prR.set(c, _prD.set(T.v.x / vl, 0, T.v.z / vl)); _prR.far = vl * dt + T.r + 0.05;
+    if (_prR.intersectObjects(walk.meshes, false).length) { T.v.multiplyScalar(-0.35); noise(0.06, 0.05, 700); }   // (off the walls and the furniture)
+    T.p.x += T.v.x * dt; T.p.z += T.v.z * dt; T.p.x = THREE.MathUtils.clamp(T.p.x, YARD.HL + 0.6, YARD.XR - 0.6); T.p.z = THREE.MathUtils.clamp(T.p.z, U.zF + 0.6, U.zB - 0.6);
+    const side = T.v.x * -T.dir.z + T.v.z * T.dir.x; T.roll += side / T.r * dt;                                    // (the part of the shove across its length rolls it)
+    T.v.multiplyScalar(Math.exp(-dt * 1.5)); if (clock > (T.rumT || 0) && vl > 0.6) { T.rumT = clock + 0.16; noise(0.14, 0.035, 260); }   // (a tinny rumble as it goes)
+    _binQ.setFromAxisAngle(T.dir, T.roll).multiply(T.q0); T.g.quaternion.copy(_binQ); T.g.position.copy(T.p);
+    T.sh.position.set(T.p.x + T.dir.x * 0.6, T.sh.position.y, T.p.z + T.dir.z * 0.6); return;
+  }
   if (T.state !== 'tip') return;
   T.t += dt; const k = Math.min(1, T.t / 0.55), th = Math.PI / 2 * k * k;                                // (slow to start, then down it crashes)
   _binQ.setFromAxisAngle(T.axis, th); T.g.quaternion.copy(_binQ);
   const e = _binV.copy(T.dir).multiplyScalar(T.r); T.g.position.set(T.x + e.x - T.dir.x * T.r * Math.cos(th), U.UF + T.r * Math.sin(th), T.z + e.z - T.dir.z * T.r * Math.cos(th));   // (rolling over its bottom edge)
   T.sh.position.set(T.x + T.dir.x * 0.6 * k, T.sh.position.y, T.z + T.dir.z * 0.6 * k);
-  if (k >= 1) { T.state = 'down'; const m = new THREE.Vector3(T.x + T.dir.x * 1.35, U.UF, T.z + T.dir.z * 1.35);   // CLANG: and out it all slides
+  if (k >= 1) { T.state = 'down'; T.p.copy(T.g.position); T.q0.copy(T.g.quaternion); T.roll = 0; T.v.set(0, 0, 0); const m = new THREE.Vector3(T.x + T.dir.x * 1.35, U.UF, T.z + T.dir.z * 1.35);   // CLANG: and out it all slides
     noise(0.3, 0.16, 1400); tone(420, 260, 0.35, 'square', 0.035); tone(980, 900, 0.5, 'triangle', 0.025, 0.05); for (let i = 0; i < 4; i++) tone(700 - i * 90, 600 - i * 90, 0.06, 'triangle', 0.02, 0.25 + i * 0.12);   // (the lid, rattling to a stop)
     splashUp(m, U.UF, [0x3a3020, 0x6b8e23, 0xe3a33c], 1.3, T.dir); if (U.flies) U.flies.scatter = 1.5; showWalkName('🗑️ CRASH! Over goes the bin');
     const A = U.aunty; if (A && A.first === 2 && clock > (A.breakT || 0)) { A.breakT = clock + 8; auntySay([['a', A.lines.bins[Math.random() * A.lines.bins.length | 0]]], 'break'); } }
@@ -5765,24 +5783,58 @@ function bagSwipe(paw) {                                              // a swipe
   const U = UPPER; if (!U.bin || !walk.on || !U.root.visible) return false;
   for (const b of U.bags) if (!b.popped && Math.hypot(paw.x - b.x, paw.z - b.z) < b.r + 0.45 && paw.y < U.UF + b.h + 0.6) { popBag(b); return true; }
   const T = U.bin; if (T.state === 'up' && Math.hypot(paw.x - T.x, paw.z - T.z) < T.r + 0.5 && paw.y < U.UF + 1.6) { tipBin(T.x - walk.pos.x, T.z - walk.pos.z); return true; }
+  if (T.state === 'down' && paw.y < U.UF + 1.2 && Math.hypot(paw.x - (T.p.x + T.dir.x * 0.6), paw.z - (T.p.z + T.dir.z * 0.6)) < 1.1) { const dx = T.p.x + T.dir.x * 0.6 - walk.pos.x, dz = T.p.z + T.dir.z * 0.6 - walk.pos.z, l = Math.hypot(dx, dz) || 1; T.v.x += dx / l * 3.6; T.v.z += dz / l * 3.6; tone(300, 200, 0.08, 'triangle', 0.03); return true; }   // (swiped along the floor)
   return false;
 }
-function updateTub() {                                                // the bathtub of dishes: jump in and SPLOOSH (the first time, the dishes go too)
-  const T = UPPER.tub; if (!T) return; const p = walk.pos;
-  const on = walk.on && state === 'playing' && walk.grounded && p.x > T.x0 && p.x < T.x1 && p.z > T.z0 && p.z < T.z1 && p.y > T.wl - 0.15 && p.y < T.wl + 0.7;
-  if (on && !T.on && clock > T.t) { T.t = clock + 0.5; const U = UPPER, at = p.clone();
-    for (let i = 0; i < 16; i++) { const m = new THREE.Mesh(_dropGeo, bitMat(i % 3 ? 0x9fb3b8 : 0xe6eef0)); m.position.set(at.x, T.wl + 0.1, at.z); m.userData.noWalk = true; U.root.add(m);   // water, everywhere
-      const a = Math.random() * 6.28, sp = 1 + Math.random() * 2.2; upBits.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, 2.5 + Math.random() * 2.5, Math.sin(a) * sp), spin: 0, down: false, gy: U.UF, ox: at.x, oz: at.z, drop: true }); }
-    splashUp(new THREE.Vector3(at.x, U.UF, T.z1 + 0.9), U.UF, 0x9fb8c0, 1.6);                             // (a lake on the bathroom floor)
-    noise(0.45, 0.16, 1300); tone(320, 110, 0.3, 'sine', 0.06);                                            // SPLOOSH
-    if (!T.smashed) { T.smashed = true; T.g.visible = false;                                               // ...and every dish in there breaks
-      for (let i = 0; i < 18; i++) { const m = new THREE.Mesh(_shardGeo, bitMat([0xe8e0d0, 0xc9ccd1, 0x2f6fb0][i % 3])); const s = 0.6 + Math.random() * 0.9; m.scale.set(s, 0.3, s); m.position.set(at.x, T.wl + 0.05, at.z); m.userData.noWalk = true; U.root.add(m);
-        const a = Math.random() * 6.28, sp = 0.6 + Math.random() * 1.8; upBits.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, 1 + Math.random() * 2, Math.sin(a) * sp), spin: (Math.random() - 0.5) * 20, down: false, gy: T.wl, ox: at.x, oz: at.z }); }
-      noise(0.3, 0.1, 3600); tone(2300, 1400, 0.09, 'triangle', 0.04, 0.05); tone(1800, 1100, 0.1, 'triangle', 0.035, 0.12); showWalkName('💦 SPLOOSH! ...and CRASH. So much for the dishes');
-      const A = UPPER.aunty; if (A && A.first === 2 && clock > (A.breakT || 0)) { A.breakT = clock + 8; auntySay([['a', A.lines.breaks[Math.random() * A.lines.breaks.length | 0]]], 'break'); } }
-    else showWalkName('💦 SPLOOSH!');
-    while (upBits.length > 170) dropBit(upBits.shift()); }
-  T.on = on;
+function waterTex() {                                                 // dishwater: soft light and dark swirls (it drifts)
+  return waterTex.t || (waterTex.t = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#b8bcb2'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 70; i++) { const x = Math.random() * w, y = Math.random() * h, r = 5 + Math.random() * 18, lite = Math.random() < 0.5, gr = c.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, lite ? 'rgba(255,255,255,.35)' : 'rgba(40,50,40,.22)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); for (const dx of [-w, 0, w]) for (const dy of [-h, 0, h]) { c.save(); c.translate(dx, dy); c.fillStyle = gr; c.fillRect(x - r, y - r, 2 * r, 2 * r); c.restore(); } } }, 2, 1));
+}
+function tubWet() { const T = UPPER.tub, p = walk.pos; return !!T && p.x > T.x0 && p.x < T.x1 && p.z > T.z0 && p.z < T.z1 && p.y < T.wl - 0.02 && p.y > T.wl - 1.2; }   // (standing in the bath water)
+function ripple(x, z, size, delay) {                                  // a ring running out across the water
+  const T = UPPER.tub; let r = T.rings.find(q => q.t >= q.life);
+  if (!r) { if (T.rings.length >= 12) return; const m = new THREE.Mesh(new THREE.RingGeometry(0.86, 1, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false })); m.rotation.x = -Math.PI / 2; m.renderOrder = 3; m.userData.noWalk = true; UPPER.root.add(m); r = { m, t: 0, life: 1.1, size: 1 }; T.rings.push(r); }
+  r.t = -(delay || 0); r.size = size; r.m.position.set(x, T.wl + 0.008, z); r.m.visible = false;
+}
+function splashSound(s) {                                             // a plunge: a low plunk, a rush of white water, drips pattering back down
+  tone(210, 70, 0.18, 'sine', 0.07 * Math.min(1.2, s));
+  if (actx) { const t = actx.currentTime, n = Math.floor(actx.sampleRate * 0.9), b = actx.createBuffer(1, n, actx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 1.6);
+    const src = actx.createBufferSource(), bp = actx.createBiquadFilter(), g = actx.createGain(); src.buffer = b; bp.type = 'bandpass'; bp.Q.value = 0.8; bp.frequency.setValueAtTime(2600, t); bp.frequency.exponentialRampToValueAtTime(480, t + 0.75);
+    g.gain.value = 0.24 * Math.min(1.2, s); src.connect(bp); bp.connect(g); g.connect(actx.destination); src.start(t); }
+  for (let i = 0, k = Math.round(9 * s); i < k; i++) tone(1400 + Math.random() * 2400, 900 + Math.random() * 900, 0.035, 'sine', 0.012, 0.25 + Math.random() * 0.8);   // (drips)
+}
+const _tubDropMat = new THREE.MeshPhongMaterial({ color: 0xe8f2f4, shininess: 90, specular: 0xffffff, transparent: true, opacity: 0.85, fog: false });
+function tubPlunge(p, s) {                                            // SPLOOSH: a crown of water flung up, rings running out, the water slopping about, (the first time) every dish in there broken
+  const T = UPPER.tub, U = UPPER; T.slosh = Math.min(1.6, T.slosh + s);
+  for (let k = 0; k < 3; k++) ripple(p.x, p.z, (0.8 + k * 0.35) * Math.max(0.6, s), k * 0.15);
+  for (let i = 0, n = Math.round(26 * s); i < n; i++) { const a = i / n * 6.28 + Math.random() * 0.3, sp = (1.1 + Math.random() * 1.7) * s, m = new THREE.Mesh(_dropGeo, _tubDropMat); m.scale.setScalar(0.8 + Math.random() * 0.9); m.userData.noWalk = true;
+    m.position.set(p.x + Math.cos(a) * 0.28, T.wl + 0.05, p.z + Math.sin(a) * 0.28); U.root.add(m); T.drops.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, (2.6 + Math.random() * 2.8) * Math.sqrt(s), Math.sin(a) * sp) }); }
+  if (s > 0.4) { const c = T.col; c.t = 0; c.s = s; c.m.position.set(p.x, T.wl, p.z); c.m.visible = true; }                           // (a white column of water)
+  splashSound(s);
+  if (s > 0.6) splashUp(new THREE.Vector3(p.x, U.UF, T.z1 + 0.9), U.UF, 0x9fb8c0, 1.2 * s);             // (a lake on the bathroom floor)
+  if (!T.smashed && s > 0.45) { T.smashed = true; T.g.visible = false;                                   // ...and every dish in there breaks
+    for (let i = 0; i < 18; i++) { const m = new THREE.Mesh(_shardGeo, bitMat([0xe8e0d0, 0xc9ccd1, 0x2f6fb0][i % 3])); const sc = 0.6 + Math.random() * 0.9; m.scale.set(sc, 0.3, sc); m.position.set(p.x, T.wl + 0.05, p.z); m.userData.noWalk = true; U.root.add(m);
+      const a = Math.random() * 6.28, sp = 0.6 + Math.random() * 1.8; upBits.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, 1 + Math.random() * 2, Math.sin(a) * sp), spin: (Math.random() - 0.5) * 20, down: false, gy: T.wl - 0.3, ox: p.x, oz: p.z }); }
+    noise(0.3, 0.1, 3600); tone(2300, 1400, 0.09, 'triangle', 0.04, 0.05); tone(1800, 1100, 0.1, 'triangle', 0.035, 0.12); showWalkName('💦 SPLOOSH! ...and CRASH. So much for the dishes');
+    const A = U.aunty; if (A && A.first === 2 && clock > (A.breakT || 0)) { A.breakT = clock + 8; auntySay([['a', A.lines.breaks[Math.random() * A.lines.breaks.length | 0]]], 'break'); } }
+  else if (s > 0.45) showWalkName('💦 SPLOOSH!');
+  while (upBits.length > 170) dropBit(upBits.shift());
+}
+function updateTub(dt) {                                              // the bath of dishwater: it drifts and slops about; she wades in it, and jumping in sends it everywhere
+  const T = UPPER.tub, U = UPPER; if (!T || !U.root.visible) return; const p = walk.pos;
+  const W = U.tubWater; W.material.map.offset.set(clock * 0.012, clock * 0.007); T.slosh *= Math.exp(-dt * 1.5); W.position.y = T.wl + Math.sin(clock * 9) * T.slosh * 0.035;
+  for (const r of T.rings) { if (r.t >= r.life) continue; r.t += dt; if (r.t < 0) continue; const k = r.t / r.life; r.m.visible = k < 1; r.m.scale.setScalar(0.15 + k * r.size); r.m.material.opacity = 0.5 * (1 - k); }
+  for (let i = T.drops.length - 1; i >= 0; i--) { const d = T.drops[i], m = d.m; d.v.y -= 20 * dt; m.position.addScaledVector(d.v, dt);
+    const inside = m.position.x > T.x0 - 0.2 && m.position.x < T.x1 + 0.2 && m.position.z > T.z0 - 0.2 && m.position.z < T.z1 + 0.2;
+    if (d.v.y < 0 && ((inside && m.position.y < T.wl) || m.position.y < U.UF + 0.02)) { U.root.remove(m); T.drops.splice(i, 1); if (inside && Math.random() < 0.3) ripple(m.position.x, m.position.z, 0.3); } }   // (back into the bath, or a drip on the floor)
+  const c = T.col; if (c.m.visible) { c.t += dt; const k = c.t / 0.5; if (k >= 1) c.m.visible = false; else { c.m.scale.set(0.6 + k * 0.8, (0.2 + Math.sin(k * Math.PI) * 1.3) * c.s, 0.6 + k * 0.8); c.m.material.opacity = 0.6 * (1 - k); } }
+  if (!walk.on || state !== 'playing') { T.py = p.y; return; }
+  const inTub = p.x > T.x0 && p.x < T.x1 && p.z > T.z0 && p.z < T.z1, py0 = T.py === undefined ? p.y : T.py; T.py = p.y;
+  if (!inTub) return;
+  if (py0 >= T.wl && p.y < T.wl) tubPlunge(p, Math.min(1.6, Math.max(0.5, -walk.vy / 6)));              // in she goes
+  else if (py0 < T.wl && p.y >= T.wl) tubPlunge(p, 0.3);                                               // (and out, dripping)
+  else if (p.y < T.wl && walk.grounded && Math.hypot(walk.vel.x, walk.vel.z) > 0.5 && clock > (T.wadeT || 0)) { T.wadeT = clock + 0.34; ripple(p.x, p.z, 0.7); T.slosh = Math.min(1.6, T.slosh + 0.15); noise(0.16, 0.05, 900); tone(260, 180, 0.08, 'sine', 0.012); }   // wading: slosh, slosh
 }
 function updateFanHit() {                                             // the living room's ceiling fan: jump into the blades and WHAP, she's flung across the room
   const F = UPPER.fan; if (!F || !walk.on || state !== 'playing') return; const p = walk.pos, fy = F.position.y - 0.04, dx = p.x - F.position.x, dz = p.z - F.position.z, d = Math.hypot(dx, dz);
@@ -5941,8 +5993,8 @@ function resetUpProps() {                                             // a new F
   for (const q of U.props) { q.state = 'rest'; q.spilled = false; if (q.inner) q.inner.visible = true; q.v.set(0, 0, 0); q.g.visible = true; q.g.position.copy(q.home); q.g.rotation.set(0, q.homeRy, 0); }
   for (const b of upBits) dropBit(b); upBits.length = 0;
   if (U.bags) for (const b of U.bags) { b.popped = false; b.g.scale.set(1, 1, 1); }                      // (fresh bin bags, the bin back up, the dishes back in the tub)
-  if (U.bin) { const T = U.bin; T.state = 'up'; T.g.quaternion.identity(); T.g.position.set(T.x, U.UF, T.z); if (T.sh) T.sh.position.set(T.x, T.sh.position.y, T.z); }
-  if (U.tub) { U.tub.g.visible = true; U.tub.smashed = false; U.tub.on = false; }
+  if (U.bin) { const T = U.bin; T.state = 'up'; T.v.set(0, 0, 0); T.roll = 0; T.g.quaternion.identity(); T.g.position.set(T.x, U.UF, T.z); if (T.sh) T.sh.position.set(T.x, T.sh.position.y, T.z); }
+  if (U.tub) { U.tub.g.visible = true; U.tub.smashed = false; U.tub.slosh = 0; for (const d of U.tub.drops) U.root.remove(d.m); U.tub.drops.length = 0; }
   if (U.mouse) { U.mouse.st = null; U.mouse.out = 0; if (U.cupDoor) U.cupDoor.rotation.y = 0; }   // (the mouse back in its cupboard, the door shut)
   const L = U.loo; if (L) { L.t = 0; L.on = false; L.poop.visible = true; L.poop.position.y = L.py; L.poop.rotation.y = 0; L.poop.scale.setScalar(1); L.clean.visible = L.swirl.visible = false; }   // (and the loo unflushed again)
 }
@@ -5970,7 +6022,7 @@ function knockDoor(paw) {                                             // she swi
   showWalkName('🚪 Knock knock...'); D.want = 1; D.openAt = clock + 1.1; return true;
 }
 function updateFrontDoor(dt) {                                        // the door swings in once she's knocked; the jhoola sways; the fan turns
-  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 7; updateFlies(dt); updateAunty(dt); updateVermin(dt); updateUpProps(dt); updateLoo(dt); updateBins(dt); updateTub(); updateFanHit(); updateEscape();
+  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 7; updateFlies(dt); updateAunty(dt); updateVermin(dt); updateUpProps(dt); updateLoo(dt); updateBins(dt); updateTub(dt); updateFanHit(); updateEscape();
   const D = frontDoor; if (!D) return;
   const go = D.want && clock > D.openAt;
   if (go && !D.said) { D.said = true; tone(260, 185, 0.55, 'sawtooth', 0.02); noise(0.35, 0.03, 500); showWalkName('🚪 ...the door creaks open. Come on in!'); }
@@ -6341,62 +6393,88 @@ function bikeHud(dt) {   // dom writes, ten times a second at most
 }
 
 /* ---------- sound: a putt-putt engine, a light beat, and blips (all optional, none may throw) ---------- */
+function bikeNoiseBuf() { if (!BIKE.nb) { const n = actx.sampleRate * 2, b = actx.createBuffer(1, n, actx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; BIKE.nb = b; } return BIKE.nb; }
+function bikeHit(delay, dur, vol, freq, type, q) {                    // a filtered noise hit, scheduled ahead (for the drums)
+  if (!actx) return; try { const t = actx.currentTime + (delay || 0), s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain(); s.buffer = bikeNoiseBuf(); f.type = type || 'highpass'; f.frequency.value = freq; f.Q.value = q || 0.7;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); s.connect(f); f.connect(g); g.connect(actx.destination); s.start(t, Math.random()); s.stop(t + dur + 0.02); } catch (e) {}
+}
 function bikeSfx(n) {
   if (!actx) return;
   try {
-    if (n === 'treat') { const f = 1000 * Math.pow(2, Math.min(BIKE.combo, 12) / 12); tone(f, f * 1.5, 0.09, 'sine', 0.045); }
-    else if (n === 'jump') { noise(0.22, 0.07, 1600); tone(300, 620, 0.16, 'triangle', 0.03); }
-    else if (n === 'ramp') { noise(0.45, 0.09, 2400); tone(260, 900, 0.35, 'triangle', 0.04); }
-    else if (n === 'land') noise(0.09, 0.12, 380);
-    else if (n === 'swish') noise(0.08, 0.035, 3000);
+    if (n === 'treat') { const f = 1000 * Math.pow(2, Math.min(BIKE.combo, 12) / 12); tone(f, f * 1.5, 0.09, 'sine', 0.045); tone(f * 2, f * 2.2, 0.06, 'sine', 0.015, 0.03); }
+    else if (n === 'jump') { bikeHit(0, 0.3, 0.06, 900, 'bandpass', 0.6); tone(300, 620, 0.16, 'triangle', 0.02); BIKE.rev = 1; }   // (the engine free-revs in the air)
+    else if (n === 'ramp') { bikeHit(0, 0.5, 0.09, 1200, 'bandpass', 0.5); tone(260, 900, 0.35, 'triangle', 0.03); BIKE.rev = 1; }
+    else if (n === 'land') { tone(110, 45, 0.18, 'sine', 0.12); bikeHit(0, 0.12, 0.1, 300, 'lowpass'); tone(700, 520, 0.08, 'triangle', 0.015, 0.05); }   // thump, and the suspension creaks
+    else if (n === 'swish') bikeHit(0, 0.12, 0.04, 2500, 'bandpass', 0.8);
     else if (n === 'tuck') tone(420, 220, 0.1, 'triangle', 0.03);
-    else if (n === 'stumble') { tone(320, 140, 0.18, 'square', 0.04); noise(0.15, 0.12, 700); }
-    else if (n === 'crash') { noise(0.7, 0.35, 900); tone(180, 38, 0.55, 'sine', 0.22); tone(820, 420, 0.35, 'triangle', 0.05, 0.12); }   // bang, then a startled mrrow
-    else if (n === 'bonk') { tone(600, 180, 0.12, 'square', 0.035); noise(0.1, 0.1, 1200); }
+    else if (n === 'stumble') { tone(320, 140, 0.18, 'square', 0.035); bikeHit(0, 0.18, 0.1, 700, 'lowpass'); }
+    else if (n === 'crash') { bikeHit(0, 0.6, 0.3, 800, 'lowpass'); tone(180, 38, 0.55, 'sine', 0.2); bikeHit(0.08, 1.1, 0.07, 3200, 'bandpass', 1.2);   // bang, then metal scraping along the road...
+      for (let i = 0; i < 5; i++) { const f = 900 + Math.random() * 1600; tone(f, f * 0.97, 0.25, 'triangle', 0.018, 0.15 + i * 0.17); }   // ...bits of bike tinkling after it
+      tone(820, 420, 0.35, 'triangle', 0.04, 0.35); }                                                            // (and a startled mrrow)
+    else if (n === 'bonk') { tone(600, 180, 0.12, 'square', 0.03); bikeHit(0, 0.1, 0.09, 1200, 'bandpass'); }
     else if (n === 'power') for (let i = 0; i < 4; i++) tone(660 + i * 220, 660 + i * 220, 0.1, 'triangle', 0.04, i * 0.07);
-    else if (n === 'beep') tone(660, 660, 0.14, 'square', 0.035);
-    else if (n === 'go') { tone(990, 990, 0.1, 'square', 0.04); tone(1320, 1320, 0.3, 'square', 0.04, 0.1); }
+    else if (n === 'beep') { tone(660, 660, 0.14, 'square', 0.03); BIKE.rev = 0.6; }                            // (a blip of the throttle on each beep)
+    else if (n === 'go') { tone(990, 990, 0.1, 'square', 0.035); tone(1320, 1320, 0.3, 'square', 0.035, 0.1); BIKE.rev = 1; }
     else if (n === 'nope') tone(200, 160, 0.08, 'square', 0.03);
   } catch (e) {}
 }
-function bikeEngineOn() {
+function bikeEngineOn() {                                             // a proper motorbike: a V-twin's uneven pulse through a little overdrive, the exhaust burbling on each firing, the wind picking up with speed
   bikeEngineOff();
   if (!actx) return;
   try {
-    const t = actx.currentTime, e = { a: actx.createOscillator(), b: actx.createOscillator(), lfo: actx.createOscillator(), lp: actx.createBiquadFilter(), g: actx.createGain(), lg: actx.createGain() };
-    e.a.type = e.b.type = 'sawtooth'; e.b.detune.value = 14; e.a.frequency.value = e.b.frequency.value = 46;
-    e.lfo.type = 'square'; e.lfo.frequency.value = 9; e.lp.type = 'lowpass'; e.lp.frequency.value = 420; e.lp.Q.value = 3;
-    e.g.gain.setValueAtTime(0, t); e.g.gain.linearRampToValueAtTime(0.03, t + 0.4); e.lg.gain.value = 0.009;   // the lfo wobbles the gain: putt-putt
-    e.a.connect(e.lp); e.b.connect(e.lp); e.lp.connect(e.g); e.g.connect(actx.destination); e.lfo.connect(e.lg); e.lg.connect(e.g.gain);
-    e.a.start(t); e.b.start(t); e.lfo.start(t);
-    BIKE.eng = e;
+    const t = actx.currentTime, e = {};
+    if (!BIKE.wave) { const n = 28, re = new Float32Array(n), im = new Float32Array(n); for (let k = 1; k < n; k++) im[k] = (k % 2 ? 1 : 0.7) / Math.pow(k, 0.8); BIKE.wave = actx.createPeriodicWave(re, im); }
+    if (!BIKE.curve) { const c = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i / 255.5 - 1; c[i] = (1 + 6) * x / (1 + 6 * Math.abs(x)); } BIKE.curve = c; }
+    e.a = actx.createOscillator(); e.a.setPeriodicWave(BIKE.wave); e.a.frequency.value = 20;                         // the firing pulse (its harmonics are the growl)
+    e.b = actx.createOscillator(); e.b.type = 'sawtooth'; e.b.frequency.value = 10; e.bg = actx.createGain(); e.bg.gain.value = 0.55;   // (half as fast: the lope of the uneven twin)
+    e.sh = actx.createWaveShaper(); e.sh.curve = BIKE.curve; e.lp = actx.createBiquadFilter(); e.lp.type = 'lowpass'; e.lp.frequency.value = 600; e.lp.Q.value = 2.2;
+    e.g = actx.createGain(); e.g.gain.setValueAtTime(0, t); e.g.gain.linearRampToValueAtTime(0.03, t + 0.5);
+    e.n = actx.createBufferSource(); e.n.buffer = bikeNoiseBuf(); e.n.loop = true; e.nbp = actx.createBiquadFilter(); e.nbp.type = 'bandpass'; e.nbp.frequency.value = 420; e.nbp.Q.value = 0.9;
+    e.ng = actx.createGain(); e.ng.gain.value = 0.012; e.mod = actx.createOscillator(); e.mod.type = 'square'; e.mod.frequency.value = 20; e.mg = actx.createGain(); e.mg.gain.value = 0.012;   // the exhaust: noise, pulsed on each firing
+    e.wbp = actx.createBiquadFilter(); e.wbp.type = 'bandpass'; e.wbp.frequency.value = 1400; e.wbp.Q.value = 0.4; e.wg = actx.createGain(); e.wg.gain.value = 0;   // the wind
+    e.a.connect(e.sh); e.b.connect(e.bg); e.bg.connect(e.sh); e.sh.connect(e.lp); e.lp.connect(e.g); e.g.connect(actx.destination);
+    e.n.connect(e.nbp); e.nbp.connect(e.ng); e.ng.connect(actx.destination); e.mod.connect(e.mg); e.mg.connect(e.ng.gain);
+    e.n.connect(e.wbp); e.wbp.connect(e.wg); e.wg.connect(actx.destination);
+    for (const k of ['a', 'b', 'n', 'mod']) e[k].start(t);
+    e.rpm = 1100; e.gear = 0; BIKE.eng = e; BIKE.rev = 0;
   } catch (err) { BIKE.eng = null; }
 }
-function bikeEngineSet(s) {   // pitch and growl follow the speed; silent while the tab is hidden
+function bikeEngineSet(s) {   // revs follow the road speed through five gears (it drops a gear's worth on each change-up), free-revs in the air; silent while the tab is hidden
   const e = BIKE.eng; if (!e || !actx) return;
   try {
-    const t = actx.currentTime, f = 44 + s * 3.2, v = document.hidden ? 0 : 0.03;
-    e.a.frequency.setTargetAtTime(f, t, 0.12); e.b.frequency.setTargetAtTime(f, t, 0.12);
-    e.lp.frequency.setTargetAtTime(380 + s * 28, t, 0.15); e.lfo.frequency.setTargetAtTime(8 + s * 0.9, t, 0.15);
-    e.g.gain.setTargetAtTime(v, t, 0.1); e.lg.gain.setTargetAtTime(v * 0.3, t, 0.1);
+    const t = actx.currentTime, B = BIKE, riding = B.phase === 'ride', BANDS = [0, 16, 20, 24, 28, 99];
+    let gear = 0; while (s >= BANDS[gear + 1]) gear++;
+    let rpm = riding ? 3200 + (s - BANDS[gear]) / Math.max(1, Math.min(BANDS[gear + 1], 34) - BANDS[gear]) * 4200 : 1150;
+    B.rev = Math.max(0, (B.rev || 0) - 0.1); rpm += (B.air ? 1800 : 0) + B.rev * 2600;                              // (in the air, or a blip)
+    const f = rpm / 60, hid = document.hidden, v = hid ? 0 : 0.026 + (riding ? 0.012 : 0);
+    if (riding && gear !== e.gear) { if (gear > e.gear) { e.g.gain.setValueAtTime(v * 0.35, t); bikeHit(0, 0.06, 0.05, 500, 'lowpass'); } e.gear = gear; }   // a change up: the throttle cuts, clunk
+    e.a.frequency.setTargetAtTime(f, t, 0.07); e.b.frequency.setTargetAtTime(f / 2, t, 0.07); e.mod.frequency.setTargetAtTime(f, t, 0.07);
+    e.lp.frequency.setTargetAtTime(480 + rpm * 0.16, t, 0.1); e.nbp.frequency.setTargetAtTime(300 + rpm * 0.05, t, 0.1);
+    e.g.gain.setTargetAtTime(v, t, 0.12); e.ng.gain.setTargetAtTime(hid ? 0 : 0.012, t, 0.1); e.mg.gain.setTargetAtTime(hid ? 0 : 0.012, t, 0.1);
+    e.wg.gain.setTargetAtTime(hid || !riding ? 0 : Math.min(0.028, 0.00004 * s * s), t, 0.2);
   } catch (err) {}
 }
 function bikeEngineOff() {
   const e = BIKE.eng; BIKE.eng = null; if (!e || !actx) return;
   try {
-    const t = actx.currentTime; e.g.gain.setTargetAtTime(0, t, 0.05); e.lg.gain.setTargetAtTime(0, t, 0.05);
-    e.a.onended = () => { for (const k in e) try { e[k].disconnect(); } catch (x) {} };
-    e.a.stop(t + 0.3); e.b.stop(t + 0.3); e.lfo.stop(t + 0.3);
+    const t = actx.currentTime; for (const k of ['g', 'ng', 'wg', 'mg']) e[k].gain.setTargetAtTime(0, t, 0.05);
+    e.a.onended = () => { for (const k in e) try { if (e[k] && e[k].disconnect) e[k].disconnect(); } catch (x) {} };
+    for (const k of ['a', 'b', 'n', 'mod']) e[k].stop(t + 0.3);
   } catch (err) {}
 }
-function bikeBeat(dt) {   // a quiet kick, tick and bouncing bass, eighth notes at 120 bpm
-  const B = BIKE; if (!actx || (B.opts && B.opts.music === false)) return;
-  B.beatT -= dt; if (B.beatT > 0) return; B.beatT = Math.max(B.beatT + 0.25, 0.05);
-  const n = B.beatN++, st = n & 7, root = [98, 82.4, 65.4, 73.4][(n >> 3) & 3];
+function bikeBeat(dt) {   // a driving little track under the engine: kick on every beat, claps on 2 and 4, sixteenth hats, a bouncing bass and a bright arpeggio (A minor: Am F C G)
+  const B = BIKE; if (!actx || (B.opts && B.opts.music === false) || document.hidden) return;
   try {
-    if (st === 0 || st === 4) tone(120, 42, 0.14, 'sine', 0.05);
-    if (st === 2 || st === 6) noise(0.04, 0.018, 7000);
-    tone(root * (st & 1 ? 2 : 1), root * (st & 1 ? 2 : 1), 0.16, 'triangle', 0.03);
+    const now = actx.currentTime, six = 60 / 124 / 4; if (!B.beatNext || B.beatNext < now) B.beatNext = now + 0.05;
+    while (B.beatNext < now + 0.2) {
+      const d = B.beatNext - now, n = B.beatN++, st = n % 16, bar = (n >> 4) % 4, root = [57, 53, 48, 55][bar], third = bar === 0 ? 3 : 4;
+      if (st % 4 === 0) tone(150, 42, 0.18, 'sine', 0.08, d);                                                                 // kick
+      if (st === 4 || st === 12) { bikeHit(d, 0.12, 0.05, 1600, 'bandpass', 0.9); bikeHit(d + 0.012, 0.1, 0.035, 1900, 'bandpass', 1); }   // clap
+      if (st % 2 === 1) bikeHit(d, 0.035, st % 4 === 3 ? 0.02 : 0.012, 8000);                                                   // hats
+      if (st % 2 === 0) { const m = root - 24 + (st % 8 === 6 ? 12 : 0), f = 440 * Math.pow(2, (m - 69) / 12); tone(f, f, six * 1.7, 'sawtooth', 0.02, d); }   // bass
+      if (st % 2 === 1 && n >= 32) { const m = root + 12 + [0, third, 7, 12][(st >> 1) % 4], f = 440 * Math.pow(2, (m - 69) / 12); tone(f, f, six * 0.9, 'square', 0.009, d); }   // (the arpeggio joins on the third bar)
+      B.beatNext += six;
+    }
   } catch (e) {}
 }
 
@@ -6735,8 +6813,7 @@ function buildGarage(zF) {                                            // the gar
   const G = garage, gr = new THREE.Group(); gr.userData.name = 'Garage'; povEndWall.add(gr);
   const X0 = G.g0 - 0.35, X1 = YARD.XR - 0.15, D = 12.8, Z1 = zF + D, cx = (X0 + X1) / 2, CH = 6.0, WALL = 0xcac6bd, gx = G.gx;
   Object.assign(G, { X0, X1, z1: Z1 }); const DD = D - 0.03, ZC = zF + 0.03 + DD / 2;   // (everything that runs front to back starts just behind the brick: no faces shared with it, so no flicker)
-  yBox(gr, X1 - X0, 0.02, DD, 0x9b978f, cx, 0.01, ZC);                                              // bare concrete...
-  yBox(gr, 2.2, 0.004, 1.4, 0x6f6c66, gx - 0.4, 0.022, zF + 6.4); yBox(gr, 1.1, 0.004, 0.8, 0x77746d, gx + 1.3, 0.022, zF + 9.1);   // ...an oil stain or two
+  yBox(gr, X1 - X0, 0.02, DD, 0x9b978f, cx, 0.01, ZC);                                                    // bare concrete (see garagePanel: textured over the top)                                              // bare concrete...
   yBox(gr, 0.12, CH, DD, WALL, X0 - 0.06, CH / 2, ZC); yBox(gr, 0.12, CH, DD, WALL, X1 + 0.06, CH / 2, ZC); yBox(gr, X1 - X0 + 0.24, CH, 0.12, WALL, cx, CH / 2, Z1 + 0.06);   // drywall, taped, never painted
   yBox(gr, X1 - X0 + 0.24, 0.12, DD, 0xe4e1da, cx, CH + 0.06, ZC);                                   // the ceiling (the living room's right over it)
   yBox(gr, G.g0 - X0 + 0.12, CH, 0.12, WALL, (X0 + G.g0) / 2 - 0.06, CH / 2, zF + 0.28); yBox(gr, X1 - G.g1 + 0.12, CH, 0.12, WALL, (G.g1 + X1) / 2 + 0.06, CH / 2, zF + 0.28);
@@ -6761,6 +6838,14 @@ function buildGarage(zF) {                                            // the gar
   { const s = yBox(gr, 0.06, 2.4, 0.06, 0xb8956a, X1 - 0.3, 1.2, zF + 3.2); s.rotation.x = 0.18; yBox(gr, 0.6, 0.7, 0.05, 0x2a5aa0, X1 - 0.3, 0.3, zF + 2.95); }   // a snow shovel
   yBox(gr, 0.9, 0.45, 0.6, 0x1f5fa8, X1 - 0.9, 0.23, zF + 1.2);                                              // a blue box by the door
   bakeYard(gr);
+  { const gp = new THREE.Group(); gp.userData.name = 'Garage'; gp.userData.noWalk = true; povEndWall.add(gp); const SH = 3.07;   // textures over it all: concrete, drywall, ceiling, pegboard
+    garagePanel(gp, 'concrete', X1 - X0, DD, cx, 0.022, ZC, 0, 1, 0);
+    garagePanel(gp, 'drywall', DD, CH, X0 + 0.006, CH / 2, ZC, 1, 0, 0, [DD / SH, 1]); garagePanel(gp, 'drywall', DD, CH, X1 - 0.006, CH / 2, ZC, -1, 0, 0, [DD / SH, 1]);
+    garagePanel(gp, 'drywall', X1 - X0, CH, cx, CH / 2, Z1 - 0.006, 0, 0, -1, [(X1 - X0) / SH, 1]);
+    garagePanel(gp, 'drywall', G.g0 - X0, CH, (X0 + G.g0) / 2, CH / 2, zF + 0.346, 0, 0, 1, [(G.g0 - X0) / SH, 1]); garagePanel(gp, 'drywall', X1 - G.g1, CH, (G.g1 + X1) / 2, CH / 2, zF + 0.346, 0, 0, 1, [(X1 - G.g1) / SH, 1]);
+    garagePanel(gp, 'drywall', G.g1 - G.g0, CH - 5.45, gx, (CH + 5.45) / 2, zF + 0.346, 0, 0, 1, [(G.g1 - G.g0) / SH, (CH - 5.45) / CH]);
+    garagePanel(gp, 'ceiling', X1 - X0, DD, cx, CH - 0.006, ZC, 0, -1, 0, [(X1 - X0) / SH, DD / SH]);
+    garagePanel(gp, 'pegboard', 4.0, 1.8, cx + 1.4, 3.1, Z1 - 0.058, 0, 0, -1); }
   // -- the motorcycle, in pride of place, pointing out at the street: princess pink, chrome, on its kickstand
   const b = new THREE.Group(); b.userData.name = 'Motorcycle'; b.position.set(gx - 0.2, 0, zF + 6.4); povEndWall.add(b); G.bike = b;
   const lean = new THREE.Group(); lean.rotation.z = 0.1; b.add(lean);                                       // (leaning on its stand)
@@ -6782,6 +6867,35 @@ function buildGarage(zF) {                                            // the gar
   { const ks = yBox(b, 0.05, 0.95, 0.05, 0x333333, -0.45, 0.42, 0.3); ks.rotation.z = -0.5; }                  // the kickstand
   bakeYard(b); bakeYard(lean);
   { const sh = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 4.8), softShadowMat(0.35, true)); sh.rotation.x = -Math.PI / 2; sh.position.set(gx - 0.2, 0.03, zF + 6.4); sh.userData.noWalk = true; sh.renderOrder = 1; povEndWall.add(sh); }
+}
+function garageTex(kind) {                                            // the garage's surfaces: poured concrete (joints, cracks, oil), taped drywall, the ceiling, a pegboard
+  const T = garageTex.t || (garageTex.t = {}); if (T[kind]) return T[kind];
+  let sd = 23; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const blot = (c, x, y, r, col) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(x - r, y - r, 2 * r, 2 * r); };
+  let t;
+  if (kind === 'concrete') t = canvasTex(512, 512, (c, w, h) => { c.fillStyle = '#95928b'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 90; i++) blot(c, rn() * w, rn() * h, 20 + rn() * 70, rn() < 0.5 ? 'rgba(255,255,255,.07)' : 'rgba(40,36,30,.08)');   // (mottled, as poured)
+      for (let i = 0; i < 9000; i++) { c.fillStyle = `rgba(${rn() < 0.5 ? '30,28,24' : '255,255,255'},${0.05 + rn() * 0.1})`; c.fillRect(rn() * w, rn() * h, 1.5, 1.5); }
+      c.strokeStyle = 'rgba(40,38,34,.55)'; c.lineWidth = 3; for (const f of [0.34, 0.67]) { c.beginPath(); c.moveTo(0, f * h); c.lineTo(w, f * h); c.stroke(); } c.beginPath(); c.moveTo(w / 2, 0); c.lineTo(w / 2, h); c.stroke();   // saw-cut joints
+      c.strokeStyle = 'rgba(40,36,30,.4)'; c.lineWidth = 1.2; for (let k = 0; k < 4; k++) { let x = rn() * w, y = rn() * h; c.beginPath(); c.moveTo(x, y); for (let s = 0; s < 9; s++) { x += (rn() - 0.5) * 30; y += (rn() - 0.3) * 22; c.lineTo(x, y); } c.stroke(); }   // hairline cracks
+      blot(c, 0.38 * w, 0.5 * h, 70, 'rgba(25,22,18,.5)'); blot(c, 0.35 * w, 0.46 * h, 40, 'rgba(20,18,14,.45)'); blot(c, 0.88 * w, 0.25 * h, 40, 'rgba(30,26,20,.4)'); blot(c, 0.55 * w, 0.2 * h, 30, 'rgba(30,26,20,.3)');   // oil, under the bike and the mower
+      c.fillStyle = 'rgba(30,28,26,.12)'; for (const x of [0.3, 0.46]) c.fillRect(x * w, 0.52 * h, 16, 0.48 * h);                            // (tyre marks in from the door)
+    }, 1, 1);
+  else if (kind === 'drywall' || kind === 'ceiling') t = canvasTex(256, 512, (c, w, h) => { c.fillStyle = kind === 'ceiling' ? '#e8e5de' : '#d6d1c6'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 2500; i++) { c.fillStyle = `rgba(${rn() < 0.5 ? '0,0,0' : '255,255,255'},${0.03 + rn() * 0.04})`; c.fillRect(rn() * w, rn() * h, 1.5, 1.5); }
+      for (const x of [0, w]) { const g = c.createLinearGradient(x - 22, 0, x + 22, 0); g.addColorStop(0, 'rgba(240,237,230,0)'); g.addColorStop(0.5, 'rgba(240,237,230,.85)'); g.addColorStop(1, 'rgba(240,237,230,0)'); c.fillStyle = g; c.fillRect(x - 22, 0, 44, h); }   // taped and mudded seams
+      c.fillStyle = 'rgba(245,242,236,.9)'; for (const fx of [0.04, 0.5, 0.96]) for (let y = 30; y < h; y += 58) { c.beginPath(); c.arc(fx * w, y, 3, 0, 7); c.fill(); }   // (screw heads, filled)
+      if (kind === 'drywall') { const g = c.createLinearGradient(0, h * 0.8, 0, h); g.addColorStop(0, 'rgba(60,50,40,0)'); g.addColorStop(1, 'rgba(60,50,40,.28)'); c.fillStyle = g; c.fillRect(0, h * 0.8, w, h * 0.2);   // grubby down low...
+        c.strokeStyle = 'rgba(50,44,40,.35)'; c.lineWidth = 2; for (let i = 0; i < 12; i++) { const x = rn() * w, y = h * (0.7 + rn() * 0.28); c.beginPath(); c.moveTo(x, y); c.lineTo(x + 8 + rn() * 26, y + (rn() - 0.5) * 6); c.stroke(); } }   // ...scuffs and knocks
+    }, 1, 1);
+  else t = canvasTex(256, 128, (c, w, h) => { c.fillStyle = '#b58f62'; c.fillRect(0, 0, w, h); for (let i = 0; i < 1500; i++) { c.fillStyle = `rgba(90,60,30,${rn() * 0.12})`; c.fillRect(rn() * w, rn() * h, 3, 1); }
+      c.fillStyle = '#3e2c1c'; for (let x = 4; x < w; x += 8) for (let y = 4; y < h; y += 8) { c.beginPath(); c.arc(x, y, 1.4, 0, 7); c.fill(); } }, 1, 1);   // pegboard: holes in a grid
+  T[kind] = t; return t;
+}
+function garagePanel(par, kind, w, h, x, y, z, nx, ny, nz, rep) {     // a textured sheet laid over one of the garage's surfaces, shaded like the rest
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: garageTex(kind), fog: false })), k = tqShade(nx, ny, nz) * (ny > 0.5 ? 0.82 : 0.95);
+  m.material.color.setRGB(k, k, k); if (rep) { const U = m.geometry.attributes.uv; for (let i = 0; i < U.count; i++) U.setXY(i, U.getX(i) * rep[0], U.getY(i) * rep[1]); }
+  m.position.set(x, y, z); m.lookAt(x + nx, y + ny, z + nz); m.userData.noWalk = true; par.add(m); return m;
 }
 function garageOK(x, z) {                                             // she can walk in under the door once it's (most of the way) up
   const G = garage, U = UPPER; if (!G || G.open < 0.6 || walk.pos.y > 6) return false;
@@ -7931,7 +8045,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 17:05';                                              // stamped when the site is published
+const BUILD = '2026-09-29 17:28';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -10548,36 +10662,44 @@ function scheduleMusic() {
     musicNext += eighth; musicStep++;
   }
 }
-// ---- upstairs: Aunty-ji's place has its own soundtrack. A tanpura drone, a tabla keeping a lilting keherwa, and a sitar singing raag Bhairav ----
+// ---- upstairs: Aunty-ji's place has its own soundtrack. Bhangra: the dhol's galloping chaal, a tumbi twanging a hook, a harmonium drone, a shehnai singing over it ----
 let musicTrk = '';
-const DESI = { SA: 50, MEL: [7, -1, 8, 7, 5, 4, 5, -1,  4, 1, 0, -1, 1, 4, 5, 7,  8, -1, 11, 12, 11, 8, 7, -1,  5, 4, 1, 4, 0, -1, -1, -1,
-                              12, -1, 11, 8, 7, -1, 8, 7,  5, 7, 8, 7, 5, 4, 1, -1,  0, 1, 4, 5, 7, 8, 11, 12,  11, 8, 7, 5, 4, 1, 0, -1] };
+const DESI = { SA: 62, TUMBI: [81, 81, -1, 81, 83, 81, -1, 78, -1, 76, 78, -1,  74, -1, 74, 76, 78, -1, 76, -1, 74, -1, -1, -1,  81, 81, -1, 81, 83, 84, -1, 83, -1, 81, 83, -1,  81, -1, 79, 78, 76, -1, 74, -1, 74, -1, -1, -1],
+               SHEH: [74, 76, 78, 79, 81, 79, 78, 76, 78, -1, 74, -1,  76, 78, 79, 81, 83, 81, 79, 78, 79, -1, 76, -1] };   // (D Mixolydian, near enough Khamaj: very Punjabi)
 function kittyUpstairs() { const p = walk.pos, U = UPPER; return walk.on && inUpper(p.x, p.z) && (p.y > U.UF - 0.6 || (p.x < -0.2 && p.z < U.SW + 0.2 && p.y > U.LH - 0.6)); }   // (up there, or in the foyer on the way)
-function dPluck(midi, t, dur, vol, slide) {                           // a sitar-ish pluck: two buzzy saws through a nasal band-pass, the odd meend (a slide up into the note)
-  const f = mtof(midi), g = actx.createGain(), bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f * 3.2; bp.Q.value = 1.6;
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  for (const det of [-7, 6]) { const o = actx.createOscillator(); o.type = 'sawtooth'; o.detune.value = det;
-    if (slide) { o.frequency.setValueAtTime(f * 0.94, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.09); } else o.frequency.value = f;
-    o.connect(bp); o.start(t); o.stop(t + dur + 0.05); }
-  bp.connect(g); g.connect(musicBus);
-}
 function dDrum(t, f0, f1, dur, vol, type) { const o = actx.createOscillator(), g = actx.createGain(); o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + dur + 0.02); }
-function scheduleDesi() {                                            // 92 bpm, eighth notes: tabla every step, the drone each bar, the melody over eight bars
-  const eighth = 60 / 92 / 2, SA = DESI.SA;
+function dTumbi(midi, t, vol) {                                       // the tumbi: one high steel string, plucked hard, nasal, a flick of pitch as it's struck
+  const f = mtof(midi), o = actx.createOscillator(), bp = actx.createBiquadFilter(), g = actx.createGain(); o.type = 'square';
+  o.frequency.setValueAtTime(f * 1.04, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.03); bp.type = 'bandpass'; bp.frequency.value = f * 2.2; bp.Q.value = 3;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  o.connect(bp); bp.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.25);
+}
+function dShehnai(midi, t, dur, vol, from) {                          // the shehnai: a reedy, nasal double-reed, sliding into its notes, a little vibrato
+  const f = mtof(midi), o = actx.createOscillator(), o2 = actx.createOscillator(), bp = actx.createBiquadFilter(), g = actx.createGain(), lfo = actx.createOscillator(), lg = actx.createGain();
+  o.type = 'sawtooth'; o2.type = 'square'; o2.detune.value = 7;
+  for (const x of [o, o2]) { if (from) { x.frequency.setValueAtTime(mtof(from), t); x.frequency.exponentialRampToValueAtTime(f, t + 0.09); } else x.frequency.value = f; }   // (meend: gliding up from the last note)
+  lfo.frequency.value = 5.5; lg.gain.value = f * 0.012; lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
+  bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 1.4;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.05); g.gain.setValueAtTime(vol, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(bp); o2.connect(bp); bp.connect(g); g.connect(musicBus); for (const x of [o, o2, lfo]) { x.start(t); x.stop(t + dur + 0.05); }
+}
+function scheduleDesi() {                                            // 104 bpm in a triplet swing (12 steps a bar): the dhol under everything, the tumbi hook, the shehnai answering it
+  const step = 60 / 104 / 3, SA = DESI.SA;
   if (musicNext < actx.currentTime) musicNext = actx.currentTime + 0.05;
   while (musicNext < actx.currentTime + 0.3) {
-    const t = musicNext, st = musicStep % 8, n = musicStep;
-    if (st === 0) [[SA - 5, 0], [SA, 2], [SA, 4], [SA - 12, 6]].forEach(([m, k]) => dPluck(m, t + k * eighth, eighth * 7, 0.022));   // the tanpura: Pa, Sa, Sa, low Sa, round and round
-    const bol = 'DGNTNKDN'[st];                                                                           // keherwa: dha ge na ti | na ka dhi na
-    if (bol === 'D' || bol === 'G') dDrum(t, bol === 'D' ? 130 : 95, 62, 0.34, 0.2);                       // the bayan: a deep, bending boom
-    if (bol === 'D' || bol === 'N') { dDrum(t, 560, 520, 0.16, 0.07, 'triangle'); dDrum(t, 1120, 1080, 0.08, 0.025); }   // the dayan: a ringing "na"
-    if (bol === 'T' || bol === 'K') rNoise(t, 0.05, 0.09, 'bandpass', 3200, 2);                           // (a dry "ti", "ka")
-    const m = DESI.MEL[n % DESI.MEL.length];
-    if (m >= 0 && n >= 16) dPluck(SA + 12 + m, t, eighth * (DESI.MEL[(n + 1) % DESI.MEL.length] < 0 ? 3.2 : 1.8), 0.05, Math.random() < 0.3);   // (the sitar comes in on the third bar)
-    musicNext += eighth; musicStep++;
+    const t = musicNext, n = musicStep, st = n % 12, bar = Math.floor(n / 12), sec = Math.floor(bar / 4) % 4;   // (four-bar sections: dhol in, + tumbi, + shehnai, all together)
+    if (st === 0 && bar % 2 === 0) { cPad(SA - 12, t, step * 24, 0.02); cPad(SA - 5, t, step * 24, 0.016); cPad(SA, t, step * 24, 0.012); }   // the harmonium, pumping out Sa and Pa
+    if (st === 0 || st === 6) { dDrum(t, 115, 52, 0.32, 0.3); rNoise(t, 0.08, 0.1, 'lowpass', 260); }        // the dhol's bass side (dagga): BOOM
+    if (st === 3 || st === 9 && bar % 2) dDrum(t, 95, 60, 0.2, 0.14);                                          // (a lighter one, pushing it along)
+    if (st === 2 || st === 4 || st === 5 || st === 8 || st === 10 || st === 11) { rNoise(t, 0.055, st === 5 || st === 11 ? 0.11 : 0.07, 'bandpass', 3000, 1.6); dDrum(t, 820, 640, 0.05, 0.03, 'triangle'); }   // the treble side (tihli): tak-tak
+    if (bar % 4 === 3 && st >= 6) rNoise(t + step / 2, 0.04, 0.05, 'bandpass', 3400, 1.6);                     // (a roll into the next section)
+    if (sec >= 1 && sec !== 2) { const m = DESI.TUMBI[n % 48]; if (m > 0) dTumbi(m, t, 0.05); }
+    if (sec >= 2 && st % 3 === 0) { const i = Math.floor(n / 3) % 24, m = DESI.SHEH[i]; if (m > 0) { let len = 1; while (DESI.SHEH[(i + len) % 24] < 0 && len < 3) len++; dShehnai(m, t, step * 3 * len * 0.95, 0.03, i && DESI.SHEH[i - 1] > 0 ? DESI.SHEH[i - 1] : 0); } }
+    musicNext += step; musicStep++;
   }
 }
+
 // ---- catnip soundtracks ----
 function cPad(midi, t, dur, vol) {                                   // a soft detuned pad that swells in and out
   for (const det of [-9, 9]) {
@@ -11116,6 +11238,7 @@ function updateWalk(dt) {
   const yaw = fc.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);   // stick up = away from the camera
   _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * nipK().walk * (!inRoomXZ(p.x, p.z) && !upstairsView(p) ? 1.9 : 1));   // (outdoors, back or front, she tears about; indoors upstairs, she walks)   // catnip: zoomies / a floaty drift / a slow zen amble
   if (yardOpen() && inBush(p.x, p.z, p.y)) { _wv.multiplyScalar(0.6); if (_wv.lengthSq() > 1 && clock > (walk.rustleT || 0)) { walk.rustleT = clock + 0.32; noise(0.16, 0.05, 1300 + Math.random() * 600); } }   // (pushing through a bush: slower, and rustling)
+  if (tubWet()) _wv.multiplyScalar(0.55);                             // (wading through the bath: slow going)
   if (clock > (walk.flingT || 0)) walk.vel.lerp(_wv, 1 - Math.exp(-dt * (walk.grounded ? 12 : 8)));   // (flung by the fan: no steering out of it for a moment)
   if (walk.jumpQ > 0 && clock - walk.jumpQ < 0.2 && walk.grounded) {   // (a press just before landing still counts)
     walk.vy = WALK.jumpV * nipK().jump; walk.grounded = false; walk.jumpQ = -1; tone(520, 940, 0.11, 'triangle', 0.035);
