@@ -7181,7 +7181,7 @@ function updateTOD(dt) {
   const T = TOD, run = state === 'playing' || state === 'levelup' || state === 'menu' || state === 'over', XF = 14, P = TOD_P;
   if (run) T.t += dt;
   if (T.t >= P[T.i].d) { T.t -= P[T.i].d; T.i = (T.i + 1) % P.length; const p = P[T.i]; if (p.say) todSay(p.say);
-    if (!T.wx && Math.random() < 0.45) todWeather(Math.random() < (p.night ? 0.5 : 0.3) ? 'snow' : 'rain'); }
+    if (!T.wx && Math.random() < (p.n === 'night' ? 0.6 : 0.4)) todWeather(Math.random() < (p.n === 'night' ? 0.3 : 0.25) ? 'snow' : 'rain'); }
   const cur = P[T.i], nxt = P[(T.i + 1) % P.length], f = Math.max(0, (T.t - (cur.d - XF)) / XF), s = f * f * (3 - 2 * f), L = (a, b) => a + (b - a) * s;
   if (T.sky.material.map !== todSkyTex(cur.sky)) { T.sky.material.map = todSkyTex(cur.sky); T.sky.material.needsUpdate = true; }
   T.skyB.visible = f > 0; if (f > 0) { const mb = todSkyTex(nxt.sky); if (T.skyB.material.map !== mb) { T.skyB.material.map = mb; T.skyB.material.needsUpdate = true; } T.skyB.material.opacity = s; }
@@ -7237,6 +7237,110 @@ function updateTOD(dt) {
       T.audio = { src, g, lp }; }
     if (T.audio) { T.audio.g.gain.value += (want - T.audio.g.gain.value) * Math.min(1, dt * 2); T.audio.lp.frequency.value = camIn ? 900 : 2400;
       if (want === 0 && T.audio.g.gain.value < 0.001) { T.audio.src.stop(); T.audio = null; } } }
+}
+// ---- Zombie night: on a rainy night, zombies claw up out of the backyard lawn. Pounce on their heads or swipe them to put them back down (one hit each).
+// Waves get bigger; each zombie that reaches her costs a heart (three a night). Survive till the rain stops or the sun comes up, or clear three waves, for the achievement.
+var ZN = null;
+function zombieOK() { return !!TOD && TOD.nightF > 0.8 && TOD.wx === 'rain' && TOD.W > 0.7; }
+function makeZombie() {                                                // a shambling cartoon zombie, about twice her height: torn shirt, green skin, glowing eyes
+  const M = (hex, e) => { const m = new THREE.MeshLambertMaterial({ color: hex, emissive: new THREE.Color(hex).multiplyScalar(e === undefined ? 0.45 : e) }); m.userData.noTod = true; return m; };
+  const skin = M(0x7fa05a), shirt = M([0x6a4f7a, 0x4f6a78, 0x7a5a3e, 0x8a3a3a][Math.random() * 4 | 0]), pants = M(0x33384a), dark = M(0x1d1a18, 0.2), rot = M(0x5d7a40);
+  const B = (par, w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); par.add(o); return o; };
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const legs = [-1, 1].map(s => { const l = new THREE.Group(); l.position.set(s * 0.16, 0.72, 0); body.add(l); B(l, 0.22, 0.72, 0.24, pants, 0, -0.36, 0); B(l, 0.24, 0.12, 0.34, dark, 0, -0.7, 0.05); return l; });
+  const torso = new THREE.Group(); torso.position.y = 0.72; torso.rotation.x = 0.18; body.add(torso);
+  B(torso, 0.56, 0.62, 0.3, shirt, 0, 0.31, 0); B(torso, 0.2, 0.14, 0.02, rot, 0.12, 0.2, 0.16); B(torso, 0.12, 0.2, 0.02, skin, -0.14, 0.42, 0.16);   // (rips in the shirt)
+  const arms = [-1, 1].map(s => { const a = new THREE.Group(); a.position.set(s * 0.36, 0.56, 0); torso.add(a); a.rotation.x = -1.45;   // (arms out in front, of course)
+    B(a, 0.16, 0.56, 0.16, shirt, 0, -0.22, 0); B(a, 0.13, 0.2, 0.13, skin, 0, -0.56, 0); for (const f of [-1, 0, 1]) B(a, 0.03, 0.1, 0.03, skin, f * 0.04, -0.7, 0.02); return a; });
+  const head = new THREE.Group(); head.position.set(0, 0.7, 0.04); torso.add(head); head.rotation.z = 0.25;
+  B(head, 0.4, 0.42, 0.38, skin, 0, 0.2, 0); B(head, 0.42, 0.1, 0.4, dark, 0, 0.42, -0.02); B(head, 0.18, 0.05, 0.02, dark, 0, 0.06, 0.2); B(head, 0.05, 0.06, 0.02, M(0xeeeedd, 0.5), 0.04, 0.05, 0.205);
+  B(head, 0.1, 0.08, 0.02, rot, -0.12, 0.3, 0.195);
+  for (const s of [-1, 1]) { const e = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xb6ff3a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    e.position.set(s * 0.09, 0.2, 0.21); e.scale.setScalar(0.22); head.add(e); B(head, 0.06, 0.05, 0.02, M(0xd8ff7a, 1.2), s * 0.09, 0.2, 0.2); }
+  const mound = new THREE.Mesh(new THREE.CircleGeometry(0.7, 14), new THREE.MeshBasicMaterial({ color: 0x3a2a1c, transparent: true, opacity: 0, depthWrite: false })); mound.rotation.x = -Math.PI / 2; mound.renderOrder = 1; mound.material.userData.noTod = true;
+  return { g, body, legs, arms, torso, head, mound, st: 'off', t: 0, x: 0, z: 0, face: 0, sp: 1, ph: Math.random() * 7, groanT: 2 + Math.random() * 4 };
+}
+function zGroan(vol) { const f = 70 + Math.random() * 40; tone(f, f * 0.7, 0.9, 'sawtooth', vol || 0.03); tone(f * 1.5, f * 1.1, 0.7, 'triangle', (vol || 0.03) * 0.6, 0.1); }
+function zHud() {
+  if (!ZN.hud) { const d = ZN.hud = document.createElement('div'); d.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,26,14,.78);color:#d8ff9a;font:700 15px system-ui,sans-serif;padding:7px 16px;border-radius:18px;border:2px solid #7fbf3a;text-shadow:0 1px 2px #000;white-space:nowrap'; document.body.appendChild(d); }
+  ZN.hud.hidden = !ZN.on || state !== 'playing'; if (ZN.hud.hidden) return;
+  ZN.hud.textContent = `🧟 Zombie night · Wave ${ZN.wave} · 💀 ${ZN.kills} · ${'❤️'.repeat(Math.max(0, ZN.hearts))}${'🖤'.repeat(Math.max(0, 3 - ZN.hearts))}`;
+}
+function zSpawnSpot() {                                                // somewhere on our lawn a few metres from her, clear of the patio, shed and so on
+  const p = walk.pos;
+  for (let k = 0; k < 40; k++) { const a = Math.random() * Math.PI * 2, r = 4 + Math.random() * 6, x = p.x + Math.cos(a) * r, z = p.z + Math.sin(a) * r;
+    if (!inOurYard(x, z) || z < ROOM.visDepth + 2.5 || z > YARD.FZ - 1 || x > YARD.XR - 0.8 || x < yardXL(z) + 0.8) continue;
+    if (YARD_BLOCKS.some(([x0, x1, z0, z1]) => x > x0 - 0.5 && x < x1 + 0.5 && z > z0 - 0.5 && z < z1 + 0.5)) continue;
+    if (ZN.z.some(q => q.st !== 'off' && Math.hypot(q.x - x, q.z - z) < 1.4)) continue;
+    return [x, z]; }
+  return null;
+}
+function zStart() {
+  if (!ZN.pool) { ZN.root = new THREE.Group(); ZN.root.userData.noWalk = true; ZN.root.userData.name = 'Zombies'; scene.add(ZN.root); ZN.pool = true; ZN.z = [];
+    for (let i = 0; i < 8; i++) { const q = makeZombie(); q.g.visible = false; ZN.root.add(q.g, q.mound); ZN.z.push(q); } }
+  Object.assign(ZN, { on: true, wave: 0, kills: 0, hearts: 3, left: 0, spawnT: 1.5, breakT: 0, hurtT: 0, waves: 0 });
+  zNextWave(); showWalkName('🧟 The ground is moving... ZOMBIES! Pounce on their heads or swipe them!'); zGroan(0.05); setTimeout(() => zGroan(0.04), 500);
+}
+function zNextWave() { ZN.wave++; ZN.left = 2 + ZN.wave * 2; ZN.spawnT = 1.2; ZN.breakT = 0; if (ZN.wave > 1) showWalkName(`🧟 Wave ${ZN.wave}! More of them are coming up...`); }
+function zEnd(won, why) {
+  ZN.on = false; ZN.cool = true; for (const q of ZN.z) if (q.st !== 'off' && q.st !== 'die') { q.st = 'sink'; q.t = 0; }
+  if (won) { const fresh = !achDone.zombieNight; unlock('zombieNight'); showWalkName(`${why} You survived zombie night! ${ZN.kills} zombies bopped${fresh ? '' : ' (again)'}`); [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.16, 'triangle', 0.04, i * 0.1)); }
+  else { showWalkName(`🧟 The zombies got her! They sink back into the mud... (${ZN.kills} bopped)`); tone(300, 90, 0.8, 'sawtooth', 0.04); }
+  zHud();
+}
+function zKill(q, how) {
+  q.st = 'die'; q.t = 0; ZN.kills++; q.dir = how === 'stomp' ? 0 : 1;
+  burst(new THREE.Vector3(q.x, 1.2, q.z), 0x8fcf4a, 14, 3, 2, 0.35); noise(0.15, 0.3, 500); tone(180, 60, 0.3, 'square', 0.05); zGroan(0.025);
+  if (how === 'stomp') { walk.vy = WALK.jumpV * 0.7; walk.grounded = false; walk.squash = 1; tone(660, 990, 0.1, 'triangle', 0.04); }
+}
+function zombieSwipe(paw) {
+  if (!ZN || !ZN.on) return false; let best = null, bd = 1.1;
+  for (const q of ZN.z) if (q.st === 'walk' || (q.st === 'rise' && q.t > 0.8)) { const d = Math.hypot(q.x - paw.x, q.z - paw.z); if (d < bd && paw.y < 2.2) { bd = d; best = q; } }
+  if (!best) return false; zKill(best, 'swipe'); return true;
+}
+function updateZombies(dt) {
+  if (!walk.on || state !== 'playing') { if (ZN && ZN.hud) ZN.hud.hidden = true; return; }
+  if (!ZN) ZN = { on: false, cool: false };
+  const p = walk.pos, ok = zombieOK();
+  if (!ok) ZN.cool = false;                                           // (one rising per rainy night)
+  if (!ZN.on && ok && !ZN.cool && inOurYard(p.x, p.z) && p.z > ROOM.visDepth + 2) zStart();
+  if (ZN.on && !ok) zEnd(true, TOD.nightF > 0.8 ? '🌧️ The rain stops.' : '🌅 The sun comes up.');
+  if (!ZN.pool) return;
+  const inYard = inOurYard(p.x, p.z);
+  if (ZN.on) {
+    if (ZN.hurtT > 0) ZN.hurtT -= dt;
+    const alive = ZN.z.filter(q => q.st === 'rise' || q.st === 'walk').length;
+    if (ZN.left > 0 && inYard && alive < 6 && (ZN.spawnT -= dt) <= 0) { const s = zSpawnSpot(), q = ZN.z.find(q => q.st === 'off');
+      if (s && q) { ZN.left--; ZN.spawnT = Math.max(0.7, 2.6 - ZN.wave * 0.3) + Math.random(); Object.assign(q, { st: 'rise', t: 0, x: s[0], z: s[1], sp: 0.9 + Math.random() * 0.4 + ZN.wave * 0.12 });
+        q.g.visible = true; q.mound.position.set(s[0], 0.03, s[1]); q.mound.material.opacity = 0.9; noise(0.5, 0.12, 300); zGroan(0.03); } }
+    if (ZN.left <= 0 && alive === 0) { if (!ZN.breakT) { ZN.breakT = 3.5; ZN.waves++; showWalkName(`🧟 Wave ${ZN.wave} cleared!`); if (ZN.waves >= 3) { zEnd(true, '🏆 Three waves down!'); } }
+      else if ((ZN.breakT -= dt) <= 0) zNextWave(); }
+  }
+  for (const q of ZN.z) { if (q.st === 'off') continue; q.t += dt;
+    const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz);
+    if (q.st === 'rise') { const k = Math.min(1, q.t / 1.6); q.body.position.y = -1.9 * (1 - k) * (1 - k); q.body.rotation.z = Math.sin(q.t * 18) * 0.08 * (1 - k); q.arms.forEach((a, i) => a.rotation.x = -2.6 + k * 1.15 + Math.sin(q.t * 9 + i) * 0.2);
+      if (Math.random() < dt * 10) burst(new THREE.Vector3(q.x + (Math.random() - 0.5) * 0.6, 0.1, q.z + (Math.random() - 0.5) * 0.6), 0x4a3524, 2, 1.5, 2, 0.25);
+      q.face = Math.atan2(dx, dz); if (k >= 1) { q.st = ZN.on ? 'walk' : 'sink'; q.t = 0; } }
+    else if (q.st === 'walk') {                                        // shamble toward her (they stay on our lawn)
+      const want = Math.atan2(dx, dz); let da = want - q.face; da = Math.atan2(Math.sin(da), Math.cos(da)); q.face += da * Math.min(1, dt * 2.5);
+      if (d > 0.5) { const sp = q.sp * (0.75 + 0.35 * Math.sin(q.t * 4 + q.ph)); let nx = q.x + Math.sin(q.face) * sp * dt, nz = q.z + Math.cos(q.face) * sp * dt;
+        if (!ZN.z.some(o => o !== q && (o.st === 'walk' || o.st === 'rise') && Math.hypot(o.x - nx, o.z - nz) < 0.8) && inOurYard(nx, nz) && nz > ROOM.visDepth + 1 && !YARD_BLOCKS.some(([x0, x1, z0, z1]) => nx > x0 && nx < x1 && nz > z0 && nz < z1)) { q.x = nx; q.z = nz; } }
+      const sw = Math.sin(q.t * 4 + q.ph); q.legs[0].rotation.x = sw * 0.5; q.legs[1].rotation.x = -sw * 0.5; q.body.position.y = Math.abs(sw) * 0.05; q.body.rotation.z = Math.sin(q.t * 2 + q.ph) * 0.1;
+      q.arms.forEach((a, i) => a.rotation.x = -1.45 + Math.sin(q.t * 3 + i * 1.3) * 0.15); q.head.rotation.x = Math.sin(q.t * 1.7 + q.ph) * 0.2;
+      if ((q.groanT -= dt) <= 0) { q.groanT = 3 + Math.random() * 5; if (d < 14) zGroan(0.03 * Math.max(0.2, 1 - d / 14)); }
+      const hy = 1.62;                                                 // (the top of its head)
+      if (walk.vy < -0.5 && d < 0.8 && p.y > hy - 0.7 && p.y < hy + 0.45) zKill(q, 'stomp');
+      else if (ZN.on && d < 0.62 && p.y < 1.1 && ZN.hurtT <= 0) {       // it got her: a heart, and she's knocked back
+        ZN.hurtT = 1.6; ZN.hearts--; const ox = dx / (d || 1), oz = dz / (d || 1); walk.vel.set(ox * 7, 0, oz * 7); walk.vy = 5; walk.grounded = false; walk.flingT = clock + 0.6; walk.squash = 1;
+        tone(900, 1700, 0.18, 'sawtooth', 0.04); noise(0.1, 0.25, 700); zGroan(0.05);
+        if (ZN.hearts <= 0) zEnd(false); else showWalkName(ZN.hearts === 1 ? '🧟 Ouch! Last heart - careful!' : '🧟 A zombie got her! Ouch!'); }
+      if (!ZN.on) { q.st = 'sink'; q.t = 0; } }
+    else if (q.st === 'die') { const k = Math.min(1, q.t / 0.5); q.body.rotation.x = (q.dir ? -1 : 1) * k * 1.45; q.body.position.y = 0; if (q.dir === 0) q.body.scale.y = 1 - 0.5 * k;
+      if (q.t > 0.9) q.body.position.y = -(q.t - 0.9) * 1.6; if (q.t > 2.2) { q.st = 'off'; q.g.visible = false; q.body.rotation.set(0, 0, 0); q.body.scale.set(1, 1, 1); } }
+    else if (q.st === 'sink') { q.body.position.y -= dt * 1.2; if (q.body.position.y < -2) { q.st = 'off'; q.g.visible = false; } }
+    q.g.position.set(q.x, 0, q.z); q.g.rotation.y = q.face;
+    if (q.mound.material.opacity > 0 && q.st !== 'rise') q.mound.material.opacity = Math.max(0, q.mound.material.opacity - dt * 0.08); }
+  zHud();
 }
 function updateYardLife(dt) {                                         // the sky rides with the camera; clouds drift; butterflies flit; birds circle; birdsong outside
   if (!skyRig || !povEndWall || !povEndWall.visible) return;
@@ -8264,6 +8368,7 @@ const ACHIEVEMENTS = [
     ['mosaicSmash', '🪞', 'Seven years bad luck', 'In Free roam, leap into the mosaic mirror art and bring it crashing down'],
     ['coonShot', '🎯', 'Trash panda down', 'In Free roam, shoot the raccoon taunting you at the slider'],
     ['catscape', '🪟', 'The Great Catscape', 'In Free roam, leap out of an upstairs back window. Aunty-ji is already calling your mother'],
+    ['zombieNight', '🧟', 'Night of the Living Dead', 'In Free roam, survive zombie night in the backyard (it only happens when it rains at night)'],
     ['glassBreak', '💥', 'Slider smasher', 'Shatter the sliding glass door'],
     ['copsCalled', '🚨', 'Someone called the cops', 'Stick around until the sirens show up after the raccoon incident'],
     ['laundryMess', '🧺', 'Laundry day', 'In Free roam, swipe the folded laundry off the armchair'],
@@ -8298,7 +8403,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 19:12';                                              // stamped when the site is published
+const BUILD = '2026-09-29 19:20';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -11905,6 +12010,7 @@ function walkSwipe() {                                               // swipe at
   const paw = new THREE.Vector3(p.x + fx * 0.45, p.y + 0.35, p.z + fz * 0.45);
   if (blanketRigs.some(r => r.state === 'cat')) { shrugBlanket(); return; }   // under a blanket: the swipe flings it off
   if (gunRig.state === 'cat') { fireGun(); return; }                 // armed: the swipe pulls the trigger
+  if (zombieSwipe(paw)) return;                                      /* zombie night: one swipe each */
   if (coonSwipe(paw)) return;                                        // the raccoon at the slider: whack the glass right in front of it
   if (dogSwipe(paw)) return;                                         // the Doberman out in the yard
   if (knockDoor(paw)) return;
@@ -12801,7 +12907,7 @@ function frame(now) {
   candleLight.intensity = (0.32 + flick / flames.length * 0.1) * lit / flames.length;
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
   if (sliderDisco) updateSliderDisco(dt);
-  updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateYardGate(dt); updateGarage(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
+  updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateZombies(dt); updateYardGate(dt); updateGarage(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
 
   if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && (camera.position.z >= ROOM.visDepth - 0.05 || !inRoomXZ(camera.position.x, camera.position.z) || upstairsView(camera.position)));   // (or out in the yard, round the front, or upstairs)
   updateUpperLights();   // the end wall + door: only from inside the room
