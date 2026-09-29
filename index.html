@@ -3591,20 +3591,27 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
             if (half) {                                                                                            // next door's: seven straight steps the full width of it, white railings
               for (let k = 0; k < 7; k++) { const h = LH - (k + 1) * LH / 8; yBox(steps, SWD, h, 0.62, 0xb0aca4, ex, h / 2, zF - 1.91 - k * 0.62); }
               for (const s of [-1, 1]) { const rx = ex + s * (SWD / 2 - 0.1); rail([[rx, LH, zF - 0.12], [rx, LH, zF - 1.6], [rx, LH / 8, zF - 5.94]], [[0, LH], [1, LH], [2, LH / 8]]); }
-            } else {                                                                                               // ours (the Street View photo): a poured-concrete stoop, the common Toronto kind. Straight treads coming down to
-              const xs = ex + SWD / 2, zc = zF - 1.6, T = 0.62, N = 7, RX = SWD, RZ = N * T + 0.5, SEG = 8;          // the street; the side by the side door straight, the lawn side sweeping in as it comes down (a quarter-ellipse),
-              const hK = k => LH - (k + 1) * LH / 8, edgeX = (d, i) => xs - (RX - i) * Math.sqrt(Math.max(0, 1 - (d / (RZ - i)) ** 2));   // so the flight turns in toward the driveway. (d: how far out from the landing)
-              for (let k = 0; k < N; k++) {                                                                        // each tread its own band, the next one down butting up against it (no shared faces)
-                const d0 = k * T, d1 = (k + 1) * T, P = [[xs, zc - d0], [xs, zc - d1]];
-                for (let i = 0; i <= SEG; i++) { const d = d1 - (d1 - d0) * i / SEG; P.push([edgeX(d, 0), zc - d]); }   // (its rounded end, on the curve)
+            } else {                                                                                               // ours (the user's plan, top down): a rectangular landing at the doors; the steps leave its lawn side along the house,
+              const xLm = ex - SWD / 2, xLp = ex + SWD / 2, zLF = zF - 1.6, W = 2.4, R = 1.6, L1 = 0.4, N = 8;       // sweep round toward the street in a half turn, and come back along below the landing to step off facing
+              const cxS = xLm - L1, zT = zF - W / 2 - 0.02, czS = zT - R, xEnd = xLp - 1.8, S = L1 + Math.PI * R + (xEnd - cxS);   // the driveway. A garden bed in the curve, railings round the outside, the inside, and the landing
+              const hK = k => LH - (k + 1) * LH / (N + 1);
+              const at = s => { if (s <= L1) return [xLm - s, zT, 0, -1];                                              // [x, z, and which way's in (toward the curve's middle)]
+                if (s <= L1 + Math.PI * R) { const a = (s - L1) / R; return [cxS - R * Math.sin(a), czS + R * Math.cos(a), Math.sin(a), -Math.cos(a)]; }
+                return [cxS + (s - L1 - Math.PI * R), czS - R, 0, 1]; };
+              const edge = (s, off) => { const [x, z, ix, iz] = at(s); return [x + ix * off, z + iz * off]; };        // (off > 0: toward the inside of the curve)
+              for (let k = 0; k < N; k++) {                                                                          // each step a band along the path, the next butting up against it (no shared faces)
+                const s0 = k * S / N, s1 = (k + 1) * S / N, P = [], n = 8;
+                for (let i = 0; i <= n; i++) P.push(edge(s0 + (s1 - s0) * i / n, -W / 2)); for (let i = n; i >= 0; i--) P.push(edge(s0 + (s1 - s0) * i / n, W / 2));
                 const g = new THREE.ExtrudeGeometry(new THREE.Shape(P.map(([x, z]) => new THREE.Vector2(x, -z))), { depth: hK(k), bevelEnabled: false });
                 const m = new THREE.Mesh(g, yMat(k % 2 ? 0xb0aca4 : 0xaaa69e)); m.rotation.x = -Math.PI / 2; steps.add(m); }
-              const dEnd = N * T - 0.28, railY = d => Math.max(hK(N - 1), LH - LH * d / (8 * T));                  // (a rail follows the line of the nosings: never below a step)
-              rail([[xs - 0.1, LH, zF - 0.12], [xs - 0.1, LH, zc], [xs - 0.1, railY(dEnd), zc - dEnd]], [[0, LH], [1, LH], [2, hK(N - 1)]]);   // the side-door side: straight down
-              { const pts = [[xs - SWD + 0.1, LH, zF - 0.12], [xs - SWD + 0.1, LH, zc]];                              // the lawn side: along the landing, then round the curve and down to the bottom step
-                for (let i = 1; i <= 12; i++) { const d = dEnd * i / 12; pts.push([edgeX(d, 0.12), railY(d), zc - d]); }
-                rail(pts, [[0, LH], [1, LH], [8, hK(Math.floor(dEnd * 6 / 12 / T))], [13, hK(N - 1)]]); }
-              yCyl(hd, 0.26, 0.2, 0.42, 0x8a5a3a, ex - 2.45, LH + 0.21, zF - 1.38, 12); yBlob(hd, 0.32, 0x4f7a3a, ex - 2.45, LH + 0.62, zF - 1.38, 0.8); }   // (a potted plant on the landing)
+              const railPts = (off, s0, s1, n) => Array.from({ length: n + 1 }, (_, i) => { const s = s0 + (s1 - s0) * i / n, [x, z] = edge(s, off); return [x, LH - (LH - hK(N - 1)) * s / S, z]; });   // (along the line of the nosings)
+              const foot = s => hK(Math.min(N - 1, Math.floor(s / (S / N) + 1e-6)));
+              { const o = railPts(-W / 2 + 0.12, 0, S - 0.3, 20); rail(o, [[0, LH], [10, foot((S - 0.3) / 2)], [20, hK(N - 1)]]); }   // the outside, from the wall right round
+              { const o = railPts(W / 2 - 0.12, 0, S - 0.3, 16); rail(o, [[0, hK(0)], [8, foot((S - 0.3) / 2)], [16, hK(N - 1)]]); }   // the inside, round the garden bed
+              rail([[xLm + 0.1, LH, zLF + 0.1], [xLp - 0.1, LH, zLF + 0.1], [xLp - 0.1, LH, zF - 0.12]], [[0, LH], [1, LH], [2, LH]]);   // the landing: along its front (a drop to the bed) and its side-door side
+              yBox(hd, xLp - xLm - 0.2, 0.06, zLF - (czS - R + W / 2) - 0.2, 0x4a3526, (xLm + xLp) / 2, 0.03, (zLF + czS - R + W / 2) / 2);   // the garden bed in the curve: mulch...
+              for (const [bx, bz, r] of [[xLm + 1.0, zLF - 0.7, 0.55], [xLm + 2.4, zLF - 0.9, 0.45], [xLp - 1.2, zLF - 0.7, 0.5]]) yBlob(hd, r, 0x3f7a3a, bx, r * 0.7, bz, 0.8);   // ...and a few shrubs
+              yCyl(hd, 0.26, 0.2, 0.42, 0x8a5a3a, xLp - 0.7, LH + 0.21, zF - 0.6, 12); yBlob(hd, 0.32, 0x4f7a3a, xLp - 0.7, LH + 0.62, zF - 0.6, 0.8); }   // (a potted plant on the landing)
           }
           bakeYard(steps);
         }
@@ -5102,11 +5109,12 @@ function buildUpperFloor() {                                          // behind 
     for (let k = 0; k < 4; k++) S(0.05, 0xffd23a, 2.2 + Math.cos(k * 1.57) * 0.24, UF + 2.0, zF + 0.8 + Math.sin(k * 1.57) * 0.24, 1.8, 'glow', glow);
     shadow(mx, mz, 1.8, 1.6, 0.3); }
   C(0.4, 0.3, 0.9, 0xb5552b, 12.7, UF, zF + 0.75, 12); S(0.5, 0x3f8a45, 12.7, UF + 1.4, zF + 0.75, 1.1); S(0.4, 0x4f9a50, 12.5, UF + 1.95, zF + 0.9); shadow(12.7, zF + 0.75, 1.0, 1.0, 0.3);   // a potted plant in the corner
-  { const z = zF + 12;                                                                                    // a carved jaali screen between the living room and the dining room
-    B(-0.3, 3.4, UF, UF + 0.3, z - 0.1, z + 0.1, DARK, 'wood'); B(-0.3, 3.4, UF + 4.6, UF + 4.9, z - 0.1, z + 0.1, DARK, 'wood');
-    for (let x = -0.3; x <= 3.41; x += 0.46) B(x - 0.05, x + 0.05, UF + 0.3, UF + 4.6, z - 0.08, z + 0.08, DARK, 'wood');
-    for (let y = UF + 0.76; y < UF + 4.6; y += 0.46) B(-0.3, 3.4, y - 0.04, y + 0.04, z - 0.06, z + 0.06, TEAK, 'wood');
-    for (let x = -0.07; x < 3.3; x += 0.46) for (let y = UF + 0.53; y < UF + 4.5; y += 0.46) B(x - 0.07, x + 0.07, y - 0.07, y + 0.07, z - 0.05, z + 0.05, BRASS, 'shiny').rotation.z = Math.PI / 4; }   // (a brass diamond in every opening)
+  { const z = zF + 12, jg = new THREE.Group(); jg.userData.name = 'Jaali screen'; root.add(jg);          // a carved jaali screen between the living room and the dining room (fly into it and it comes down)
+    B(-0.3, 3.4, UF, UF + 0.3, z - 0.1, z + 0.1, DARK, 'wood', jg); B(-0.3, 3.4, UF + 4.6, UF + 4.9, z - 0.1, z + 0.1, DARK, 'wood', jg);
+    for (let x = -0.3; x <= 3.41; x += 0.46) B(x - 0.05, x + 0.05, UF + 0.3, UF + 4.6, z - 0.08, z + 0.08, DARK, 'wood', jg);
+    for (let y = UF + 0.76; y < UF + 4.6; y += 0.46) B(-0.3, 3.4, y - 0.04, y + 0.04, z - 0.06, z + 0.06, TEAK, 'wood', jg);
+    for (let x = -0.07; x < 3.3; x += 0.46) for (let y = UF + 0.53; y < UF + 4.5; y += 0.46) B(x - 0.07, x + 0.07, y - 0.07, y + 0.07, z - 0.05, z + 0.05, BRASS, 'shiny', jg).rotation.z = Math.PI / 4;   // (a brass diamond in every opening)
+    bakeKinds(jg, scales); U.jaali = { g: jg, z, x0: -0.3, x1: 3.4, broken: false }; }
   garland(HL + 2.95, SW + 0.05, -0.3, SW + 0.05, UF + 4.9, 0.45, 14);                                     // a toran over the top of the stairs
   // ======== the hall: a console with a brass urli of floating flowers, a Madhubani painting ========
   B(HL + 0.2, HL + 1.3, UF, UF + 2.0, -9.4, -7.0, TEAK, 'wood'); C(0.55, 0.3, 0.2, BRASS, HL + 0.75, UF + 2.0, -8.2, 18, 'shiny'); C(0.5, 0.5, 0.02, 0x7fb3c9, HL + 0.75, UF + 2.17, -8.2, 18, 'shiny', dec);
@@ -5795,7 +5803,7 @@ function tubWet() { const T = UPPER.tub, p = walk.pos; return !!T && p.x > T.x0 
 function ripple(x, z, size, delay) {                                  // a ring running out across the water
   const T = UPPER.tub; let r = T.rings.find(q => q.t >= q.life);
   if (!r) { if (T.rings.length >= 12) return; const m = new THREE.Mesh(new THREE.RingGeometry(0.86, 1, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false })); m.rotation.x = -Math.PI / 2; m.renderOrder = 3; m.userData.noWalk = true; UPPER.root.add(m); r = { m, t: 0, life: 1.1, size: 1 }; T.rings.push(r); }
-  r.t = -(delay || 0); r.size = size; r.m.position.set(x, T.wl + 0.008, z); r.m.visible = false;
+  r.t = -(delay || 0); r.size = Math.max(0.2, Math.min(size, x - T.x0 + 0.2, T.x1 + 0.2 - x, z - T.z0 + 0.2, T.z1 + 0.2 - z)); r.m.position.set(x, T.wl + 0.008, z); r.m.visible = false;   /* (never bigger than the bath it's in) */
 }
 function splashSound(s) {                                             // a plunge: a low plunk, a rush of white water, drips pattering back down
   tone(210, 70, 0.18, 'sine', 0.07 * Math.min(1.2, s));
@@ -5815,7 +5823,7 @@ function tubPlunge(p, s) {                                            // SPLOOSH
   if (s > 0.6) splashUp(new THREE.Vector3(p.x, U.UF, T.z1 + 0.9), U.UF, 0x9fb8c0, 1.2 * s);             // (a lake on the bathroom floor)
   if (!T.smashed && s > 0.45) { T.smashed = true; T.g.visible = false;                                   // ...and every dish in there breaks
     for (let i = 0; i < 18; i++) { const m = new THREE.Mesh(_shardGeo, bitMat([0xe8e0d0, 0xc9ccd1, 0x2f6fb0][i % 3])); const sc = 0.6 + Math.random() * 0.9; m.scale.set(sc, 0.3, sc); m.position.set(p.x, T.wl + 0.05, p.z); m.userData.noWalk = true; U.root.add(m);
-      const a = Math.random() * 6.28, sp = 0.6 + Math.random() * 1.8; upBits.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, 1 + Math.random() * 2, Math.sin(a) * sp), spin: (Math.random() - 0.5) * 20, down: false, gy: T.wl - 0.3, ox: p.x, oz: p.z }); }
+      const a = Math.random() * 6.28, sp = 0.6 + Math.random() * 1.8; upBits.push({ m, v: new THREE.Vector3(Math.cos(a) * sp, 1 + Math.random() * 2, Math.sin(a) * sp), spin: (Math.random() - 0.5) * 20, down: false, gy: T.wl - 0.3, ox: p.x, oz: p.z, tub: T }); }
     noise(0.3, 0.1, 3600); tone(2300, 1400, 0.09, 'triangle', 0.04, 0.05); tone(1800, 1100, 0.1, 'triangle', 0.035, 0.12); showWalkName('💦 SPLOOSH! ...and CRASH. So much for the dishes');
     const A = U.aunty; if (A && A.first === 2 && clock > (A.breakT || 0)) { A.breakT = clock + 8; auntySay([['a', A.lines.breaks[Math.random() * A.lines.breaks.length | 0]]], 'break'); } }
   else if (s > 0.45) showWalkName('💦 SPLOOSH!');
@@ -5835,6 +5843,17 @@ function updateTub(dt) {                                              // the bat
   if (py0 >= T.wl && p.y < T.wl) tubPlunge(p, Math.min(1.6, Math.max(0.5, -walk.vy / 6)));              // in she goes
   else if (py0 < T.wl && p.y >= T.wl) tubPlunge(p, 0.3);                                               // (and out, dripping)
   else if (p.y < T.wl && walk.grounded && Math.hypot(walk.vel.x, walk.vel.z) > 0.5 && clock > (T.wadeT || 0)) { T.wadeT = clock + 0.34; ripple(p.x, p.z, 0.7); T.slosh = Math.min(1.6, T.slosh + 0.15); noise(0.16, 0.05, 900); tone(260, 180, 0.08, 'sine', 0.012); }   // wading: slosh, slosh
+}
+function updateJaali() {                                              // the jaali screen: flung into it (the fan!), or charging into it flat out, and the whole thing comes down
+  const J = UPPER.jaali; if (!J || J.broken || !walk.on || state !== 'playing') return; const p = walk.pos, U = UPPER, sp = Math.hypot(walk.vel.x, walk.vel.z);
+  if (p.x < J.x0 - 0.4 || p.x > J.x1 + 0.4 || Math.abs(p.z - J.z) > 0.75 || p.y > U.UF + 4.8 || p.y < U.UF - 0.5) return;
+  if (!(clock < (walk.flingT || 0) + 0.3 || sp > 6)) return;                                                    // (only a real crash brings it down)
+  J.broken = true; J.g.visible = false; while (upBits.length > 150) dropBit(upBits.shift());
+  for (let i = 0; i < 26; i++) { const m = new THREE.Mesh(i % 3 ? _shardGeo : (updateJaali.slat || (updateJaali.slat = new THREE.BoxGeometry(0.1, 0.9, 0.1))), bitMat([0x5a3a24, 0x8a5a34, 0xc9a23a][i % 3])); m.position.set(J.x0 + Math.random() * (J.x1 - J.x0), U.UF + 0.5 + Math.random() * 3.5, J.z); m.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6); m.userData.noWalk = true; U.root.add(m);
+    upBits.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 2.5, 1 + Math.random() * 2, (Math.random() - 0.5) * 3 + walk.vel.z * 0.3), spin: (Math.random() - 0.5) * 12, down: false, gy: U.UF, ox: m.position.x, oz: J.z }); }
+  noise(0.6, 0.25, 1100); tone(160, 60, 0.4, 'sawtooth', 0.05); for (let i = 0; i < 6; i++) tone(700 + Math.random() * 500, 400, 0.08, 'triangle', 0.02, 0.1 + i * 0.09);   // CRACK, and the clatter
+  shake = Math.max(shake, reduceMotion ? 0.05 : 0.3); showWalkName('💥 CRASH! Straight through the jaali screen');
+  const A = U.aunty; if (A && A.first === 2) auntySay([['a', "My JAALI! Hand-carved in Jaipur! Your uncle haggled for THREE HOURS!"]], 'break');
 }
 function updateFanHit() {                                             // the living room's ceiling fan: jump into the blades and WHAP, she's flung across the room
   const F = UPPER.fan; if (!F || !walk.on || state !== 'playing') return; const p = walk.pos, fy = F.position.y - 0.04, dx = p.x - F.position.x, dz = p.z - F.position.z, d = Math.hypot(dx, dz);
@@ -5986,6 +6005,7 @@ function updateUpProps(dt) {                                          // the din
   }
   for (const b of upBits) { if (b.down) continue; b.v.y -= 20 * dt; b.m.position.addScaledVector(b.v, dt); b.m.rotation.x += b.spin * dt; b.m.rotation.y += b.spin * 0.7 * dt;
     const ox = b.m.position.x - b.ox, oz = b.m.position.z - b.oz, od = Math.hypot(ox, oz); if (od > 0.8) { b.m.position.x = b.ox + ox / od * 0.8; b.m.position.z = b.oz + oz / od * 0.8; b.v.x *= -0.2; b.v.z *= -0.2; }   // (shards stay by where it broke)
+    if (b.tub) { const T = b.tub, q = b.m.position; q.x = Math.min(q.x, YARD.XR - 0.3); b.gy = q.x > T.x0 && q.x < T.x1 && q.z > T.z0 && q.z < T.z1 ? T.wl - 0.3 : UPPER.UF; }   /* (a shard from the bath: in the bath, or on the floor, never in mid-air or the wall) */
     const gy = b.gy + 0.01; if (b.m.position.y <= gy) { b.m.position.y = gy; if (b.v.y < -3 && !b.drop) { b.v.y *= -0.25; b.v.x *= 0.5; b.v.z *= 0.5; } else { b.down = true; b.m.rotation.x = 0; b.m.rotation.z = 0; if (b.drop) b.m.scale.set(1.7, 0.2, 1.7); } } }   // (a droplet lands as a little splash)
 }
 function upPropSwipe(paw) {                                           // a swipe at the table's things: the nearest one goes flying
@@ -5999,6 +6019,7 @@ function resetUpProps() {                                             // a new F
   for (const b of upBits) dropBit(b); upBits.length = 0;
   if (U.bags) for (const b of U.bags) { b.popped = false; b.g.scale.set(1, 1, 1); }                      // (fresh bin bags, the bin back up, the dishes back in the tub)
   if (U.bin) { const T = U.bin; T.state = 'up'; T.v.set(0, 0, 0); T.roll = 0; T.g.quaternion.identity(); T.g.position.set(T.x, U.UF, T.z); if (T.sh) T.sh.position.set(T.x, T.sh.position.y, T.z); }
+  if (U.jaali) { U.jaali.broken = false; U.jaali.g.visible = true; }                                          // (the jaali back up)
   if (U.tub) { U.tub.g.visible = true; U.tub.smashed = false; U.tub.slosh = 0; for (const d of U.tub.drops) U.root.remove(d.m); U.tub.drops.length = 0; }
   if (U.mouse) { U.mouse.st = null; U.mouse.out = 0; if (U.cupDoor) U.cupDoor.rotation.y = 0; }   // (the mouse back in its cupboard, the door shut)
   const L = U.loo; if (L) { L.t = 0; L.on = false; L.poop.visible = true; L.poop.position.y = L.py; L.poop.rotation.y = 0; L.poop.scale.setScalar(1); L.clean.visible = L.swirl.visible = false; }   // (and the loo unflushed again)
@@ -6027,7 +6048,7 @@ function knockDoor(paw) {                                             // she swi
   showWalkName('🚪 Knock knock...'); D.want = 1; D.openAt = clock + 1.1; return true;
 }
 function updateFrontDoor(dt) {                                        // the door swings in once she's knocked; the jhoola sways; the fan turns
-  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 7; updateFlies(dt); updateAunty(dt); updateVermin(dt); updateUpProps(dt); updateLoo(dt); updateBins(dt); updateTub(dt); updateFanHit(); updateEscape();
+  const U = UPPER; if (U.jhoola) U.jhoola.rotation.x = Math.sin(clock * 1.1) * 0.05; if (U.fan) U.fan.rotation.y += dt * 7; updateFlies(dt); updateAunty(dt); updateVermin(dt); updateUpProps(dt); updateLoo(dt); updateBins(dt); updateTub(dt); updateFanHit(); updateJaali(); updateEscape();
   const D = frontDoor; if (!D) return;
   const go = D.want && clock > D.openAt;
   if (go && !D.said) { D.said = true; tone(260, 185, 0.55, 'sawtooth', 0.02); noise(0.35, 0.03, 500); showWalkName('🚪 ...the door creaks open. Come on in!'); }
@@ -8050,7 +8071,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 18:01';                                              // stamped when the site is published
+const BUILD = '2026-09-29 18:42';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -10667,48 +10688,44 @@ function scheduleMusic() {
     musicNext += eighth; musicStep++;
   }
 }
-// ---- upstairs: Aunty-ji's place has its own soundtrack, an old Bollywood film song. A dholak's lilting keherwa, a harmonium pumping the chords, the string section
-//      swooping in, a bansuri flute singing the tune, mandolin trembling through the chorus. (A minor, the filmi way: Am, G, F and an E major that tugs back home) ----
+// ---- upstairs: Aunty-ji's place has its own soundtrack. Upbeat, warm Bollywood: a bright dholak groove with claps, a round bass, harmonium stabs on the off-beats,
+//      warm strings under it all, and a flute and a mandolin trading the happy hook (G major, festive: G, F, C, G) ----
 let musicTrk = '';
-const DESI = { CH: [[57, 60, 64], [55, 59, 62], [53, 57, 60], [52, 56, 59]],
-  MEL: [76, -1, 76, 74, 72, -1, 71, 72,  74, -1, 74, 72, 71, -1, 69, 71,  72, -1, 72, 71, 69, -1, 68, 69,  71, -1, -1, 68, 64, -1, -1, -1],
-  HOOK: [81, -1, 79, 77, 76, -1, 77, 79,  79, -1, 77, 76, 74, -1, 76, 77,  77, -1, 76, 74, 72, -1, 71, 72,  71, -1, 72, 71, 68, -1, -1, -1] };
+const DESI = { CH: [[55, 59, 62], [53, 57, 60], [48, 52, 55], [55, 59, 62]],
+  HOOK: [74, 76, 79, 76, 74, -1, 71, 74,  72, 74, 77, 74, 72, -1, 69, 72,  67, 69, 71, 72, 74, 76, 74, 72,  71, -1, 67, -1, 71, 72, 74, -1],
+  ANS: [79, -1, 81, 79, 77, 76, 74, -1,  77, -1, 79, 77, 76, 74, 72, -1,  76, 74, 72, 71, 72, 74, 76, -1,  79, -1, 78, -1, 79, -1, -1, -1] };
 function kittyUpstairs() { const p = walk.pos, U = UPPER; return walk.on && inUpper(p.x, p.z) && (p.y > U.UF - 0.6 || (p.x < -0.2 && p.z < U.SW + 0.2 && p.y > U.LH - 0.6)); }   // (up there, or in the foyer on the way)
 function dDrum(t, f0, f1, dur, vol, type) { const o = actx.createOscillator(), g = actx.createGain(); o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + dur + 0.02); }
-function dVoice(midi, t, dur, vol, from, cfg) {                        // one sustained voice (flute, strings, harmonium): oscillators through a filter, sliding in from the last note, a vibrato
+function dVoice(midi, t, dur, vol, from, cfg) {                        // one sustained voice (flute, strings, harmonium): oscillators through a warm filter, sliding in from the last note, a vibrato
   const f = mtof(midi), g = actx.createGain(), lp = actx.createBiquadFilter(), lfo = actx.createOscillator(), lg = actx.createGain(), os = [];
-  lp.type = 'lowpass'; lp.frequency.value = cfg.cut; lfo.frequency.value = cfg.vib || 5.5; lg.gain.value = f * (cfg.depth || 0.006); lfo.connect(lg);
+  lp.type = 'lowpass'; lp.frequency.value = cfg.cut; lfo.frequency.value = cfg.vib || 5.5; lg.gain.value = f * (cfg.depth || 0); lfo.connect(lg);
   for (const [type, det] of cfg.osc) { const o = actx.createOscillator(); o.type = type; o.detune.value = det;
-    if (from) { o.frequency.setValueAtTime(mtof(from), t); o.frequency.exponentialRampToValueAtTime(f, t + (cfg.glide || 0.08)); } else o.frequency.value = f;
+    if (from) { o.frequency.setValueAtTime(mtof(from), t); o.frequency.exponentialRampToValueAtTime(f, t + (cfg.glide || 0.06)); } else o.frequency.value = f;
     lg.connect(o.frequency); o.connect(lp); os.push(o); }
-  const at = cfg.att || 0.05; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + at); g.gain.setValueAtTime(vol, t + Math.max(at, dur * 0.75)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const at = cfg.att || 0.03; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + at); g.gain.setValueAtTime(vol, t + Math.max(at, dur * 0.7)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   lp.connect(g); g.connect(musicBus); for (const o of [...os, lfo]) { o.start(t); o.stop(t + dur + 0.05); }
 }
-const D_FLUTE = { osc: [['sine', 0], ['triangle', 4]], cut: 3200, vib: 5.2, depth: 0.007, att: 0.06, glide: 0.1 };            // the bansuri
-const D_STR = { osc: [['sawtooth', -9], ['sawtooth', 0], ['sawtooth', 10]], cut: 2400, vib: 5.8, depth: 0.005, att: 0.14, glide: 0.35 };   // the violins (they swoop)
-const D_HARM = { osc: [['sawtooth', 0], ['square', -12]], cut: 1500, vib: 0.1, depth: 0, att: 0.04 };                            // the harmonium's reeds
-function dPluck(midi, t, vol) {                                       // the mandolin: a bright little pluck (played as a tremolo, it shimmers)
-  const f = mtof(midi), o = actx.createOscillator(), bp = actx.createBiquadFilter(), g = actx.createGain(); o.type = 'sawtooth'; o.frequency.value = f; bp.type = 'bandpass'; bp.frequency.value = f * 2.5; bp.Q.value = 1.5;
-  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09); o.connect(bp); bp.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.1);
-}
-function scheduleDesi() {                                            // 92 bpm, swung eighths; four-bar sections: strings swoop in, the flute's verse, the strings-and-mandolin chorus, the verse again
-  const e8 = 60 / 92 / 2;
+const D_FLUTE = { osc: [['sine', 0], ['triangle', 3]], cut: 3000, vib: 5.5, depth: 0.006, att: 0.03, glide: 0.06 };
+const D_STR = { osc: [['sawtooth', -8], ['sawtooth', 8]], cut: 1500, vib: 5, depth: 0.003, att: 0.25 };                       // warm, soft strings
+const D_HARM = { osc: [['sawtooth', 0], ['square', -10]], cut: 1800, att: 0.01 };
+function dPluck(midi, t, vol) { const f = mtof(midi), o = actx.createOscillator(), bp = actx.createBiquadFilter(), g = actx.createGain(); o.type = 'sawtooth'; o.frequency.value = f; bp.type = 'bandpass'; bp.frequency.value = f * 2.5; bp.Q.value = 1.5;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12); o.connect(bp); bp.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.13); }
+function dClap(t, vol) { for (const k of [0, 0.011, 0.022]) rNoise(t + k, 0.07, vol, 'bandpass', 1500, 0.8); }                // (a hand clap: three quick slaps)
+function scheduleDesi() {                                            // 116 bpm, eighths with a little bounce; four-bar sections: groove in, the flute's hook, the mandolin answers, everyone together
+  const e8 = 60 / 116 / 2;
   if (musicNext < actx.currentTime) musicNext = actx.currentTime + 0.05;
   while (musicNext < actx.currentTime + 0.3) {
-    const n = musicStep, st = n % 8, bar = Math.floor(n / 8), sec = Math.floor(bar / 4) % 4, t = musicNext + (st % 2 ? e8 * 0.14 : 0), ch = DESI.CH[bar % 4], i = (bar % 4) * 8 + st;
-    if (st === 0 || st === 4) ch.forEach((m, k) => dVoice(m, t, e8 * 3.6, k ? 0.007 : 0.009, 0, D_HARM));                          // the harmonium, pumping on 1 and 3
-    if (st === 0 || st === 6) { dDrum(t, 150, 70, 0.3, 0.2); dDrum(t, 900, 860, 0.1, 0.05); }                                       // the dholak: dha / dhi (both heads)
-    if (st === 1) dDrum(t, 92, 150, 0.26, 0.13);                                                                                    // ...ge: the bass head, the heel sliding it up (that dholak "boing")
-    if (st === 2 || st === 4 || st === 7) { dDrum(t, 880, 850, 0.1, 0.05); rNoise(t, 0.025, 0.035, 'bandpass', 3600, 2); }        // ...na: the treble head's ring
-    if (st === 3 || st === 5) rNoise(t, 0.04, 0.06, 'bandpass', 2300, 1.2);                                                        // ...ti, ka: slaps
-    const line = sec === 2 ? DESI.HOOK : DESI.MEL, m = line[i];
-    if (sec === 0 && st === 0 && bar % 4 === 0) dVoice(69, t, e8 * 14, 0.016, 57, D_STR);                                            // the intro: the strings swoop up an octave...
-    if (sec === 0 && st === 0 && bar % 4 === 2) dVoice(76, t, e8 * 14, 0.014, 64, D_STR);                                            // ...and again
-    if (sec !== 0 && m > 0) { let len = 1; while (line[(i + len) % 32] < 0 && len < 4) len++; const prev = i ? line[i - 1] : 0, from = prev > 0 && Math.random() < 0.6 ? prev : 0;
-      if (sec === 2) { dVoice(m, t, e8 * len * 0.98, 0.012, from, D_STR); for (let k = 0; k < len * 2; k++) dPluck(m - 12, t + k * e8 / 2, 0.018); }   // the chorus: strings on the tune, a mandolin tremolo under them
-      else dVoice(m, t, e8 * len * 0.95, 0.034, from, D_FLUTE); }                                                                  // the verse: the bansuri
-    if (sec === 3 && st === 0) dVoice(ch[0] + 12, t, e8 * 7.8, 0.006, 0, D_STR);                                                   // (the strings holding the chord under the second verse)
+    const n = musicStep, st = n % 8, bar = Math.floor(n / 8), sec = Math.floor(bar / 4) % 4, t = musicNext + (st % 2 ? e8 * 0.1 : 0), ch = DESI.CH[bar % 4], i = (bar % 4) * 8 + st;
+    if (st === 0 || st === 3 || st === 4 || st === 6) dDrum(t, st === 0 ? 140 : 120, 60, 0.28, st === 0 || st === 4 ? 0.22 : 0.13);   // the dholak's bass head, bouncing
+    if (st === 1 || st === 5) dDrum(t, 90, 150, 0.2, 0.1);                                                              // (the heel slide: that happy "boing")
+    if (st % 2 === 1 || st === 2) { dDrum(t, 900, 870, 0.08, 0.045); rNoise(t, 0.025, 0.03, 'bandpass', 3800, 2); }    // the treble head's ring
+    if (st === 2 || st === 6) dClap(t, 0.07);                                                                           // claps on 2 and 4
+    if (st === 0 || st === 3 || st === 4) dVoice(ch[0] - 12, t, e8 * (st === 3 ? 1 : 2.4), 0.06, 0, { osc: [['triangle', 0]], cut: 600 });   // a round bass
+    if (st % 2 === 1) ch.forEach(m => dVoice(m + 12, t, e8 * 0.5, 0.008, 0, D_HARM));                                 // harmonium chords on the off-beats: chk, chk
+    if (st === 0 && bar % 2 === 0) ch.forEach(m => dVoice(m, t, e8 * 15.5, 0.007, 0, D_STR));                         // warm strings under it all
+    if (sec === 1 || sec === 3) { const m = DESI.HOOK[i]; if (m > 0) { let len = 1; while (DESI.HOOK[(i + len) % 32] < 0 && len < 3) len++; dVoice(m, t, e8 * len * 0.92, 0.035, i && DESI.HOOK[i - 1] > 0 && Math.random() < 0.4 ? DESI.HOOK[i - 1] : 0, D_FLUTE); } }   // the flute's hook
+    if (sec === 2 || sec === 3) { const m = DESI.ANS[i]; if (m > 0) { dPluck(m, t, sec === 3 ? 0.022 : 0.03); dPluck(m, t + e8 / 2, 0.018); } }   // the mandolin answering (tremolo)
     musicNext += e8; musicStep++;
   }
 }
