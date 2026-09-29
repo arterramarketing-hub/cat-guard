@@ -3591,18 +3591,19 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
             if (half) {                                                                                            // next door's: seven straight steps the full width of it, white railings
               for (let k = 0; k < 7; k++) { const h = LH - (k + 1) * LH / 8; yBox(steps, SWD, h, 0.62, 0xb0aca4, ex, h / 2, zF - 1.91 - k * 0.62); }
               for (const s of [-1, 1]) { const rx = ex + s * (SWD / 2 - 0.1); rail([[rx, LH, zF - 0.12], [rx, LH, zF - 1.6], [rx, LH / 8, zF - 5.94]], [[0, LH], [1, LH], [2, LH / 8]]); }
-            } else {                                                                                               // ours (the Street View photo): down off the landing, then turning left toward the driveway, the steps fanning round
-              const cx = ex + SWD / 2, cz = zF - 1.6, RI = 0.32, RO = SWD, N = 7, DA = Math.PI / 2 / N, SEG = 6;       // the landing's corner (winders, like a spiral stair's quarter turn); a long cream railing round the outside
-              const hK = k => LH - (k + 1) * LH / 8, pt = (r, a) => [cx - Math.cos(a) * r, cz - Math.sin(a) * r];      // of the turn, a short steep one round the inside. (a: 0 along the landing's front edge, round to π/2: facing the driveway)
-              for (let k = 0; k < N; k++) {                                                                        // each step a wedge between the pier and the outside arc
-                const P = []; for (let i = 0; i <= SEG; i++) P.push(pt(RO, (k + i / SEG) * DA)); for (let i = SEG; i >= 0; i--) P.push(pt(RI, (k + i / SEG) * DA));
+            } else {                                                                                               // ours (the Street View photo): a poured-concrete stoop, the common Toronto kind. Straight treads coming down to
+              const xs = ex + SWD / 2, zc = zF - 1.6, T = 0.62, N = 7, RX = SWD, RZ = N * T + 0.5, SEG = 8;          // the street; the side by the side door straight, the lawn side sweeping in as it comes down (a quarter-ellipse),
+              const hK = k => LH - (k + 1) * LH / 8, edgeX = (d, i) => xs - (RX - i) * Math.sqrt(Math.max(0, 1 - (d / (RZ - i)) ** 2));   // so the flight turns in toward the driveway. (d: how far out from the landing)
+              for (let k = 0; k < N; k++) {                                                                        // each tread its own band, the next one down butting up against it (no shared faces)
+                const d0 = k * T, d1 = (k + 1) * T, P = [[xs, zc - d0], [xs, zc - d1]];
+                for (let i = 0; i <= SEG; i++) { const d = d1 - (d1 - d0) * i / SEG; P.push([edgeX(d, 0), zc - d]); }   // (its rounded end, on the curve)
                 const g = new THREE.ExtrudeGeometry(new THREE.Shape(P.map(([x, z]) => new THREE.Vector2(x, -z))), { depth: hK(k), bevelEnabled: false });
                 const m = new THREE.Mesh(g, yMat(k % 2 ? 0xb0aca4 : 0xaaa69e)); m.rotation.x = -Math.PI / 2; steps.add(m); }
-              yCyl(steps, RI, RI, LH + 0.02, 0xa39f97, cx, (LH + 0.02) / 2, cz, 16);                              // (a round pier at the corner they turn about)
-              const foot = a => hK(Math.min(N - 1, Math.floor(a / DA + 1e-6)));
-              const arc = (r, n) => Array.from({ length: n }, (_, i) => { const a = (i + 1) / n * Math.PI / 2, [x, z] = pt(r, a); return [x, LH - (LH - hK(N - 1)) * a / (Math.PI / 2), z, foot(Math.min(a, Math.PI / 2 - 1e-3))]; });   // (an even slope all the way round: never below a step)
-              { const o = arc(RO - 0.12, 12); rail([[ex - SWD / 2 + 0.1, LH, zF - 0.12], [ex - SWD / 2 + 0.1, LH, cz], ...o.map(p => p.slice(0, 3))], [[0, LH], [1, LH], [7, o[5][3]], [13, o[11][3]]]); }   // the outside of the turn: the landing's lawn side, then round the long way
-              { const o = arc(RI + 0.14, 4); rail([[cx - 0.1, LH, zF - 0.12], [cx - 0.1, LH, cz + 0.02], ...o.map(p => p.slice(0, 3))], [[0, LH], [1, LH], [5, o[3][3]]]); }   // the inside: short and steep, from the side-door end of the landing
+              const dEnd = N * T - 0.28, railY = d => Math.max(hK(N - 1), LH - LH * d / (8 * T));                  // (a rail follows the line of the nosings: never below a step)
+              rail([[xs - 0.1, LH, zF - 0.12], [xs - 0.1, LH, zc], [xs - 0.1, railY(dEnd), zc - dEnd]], [[0, LH], [1, LH], [2, hK(N - 1)]]);   // the side-door side: straight down
+              { const pts = [[xs - SWD + 0.1, LH, zF - 0.12], [xs - SWD + 0.1, LH, zc]];                              // the lawn side: along the landing, then round the curve and down to the bottom step
+                for (let i = 1; i <= 12; i++) { const d = dEnd * i / 12; pts.push([edgeX(d, 0.12), railY(d), zc - d]); }
+                rail(pts, [[0, LH], [1, LH], [8, hK(Math.floor(dEnd * 6 / 12 / T))], [13, hK(N - 1)]]); }
               yCyl(hd, 0.26, 0.2, 0.42, 0x8a5a3a, ex - 2.45, LH + 0.21, zF - 1.38, 12); yBlob(hd, 0.32, 0x4f7a3a, ex - 2.45, LH + 0.62, zF - 1.38, 0.8); }   // (a potted plant on the landing)
           }
           bakeYard(steps);
@@ -7930,7 +7931,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 16:57';                                              // stamped when the site is published
+const BUILD = '2026-09-29 17:05';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
