@@ -447,6 +447,8 @@
     <div class="set-row"><span>🔊 Sound effects</span><button class="tog" id="sfxBtn">On</button></div>
     <div class="set-row set-q"><span>✨ Graphics</span><div class="seg" id="qSeg"><button data-q="auto">Auto</button><button data-q="high">Sharp</button><button data-q="low">Battery saver</button></div></div>
     <p class="set-note" id="qNote"></p>
+    <div class="set-row"><span>🔧 Free roam house</span><button class="tog off" id="roamFix">Fix it up</button></div>
+    <p class="set-note">Free roam remembers the time, the weather and anything she’s broken open. This puts it all back.</p>
     <button class="btn" id="setClose">Back</button>
   </div>
 </section>
@@ -6701,6 +6703,7 @@ function bikeBuildUI() {
 #bikeUI .bk-msg.pop{animation:bkPop 1.1s ease-out forwards}
 #bikeUI .bk-count{position:absolute;left:0;right:0;top:32%;text-align:center;font-size:clamp(84px,22vw,170px);line-height:1;text-shadow:0 6px 0 #d63a82,0 0 30px rgba(58,20,52,.5);opacity:0}
 #bikeUI .bk-count.pop{animation:bkCount .95s ease-out forwards}
+#bikeUI .bk-hint{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);transform:translateX(-50%);background:rgba(58,20,52,.82);color:#fff4f8;font:800 14px var(--body);padding:9px 16px;border-radius:14px;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .5s;pointer-events:none}#bikeUI .bk-hint.on{opacity:1}#bikeUI.paused .bk-hint,#bikeUI.shopping .bk-hint,#bikeUI.rp .bk-hint{display:none}
 #bikeUI .bk-pads{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;justify-content:center;gap:12px}
 #bikeUI .bk-pads button{width:60px;height:60px;border-radius:16px;background:rgba(58,20,52,.8);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 rgba(45,19,40,.35)}
 #bikeUI .bk-pads button:active{background:#d63a82;transform:translateY(2px)}
@@ -6837,7 +6840,7 @@ body.biking .ach-toast{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 14
 <div class="bk-msg" id="bikeMsg"></div><div class="bk-count" id="bikeCount"></div>
 <div class="bk-panel bk-mstart" id="bikeMsS"></div><div class="bk-mtoast" id="bikeMsT"></div>
 <div class="bk-burst" id="bikeBurst"><b><span id="bikeBurstT"></span><small id="bikeBurstS"></small></b>${Array.from({ length: 22 }, (_, i) => `<i style="left:${(i * 4.6 + 2) % 100}%;background:${['#ff6fae', '#ffc93c', '#8a5cff', '#6fe0bf', '#8fd6ff'][i % 5]};animation-delay:${((i * 0.13) % 0.9).toFixed(2)}s"></i>`).join('')}</div>
-<div class="bk-pads">${arrow('L', 'M15 5l-7 7 7 7')}${arrow('U', 'M5 15l7-7 7 7')}${arrow('D', 'M5 9l7 7 7-7')}${arrow('R', 'M9 5l7 7-7 7')}</div>
+<div class="bk-hint" id="bikeSwipeHint">👆 Swipe ← → lanes · ↑ jump · ↓ duck</div>
 <div class="bk-rp"><div class="bk-rp-bar top"></div><div class="bk-rp-bar bot"></div><div class="bk-rp-tag"><i></i>REPLAY<small>slow-mo</small></div><div class="bk-rp-skip">tap to skip</div></div>
 <div class="bk-over" id="bikePauseOv"><div class="bk-card bk-pcard"><h2>Paused</h2><div class="bk-cap" id="bikePauseSub"></div><div class="bk-ms" id="bikeMsP"></div><button class="bk-btn" id="bikeResume">&#x25B6;&#xFE0E; Resume</button><button class="bk-btn alt" id="bikeQuit">Back to the garage</button></div></div>
 <div class="bk-over" id="bikeOver"><div class="bk-card" id="bikeCard"><div class="bk-conf">${Array.from({ length: 18 }, (_, i) => `<i style="left:${(i * 5.7 + 1) % 100}%;background:${['#ff6fae', '#ffc93c', '#8a5cff', '#6fe0bf', '#8fd6ff'][i % 5]};animation-delay:${(-((i * 0.37) % 2.6)).toFixed(2)}s"></i>`).join('')}</div>
@@ -8077,6 +8080,7 @@ function startBike(opts) {
     paused: false, pauseDrawn: false, hitStop: 0, kick: 0, inv: 0, revives: 0, bankedN: 0, crashSpd: 0, tramWarn: 0, goMsg: '', gold: false, nipMax: 5, magMax: 8, dist0: 0, bestS0: 0,
     ups: bikeUps(), shut: [0, 0, 0], workAt: 0, tramAt: 0, binAt: 0, binsTo: 0, wkSeg: 0, wkDir: 0, wkSide: 1, wkSigned: true, shopTab: 'paint' });
   B.laneLast.fill(0); B.laneBlock.fill(0); B.sw.id = -1;
+  { const h = $('bikeSwipeHint'); if (h) { let n = 0; try { n = parseInt(localStorage.getItem('catguard.bikeHintN') || '0', 10) || 0; localStorage.setItem('catguard.bikeHintN', String(n + 1)); } catch (e) {} h.classList.toggle('on', n < 3); clearTimeout(h._t); h._t = setTimeout(() => h.classList.remove('on'), 6500); } }   /* (the first few rides: how the swipes work) */
   { const hs = [0, 150, 300][B.ups.head] || 0;   /* head start: 150 m or 300 m in, at the speed she'd have there */
     if (hs) { let t = 0, dd = 0; while (dd < hs) { t += 0.05; dd += (13 + 17 * (1 - Math.exp(-t / 110))) * 0.05; }
       Object.assign(B, { dist: hs, dist0: hs, runT: t, resumeSpd: 13 + 17 * (1 - Math.exp(-t / 110)), rowAt: hs + 45, powerAt: hs + 320, lastCyc: hs % 2100, goMsg: 'Head start! ' + hs + ' m' }); } }
@@ -8336,7 +8340,7 @@ function garageOK(x, z) {                                             // she can
 function garageSwipe(paw) {                                           // a swipe at the garage door: up it goes
   const G = garage, U = UPPER; if (!G || G.want || !walk.on) return false;
   if (paw.x < G.g0 - 0.3 || paw.x > G.g1 + 0.3 || paw.z < U.zF - 1.4 || paw.z > U.zF + 0.4 || paw.y > 4) return false;
-  G.want = 1; G.hinted = true; tone(58, 64, 3.4, 'sawtooth', 0.016); for (let i = 0; i < 6; i++) setTimeout(() => noise(0.08, 0.035, 1400), 300 + i * 520);   // the opener hums, the door rattles up
+  G.want = 1; G.hinted = true; roamSave({ garage: 1 }); tone(58, 64, 3.4, 'sawtooth', 0.016); for (let i = 0; i < 6; i++) setTimeout(() => noise(0.08, 0.035, 1400), 300 + i * 520);   // the opener hums, the door rattles up
   showWalkName('🏍️ The garage door rumbles up...'); return true;
 }
 function updateGarage(dt) {
@@ -8725,10 +8729,36 @@ function todWeather(kind) {                                            // start 
   const T = TOD; if (kind) { T.wx = kind; T.wxLeft = 70 + Math.random() * 90; T.murk.material.map = todSkyTex('overcast'); todSay(kind === 'rain' ? '🌧️ It\'s starting to rain...' : '❄️ It\'s snowing!'); }
   else T.wxLeft = 0;
 }
+function roamLoad() { try { const o = JSON.parse(localStorage.getItem('catguard.roam') || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+function roamSave(patch) {                                            // Free roam remembers between visits: the time of day and the weather, the slider she smashed, the garage she opened, that she's been out of the yard
+  const R = roamSave.o || (roamSave.o = roamLoad()); if (patch) Object.assign(R, patch);
+  if (TOD) R.tod = { i: TOD.i, t: +TOD.t.toFixed(1), wx: TOD.wx || null, W: +(TOD.W || 0).toFixed(2), wxLeft: +(TOD.wxLeft || 0).toFixed(1) };
+  try { localStorage.setItem('catguard.roam', JSON.stringify(R)); } catch (e) {}
+}
+function roamRestoreTod() {                                           // (once, when the sky's first made: pick up where the day left off)
+  const R = roamSave.o || (roamSave.o = roamLoad()), s = R.tod, T = TOD; if (!s || !(s.i >= 0 && s.i < TOD_P.length)) return;
+  T.i = s.i | 0; T.t = Math.max(0, Math.min(TOD_P[T.i].d - 0.5, +s.t || 0));
+  if ((s.wx === 'rain' || s.wx === 'snow') && s.wxLeft > 3) { T.wx = s.wx; T.wxLeft = s.wxLeft; T.W = Math.max(0, Math.min(1, +s.W || 0)); if (T.murk) T.murk.material.map = todSkyTex('overcast'); }
+}
+function roamRestoreWorld() {                                         // back in Free roam: everything just how she left it
+  const R = roamSave.o || (roamSave.o = roamLoad());
+  if (R.slider) sliderGlass.forEach(g => { g.visible = false; });
+  if (R.garage && garage) { Object.assign(garage, { want: 1, open: 1, hinted: true, said: true }); placeGarageDoor(garage); }
+  if (R.free) walk.free = true;
+  if (R.slider || R.garage || R.free || (R.tod && R.tod.wx && R.tod.wxLeft > 3)) setTimeout(() => { if (!walk.on || state !== 'playing') return; const T = TOD, wet = T && T.wx && T.wxLeft > 3 ? (T.wx === 'snow' ? ' (and it’s still snowing!)' : ' (and it’s still raining!)') : '';
+    showWalkName('\u{1F3E1} Welcome back! Everything’s just how she left it' + wet); }, 1900);
+}
+function roamReset() {                                                // Settings: fix the house up (the slider's glass back, the garage shut, a fresh morning)
+  roamSave.o = {}; try { localStorage.removeItem('catguard.roam'); } catch (e) {}
+  if (TOD) { TOD.i = 1; TOD.t = 0; TOD.wxLeft = 0; }
+}
+addEventListener('pagehide', () => { if (TOD) roamSave(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && TOD) roamSave(); });
 function updateTOD(dt) {
-  if (!TOD) { if (!skyRig || !cloudDome) return; todInit(); }
+  if (!TOD) { if (!skyRig || !cloudDome) return; todInit(); roamRestoreTod(); }
   const T = TOD, run = state === 'playing' || state === 'levelup' || state === 'menu' || state === 'over', XF = 14, P = TOD_P;
   if (run) T.t += dt;
+  if ((T.saveT = (T.saveT || 10) - dt) <= 0) { T.saveT = 10; roamSave(); }   /* (every so often: the time and the weather, for next visit) */
   if (T.t >= P[T.i].d) { T.t -= P[T.i].d; T.i = (T.i + 1) % P.length; const p = P[T.i]; if (p.say) todSay(p.say);
     if (!T.wx && Math.random() < (p.n === 'night' ? 0.6 : 0.4)) todWeather(Math.random() < (p.n === 'night' ? 0.3 : 0.25) ? 'snow' : 'rain'); }
   const cur = P[T.i], nxt = P[(T.i + 1) % P.length], f = Math.max(0, (T.t - (cur.d - XF)) / XF), s = f * f * (3 - 2 * f), L = (a, b) => a + (b - a) * s;
@@ -10349,8 +10379,13 @@ const ACHIEVEMENTS = [
     ['dogTag', '🏃', 'Gotcha, Porter!', 'In Free roam, catch Porter 3 times'],
     ['greenThumb', '🌿', 'Green thumb', 'In Free roam, pull 5 weeds out of the backyard lawn'],
     ['notAGlitch', '🚧', 'Notice: out of bounds', 'In Free roam, climb high enough in the backyard to hop the fence... and wander off'],
+    ['auntyHelper', '🪔', 'Aunty’s Little Helper', 'In Free roam, finish 3 of Aunty-ji’s little quests (she asks once you’ve met her upstairs)'],
+    ['auntyGem', '💎', 'Beta, You Are a Gem', 'In Free roam, finish every one of Aunty-ji’s little quests'],
     ['treetop', '🌳', 'Queen of the Canopy', 'In Free roam, climb a tree (jump right at its trunk) and stand on top'],
     ['treeTour', '🍃', 'Treetop Tour', 'In Free roam, stand on top of 5 different trees in one visit'],
+    ['fashionista', '👗', 'Fashionista', 'Own 6 things from Kitty’s Closet'],
+    ['dressedNines', '💃', 'Dressed to the nines', 'Wear something in all 6 Closet slots at once'],
+    ['bigSpender', '💸', 'Big spender', 'Spend 1,000 fish in Kitty’s Closet'],
     ['indestructible', '💥', 'Indestructible', 'In Free roam, touch a car. The car loses'],
     ['knockKnock', '🚪', 'Knock knock', 'In Free roam, knock on the front door and head upstairs'],
     ['auntyJi', '☕', 'Aunty-ji', 'In Free roam, sit through all of Aunty-ji’s questions upstairs'],
@@ -10387,7 +10422,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-30 10:26';                                              // stamped when the site is published
+const BUILD = '2026-09-30 12:48';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -10406,7 +10441,7 @@ let achDone = {}; try { achDone = JSON.parse(localStorage.getItem(ACH_KEY) || '{
 function unlock(id) {
   if (achDone[id] || !ACH_BY_ID[id]) return;
   achDone[id] = Date.now(); try { localStorage.setItem(ACH_KEY, JSON.stringify(achDone)); } catch (e) {}
-  const a = ACH_BY_ID[id], el = document.createElement('div'); el.className = 'ach-toast'; el.textContent = `🏆 ${a[1]} ${a[2]}`; document.body.appendChild(el); setTimeout(() => el.remove(), 3300);
+  const a = ACH_BY_ID[id], el = document.createElement('div'); el.className = 'ach-toast'; el.textContent = `🏆 ${a[1]} ${a[2]}` + closetAchPay(id); document.body.appendChild(el); setTimeout(() => el.remove(), 3300);
   [784, 1047, 1319].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.035, i * 0.08));
   updateAchCount();
 }
@@ -12558,7 +12593,7 @@ function resumeGame() {
 function quitToTitle() {
   gameMode = 'classic';
   resetGame(); resetChaosCam();                                        // put the whole room back (fire out, mirror up, mess cleared) behind the title
-  state = 'menu'; ui.pause.hidden = true; ui.hud.hidden = true; ui.start.hidden = false; showBestOnStart();
+  state = 'menu'; ui.pause.hidden = true; ui.hud.hidden = true; ui.start.hidden = false; showBestOnStart(); if (typeof ckDot === 'function') ckDot();
 }
 /* ---------- share: a scorecard picture (room snapshot + score) sent through the phone's share sheet (iMessage etc.) ---------- */
 let shareBlob = null;
@@ -12616,6 +12651,7 @@ function showGameOver() {
   $('oWhacked').textContent = mm ? heist.lvl : whackedCount; $('oWhackedLbl').textContent = mm ? 'Level reached' : 'Mice whacked';
   $('oBest').textContent = Math.max(best, val);
   $('oBest').classList.toggle('new', isNew && val > 0);
+  closetGameOverPay(mm, val);
   ui.over.hidden = false;
   $('againBtn').focus({ preventScroll: true });
   prepareScoreCard();
@@ -13145,6 +13181,7 @@ function menuOrbit(dt) {                                              // behind 
   camera.position.set(camTarget.x + Math.sin(a) * r, camBase.y + Math.sin(M.t * 0.07) * 0.35, camTarget.z + Math.cos(a) * r); camera.lookAt(camTarget);
 }
 $('setBtn').addEventListener('click', () => { $('startScreen').hidden = true; $('setScreen').hidden = false; syncSettings(); });
+$('roamFix').addEventListener('click', () => { const b = $('roamFix'); if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Sure? Tap again'; clearTimeout(b._t); b._t = setTimeout(() => { delete b.dataset.sure; b.textContent = 'Fix it up'; }, 3000); return; } delete b.dataset.sure; b.textContent = 'All fixed ✓'; b._t = setTimeout(() => { b.textContent = 'Fix it up'; }, 2500); roamReset(); camToast('🧹 The house is all fixed up!', 2200); });
 $('setClose').addEventListener('click', () => { $('setScreen').hidden = true; $('startScreen').hidden = false; });
 $('sfxBtn').addEventListener('click', toggleSfx);
 for (const b of document.querySelectorAll('#qSeg button')) b.addEventListener('click', () => setGfx(b.dataset.q));
@@ -13495,7 +13532,9 @@ function makeWalker(dark) {                                          // dark = t
     e.position.set(sx * 0.07, 0.02, 0.15); e.scale.setScalar(0.14); head.add(e); eyes.push(e);
   }
   rigMerge(g, new Set([...peepers, ...lids]));
-  return { g, body, head, legs, tail, shadow, eyes, peepers, lids };
+  const rig = { g, body, head, legs, tail, shadow, eyes, peepers, lids, crown };
+  if (!dark) try { closetDress(rig); } catch (e) { console.error(e); }   /* (Kitty's Closet: she comes dressed in her saved outfit) */
+  return rig;
 }
 function walkNear(x, y, z) {                                          // the solid things within a few metres of her: her feelers only test these (not every mesh in the world)
   const N = walkNear.N || (walkNear.N = { list: [], c: new THREE.Vector3(), s: new THREE.Sphere(), r: 4.2, ok: false }), M = walk.meshes; if (!M) return;
@@ -14329,6 +14368,1455 @@ function hopKey(e) {   // space (or enter, or up) to crouch and leap; Esc or P t
   if (pause) { hopPause(); return; }
   hopDown();
 }
+/* ---------- Aunty-ji's little quests (Free roam): once they've met, now and then she's lost something (a gold jhumka, her reading
+   glasses, the TV remote in its plastic bag, her ball of knitting wool...) and sends Princess Kitty to find it. A chip up in the
+   corner says what she's after, its paw pings faster the closer she gets; the thing itself twinkles once she's near. She picks it up
+   by walking into it (or a swipe), carries it back in her mouth, and Aunty-ji says thank you with a ladoo and fish for the piggy bank.
+   One at a time, saved in catguard.auntyQuests: a quest (and whatever's in her mouth) keeps till she's done it. ---------- */
+const AQ_KEY = 'catguard.auntyQuests';
+const AQ = { st: null, on: false, giving: false, nextT: 0, remT: 0, seeT: 0, talk: null, item: null, trail: null, chip: null, chipK: '', heatK: -1, gT: 0, lad: null, back: null };
+const AQ_LIST = [
+  { id: 'jhumka', icon: '✨', title: 'Find Aunty-ji’s gold jhumka', carry: 'Bring the jhumka back to Aunty-ji', fish: 60, kind: 'jhumka',
+    give: [['a', "Beta! BETA! Hai Ram, my jhumka! One gold jhumka is GONE!"], ['k', "The little dangly bell one?"],
+      ['a', "My wedding jhumkas! Yesterday I was everywhere. Downstairs to complain, the garden, the washing line..."], ['a', "Find it, na? There's something sweet in it for you."]],
+    remind: ["Any luck with my jhumka, beta? Look downstairs! Look in the garden!", "My ear feels so empty without my jhumka..."],
+    done: [['a', "My JHUMKA! Beta, you are a GEM! My husband's mother would never have let me forget it."], ['k', "It was nothing, Aunty-ji."], ['a', "Nothing?! It's GOLD! Here, have a ladoo. And some fish, for your piggy bank."]],
+    spots: [{ k: 'sofa', x: -3.95, z: 6.3, y: 1.6, found: '✨ Found it! Down the side of the sofa cushions' }, { k: 'box', x: 0.22, z: 2.0, y: 0.6, found: '✨ Found it! ...in your own box?!' },
+      { k: 'birdbath', x: -8.45, z: 36.4, y: 2.5, out: 1, found: '✨ Found it! Glinting in the birdbath' }, { k: 'shed', x: -13.1, z: 48.3, y: 0.6, out: 1, found: '✨ Found it! On the shed’s doorstep' }] },
+  { id: 'glasses', icon: '👓', title: 'Find Aunty-ji’s reading glasses', carry: 'Bring the glasses back to Aunty-ji', fish: 45, kind: 'glasses',
+    give: [['a', "Beta, have you seen my reading glasses?"], ['k', "Aunty-ji... you're wearing glasses."],
+      ['a', "These are for DISTANCE! The reading ones are gold, with a chain. I was reading the landlord's letter and put them down... somewhere."], ['a', "Without them his letter is just blah blah blah. Find them, na?"]],
+    remind: ["My reading glasses, beta? I can't even read my phone. Twenty messages from the WhatsApp group!", "Still no glasses? The landlord's letter is waiting. Unfortunately."],
+    done: [['a', "My glasses! Shabash, beta! Now let me read this letter properly..."], ['a', "...Hai Ram, he's raising the rent AGAIN! Here, have a ladoo. At least one of us should be happy."]],
+    spots: [{ k: 'coffee', x: 6.9, z: -20.7, y: 9, up: 1, found: '👓 Found them! On her coffee table... right in front of her sofa' }, { k: 'desk', x: -4.7, z: 22.45, y: 10, up: 1, found: '👓 Found them! Beside her laptop' },
+      { k: 'bed', x: 9.8, z: 14.0, y: 10, up: 1, found: '👓 Found them! On her bed' }, { k: 'bistro', x: -5.25, z: 26.5, y: 3, out: 1, found: '👓 Found them! On the garden table' },
+      { k: 'armchair', x: 3.6, z: 21.4, y: 3, found: '👓 Found them! On the books on OUR armchair?!' }] },
+  { id: 'remote', icon: '📺', title: 'Find Aunty-ji’s TV remote', carry: 'Bring the remote back to Aunty-ji', fish: 40, kind: 'remote',
+    give: [['a', "Arre, beta! My TV remote is missing! My serial starts in ten minutes!"], ['k', "The one in the plastic bag?"], ['a', "For HYGIENE! Maybe the family downstairs borrowed it."],
+      ['k', "We have our own remote, Aunty-ji..."], ['a', "Then where is MINE? Go and look. Quickly, quickly!"]],
+    remind: ["The remote, beta! The mother-in-law is about to find out about the twins!", "Still no remote? I'm missing the whole episode!"],
+    done: [['a', "My remote! Just in time! Sit, sit, watch with me."], ['a', "Today the evil mother-in-law finds out about the twins. Here, have a ladoo. It's a big episode."]],
+    spots: [{ k: 'sofa', x: 3.95, z: 13.4, y: 1.6, found: '📺 Found it! On OUR sofa...' }, { k: 'tree', x: -1.28, z: 22.1, y: 1.6, found: '📺 Found it! Up on the cat tree' },
+      { k: 'divan', x: -4.6, z: 12.8, y: 10, up: 1, found: '📺 Found it! On the divan in the spare room' }, { k: 'news', x: 2.35, z: -17.35, y: 7, up: 1, found: '📺 Found it! Next to the pile of newspapers' }] },
+  { id: 'wool', icon: '🧶', title: 'Follow the wool to Aunty-ji’s knitting', carry: 'Bring the wool back to Aunty-ji', fish: 30, kind: 'wool', trail: true,
+    give: [['a', "Beta, I'm knitting you a sweater! Pink, with a crown on the front."], ['k', "I have fur, Aunty-ji."], ['a', "Still! But my ball of wool rolled off somewhere. Follow the string, it's all over the flat!"]],
+    remind: ["Follow the pink string, beta! It goes all over, like my husband's stories."],
+    done: [['a', "My wool! Now the sweater is back on. By Diwali it will be ready. Diwali after next, maybe."], ['k', "...thank you, Aunty-ji."], ['a', "Here, have a ladoo. Keep your strength up for the fittings."]],
+    spots: [{ k: 'dining', x: -1.05, z: -10.8, y: 7.4, up: 1, node: 'D1', found: '🧶 Found it! Under the dining table' }, { k: 'kitchen', x: 10.3, z: -9.3, y: 7.4, up: 1, node: 'K1', found: '🧶 Found it! In the kitchen' },
+      { k: 'bath', x: 10.6, z: -3.2, y: 7.4, up: 1, node: 'BT', found: '🧶 Found it! In the bathroom?!' }, { k: 'bed2', x: -0.3, z: 19.8, y: 7.4, up: 1, node: 'R2B', found: '🧶 Found it! In the spare room' },
+      { k: 'master', x: 6.9, z: 20.6, y: 7.4, up: 1, node: 'M2', found: '🧶 Found it! By her bed' }] },
+  { id: 'marigold', icon: '🌼', title: 'Pick a marigold for Aunty-ji', carry: 'Bring the marigold to Aunty-ji', fish: 35, kind: 'marigold',
+    give: [['a', "Beta, my little shelf of flowers looks so sad today. Only one old marigold, all dried up."], ['a', "Bring me one nice orange one? The garden has plenty. Gently, gently!"], ['k', "One marigold, coming up!"]],
+    remind: ["A marigold, beta! Orange! Not the pink ones, those are for the neighbours."],
+    done: [['a', "So fresh! Look at the colour! It goes right next to my little brass lamp."], ['a', "Now the shelf is happy. And so am I. Here, a ladoo for you."]],
+    spots: [{ k: 'bedA', x: 12.45, z: 27.56, y: 0.5, dy: 0.84, out: 1, found: '🌼 Picked the nicest orange marigold' }, { k: 'bedB', x: 12.4, z: 40.06, y: 0.5, dy: 0.8, out: 1, found: '🌼 Picked the nicest orange marigold' },
+      { k: 'bedC', x: 12.4, z: 50.4, y: 0.5, dy: 0.78, out: 1, found: '🌼 Picked the nicest orange marigold' }, { k: 'pot', x: -3.75, z: 23.95, y: 2, out: 1, found: '🌼 Picked one from the pot by the slider' },
+      { k: 'toran', x: -2.3, z: -25.9, y: 3.5, up: 1, fb: 1, hint: "...or, one fell off the toran over our front door this morning. That one will do also.", found: '🌼 Found one, fallen off the toran by the door' },
+      { k: 'cart', x: 3.0, z: -1.9, y: 7.4, up: 1, fb: 1, hint: "...or one fell off my lassi cart. That will do also.", found: '🌼 Found one, fallen off the lassi cart' }] },
+  { id: 'dabba', icon: '🥡', title: 'Get Aunty-ji’s Tupperware back', carry: 'Bring the Tupperware back to Aunty-ji', fish: 50, kind: 'dabba',
+    give: [['a', "Beta, one small thing. My Tupperware. The blue one."], ['a', "Last month I sent parathas downstairs in it. The parathas came back? No. The TUPPERWARE came back? Also no!"],
+      ['k', "I'll look downstairs, Aunty-ji."], ['a', "Shabash. And don't let them put it in the dishwasher. It warps."]],
+    remind: ["My Tupperware, beta! Blue lid! My name is on the tape!"],
+    done: [['a', "My Tupperware! It came HOME!"], ['a', "...There is still paratha in it. From LAST MONTH. Chhi! Never mind, I'll wash it. Here, have a ladoo."]],
+    spots: [{ k: 'side', x: 3.95, z: 6.85, y: 3, found: '🥡 Found it! On the side table... being used as a coaster' }, { k: 'table', x: -3.8, z: 16.9, y: 3, found: '🥡 Found it! On the dining table, with the ducks' },
+      { k: 'bbq', x: 2.15, z: 25.5, y: 0.6, out: 1, found: '🥡 Found it! By the BBQ... did somebody marinate in it?!' }] }
+];
+const AQ_BY = {}; AQ_LIST.forEach(q => { AQ_BY[q.id] = q; });
+function aqLoad() {                                                   // (blocked storage: it all still works, it just doesn't keep)
+  const st = { done: [], n: 0, last: null, cur: null }; let s = null;
+  try { s = JSON.parse(localStorage.getItem(AQ_KEY) || 'null'); } catch (e) {}
+  if (s && typeof s === 'object') {
+    if (Array.isArray(s.done)) st.done = s.done.filter((id, i, a) => AQ_BY[id] && a.indexOf(id) === i);
+    st.n = Math.max(0, s.n | 0); st.last = AQ_BY[s.last] ? s.last : null;
+    const c = s.cur; if (c && AQ_BY[c.id] && AQ_BY[c.id].spots.some(q => q.k === c.spot)) st.cur = { id: c.id, spot: c.spot, carry: !!c.carry };
+  }
+  AQ.st = st;
+}
+function aqSave() { try { localStorage.setItem(AQ_KEY, JSON.stringify(AQ.st)); } catch (e) {} }
+function aqSpot(c) { const D = c && AQ_BY[c.id]; return D ? D.spots.find(q => q.k === c.spot) : null; }
+function aqGround(S) {                                                // what the lost thing rests on (the flat and the yard are hidden unless seen: look anyway)
+  const U = UPPER, ho = walk.hitObj, a = U.root ? U.root.visible : false, b = povEndWall ? povEndWall.visible : false;
+  if (U.root) U.root.visible = true; if (povEndWall) povEndWall.visible = true;
+  const y = surfaceTop(S.x, S.z, S.y);
+  if (U.root) U.root.visible = a; if (povEndWall) povEndWall.visible = b; walk.hitObj = ho;
+  return y + (S.dy || 0);
+}
+function aqMesh(kind) {                                               // the little lost things: low-poly, one mesh each (the parts merged, coloured per vertex)
+  const P = [], add = (g, col, x, y, z, rx, ry, rz, sx, sy, sz) => P.push([g, col, x, y, z, rx || 0, ry || 0, rz || 0, sx || 1, sy || 1, sz || 1]);
+  const sph = (r, w, h) => new THREE.SphereGeometry(r, w || 10, h || 8), box = (w, h, d) => new THREE.BoxGeometry(w, h, d), cyl = (a, b, h, n) => new THREE.CylinderGeometry(a, b, h, n || 8);
+  const GLD = 0xe8b830, PRL = 0xfbf6e8; let shin = 25, spec = 0x222222, emi = 0x000000, side = THREE.FrontSide;
+  if (kind === 'jhumka') {                                              // a gold jhumka: the stud (a ruby in it), a little bell, a clapper, pearls round the rim
+    const bell = []; for (const [r, y] of [[0.004, 0.105], [0.018, 0.1], [0.03, 0.085], [0.043, 0.06], [0.054, 0.035], [0.06, 0.02], [0.057, 0.014]]) bell.push(new THREE.Vector2(r, y));
+    add(new THREE.LatheGeometry(bell, 14), GLD, 0, 0, 0); add(sph(0.016), GLD, 0, 0.018, 0); add(cyl(0.008, 0.012, 0.03, 8), GLD, 0, 0.12, 0);
+    add(sph(0.022, 12, 10), GLD, 0, 0.15, 0); add(sph(0.011), 0xc81d3a, 0, 0.152, 0.017); add(new THREE.TorusGeometry(0.02, 0.004, 5, 12), GLD, 0, 0.18, 0);
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; add(sph(0.0095, 6, 5), PRL, Math.sin(a) * 0.058, 0.006, Math.cos(a) * 0.058); }
+    for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; add(sph(0.006, 5, 4), GLD, Math.sin(a) * 0.045, 0.058, Math.cos(a) * 0.045); }
+    shin = 90; spec = 0xfff0b0; emi = 0x2a1c00; side = THREE.DoubleSide;
+  } else if (kind === 'glasses') {                                      // gold round reading glasses, standing on their rims, the arms open, a chain
+    for (const s of [-1, 1]) { add(new THREE.TorusGeometry(0.048, 0.007, 6, 20), GLD, s * 0.056, 0.055, 0); add(new THREE.CircleGeometry(0.043, 16), 0xcfe8f4, s * 0.056, 0.055, 0);
+      add(box(0.008, 0.009, 0.14), GLD, s * 0.104, 0.07, -0.07); add(box(0.008, 0.03, 0.01), GLD, s * 0.104, 0.058, -0.138); }
+    add(new THREE.TorusGeometry(0.012, 0.005, 5, 8, Math.PI), GLD, 0, 0.066, 0);
+    for (let k = 0; k <= 12; k++) { const t = k / 12, x = (t - 0.5) * 0.21, z = -0.145 - Math.sin(t * Math.PI) * 0.07; add(sph(0.0055, 5, 4), GLD, x, 0.006, z); }
+    shin = 90; spec = 0xfff0b0; emi = 0x201600; side = THREE.DoubleSide;
+  } else if (kind === 'remote') {                                       // the TV remote, in its plastic bag (for hygiene), knotted at one end
+    add(box(0.075, 0.028, 0.23), 0x2b2d33, 0, 0.026, 0); add(sph(0.011), 0xe23a3a, 0.02, 0.041, 0.088); add(new THREE.TorusGeometry(0.018, 0.006, 5, 12), 0x8a8f99, 0, 0.042, 0.035, Math.PI / 2);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) add(box(0.014, 0.006, 0.012), [0x9aa0aa, 0x5fbf6a, 0x4a8fe0][(r + c) % 3], (c - 1) * 0.022, 0.042, -0.02 - r * 0.024);
+    add(box(0.1, 0.01, 0.27), 0xe4edf2, 0, 0.005, 0); for (const s of [-1, 1]) add(box(0.008, 0.034, 0.27), 0xdde8ee, s * 0.049, 0.018, 0);
+    for (let k = 0; k < 4; k++) add(box(0.098, 0.004, 0.012), 0xf2f7fa, 0, 0.044, -0.1 + k * 0.066, 0, 0.25 * (k % 2 ? 1 : -1), 0);
+    add(sph(0.022), 0xeef4f7, 0, 0.022, -0.155); for (const s of [-1, 1]) add(new THREE.ConeGeometry(0.014, 0.05, 5), 0xeef4f7, s * 0.018, 0.04, -0.175, -0.6, 0, s * 0.7);
+    shin = 60; spec = 0x666666;
+  } else if (kind === 'wool') {                                         // a ball of pink wool, strands wound round it, two knitting needles through it
+    add(new THREE.IcosahedronGeometry(0.085, 1), 0xd6337a, 0, 0.085, 0);
+    for (const [rx, ry] of [[0.3, 0], [1.2, 0.8], [2.0, 2.2], [0.8, 1.6]]) add(new THREE.TorusGeometry(0.085, 0.006, 4, 20), 0xb0245f, 0, 0.085, 0, rx, ry, 0);
+    for (const s of [-1, 1]) { add(cyl(0.005, 0.005, 0.27, 5), 0xc8a06a, s * 0.02, 0.12, 0, 0, 0, s * 0.9); add(sph(0.012), 0xf0c040, s * 0.02 - Math.sin(s * 0.9) * 0.135, 0.12 + Math.cos(s * 0.9) * 0.135, 0); }
+  } else if (kind === 'marigold') {                                     // one big orange marigold: a frilly pom-pom of petals on a green stem, two leaves
+    add(new THREE.IcosahedronGeometry(0.058, 1), 0xff9a1a, 0, 0.16, 0);
+    for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; add(sph(0.03, 6, 4), k % 2 ? 0xff8a00 : 0xffb325, Math.sin(a) * 0.06, 0.15, Math.cos(a) * 0.06, 0, a, 0, 1.3, 0.5, 0.9); }
+    for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2 + 0.3; add(sph(0.024, 6, 4), 0xffc23a, Math.sin(a) * 0.035, 0.195, Math.cos(a) * 0.035, 0, a, 0, 1.2, 0.6, 0.9); }
+    add(cyl(0.007, 0.008, 0.13, 5), 0x3f8a3a, 0, 0.065, 0); for (const s of [-1, 1]) add(sph(0.03, 6, 4), 0x4f9a3f, s * 0.03, 0.06, 0, 0, 0, s * 0.6, 1.4, 0.35, 0.7);
+    shin = 12;
+  } else if (kind === 'dabba') {                                        // her blue Tupperware: the tub, the lid, a strip of masking tape with her name on it
+    add(box(0.22, 0.085, 0.16), 0x9bd3ee, 0, 0.0425, 0); add(box(0.232, 0.022, 0.172), 0x2f7fd0, 0, 0.096, 0); add(box(0.05, 0.008, 0.022), 0x2f7fd0, 0, 0.09, 0.093);
+    add(box(0.13, 0.004, 0.04), 0xf1e3b0, 0, 0.108, 0.02); for (let k = 0; k < 4; k++) add(box(0.018, 0.002, 0.006), 0x3a3a60, -0.045 + k * 0.026, 0.1105, 0.02);
+    add(box(0.2, 0.012, 0.14), 0xe8b25a, 0, 0.066, 0);                  /* (the old paratha, seen through the side) */
+    shin = 70; spec = 0x777777;
+  } else {                                                              // (the reward) a ladoo: a golden ball of boondi, a bit of pistachio on top
+    const g = new THREE.IcosahedronGeometry(0.1, 2), q = g.attributes.position; for (let i = 0; i < q.count; i++) { const k = 1 + (Math.sin(q.getX(i) * 91) * Math.sin(q.getY(i) * 77) * Math.sin(q.getZ(i) * 83)) * 0.07; q.setXYZ(i, q.getX(i) * k, q.getY(i) * k, q.getZ(i) * k); }
+    g.computeVertexNormals(); add(g, 0xf2a93b, 0, 0, 0); for (let k = 0; k < 5; k++) add(box(0.022, 0.012, 0.016), 0x86c06a, Math.sin(k * 1.3) * 0.035, 0.095, Math.cos(k * 1.3) * 0.035, 0, k, 0.3);
+    add(new THREE.CircleGeometry(0.03, 8), 0xd8dde2, 0.01, 0.103, 0.0, -Math.PI / 2);
+    shin = 20; emi = 0x2a1400;
+  }
+  const pos = [], nor = [], col = [], c = new THREE.Color(), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), E = new THREE.Euler(), V = new THREE.Vector3(), S = new THREE.Vector3();
+  for (const [g0, hex, x, y, z, rx, ry, rz, sx, sy, sz] of P) {
+    const g = g0.index ? g0.toNonIndexed() : g0; g.applyMatrix4(M.compose(V.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz)), S.set(sx, sy, sz)));
+    const pa = g.attributes.position, na = g.attributes.normal; c.setHex(hex);
+    for (let i = 0; i < pa.count; i++) { pos.push(pa.getX(i), pa.getY(i), pa.getZ(i)); nor.push(na.getX(i), na.getY(i), na.getZ(i)); col.push(c.r, c.g, c.b); }
+    g.dispose(); if (g !== g0) g0.dispose();
+  }
+  const G = new THREE.BufferGeometry(); G.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); G.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); G.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const k = AQ_SIZE[kind] || 1; G.scale(k, k, k); G.computeBoundingSphere();                   /* (a touch bigger than life: they're easier to spot on a phone) */
+  const m = new THREE.Mesh(G, new THREE.MeshPhongMaterial({ vertexColors: true, shininess: shin, specular: spec, emissive: emi, side, fog: false })); m.userData.noWalk = true; m.userData.aq = kind; return m;
+}
+function aqSparkTex() {                                               // a soft four-pointed twinkle
+  return aqSparkTex.t || (aqSparkTex.t = canvasTex(64, 64, (c, w, h) => { const g = c.createRadialGradient(32, 32, 0, 32, 32, 30); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,240,190,.55)'); g.addColorStop(1, 'rgba(255,220,140,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h); c.fillStyle = 'rgba(255,255,255,.95)'; c.beginPath(); c.moveTo(32, 1); c.quadraticCurveTo(35, 29, 63, 32); c.quadraticCurveTo(35, 35, 32, 63); c.quadraticCurveTo(29, 35, 1, 32); c.quadraticCurveTo(29, 29, 32, 1); c.fill(); }, 1, 1));
+}
+const AQ_SIZE = { jhumka: 1.25, glasses: 1.15, remote: 1.45, wool: 1.15, marigold: 1.8, dabba: 1.1, ladoo: 1.3 };
+const AQ_CARRY = { jhumka: [0, -0.26, 0.18, 0.15, 0, 0, 0.9], glasses: [0, -0.155, 0.2, 0.15, 0, 0, 0.9], remote: [0, -0.125, 0.17, 0, Math.PI / 2, 0.1, 0.7], wool: [0, -0.21, 0.22, 0, 0.4, 0, 0.75], marigold: [0, -0.17, 0.25, -0.35, 0, 0, 0.55], dabba: [0, -0.19, 0.21, 0.3, 0, 0, 0.75] };   /* (head-local: x, y, z, the tilt, how big) */
+function aqItem(D) {                                                  // the lost thing for this quest: built when it's first needed
+  const I = AQ.item; if (I && I.id === D.id) return I;
+  if (I) { if (I.g.parent) I.g.parent.remove(I.g); if (I.m.parent) I.m.parent.remove(I.m); I.m.geometry.dispose(); I.m.material.dispose(); I.spr.material.dispose(); }
+  const g = new THREE.Group(); g.userData.noWalk = true; const m = aqMesh(D.kind); g.add(m);
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: aqSparkTex(), color: 0xfff1b8, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, fog: false })); spr.position.y = 0.12; spr.scale.setScalar(0.4); g.add(spr);
+  return (AQ.item = { id: D.id, g, m, spr, yT: 0, carried: false });
+}
+function aqPlace() {                                                  // put it where it was lost (or in her mouth, if she's already got it)
+  const st = AQ.st, c = st && st.cur, D = c && AQ_BY[c.id], S = aqSpot(c); if (!D || !S || !walk.rig) return;
+  const I = aqItem(D), par = S.up && UPPER.root ? UPPER.root : scene;
+  if (I.g.parent !== par) { if (I.g.parent) I.g.parent.remove(I.g); par.add(I.g); }
+  I.g.position.set(S.x, aqGround(S), S.z); I.g.rotation.y = S.ry !== undefined ? S.ry : (S.x * 7.3 + S.z * 3.1) % 6.28;
+  if (c.carry) aqToMouth(I); else { if (I.m.parent !== I.g) I.g.add(I.m); I.m.position.set(0, 0, 0); I.m.rotation.set(0, 0, 0); I.m.scale.setScalar(1); I.carried = false; }
+  if (D.trail) aqTrail(S); else aqTrailOff();
+}
+function aqToMouth(I) {                                               // held in her mouth (it rides along with her head)
+  const o = AQ_CARRY[AQ_BY[I.id].kind] || [0, -0.18, 0.2, 0, 0, 0, 0.85]; walk.rig.head.add(I.m);
+  I.m.position.set(o[0], o[1], o[2]); I.m.rotation.set(o[3], o[4], o[5]); I.m.scale.setScalar(o[6]); I.carried = true; I.spr.material.opacity = 0;
+}
+function aqTrail(S) {                                                 // the wool quest: a pink string across the floors, from her sofa, through the doorways, to the ball
+  aqTrailOff(); const U = UPPER; if (!U.root || !S.node) return;
+  const pts = [[11.2, -21.6], AUNTY_NODES.L2, ...auntyPath('L2', S.node).map(n => AUNTY_NODES[n]), [S.x, S.z]], P = [], N = [], W = 0.022, y = U.UF + 0.024;
+  let s = 0; const push = (x, z, dx, dz) => { const L = Math.hypot(dx, dz) || 1, nx = -dz / L * W, nz = dx / L * W; P.push(x + nx, y, z + nz, x - nx, y, z - nz); N.push(0, 1, 0, 0, 1, 0); };
+  for (let i = 0; i + 1 < pts.length; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.18)), dx = (bx - ax) / L, dz = (bz - az) / L;
+    for (let j = 0; j < n; j++) { const k = j / n, ss = s + L * k, taper = Math.min(1, ss / 0.6, (i + 2 === pts.length ? (1 - k) * L / 0.6 : 1)), w = (Math.sin(ss * 2.3) * 0.16 + Math.sin(ss * 5.9 + 1) * 0.05) * taper;
+      push(ax + dx * L * k - dz * w, az + dz * L * k + dx * w, dx, dz); } s += L; }
+  push(pts[pts.length - 1][0], pts[pts.length - 1][1], 1, 0);
+  const idx = []; for (let i = 0; i + 1 < P.length / 6; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }   /* (facing up) */
+  const G = new THREE.BufferGeometry(); G.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); G.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); G.setIndex(idx); G.computeBoundingSphere();
+  const m = new THREE.Mesh(G, new THREE.MeshLambertMaterial({ color: 0xe0408a, fog: false })); m.userData.noWalk = true; m.renderOrder = 2; U.root.add(m); AQ.trail = m;
+}
+function aqTrailOff() { const m = AQ.trail; if (!m) return; if (m.parent) m.parent.remove(m); m.geometry.dispose(); m.material.dispose(); AQ.trail = null; }
+function aqCss() {
+  if (aqCss.done) return; aqCss.done = true; const st = document.createElement('style'); st.textContent = `
+#questChip{position:fixed;left:calc(12px + env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 12px);z-index:7;display:none;align-items:center;gap:7px;box-sizing:border-box;max-width:min(300px,calc(100vw - 200px));padding:4px 12px 4px 4px;border-radius:22px;background:rgba(58,20,52,.84);border:2px solid rgba(255,244,248,.45);color:#fff;font:800 13px/1.2 var(--body);box-shadow:0 4px 12px rgba(0,0,0,.25);touch-action:none;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#questChip.on{display:flex}
+#questChip.pop{animation:qcIn .5s cubic-bezier(.2,1.6,.4,1)}
+#questChip.got{animation:qcGot .7s ease}
+#questChip .qp{flex:none;position:relative;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--qh,#6f8fb8);font-size:15px;font-style:normal;transition:background .5s}
+#questChip .qp::after{content:'';position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--qh,#6f8fb8);animation:qcPing var(--qp,2s) ease-out infinite;pointer-events:none}
+#questChip .qt{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+body.biking #questChip,body.hopping #questChip,body.mirror-world #questChip,body.heist-ui #questChip{display:none!important}
+@media (min-width:561px){body.tag-on #questChip{max-width:max(150px,calc(50vw - 170px))}}
+@media (max-width:380px){#questChip{font-size:12px;max-width:calc(100vw - 196px)}}
+@keyframes qcPing{0%{transform:scale(.85);opacity:.95}100%{transform:scale(1.75);opacity:0}}
+@keyframes qcIn{from{transform:scale(.3);opacity:0}}
+@keyframes qcGot{30%{transform:scale(1.12);background:rgba(120,40,110,.95)}}`;
+  document.head.appendChild(st);
+}
+function aqChipEl() {
+  if (AQ.chip) return AQ.chip; aqCss(); const el = AQ.chip = document.createElement('div'); el.id = 'questChip'; el.setAttribute('role', 'status');
+  el.innerHTML = '<i class="qp">🐾</i><span class="qt"></span>'; (document.getElementById('walkUI') || document.body).appendChild(el);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); const c = AQ.st && AQ.st.cur, D = c && AQ_BY[c.id]; if (!D) return;
+    showWalkName(c.carry ? '🐾 Aunty-ji’s upstairs: in the front door and up the stairs' : '🐾 The paw pings faster the closer you get' + (D.trail ? '. Follow the pink string!' : '')); });
+  return el;
+}
+const AQ_HEAT = [[2.5, '#ff4d6d', 0.35], [5, '#ff7a3d', 0.55], [9, '#ffb13d', 0.8], [16, '#c9b85a', 1.15], [28, '#7f9fc8', 1.6], [1e9, '#6f7fa0', 2.2]];
+function aqChip(show, d) {                                            // the tracker: what she's after, and a paw that pings faster the closer she gets
+  const el = show || AQ.chip ? aqChipEl() : null; if (!el) return;
+  if (!show) { if (el.classList.contains('on')) el.classList.remove('on', 'pop', 'got'); return; }
+  const c = AQ.st.cur, D = AQ_BY[c.id], k = D.id + (c.carry ? '+' : '');
+  if (k !== AQ.chipK) { AQ.chipK = k; el.querySelector('.qt').textContent = (c.carry ? '🎁 ' + D.carry : D.icon + ' ' + D.title); }
+  if (!el.classList.contains('on')) el.classList.add('on');
+  let h = 0; while (d > AQ_HEAT[h][0]) h++;
+  if (h !== AQ.heatK) { AQ.heatK = h; el.style.setProperty('--qh', AQ_HEAT[h][1]); el.style.setProperty('--qp', AQ_HEAT[h][2] + 's'); }
+}
+function aqFlash(cls) { const el = aqChipEl(); el.classList.remove('pop', 'got'); void el.offsetWidth; el.classList.add(cls); }
+function aqGive(A) {                                                  // Aunty-ji's lost something: which thing (one she hasn't asked for yet, if any), and where it's got to
+  const st = AQ.st; let pool = AQ_LIST.filter(q => st.done.indexOf(q.id) < 0); if (!pool.length) pool = AQ_LIST.filter(q => q.id !== st.last);
+  const D = pool[Math.random() * pool.length | 0], open = yardOpen();
+  let spots = D.spots.filter(q => !q.fb && (open || !q.out)); if (!spots.length) spots = D.spots.filter(q => !q.out);
+  const S = spots[Math.random() * spots.length | 0];
+  st.cur = { id: D.id, spot: S.k, carry: false }; aqSave(); AQ.giving = true; AQ.remT = clock + 60; AQ.chipK = '';
+  aqSay(S.hint ? D.give.concat([['a', S.hint]]) : D.give, 'questGive'); aqPlace();
+}
+function aqSay(lines, script) { auntySay(lines, script); AQ.talk = { script, left: lines.slice() }; }   // (what she says about a quest: if something cuts her off, she picks up where she left off)
+function aqAnnounce() {                                               // (she's said her piece: the tracker pops up)
+  const c = AQ.st.cur, D = c && AQ_BY[c.id]; if (!D) return;
+  showWalkName('📜 New quest: ' + D.title); aqChip(true, 99); aqFlash('pop');
+  [523, 659, 784].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.03, i * 0.09));
+}
+function aqPickup(I, S) {                                             // got it! into her mouth it goes
+  const c = AQ.st.cur; c.carry = true; aqSave(); I.g.getWorldPosition(_aqV);
+  aqToMouth(I); showWalkName(S.found); aqFlash('got'); AQ.chipK = '';
+  burst(_aqV.setY(_aqV.y + 0.15), 0xffe27a, 10, 1.1, 1.6, 0.45); tone(1320, 1760, 0.12, 'sine', 0.035); tone(1760, 2349, 0.14, 'sine', 0.03, 0.09);
+}
+function questSwipe(paw) {                                            // a swipe at the lost thing picks it up too (for one up on a ledge)
+  const I = AQ.item, c = AQ.st && AQ.st.cur; if (!AQ.on || !I || !c || c.carry || I.carried || AQ.giving || mirrorWorld || !I.g.visible || !I.g.parent) return false;
+  I.g.getWorldPosition(_aqV); if (Math.hypot(_aqV.x - paw.x, _aqV.z - paw.z) > 0.75 || Math.abs(_aqV.y + 0.08 - paw.y) > 0.8) return false;
+  aqPickup(I, aqSpot(c)); return true;
+}
+function aqHandIn(A, D) {                                             // back to Aunty-ji with it: thank you, a ladoo, and fish for the piggy bank
+  const st = AQ.st, I = AQ.item; st.cur = null; st.last = D.id; st.n++; if (st.done.indexOf(D.id) < 0) st.done.push(D.id);
+  let w = 0; try { w = Math.max(0, parseInt(localStorage.getItem('catguard.fish') || '0', 10) || 0); localStorage.setItem('catguard.fish', String(w + D.fish)); } catch (e) {}
+  aqSave(); AQ.nextT = clock + 45; AQ.chipK = ''; aqTrailOff();
+  aqSay(D.done, 'questDone'); if (A.first !== 2) A.first = 2;          // (back with her things: they've obviously met)
+  if (I && I.carried) { I.m.getWorldPosition(_aqV); I.m.parent.remove(I.m); I.m.position.copy(_aqV); I.m.rotation.set(0, 0, 0); scene.add(I.m); AQ.back = { m: I.m, t: 0, a: _aqV.clone(), s: I.m.scale.x }; I.carried = false; }
+  AQ.lad = { t: 0, a: new THREE.Vector3(A.g.position.x, A.g.position.y + 1.05, A.g.position.z), n: D.fish };
+  showWalkName(`🎁 Quest complete! +${D.fish} 🐟 fish for your piggy bank`);
+  if (st.n >= 3) unlock('auntyHelper'); if (AQ_LIST.every(q => st.done.indexOf(q.id) >= 0)) unlock('auntyGem');
+  [659, 784, 988, 1319].forEach((f, i) => tone(f, f * 1.01, 0.16, 'triangle', 0.035, i * 0.1));
+}
+const _aqV = new THREE.Vector3(), _aqW = new THREE.Vector3();
+function aqFx(dt) {                                                   // the thing floats into Aunty-ji's paws; a ladoo floats over to Princess Kitty and pops into confetti
+  const A = UPPER.aunty, B = AQ.back;
+  if (B) { B.t += dt; const k = Math.min(1, B.t / 0.5); if (A) _aqW.set(A.g.position.x, A.g.position.y + 0.95, A.g.position.z); else _aqW.copy(B.a);
+    B.m.position.lerpVectors(B.a, _aqW, k * k); B.m.position.y += Math.sin(k * Math.PI) * 0.3; B.m.scale.setScalar(B.s * (1 - k * 0.9)); B.m.rotation.y += dt * 8;
+    if (k >= 1) { if (B.m.parent) B.m.parent.remove(B.m); AQ.back = null; if (AQ.item && AQ.item.m === B.m) { AQ.item.m.scale.setScalar(1); AQ.item.g.add(AQ.item.m); AQ.item.g.visible = false; } } }
+  const R = AQ.lad; if (!R) return;
+  const L = AQ.ladoo || (AQ.ladoo = aqMesh('ladoo')); if (L.parent !== scene) scene.add(L); L.visible = true; R.t += dt;
+  const p = walk.pos, gs = walk.gScale || 1; _aqW.set(p.x, p.y + 1.05 * gs, p.z);
+  if (R.t < 0.4) { L.position.copy(R.a); L.scale.setScalar(Math.max(0.01, R.t / 0.4)); }                  // (it appears in her paw...)
+  else if (R.t < 1.2) { const k = (R.t - 0.4) / 0.8; L.position.lerpVectors(R.a, _aqW, k); L.position.y += Math.sin(k * Math.PI) * 0.7; L.scale.setScalar(1); }   // (...floats over...)
+  else { L.position.copy(_aqW); L.position.y += Math.sin((R.t - 1.2) * 7) * 0.05; L.scale.setScalar(1 + Math.max(0, R.t - 1.8) * 1.5); }   // (...bobs over her head, swells...)
+  L.rotation.y += dt * 4;
+  if (R.t > 2.1) { L.visible = false; AQ.lad = null;                                                       // ...and pops: confetti, and the fish
+    for (const col of [0xff6fae, 0xffd23a, 0x7fd8ff, 0x9be36a, 0xb07aff]) burst(_aqW, col, 8, 1.8, 2.2, 0.55);
+    floatText(_aqW.clone().setY(_aqW.y - 0.1), `+${R.n} 🐟`, 'clutch'); tone(1047, 1568, 0.1, 'triangle', 0.035); noise(0.08, 0.04, 3200); }
+}
+function aqOff() { AQ.on = false; const I = AQ.item; if (I) I.g.visible = false; if (AQ.trail) AQ.trail.visible = false; aqChip(false); if (AQ.ladoo) AQ.ladoo.visible = false; AQ.lad = null; if (AQ.back) { if (AQ.back.m.parent) AQ.back.m.parent.remove(AQ.back.m); AQ.back = null; } }
+function updateQuests(dt) {                                           // every frame (cheap): Aunty-ji's quests, the lost thing, the tracker
+  if (!AQ.st) aqLoad();
+  if (!(walk.on && gameMode === 'walk' && walk.rig && UPPER.aunty)) { if (AQ.on) aqOff(); return; }
+  if (!AQ.on) { AQ.on = true; AQ.giving = false; aqPlace(); }        // (a new Free roam, or back from a mode: the thing's where she left it, or still in her mouth)
+  const st = AQ.st, c = st.cur, D = c && AQ_BY[c.id], S = aqSpot(c), A = UPPER.aunty, U = UPPER, p = walk.pos, t = clock, playing = state === 'playing', I = AQ.item;
+  if (AQ.giving && (A.script !== 'questGive' || (!A.say && !A.queue.length))) { AQ.giving = false; aqAnnounce(); }
+  const up = upstairsView(p) && p.y > U.UF - 0.5, ad = Math.hypot(p.x - A.g.position.x, p.z - A.g.position.z);
+  let d = 99;
+  if (D && S && I && I.id === D.id) {
+    const lying = !c.carry && !I.carried; I.g.visible = lying && !mirrorWorld; if (AQ.trail) AQ.trail.visible = !mirrorWorld;
+    if (lying) { I.g.getWorldPosition(_aqV); d = _aqV.distanceTo(p);
+      const near = !AQ.giving && !mirrorWorld && playing, tw = near && d < 5 ? Math.min(1, (5 - d) / 2) : 0;   // (a twinkle once she's within a few metres)
+      const wk = Math.max(0, Math.sin(t * 5.3)); I.spr.material.opacity = tw * (0.35 + 0.45 * wk); I.spr.scale.setScalar(0.18 + 0.1 * wk); I.spr.material.rotation = t * 0.8;   /* (a glint that circles it, winking) */
+      I.spr.position.set(Math.cos(t * 1.7) * 0.13, 0.13 + Math.sin(t * 2.3) * 0.05, Math.sin(t * 1.7) * 0.13);
+      if (d < 6 && t > I.yT) { I.yT = t + 0.5; const y = aqGround(S); if (y < I.g.position.y - 0.02) I.g.position.y = y; }   // (if what it's on gets smashed or knocked flying, down it drops)
+      if (near && !walk.fp) { const f = walk.face, gs = walk.gScale || 1, mx = p.x + Math.sin(f) * 0.3 * gs, mz = p.z + Math.cos(f) * 0.3 * gs, dy = _aqV.y - p.y;
+        if (Math.hypot(_aqV.x - mx, _aqV.z - mz) < 0.5 * gs && dy > -0.4 && dy < 0.95 * gs) aqPickup(I, S); }
+      else if (near && walk.fp && Math.hypot(_aqV.x - p.x, _aqV.z - p.z) < 0.55 && Math.abs(_aqV.y - p.y) < 0.95) aqPickup(I, S); }
+    else d = A.g.position.distanceTo(p);
+  } else if (I) { I.g.visible = false; if (AQ.trail) aqTrailOff(); }
+  aqFx(dt);
+  aqChip(!!D && !AQ.giving && playing && !mirrorWorld && !(ZN && ZN.on), d);
+  if (!playing) return;
+  const T = AQ.talk; if (T) {                                         // (cut off mid-quest by a smashed plate or a swipe: once that's said, she carries on)
+    if (A.script === T.script) { T.left = (A.say ? [A.say] : []).concat(A.queue); if (!T.left.length) AQ.talk = null; }
+    else if (!A.say && !A.queue.length) { if (T.left.length && up && ad < 6) auntySay(T.left, T.script); else AQ.talk = null; } }
+  if (c && c.carry && up && ad < (A.mode === 'sofa' ? 3.2 : 2.6) && Math.abs(p.y - A.g.position.y) < 1.8 && !AQ.giving && t > AQ.seeT) { AQ.seeT = t + 0.25;   // brought it back (face to face: not through the jaali)
+    if (ad < 1.3 || auntyClear(A.g.position, p, ad)) { aqHandIn(A, D); return; } }
+  if (!up || A.first !== 2 || A.mode === 'hop' || A.say || A.queue.length || t < A.cool - 0.12 || ad > (A.mode === 'follow' ? 5.6 : 4.8)) return;   // (just before she'd chat anyway: a quest, or a nudge about the one she's on)
+  if (!c && t > AQ.nextT) aqGive(A);
+  else if (c && !c.carry && t > AQ.remT) { AQ.remT = t + 75; auntySay([['a', D.remind[Math.random() * D.remind.length | 0]]], 'questRemind'); }
+}
+/* =====================================================================
+   KITTY'S CLOSET: a little boutique where her fish buy things Princess Kitty wears (hats, collars, capes, backpacks,
+   glasses, a bow for her tail), with a dressing-room window where she tries each one on. Everything in here is
+   prefixed ck/CK/closet so it can't trip over the house. The game calls: closetFrame(dt) while the Closet is open
+   (it draws only the dressing room), closetTick(dt) the rest of the time (capes flutter, the jetpack fires, the photo
+   cat's hat), closetDress(rig) from makeWalker, closetAchPay() for a new trophy and closetGameOverPay() at game over.
+   Saved in localStorage: catguard.closet (what she owns), catguard.outfit (slot -> item), catguard.closetSpent.
+   ===================================================================== */
+const CK_SLOTS = [
+  { id: 'hat', ic: '👑', name: 'Hats', view: 'head' },
+  { id: 'collar', ic: '🎀', name: 'Collars', view: 'neck' },
+  { id: 'cape', ic: '🦸', name: 'Capes', view: 'back' },
+  { id: 'pack', ic: '🎒', name: 'Backpacks', view: 'back' },
+  { id: 'specs', ic: '🕶️', name: 'Glasses', view: 'face' },
+  { id: 'tail', ic: '🎗️', name: 'Tail', view: 'tail' },
+];
+const CK_LINES = ['Ooh la la!', 'Très chic!', 'Purrfect!', 'Meow-velous!', 'So fancy!', 'Fabulous, darling!', 'Slay, princess!', 'Pawsitively stunning!', 'Cute overload!'];
+
+/* ---------- storage: every read and write can fail (private mode, blocked, full); a failed write keeps the fish in memory ---------- */
+function ckGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function ckPut(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+function ckState() {
+  if (ckState.S) return ckState.S;
+  const S = ckState.S = { owned: new Set(['crown']), outfit: {}, spent: 0, memFish: null };
+  try { const a = JSON.parse(ckGet('catguard.closet') || '[]'); if (Array.isArray(a)) for (const id of a) if (typeof id === 'string' && CK_BY_ID[id]) S.owned.add(id); } catch (e) {}
+  try { const o = JSON.parse(ckGet('catguard.outfit') || '{}');
+    if (o && typeof o === 'object' && !Array.isArray(o)) for (const s of CK_SLOTS) { const id = o[s.id];
+      if (s.id === 'hat' && id === 'none') S.outfit.hat = 'none';
+      else if (typeof id === 'string' && id !== 'crown' && CK_BY_ID[id] && CK_BY_ID[id].slot === s.id && S.owned.has(id)) S.outfit[s.id] = id; } } catch (e) {}
+  S.spent = Math.max(0, parseInt(ckGet('catguard.closetSpent') || '0', 10) || 0);
+  return S;
+}
+function ckSave() { const S = ckState(); ckPut('catguard.closet', JSON.stringify([...S.owned].filter(id => id !== 'crown'))); ckPut('catguard.outfit', JSON.stringify(S.outfit)); ckPut('catguard.closetSpent', String(S.spent)); }
+function ckWallet() { const S = ckState(); if (S.memFish != null) return S.memFish; return Math.max(0, parseInt(ckGet('catguard.fish') || '0', 10) || 0); }   // (the same piggy bank as the motorcycle's and Treetop Hop's)
+function ckSetWallet(n) { n = Math.max(0, Math.round(n) || 0); const S = ckState(); S.memFish = ckPut('catguard.fish', String(n)) ? null : n; if (CK.on) CK.fishTo = n; }
+function ckWornId(outfit, slot) { const v = outfit[slot]; return slot === 'hat' ? (v === 'none' ? null : v || 'crown') : v || null; }
+
+/* ---------- the catalogue: each item is built once (lazily), merged into one or two meshes on shared materials ---------- */
+// every build works in the space of the part she wears it on: the head (hats, glasses), the body (collars, capes, backpacks) or a tail segment
+const CK_ITEMS = [
+  { id: 'crown', slot: 'hat', name: 'Classic crown', price: 0, ic: '👑', blurb: 'Her very own gold crown. A princess never forgets.' },
+  { id: 'party', slot: 'hat', name: 'Party hat', price: 25, ic: '🥳', blurb: 'Every day is a party when you’re royalty.', say: 'Party time!', build: B => ckPartyHat(B) },
+  { id: 'bunny', slot: 'hat', name: 'Bunny ears', price: 60, ic: '🐰', blurb: 'A headband with two floppy bunny ears. Hop hop!', say: 'Hoppy days!', build: B => ckBunnyEars(B) },
+  { id: 'flowers', slot: 'hat', name: 'Flower crown', price: 80, ic: '🌸', blurb: 'Fresh spring blossoms, woven into a ring.', say: 'Blooming lovely!', build: B => ckFlowerCrown(B) },
+  { id: 'toque', slot: 'hat', name: 'Canada toque', price: 90, ic: '🍁', blurb: 'A cosy red knit toque with a pom-pom, eh?', say: 'Sorry, eh? 🍁', build: B => ckToque(B), cardLift: 0.07 },
+  { id: 'chef', slot: 'hat', name: 'Chef’s hat', price: 110, ic: '👩‍🍳', blurb: 'For the finest tuna tartare in Toronto.', say: 'Oui, chef!', build: B => ckChefHat(B) },
+  { id: 'cowboy', slot: 'hat', name: 'Cowgirl hat', price: 150, ic: '🤠', blurb: 'Pink, with a gold star. Yee-haw!', say: 'Yee-haw!', build: B => ckCowboyHat(B) },
+  { id: 'pirate', slot: 'hat', name: 'Pirate hat', price: 180, ic: '🏴‍☠️', blurb: 'A captain’s tricorn, skull and all.', say: 'Arrr-meow!', build: B => ckPirateHat(B) },
+  { id: 'witch', slot: 'hat', name: 'Witch hat', price: 220, ic: '🧙‍♀️', blurb: 'Tall, crooked and very, very magical.', say: 'Hocus pocus!', build: B => ckWitchHat(B) },
+  { id: 'tiara', slot: 'hat', name: 'Diamond tiara', price: 300, ic: '💎', blurb: 'Sparkling silver and pink diamonds.', say: 'Simply regal!', build: B => ckTiara(B) },
+  { id: 'halo', slot: 'hat', name: 'Angel halo', price: 450, ic: '😇', blurb: 'A glowing golden halo. She has never done anything wrong. Ever.', say: 'Such an angel...', build: B => ckHalo(B), fit: 0.5 },
+  { id: 'bandana', slot: 'collar', name: 'Polka-dot bandana', price: 30, ic: '🧣', blurb: 'A red bandana with white polka dots.', say: 'Ready for adventure!', build: B => ckBandana(B) },
+  { id: 'bowtie', slot: 'collar', name: 'Pink bow tie', price: 40, ic: '🎀', blurb: 'Satin, pink and terribly dapper.', say: 'How dapper!', build: B => ckBowTie(B) },
+  { id: 'bell', slot: 'collar', name: 'Bell collar', price: 55, ic: '🔔', blurb: 'A red collar with a shiny gold bell. Jingle!', say: 'Jingle jingle!', build: B => ckBellCollar(B) },
+  { id: 'marigold', slot: 'collar', name: 'Marigold garland', price: 120, ic: '🌼', blurb: 'A festive garland of orange and gold marigolds.', say: 'So festive!', build: B => ckGarland(B) },
+  { id: 'punk', slot: 'collar', name: 'Spiked collar', price: 140, ic: '🤘', blurb: 'Black leather and silver spikes. Rock and roll!', say: 'Rock on!', build: B => ckPunkCollar(B) },
+  { id: 'pearls', slot: 'collar', name: 'Pearl necklace', price: 260, ic: '🦪', blurb: 'A string of pearls with a pink pearl drop.', say: 'Darling, you look divine.', build: B => ckPearls(B) },
+  { id: 'hero', slot: 'cape', name: 'Hero cape', price: 200, ic: '🦸‍♀️', blurb: 'Red and gold. Saving the house from mice since forever.', say: 'Super Kitty!', build: B => ckCape(B, 'hero') },
+  { id: 'rainbow', slot: 'cape', name: 'Rainbow cape', price: 280, ic: '🌈', blurb: 'Every colour of the rainbow, all at once.', say: 'Over the rainbow!', build: B => ckCape(B, 'rainbow') },
+  { id: 'vampire', slot: 'cape', name: 'Vampire cape', price: 320, ic: '🧛‍♀️', blurb: 'Midnight black, lined in red, with a tall spooky collar.', say: 'Bleh! Bleh-bleh!', build: B => ckCape(B, 'vampire') },
+  { id: 'royal', slot: 'cape', name: 'Royal velvet cape', price: 600, ic: '🫅', blurb: 'Purple velvet with an ermine trim. Fit for a queen.', say: 'All hail the queen!', build: B => ckCape(B, 'royal') },
+  { id: 'strawberry', slot: 'pack', name: 'Strawberry bag', price: 90, ic: '🍓', blurb: 'A juicy little strawberry to carry her treats.', say: 'Berry cute!', build: B => ckStrawberry(B), thumb: [0, 0.69, -0.05, 0.165] },
+  { id: 'pizza', slot: 'pack', name: 'Pizza backpack', price: 130, ic: '🍕', blurb: 'Extra cheese, extra pepperoni, extra stylish.', say: 'Snack attack!', build: B => ckPizza(B), thumb: [0, 0.6, -0.17, 0.23] },
+  { id: 'basket', slot: 'pack', name: 'Picnic basket', price: 170, ic: '🧺', blurb: 'Gingham cloth, a baguette... a picnic for one princess.', say: 'Picnic time!', build: B => ckBasket(B), thumb: [0, 0.71, -0.03, 0.18] },
+  { id: 'jetpack', slot: 'pack', name: 'Jetpack', price: 500, ic: '🚀', blurb: 'Fires up every time she jumps. Whoosh!', say: 'To the moon!', build: B => ckJetpack(B), thumb: [0, 0.67, -0.05, 0.2] },
+  { id: 'nerd', slot: 'specs', name: 'Round glasses', price: 45, ic: '🤓', blurb: 'Big round specs, taped in the middle.', say: 'Well, actually...', build: B => ckNerdSpecs(B) },
+  { id: 'hearts', slot: 'specs', name: 'Heart sunglasses', price: 75, ic: '😍', blurb: 'Pink heart-shaped shades. Love at first sight.', say: 'Heart eyes!', build: B => ckShapeSpecs(B, 'heart') },
+  { id: 'stars', slot: 'specs', name: 'Star shades', price: 120, ic: '🤩', blurb: 'Gold star sunglasses for a total superstar.', say: 'Superstar!', build: B => ckShapeSpecs(B, 'star') },
+  { id: 'monocle', slot: 'specs', name: 'Gold monocle', price: 240, ic: '🧐', blurb: 'A gold monocle on a chain. Terribly distinguished.', say: 'Quite so, quite so.', build: B => ckMonocle(B) },
+  { id: 'tailbow', slot: 'tail', name: 'Ribbon bow', price: 25, ic: '🎀', blurb: 'A pink satin bow, tied on her tail.', say: 'Bow-tiful!', build: B => ckTailBow(B), seg: 3 },
+  { id: 'tailbell', slot: 'tail', name: 'Tail bell', price: 50, ic: '🔔', blurb: 'A tiny gold bell that swings on her tail.', say: 'Ting-a-ling!', build: B => ckTailBell(B), seg: 1 },
+  { id: 'scrunchie', slot: 'tail', name: 'Sparkly scrunchie', price: 70, ic: '✨', blurb: 'A glittery pink scrunchie. Very 1994.', say: 'Sparkle on!', build: B => ckScrunchie(B), seg: 2 },
+];
+const CK_BY_ID = Object.create(null); CK_ITEMS.forEach(it => { CK_BY_ID[it.id] = it; });   // (no prototype: a saved id like 'toString' is just unknown)
+
+/* ---------- geometry kit ---------- */
+const CKG = {
+  sph: (r, w, h) => new THREE.SphereGeometry(r, w || 12, h || 9),
+  cyl: (rt, rb, h, n, open) => new THREE.CylinderGeometry(rt, rb, h, n || 16, 1, !!open),
+  cone: (r, h, n) => new THREE.ConeGeometry(r, h, n || 16),
+  tor: (r, t, rs, ts, arc) => new THREE.TorusGeometry(r, t, rs || 6, ts || 24, arc || Math.PI * 2),
+  box: (x, y, z) => new THREE.BoxGeometry(x, y, z),
+};
+function ckB() {   // a builder: parts go in buckets by material (m matte, s shiny, g glowing, l lens, f flame); B.frame() nests a transform
+  const B = { parts: { m: [], s: [], g: [], l: [], f: [] }, M: new THREE.Matrix4(), cape: null, sprite: null, anim: null, hideClasp: false };
+  const q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+  B.mat = (p, r, s) => new THREE.Matrix4().compose(v.set(p ? p[0] : 0, p ? p[1] : 0, p ? p[2] : 0), q.setFromEuler(e.set(r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0)),
+    s == null ? sc.set(1, 1, 1) : typeof s === 'number' ? sc.set(s, s, s) : sc.set(s[0], s[1], s[2]));
+  B.frame = (p, r, s) => { B.M = p ? B.mat(p, r, s) : new THREE.Matrix4(); };
+  const add = k => (geo, col, p, r, s) => { B.parts[k].push([geo, col, B.M.clone().multiply(B.mat(p, r, s))]); };
+  B.m = add('m'); B.s = add('s'); B.g = add('g'); B.l = add('l'); B.f = add('f');
+  return B;
+}
+function ckMerge(list) {                                               // many parts -> one indexed geometry with vertex colours (col: a hex, or f(x, y, z, i) in the part's own space)
+  if (!list.length) return null;
+  const c = new THREE.Color(), nm = new THREE.Matrix3(), v = new THREE.Vector3(), used = new Set();
+  let nv = 0, ni = 0;
+  for (const [g] of list) { nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+  const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), C = new Float32Array(nv * 3), I = nv > 65000 ? new Uint32Array(ni) : new Uint16Array(ni);
+  let vo = 0, io = 0;
+  for (const [g, col, M] of list) {
+    const pa = g.attributes.position, na = g.attributes.normal, n = pa.count, fn = typeof col === 'function', flip = M.determinant() < 0; nm.getNormalMatrix(M); used.add(g);
+    if (!fn) c.set(col);
+    for (let i = 0; i < n; i++) {
+      v.fromBufferAttribute(pa, i); if (fn) c.set(col(v.x, v.y, v.z, i));
+      const o = (vo + i) * 3; C[o] = c.r; C[o + 1] = c.g; C[o + 2] = c.b;
+      v.applyMatrix4(M); P[o] = v.x; P[o + 1] = v.y; P[o + 2] = v.z;
+      v.fromBufferAttribute(na, i).applyMatrix3(nm).normalize(); N[o] = v.x; N[o + 1] = v.y; N[o + 2] = v.z;
+    }
+    const cnt = g.index ? g.index.count : n;
+    for (let k = 0; k < cnt; k += 3) { const a = g.index ? g.index.getX(k) : k, b = g.index ? g.index.getX(k + 1) : k + 1, d = g.index ? g.index.getX(k + 2) : k + 2;
+      I[io++] = a + vo; I[io++] = (flip ? d : b) + vo; I[io++] = (flip ? b : d) + vo; }
+    vo += n;
+  }
+  used.forEach(g => g.dispose());
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(P, 3)); out.setAttribute('normal', new THREE.BufferAttribute(N, 3)); out.setAttribute('color', new THREE.BufferAttribute(C, 3));
+  out.setIndex(new THREE.BufferAttribute(I, 1)); out.computeBoundingSphere(); return out;
+}
+function ckShape(pts) { const s = new THREE.Shape(); pts.forEach(([x, y], i) => i ? s.lineTo(x, y) : s.moveTo(x, y)); return s; }
+function ckHeartPts(r, n) { const p = []; for (let i = 0; i < (n || 36); i++) { const t = i / (n || 36) * Math.PI * 2, x = 16 * Math.pow(Math.sin(t), 3), y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); p.push([x / 17 * r, (y + 2.5) / 17 * r]); } return p; }
+function ckStarPts(r, k) { const p = []; for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, rr = i % 2 ? r * (k || 0.46) : r; p.push([Math.sin(a) * rr, Math.cos(a) * rr]); } return p; }
+function ckMaplePts(s) {   // a little Canadian maple leaf (the flag's), point up
+  const R = [[0.05, -1], [0.05, -0.56], [0.52, -0.64], [0.43, -0.44], [0.92, -0.06], [0.77, -0.01], [0.87, 0.3], [0.56, 0.2], [0.5, 0.38], [0.27, 0.12], [0.34, 0.66], [0.17, 0.56], [0, 0.95]];
+  const L = R.slice(0, -1).reverse().map(([x, y]) => [-x, y]); return R.concat(L).map(([x, y]) => [x * s, y * s]);
+}
+function ckFlat(pts, depth, holes) {                                   // a shape pressed out a little (seen from both sides)
+  const s = ckShape(pts); if (holes) s.holes = holes.map(h => ckShape(h));
+  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 4 }); g.translate(0, 0, -depth / 2); return g;
+}
+function ckTwoSided(g) {                                               // a thin sheet, drawn from both sides (the shiny/matte materials only draw fronts)
+  const p = g.attributes.position, n = g.attributes.normal, cnt = p.count, idx = g.index ? Array.from(g.index.array) : Array.from({ length: cnt }, (_, i) => i);
+  const P = new Float32Array(cnt * 6), N = new Float32Array(cnt * 6); P.set(p.array); N.set(n.array); P.set(p.array, cnt * 3);
+  for (let i = 0; i < cnt * 3; i++) N[cnt * 3 + i] = -n.array[i];
+  const I = idx.slice(); for (let k = 0; k < idx.length; k += 3) I.push(idx[k] + cnt, idx[k + 2] + cnt, idx[k + 1] + cnt);
+  const o = new THREE.BufferGeometry(); o.setAttribute('position', new THREE.BufferAttribute(P, 3)); o.setAttribute('normal', new THREE.BufferAttribute(N, 3)); o.setIndex(I); g.dispose(); return o;
+}
+function ckFluff(g, amt, seed) {                                       // a lumpy, fluffy ball (a pom-pom, a flower head)
+  const a = g.attributes.position; for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), z = a.getZ(i), h = Math.sin(x * 91.3 + y * 57.1 + z * 33.7 + (seed || 0)) * 43758.55, k = 1 + (h - Math.floor(h) - 0.5) * amt; a.setXYZ(i, x * k, y * k, z * k); }
+  g.computeVertexNormals(); return g;
+}
+// her shape, in the body group's space (for collars that hug her neck and capes that drape over her back): ellipsoids [cx, cy, cz, rx, ry, rz]
+const CK_BODY = [[0, 0.42, -0.02, 0.2, 0.19, 0.39], [0, 0.47, 0.2, 0.19, 0.19, 0.19], [0.1, 0.40, -0.26, 0.092, 0.144, 0.138], [-0.1, 0.40, -0.26, 0.092, 0.144, 0.138],
+  [0.1, 0.40, 0.24, 0.068, 0.098, 0.085], [-0.1, 0.40, 0.24, 0.068, 0.098, 0.085]];
+const CK_HEADE = [0, 0.68, 0.36, 0.1728, 0.152, 0.1568];
+function ckIn(x, y, z, list, m) { for (const e of list) { const a = (x - e[0]) / (e[3] + m), b = (y - e[1]) / (e[4] + m), c = (z - e[2]) / (e[5] + m); if (a * a + b * b + c * c < 1) return true; } return false; }
+function ckReach(o, d, list, m, far) { for (let t = far || 0.5; t > 0; t -= 0.002) if (ckIn(o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t, list, m)) return t + 0.002; return 0; }   // how far out from o (along d) she ends
+function ckNeck(m, drop) {                                             // a closed loop round her neck, hugging the fur (drop: how far the front hangs down onto her chest)
+  const C = ckNeck.cache || (ckNeck.cache = {}), key = m + ':' + (drop || 0); if (C[key]) return C[key];
+  const P0 = [0, 0.585, 0.285], ny = 0.86, nz = 0.51, e2 = [0, nz, -ny], list = CK_BODY.concat([CK_HEADE]), pts = [], N = 48;
+  for (let i = 0; i < N; i++) {
+    const a = i / N * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), d = [ca, sa * e2[1], sa * e2[2]];   // a = -90°: the front of her neck (down and forward)
+    const front = Math.max(0, -sa), dd = (drop || 0) * front * front, o = [P0[0], P0[1] - dd * 0.9, P0[2] + dd * 0.35];
+    const r = ckReach(o, d, list, m, 0.4); pts.push(new THREE.Vector3(o[0] + d[0] * r, o[1] + d[1] * r, o[2] + d[2] * r));
+  }
+  for (let pass = 0; pass < 3; pass++) { const s = pts.map(p => p.clone()); for (let i = 0; i < N; i++) pts[i].copy(s[(i + N - 1) % N]).add(s[i]).add(s[(i + 1) % N]).multiplyScalar(1 / 3); }
+  return (C[key] = { pts, n: new THREE.Vector3(0, ny, nz), curve: new THREE.CatmullRomCurve3(pts, true, 'centripetal') });
+}
+function ckBand(curve, n, w, t, segs) {                           // a flat collar band along a closed loop (w tall along her neck, t thick)
+  const S = segs || 64, P = [], Nn = [], I = [], up = n.clone().normalize(), p = new THREE.Vector3(), tg = new THREE.Vector3(), out = new THREE.Vector3();
+  for (let i = 0; i <= S; i++) {
+    curve.getPointAt(i / S % 1, p); curve.getTangentAt(i / S % 1, tg); out.crossVectors(tg, up).normalize();
+    const lay = [[out, -t / 2, w / 2, out], [out, t / 2, w / 2, out], [out, t / 2, -w / 2, out], [out, -t / 2, -w / 2, out]];   // (four corners round the section)
+    for (const [o, a, b] of lay) { P.push(p.x + o.x * a + up.x * b, p.y + o.y * a + up.y * b, p.z + o.z * a + up.z * b); }
+    Nn.push(-up.x * 0.2 - out.x, -up.y * 0.2 - out.y, -up.z * 0.2 - out.z, out.x + up.x * 0.3, out.y + up.y * 0.3, out.z + up.z * 0.3, out.x - up.x * 0.3, out.y - up.y * 0.3, out.z - up.z * 0.3, -out.x, -out.y, -out.z);
+  }
+  for (let i = 0; i < S; i++) for (let k = 0; k < 4; k++) { const a = i * 4 + k, b = i * 4 + (k + 1) % 4, c2 = a + 4, d = b + 4; I.push(a, c2, b, b, c2, d); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(Nn, 3)); g.setIndex(I);
+  g.computeVertexNormals(); return g;
+}
+function ckOnCurve(curve, u, out) { return curve.getPointAt(((u % 1) + 1) % 1, out || new THREE.Vector3()); }
+
+/* ---------- hats (in her head's space: its middle is (0, 0, 0), +z out of her face; her ears poke up at x ±0.1, so hats sit between them) ---------- */
+function ckPartyHat(B) {
+  B.frame([0.004, 0.142, -0.005], [-0.12, 0, -0.2]);
+  B.m(CKG.cone(0.056, 0.17, 24), (x, y, z) => ((y * 26 + Math.atan2(x, z) * 0.9) % 2 + 2) % 2 < 1 ? 0xff6fae : 0xffd23a, [0, 0.085, 0]);
+  B.m(ckFluff(CKG.sph(0.026, 12, 9), 0.35, 3), 0xfff4f8, [0, 0.174, 0]);
+  B.m(CKG.tor(0.056, 0.011, 6, 28), (x, y, z) => Math.sin(Math.atan2(y, x) * 14) > 0 ? 0xffffff : 0x8fe3ff, [0, 0.006, 0], [Math.PI / 2, 0, 0]);
+}
+function ckBunnyEars(B) {
+  B.frame([0, 0.012, 0.04], [0.16, 0, 0]);
+  B.m(CKG.tor(0.16, 0.0085, 6, 36, Math.PI * 0.94), 0xff8fc0, [0, 0, 0], [0, 0, Math.PI * 0.03], [1.1, 0.99, 1]);
+  const ear = (sx, rz, rx, flop) => {
+    B.frame([0, 0.012, 0.04], [0.16, 0, 0]); B.M.multiply(B.mat([sx * 0.048, 0.158, 0], [rx, 0, rz]));
+    B.m(CKG.sph(1, 14, 10), 0xfffafc, [0, 0.1, 0], null, [0.036, 0.1, 0.017]);
+    B.m(CKG.sph(1, 12, 8), 0xffa9cc, [0, 0.1, 0.012], null, [0.021, 0.075, 0.008]);
+    if (flop) { B.M.multiply(B.mat([0, 0.17, 0], [0.9, 0, -sx * 0.25]));
+      B.m(CKG.sph(1, 12, 8), 0xfffafc, [0, 0.045, 0], null, [0.033, 0.055, 0.016]); B.m(CKG.sph(1, 10, 8), 0xffa9cc, [0, 0.045, 0.011], null, [0.019, 0.04, 0.007]); }
+  };
+  ear(-1, 0.2, -0.1, false); ear(1, -0.3, 0.05, true);
+  B.frame();
+}
+function ckFlowerCrown(B) {
+  B.frame([0, 0.098, 0.004], [-0.16, 0, 0]);
+  B.m(CKG.tor(0.132, 0.009, 6, 40), 0x5fae55, [0, 0, 0], [Math.PI / 2, 0, 0], [1.05, 0.93, 1]);
+  const petal = [0xff8fc0, 0xffffff, 0xc9a8ff, 0xffb3d1, 0xfff1a8], at = [0, 0.55, -0.55, 1.05, -1.05, 2.25, -2.25, 2.8, -2.8, Math.PI];
+  at.forEach((a, k) => {
+    const x = Math.sin(a) * 0.132 * 1.05, z = Math.cos(a) * 0.132 * 0.93, pc = petal[k % petal.length], big = k === 0 ? 1.25 : 1;
+    B.M = B.mat([0, 0.098, 0.004], [-0.16, 0, 0]).multiply(B.mat([x, 0.004, z], [0, a, 0])).multiply(B.mat([0, 0, 0.004], [-1.25, 0, 0], big));
+    for (let i = 0; i < 5; i++) { const b = i / 5 * Math.PI * 2; B.m(CKG.sph(0.013, 8, 6), pc, [Math.sin(b) * 0.014, Math.cos(b) * 0.014, 0], [0, 0, -b], [1, 1.25, 0.45]); }
+    B.m(CKG.sph(0.008, 8, 6), 0xffc83a, [0, 0, 0.004]);
+  });
+  [0.27, -0.27, 0.8, -0.8, 1.9, -1.9, 2.5, -2.5].forEach(a => {
+    const x = Math.sin(a) * 0.132 * 1.05, z = Math.cos(a) * 0.132 * 0.93;
+    B.M = B.mat([0, 0.098, 0.004], [-0.16, 0, 0]).multiply(B.mat([x, 0.006, z], [0, a + Math.PI / 2, 0.5]));
+    B.m(CKG.sph(0.016, 8, 6), 0x7cc45e, [0, 0, 0], null, [1.3, 0.3, 0.6]);
+  });
+  B.frame();
+}
+function ckToque(B) {
+  B.frame([0, 0.004, -0.008], [-0.24, 0, 0], [1.05, 0.97, 1]);
+  B.m(new THREE.SphereGeometry(0.17, 28, 18, 0, Math.PI * 2, 0, 1.1), (x, y) => y > 0.126 && y < 0.142 ? 0xfff4f8 : 0xe0283c);
+  B.m(CKG.tor(0.151, 0.017, 8, 44), (x, y, z) => Math.sin(Math.atan2(y, x) * 40) > 0 ? 0xfff4f8 : 0xefe2e8, [0, 0.077, 0], [Math.PI / 2, 0, 0]);
+  B.m(ckFluff(CKG.sph(0.043, 14, 10), 0.3, 7), 0xfffafc, [0, 0.178, 0]);
+  B.m(ckFlat(ckMaplePts(0.022), 0.006), 0xd4142e, [0, 0.08, 0.163], [-0.08, 0, 0]);
+  B.frame();
+}
+function ckChefHat(B) {
+  B.frame([0, 0.132, -0.012], [-0.14, 0, 0]);
+  const wh = (x, y) => y > 0.09 ? 0xffffff : 0xf6f0f2;
+  B.m(CKG.cyl(0.058, 0.055, 0.06, 24, false), 0xf3edf0, [0, 0.03, 0]);
+  B.m(CKG.sph(0.07, 16, 12), wh, [0, 0.105, 0], null, [1, 0.82, 1]);
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; B.m(CKG.sph(0.043, 12, 9), wh, [Math.sin(a) * 0.05, 0.09, Math.cos(a) * 0.05]); }
+  B.m(CKG.tor(0.058, 0.005, 5, 28), 0xff6fae, [0, 0.02, 0], [Math.PI / 2, 0, 0]);
+  B.frame();
+}
+function ckCowboyHat(B) {
+  B.frame([0, 0.136, -0.012], [-0.06, 0, 0], 1.1);
+  const pink = 0xff7fb5;
+  B.m(CKG.sph(0.062, 18, 12), (x, y) => y > 0.035 && Math.abs(x) < 0.012 ? 0xe86aa2 : pink, [0, 0.03, 0], null, [0.88, 0.95, 1.08]);
+  B.m(CKG.cyl(0.056, 0.058, 0.03, 24, true), pink, [0, 0.012, 0], null, [0.9, 1, 1.08]);
+  { const g = new THREE.RingGeometry(0.045, 0.108, 32, 3), a = g.attributes.position;   // the brim: a ring laid flat, its sides curled up
+    for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), k = Math.pow(Math.abs(x) / 0.108, 2.2); a.setXYZ(i, x * 0.8, 0.002 + k * 0.05 - Math.pow(Math.max(0, y) / 0.108, 2) * 0.006, -y * 1.08); }
+    g.computeVertexNormals(); B.m(ckTwoSided(g), 0xf06aa6); }
+  B.m(CKG.tor(0.052, 0.0075, 6, 28), 0xfff4f8, [0, 0.016, 0], [Math.PI / 2, 0, 0], [0.9, 1.08, 1]);
+  B.s(ckFlat(ckStarPts(0.017), 0.004), 0xffd23a, [0, 0.03, 0.066], [-0.1, 0, 0]);
+  B.frame();
+}
+function ckPirateHat(B) {
+  B.frame([0, 0.142, -0.01], [-0.12, 0, 0]);
+  const blk = 0x2a2230;
+  B.m(CKG.cyl(0.05, 0.058, 0.06, 20), blk, [0, 0.032, 0]);
+  B.m(CKG.sph(0.05, 16, 8, 0), blk, [0, 0.062, 0], null, [1, 0.45, 1]);
+  B.m(CKG.cyl(0.118, 0.118, 0.012, 3), blk, [0, 0.008, 0], [0, Math.PI, 0]);   // a tricorn: a point to the front
+  for (let k = 0; k < 3; k++) {                                         // its three brims, turned up
+    const a = Math.PI + k / 3 * Math.PI * 2 + Math.PI / 3, r = 0.059, len = 0.18;
+    B.M = B.mat([0, 0.142, -0.01], [-0.12, 0, 0]).multiply(B.mat([Math.sin(a) * r, 0.03, Math.cos(a) * r], [0, a, 0])).multiply(B.mat([0, 0, 0], [0.42, 0, 0]));
+    B.m(CKG.box(len, 0.05, 0.009), blk);
+    B.s(CKG.box(len * 0.98, 0.006, 0.011), 0xf2c14a, [0, 0.026, 0.001]);
+  }
+  B.frame([0, 0.142, -0.01], [-0.12, 0, 0]);
+  B.m(CKG.sph(0.013, 10, 8), 0xfff8ee, [0, 0.042, 0.062], null, [1, 1.05, 0.6]);
+  B.m(CKG.sph(0.0035, 5, 4), 0x2a2230, [-0.005, 0.044, 0.07]); B.m(CKG.sph(0.0035, 5, 4), 0x2a2230, [0.005, 0.044, 0.07]);
+  B.m(CKG.cyl(0.0028, 0.0028, 0.036, 5), 0xfff8ee, [0, 0.026, 0.062], [0, 0, 0.9]); B.m(CKG.cyl(0.0028, 0.0028, 0.036, 5), 0xfff8ee, [0, 0.026, 0.062], [0, 0, -0.9]);
+  B.frame();
+}
+function ckWitchHat(B) {
+  B.frame([0, 0.15, -0.014], [-0.14, 0, 0]);
+  const pu = 0x5b2d8a;
+  B.m(CKG.cyl(0.082, 0.082, 0.008, 32), pu, [0, 0.004, 0], null, [0.94, 1, 1.12]);
+  B.m(CKG.cyl(0.036, 0.052, 0.085, 20), pu, [0, 0.05, 0]);
+  B.m(CKG.cyl(0.02, 0.036, 0.07, 16), pu, [0, 0.118, -0.01], [-0.3, 0, 0]);
+  B.m(CKG.cone(0.02, 0.07, 14), pu, [0, 0.168, -0.038], [-0.85, 0, 0]);
+  B.m(CKG.cyl(0.0505, 0.053, 0.018, 24, true), 0xff6fae, [0, 0.018, 0]);
+  B.s(CKG.box(0.022, 0.018, 0.006), 0xffd23a, [0, 0.018, 0.052]);
+  B.m(CKG.box(0.011, 0.009, 0.007), 0x3a1a55, [0, 0.018, 0.053]);
+  B.frame();
+}
+function ckTiara(B) {
+  B.frame([0, 0.004, 0.052], [0.36, 0, 0]);
+  const sil = 0xe9eef7;
+  B.s(CKG.tor(0.14, 0.0065, 6, 40, 2.1), sil, [0, 0, 0], [0, 0, Math.PI / 2 - 1.05], [1.19, 0.955, 1]);
+  const peaks = [[0, 0.056, 0xff5fa2, 0.017], [0.42, 0.036, 0x8fe3ff, 0.011], [-0.42, 0.036, 0x8fe3ff, 0.011], [0.8, 0.022, 0xff9fc9, 0.008], [-0.8, 0.022, 0xff9fc9, 0.008]];
+  for (const [a, h, gem, gr] of peaks) {
+    const x = Math.sin(a) * 0.14 * 1.19, y = Math.cos(a) * 0.14 * 0.955;
+    B.M = B.mat([0, 0.004, 0.052], [0.36, 0, 0]).multiply(B.mat([x, y, 0], [0, 0, -a]));
+    B.s(new THREE.OctahedronGeometry(1, 0), sil, [0, h * 0.5, 0], null, [h * 0.36, h * 0.62, 0.006]);
+    B.s(new THREE.OctahedronGeometry(gr, 0), gem, [0, h * 0.42, 0.007], null, [1, 1.2, 0.6]);
+  }
+  B.frame();
+}
+function ckHalo(B) {
+  B.g(CKG.tor(0.085, 0.012, 10, 40), (x, y, z) => { const k = 0.5 + 0.5 * Math.sin(Math.atan2(y, x) * 3); return new THREE.Color(0xffd84a).lerp(new THREE.Color(0xfff6c8), k).getHex(); }, [0, 0.3, -0.02], [Math.PI / 2 - 0.18, 0, 0]);
+  B.sprite = { color: 0xffe68a, pos: [0, 0.3, -0.02], scale: 0.4, opacity: 0.8 }; B.anim = 'bob';
+}
+
+/* ---------- glasses (head space: her eyes are at x ±0.07, y 0.02; lenses sit just clear of them, z 0.182) ---------- */
+function ckTemples(B, add, col, inner) {                               // the arms, back along her cheeks
+  for (const sx of [-1, 1]) add(CKG.box(0.006, 0.007, 0.112), col, [sx * 0.132, 0.03, 0.113], [0, -sx * 0.4, 0]);
+  if (inner) add(CKG.cyl(0.0045, 0.0045, inner, 6), col, [0, 0.034, 0.181], [0, 0, Math.PI / 2]);
+}
+function ckNerdSpecs(B) {
+  const blk = 0x2d1328;
+  for (const sx of [-1, 1]) B.m(CKG.tor(0.041, 0.0062, 6, 28), blk, [sx * 0.07, 0.022, 0.175], [0, sx * 0.26, 0]);
+  ckTemples(B, B.m, blk, 0.05);
+  B.m(CKG.cyl(0.0095, 0.0095, 0.016, 10), 0xfffaf2, [0, 0.034, 0.181], [0, 0, Math.PI / 2]);
+}
+function ckShapeSpecs(B, kind) {
+  const heart = kind === 'heart', pts = heart ? ckHeartPts(0.05) : ckStarPts(0.058, 0.5), inner = heart ? ckHeartPts(0.038) : ckStarPts(0.045, 0.5);
+  const fr = heart ? 0xff4f9a : 0xffc93c, lens = heart ? 0xa0265e : 0x5a2d82;
+  for (const sx of [-1, 1]) {
+    const p = [sx * 0.072, 0.024, 0.176], r = [0, sx * 0.26, heart ? 0 : sx * 0.12];
+    B.s(ckFlat(pts, 0.008, [inner]), fr, p, r);
+    B.l(ckFlat(inner, 0.003), lens, p, r);
+  }
+  ckTemples(B, B.s, fr, 0.042);
+}
+function ckMonocle(B) {
+  const gold = 0xf2c14a, p = [-0.07, 0.022, 0.175], r = [0, -0.26, 0];
+  B.s(CKG.tor(0.044, 0.0068, 8, 32), gold, p, r);
+  B.l(new THREE.CircleGeometry(0.042, 28), 0xdff4ff, [p[0], p[1], p[2] + 0.001], r);
+  const pts = [new THREE.Vector3(-0.1, -0.012, 0.172), new THREE.Vector3(-0.13, -0.07, 0.15), new THREE.Vector3(-0.145, -0.12, 0.11), new THREE.Vector3(-0.14, -0.16, 0.06)];
+  B.s(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.0032, 5, false), gold);
+}
+
+/* ---------- collars (body space: a band round her neck, computed from her shape so it never sinks into the fur) ---------- */
+function ckNeckBand(B, add, col, w, t, m, drop) { const N = ckNeck(m == null ? 0.012 : m, drop); add(ckBand(N.curve, N.n, w, t), col); return N; }
+function ckFrontOf(N, u, lift) {                                       // a point on the loop (u 0.75 is her throat) and which way is out
+  const p = ckOnCurve(N.curve, u), q = ckOnCurve(N.curve, u + 0.01), tg = q.sub(p).normalize(), out = new THREE.Vector3().crossVectors(tg, N.n).normalize();
+  if (out.z < 0 && u > 0.6 && u < 0.9) out.negate(); p.addScaledVector(N.n, lift || 0); return { p, out };
+}
+function ckBandana(B) {
+  const N = ckNeckBand(B, B.m, 0xd62839, 0.026, 0.012, 0.014);
+  const f = ckFrontOf(N, 0.75), P = [], I = [], C = [], ch = CK_BODY[1];   // the triangle flap, draped down her chest
+  const W = 0.25, H = 0.13, cols = 8, rws = 6;
+  for (let r = 0; r <= rws; r++) for (let c = 0; c <= cols; c++) {
+    const v = r / rws, u = c / cols - 0.5, half = (1 - v) * 0.5, x = u * 2 * half * W, yy = f.p.y + 0.004 - v * H;
+    let zz = ch[2] + Math.sqrt(Math.max(0, ch[3] * ch[3] - x * x - (yy - ch[1]) * (yy - ch[1]))) + 0.014 + v * 0.004;
+    zz = Math.max(zz, f.p.z - 0.01 - v * 0.02);
+    P.push(x, yy, zz);
+  }
+  for (let r = 0; r < rws; r++) for (let c = 0; c < cols; c++) { const a = r * (cols + 1) + c, b = a + 1, d = a + cols + 1, e = d + 1; I.push(a, d, b, b, d, e); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+  B.m(ckTwoSided(g), 0xd62839);
+  for (const [u, v] of [[-0.18, 0.2], [0.18, 0.2], [0, 0.42], [-0.09, 0.62], [0.09, 0.62], [0, 0.18], [-0.26, 0.05], [0.26, 0.05]]) {   // (white polka dots, just proud of the cloth)
+    const half = (1 - v) * 0.5, x = u * 2 * half * W * 0.9, yy = f.p.y + 0.004 - v * H, zz = Math.max(ch[2] + Math.sqrt(Math.max(0, ch[3] * ch[3] - x * x - (yy - ch[1]) * (yy - ch[1]))) + 0.017 + v * 0.004, f.p.z - 0.007 - v * 0.02);
+    const nx = x / ch[3], ny = (yy - ch[1]) / ch[3]; B.m(CKG.sph(0.0085, 8, 6), 0xfff4f8, [x, yy, zz], [-ny * 1.2, nx * 1.2, 0], [1, 1, 0.35]); }
+  B.m(CKG.sph(0.02, 10, 8), 0xd62839, [f.p.x, f.p.y + 0.004, f.p.z + 0.006], null, [1.3, 0.8, 0.8]);
+}
+function ckBowTie(B) {
+  const N = ckNeckBand(B, B.s, 0xff5fa2, 0.014, 0.008, 0.01), f = ckFrontOf(N, 0.75, -0.004);
+  B.frame([f.p.x, f.p.y, f.p.z + 0.012], [Math.atan2(-f.out.y, f.out.z), 0, 0]);
+  for (const sx of [-1, 1]) B.s(CKG.cone(0.036, 0.075, 14), 0xff5fa2, [sx * 0.04, 0, 0], [0, 0, sx * Math.PI / 2], [1, 1, 0.45]);
+  B.s(CKG.sph(0.017, 12, 9), 0xe23f86, [0, 0, 0.004], null, [1, 1.1, 0.8]);
+  B.frame();
+}
+function ckBellCollar(B) {
+  const N = ckNeckBand(B, B.m, 0xd9303f, 0.024, 0.012, 0.012), f = ckFrontOf(N, 0.75, -0.01);
+  const c = f.p.clone().addScaledVector(f.out, 0.026).add(new THREE.Vector3(0, -0.018, 0));
+  B.s(CKG.sph(0.028, 16, 12), (x, y) => Math.abs(y) < 0.004 ? 0xb8871f : 0xf5c542, [c.x, c.y, c.z]);
+  B.s(CKG.tor(0.009, 0.0035, 5, 12), 0xf5c542, [c.x, c.y + 0.03, c.z], [0, 0, 0]);
+  B.m(CKG.sph(0.006, 6, 5), 0x3a2a10, [c.x, c.y - 0.016, c.z + 0.024]);
+}
+function ckGarland(B) {
+  const N = ckNeck(0.022, 0.07), cols = [0xff8a1f, 0xffc23a, 0xff9f2e, 0xffd24a, 0xe8611c], n = 26;
+  for (let i = 0; i < n; i++) {
+    const p = ckOnCurve(N.curve, i / n), big = 1 + 0.25 * Math.max(0, -Math.sin(i / n * Math.PI * 2));
+    B.m(ckFluff(CKG.sph(0.024 * big, 10, 8), 0.45, i * 3.1), cols[i % cols.length], [p.x, p.y, p.z]);
+  }
+  const f = ckFrontOf(N, 0.75); B.m(CKG.sph(0.012, 8, 6), 0xd81b3a, [f.p.x, f.p.y - 0.03, f.p.z + 0.018]);
+}
+function ckPunkCollar(B) {
+  const N = ckNeckBand(B, B.m, 0x231a26, 0.03, 0.014, 0.012), n = 12;
+  for (let i = 0; i < n; i++) {
+    const u = i / n, f = ckFrontOf(N, u), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), f.out), e = new THREE.Euler().setFromQuaternion(q);
+    const p = f.p.clone().addScaledVector(f.out, 0.012);
+    B.s(CKG.cone(0.0095, 0.03, 8), 0xdfe6ee, [p.x + f.out.x * 0.012, p.y + f.out.y * 0.012, p.z + f.out.z * 0.012], [e.x, e.y, e.z]);
+  }
+  const f = ckFrontOf(N, 0.75, -0.005); B.s(CKG.tor(0.014, 0.0038, 6, 16), 0xdfe6ee, [f.p.x, f.p.y - 0.018, f.p.z + 0.014], [-0.4, 0, 0]);
+}
+function ckPearls(B) {
+  const N = ckNeck(0.018, 0.035), n = 34;
+  for (let i = 0; i < n; i++) { const p = ckOnCurve(N.curve, i / n); B.s(CKG.sph(0.0105, 10, 8), 0xf2e3d0, [p.x, p.y, p.z]); }
+  const f = ckFrontOf(N, 0.75); B.s(CKG.sph(0.019, 14, 10), 0xffb6d3, [f.p.x, f.p.y - 0.026, f.p.z + 0.012], null, [1, 1.15, 1]);
+}
+
+/* ---------- capes: a sheet draped over her back that ripples when she runs (its vertices move on the CPU); the clasp is fixed ---------- */
+const CK_CAPE = { cols: 16, rows: 13, z0: 0.175, z1: -0.33 };
+function ckCape(B, kind) {
+  const col = {
+    hero: (u, v) => v > 0.9 || Math.abs(u) > 0.94 ? 0xffc93c : 0xe0263a,
+    rainbow: u => [0xff5a5f, 0xff9f40, 0xffd84a, 0x62d26f, 0x4fb3ff, 0x9b6bff][Math.min(5, Math.floor((u + 1) / 2 * 6))],
+    vampire: (u, v) => v > 0.9 || Math.abs(u) > 0.94 ? 0xc3162f : 0x1d1024,
+    royal: (u, v, i) => { const trim = v > 0.83 || Math.abs(u) > 0.87; if (!trim) return 0x6a2c9e; return (i * 7) % 13 === 5 ? 0x1c1620 : 0xfbf8f0; },
+  }[kind];
+  B.cape = { col };
+  if (kind === 'vampire') {                                             // a tall stand-up collar behind her head: red inside, black outside
+    for (const sx of [-1, 1]) for (const [c, off] of [[0xc3162f, 0], [0x1d1024, -0.006]]) {
+      const g = new THREE.BufferGeometry(), x0 = sx * 0.02, x1 = sx * 0.17;
+      const P = [x0, 0.62, 0.17 + off, x1, 0.6, 0.2 + off, x1 * 1.05, 0.8, 0.13 + off, x0, 0.74, 0.135 + off];
+      g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(sx > 0 === (off === 0) ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]); g.computeVertexNormals();
+      B.s(g, c);   // (satin: on the clasp's material, so the cape stays two meshes)
+    }
+  }
+  const gold = 0xf2c14a;                                                // the clasp: a chain across her chest, a brooch in the middle
+  const clasp = kind === 'royal' ? 0xf2c14a : kind === 'vampire' ? 0xc3162f : kind === 'rainbow' ? 0xffffff : gold;
+  const L = [new THREE.Vector3(-0.19, 0.49, 0.2), new THREE.Vector3(-0.13, 0.46, 0.34), new THREE.Vector3(0, 0.45, 0.4), new THREE.Vector3(0.13, 0.46, 0.34), new THREE.Vector3(0.19, 0.49, 0.2)];
+  B.s(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(L), 24, 0.005, 5, false), gold);
+  if (kind === 'royal') B.s(CKG.sph(0.02, 14, 10), 0xb0142e, [0, 0.45, 0.405]);
+  if (kind === 'hero' || kind === 'royal' || kind === 'rainbow') B.s(ckFlat(ckStarPts(kind === 'royal' ? 0.03 : 0.026), 0.008), clasp, [0, 0.45, 0.406], [-0.35, 0, 0]);
+  else B.s(ckFlat(ckHeartPts(0.028), 0.008), clasp, [0, 0.445, 0.406], [-0.35, 0, 0]);
+  B.hideClasp = true;
+}
+function ckCapeGeo(spec) {                                             // the draped sheet (her shape + a little room), with the data the flutter needs
+  const { cols, rows, z0, z1 } = CK_CAPE, n = (cols + 1) * (rows + 1), P = new Float32Array(n * 3), Nn = new Float32Array(n * 3), C = new Float32Array(n * 3), UV = new Float32Array(n * 2), I = [];
+  const list = CK_BODY, c = new THREE.Color();
+  for (let r = 0; r <= rows; r++) for (let k = 0; k <= cols; k++) {
+    const i = r * (cols + 1) + k, u = k / cols * 2 - 1, v = r / rows, z = z0 + (z1 - z0) * v;
+    const tMax = 1.42 + 0.3 * v - 0.3 * (1 - v) * (1 - v), th = u * tMax, cy = 0.43, d = [Math.sin(th), Math.cos(th), -0.18 * v];
+    const dl = Math.hypot(d[0], d[1], d[2]); d[0] /= dl; d[1] /= dl; d[2] /= dl;
+    const R = ckReach([0, cy, z], d, list, 0.022 + 0.01 * v, 0.5);
+    P[i * 3] = d[0] * R * (1 + 0.04 * v * Math.abs(u)); P[i * 3 + 1] = cy + d[1] * R - 0.012 * v * v; P[i * 3 + 2] = z + d[2] * R;
+    Nn[i * 3] = d[0]; Nn[i * 3 + 1] = d[1]; Nn[i * 3 + 2] = d[2];
+    c.set(spec.col(u, v, i)); C[i * 3] = c.r; C[i * 3 + 1] = c.g; C[i * 3 + 2] = c.b; UV[i * 2] = u; UV[i * 2 + 1] = v;
+  }
+  for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) { const a = r * (cols + 1) + k, b = a + 1, d = a + cols + 1, e = d + 1; I.push(a, b, d, b, e, d); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3)); g.setIndex(I); g.computeVertexNormals();
+  g.userData.ck = { base: P.slice(), out: Nn, uv: UV, n };
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.45, -0.05), 0.6);
+  return g;
+}
+function ckCapeStep(g, amt, t) {                                       // amt 0 (still) .. 1 (running flat out): the back hem lifts and ripples
+  const D = g.userData.ck; if (!D) return; const P = g.attributes.position.array, B0 = D.base, O = D.out, UV = D.uv;
+  for (let i = 0; i < D.n; i++) {
+    const u = UV[i * 2], v = UV[i * 2 + 1], k = v * v, w = Math.sin(t * 8.5 - v * 3.4 + u * 1.6) * 0.5 + 0.5, w2 = Math.sin(t * 2.1 + u * 2.4 - v * 2);
+    const lift = k * (amt * (0.05 + 0.05 * w) + 0.006 * w2), j = i * 3;
+    P[j] = B0[j] + O[j] * lift * (1 + Math.abs(u) * 0.6); P[j + 1] = B0[j + 1] + O[j + 1] * lift + amt * k * 0.05 * w; P[j + 2] = B0[j + 2] + O[j + 2] * lift - amt * k * (0.09 + 0.03 * w);
+  }
+  g.attributes.position.needsUpdate = true;
+}
+
+/* ---------- backpacks (body space: her back is about y 0.62, from her shoulders at z 0.2 to her rump at z -0.3) ---------- */
+function ckStraps(B, col, add) {                                           // a little harness: two flat straps round her middle, snug to the fur
+  const C = ckStraps.cache || (ckStraps.cache = [0.1, -0.11].map(z => { const pts = [];
+    for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2, d = [Math.sin(a), Math.cos(a), 0], r = ckReach([0, 0.42, z], d, CK_BODY, 0.009, 0.4); pts.push(new THREE.Vector3(d[0] * r, 0.42 + d[1] * r, z)); }
+    return new THREE.CatmullRomCurve3(pts, true, 'centripetal'); }));
+  for (const c of C) (add || B.m)(ckBand(c, new THREE.Vector3(0, 0, 1), 0.02, 0.006, 48), col);
+}
+function ckStrawberry(B) {
+  B.frame([0, 0.69, -0.05], [Math.PI / 2 + 0.2, 0, 0], 1.2);   // (lying along her back, its point to her tail)
+  { const g = CKG.sph(0.085, 20, 16), a = g.attributes.position;
+    for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), z = a.getZ(i), k = y < 0 ? 1 - 0.55 * Math.pow(-y / 0.085, 1.4) : 1 - 0.1 * Math.pow(y / 0.085, 3); a.setXYZ(i, x * k, y * (y < 0 ? 1.2 : 0.85), z * k * 0.8); }
+    g.computeVertexNormals(); B.m(g, 0xe8263f); }
+  for (let i = 0; i < 16; i++) { const a = i * 2.4, h = -0.06 + (i % 5) * 0.028, rr = 0.075 * (1 - 0.5 * Math.max(0, -h / 0.1)); B.m(CKG.sph(0.0055, 6, 4), 0xffe07a, [Math.sin(a) * rr, h, Math.cos(a) * rr * 0.8], null, [1, 1.6, 1]); }
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; B.m(CKG.cone(0.02, 0.06, 5), 0x4caf50, [Math.sin(a) * 0.03, 0.074, Math.cos(a) * 0.025], [Math.cos(a) * 1.6, 0, -Math.sin(a) * 1.6], [1, 1, 0.35]); }
+  B.m(CKG.cyl(0.006, 0.008, 0.035, 6), 0x3d8b40, [0, 0.1, 0]);
+  B.frame(); ckStraps(B, 0xff5fa2);
+}
+function ckPizza(B) {
+  B.frame([0, 0.586, -0.31], [-0.2, 0, 0], 1.3);   // (its point down by her tail, the crust up by her shoulders)
+  B.m(new THREE.CylinderGeometry(0.21, 0.21, 0.026, 10, 1, false, -0.4, 0.8), (x, y) => y > 0.011 ? 0xffd35a : 0xf2b35c, [0, 0, 0]);
+  B.m(CKG.tor(0.205, 0.016, 6, 12, 0.8), 0xd98a3a, [0, 0.008, 0], [Math.PI / 2, 0, Math.PI / 2 - 0.4]);
+  for (const [a, r] of [[0.12, 0.14], [-0.15, 0.1], [0.02, 0.06], [-0.05, 0.17]]) B.m(CKG.cyl(0.019, 0.019, 0.006, 14), 0xd8342e, [Math.sin(a) * r, 0.016, Math.cos(a) * r]);
+  B.m(CKG.sph(0.012, 8, 6), 0x3f9a3f, [0.07, 0.016, 0.1], null, [1.4, 0.3, 0.8]);
+  B.frame(); ckStraps(B, 0xd98a3a);
+}
+function ckBasket(B) {
+  B.frame([0, 0.672, -0.04], [-0.1, 0, 0]);
+  const weave = (x, y, z) => (Math.floor((y + 0.1) * 90) + Math.floor((x + z + 0.2) * 45)) % 2 ? 0xc98a4a : 0xa86d34;
+  B.m(new THREE.BoxGeometry(0.2, 0.075, 0.15, 6, 3, 5), weave, [0, 0, 0]);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) B.m(CKG.box(0.034, 0.006, 0.03), (r + c) % 2 ? 0xffffff : 0xe23a4c, [-0.068 + c * 0.034, 0.042, -0.045 + r * 0.03], [0.05 * (c - 2), 0, 0.04 * (r - 1.5)]);
+  B.m(CKG.tor(0.085, 0.009, 6, 20, Math.PI), 0xb77a3e, [0, 0.038, 0], [0, Math.PI / 2, 0], [1, 0.9, 1]);
+  B.m(CKG.cyl(0.018, 0.018, 0.16, 10), 0xe8b060, [0.05, 0.07, 0.02], [0.5, 0, -0.9]);
+  B.frame(); ckStraps(B, 0xb77a3e);
+}
+function ckJetpack(B) {
+  const sil = 0xd9dee7, red = 0xe8283c; B.flamePivot = [0, 0.67, -0.165];
+  for (const sx of [-1, 1]) {
+    B.s(CKG.cyl(0.036, 0.036, 0.19, 18), sil, [sx * 0.048, 0.67, -0.04], [Math.PI / 2, 0, 0]);
+    B.s(CKG.cone(0.036, 0.055, 18), red, [sx * 0.048, 0.67, 0.083], [Math.PI / 2, 0, 0]);
+    B.s(CKG.cyl(0.024, 0.031, 0.03, 14, false), 0x4a4550, [sx * 0.048, 0.67, -0.15], [Math.PI / 2, 0, 0]);
+    B.s(CKG.box(0.004, 0.04, 0.05), red, [sx * 0.085, 0.67, -0.11]);
+    B.f(CKG.cone(0.028, 0.14, 12), (x, y) => new THREE.Color(0xffd35a).lerp(new THREE.Color(0xff3a12), Math.min(1, Math.max(0, (y + 0.07) / 0.14))).getHex(), [sx * 0.048, 0, -0.072], [-Math.PI / 2, 0, 0]);   // (flames: round a pivot at the nozzles, so they flicker in length)
+  }
+  B.s(CKG.box(0.07, 0.045, 0.15), red, [0, 0.652, -0.04]);
+  B.s(CKG.sph(0.012, 8, 6), 0x7fd3f7, [0, 0.678, 0.0]);
+  ckStraps(B, 0x4a4550, B.s);   // (all on the shiny material: one mesh, plus the flames)
+}
+
+/* ---------- tail (a tail segment's space: the fluffy segment runs along its -z) ---------- */
+function ckTailBow(B) {
+  const pk = 0xff5fa2;
+  B.s(CKG.tor(0.044, 0.0065, 6, 24), pk, [0, 0, -0.03]);
+  B.frame([0, 0.052, -0.03], [0, 0, 0], 1.45);
+  for (const sx of [-1, 1]) { B.s(CKG.tor(0.02, 0.0075, 6, 16), pk, [sx * 0.022, 0.004, 0], [0, sx * 0.3, sx * 0.3], [1.1, 0.75, 1]);
+    B.s(CKG.box(0.012, 0.042, 0.004), 0xe23f86, [sx * 0.013, -0.024, 0.004], [0, 0, sx * 0.4]); }
+  B.s(CKG.sph(0.011, 10, 8), 0xe23f86);
+  B.frame();
+}
+function ckTailBell(B) {
+  B.m(CKG.tor(0.047, 0.0085, 6, 24), 0xd9303f, [0, 0, -0.03]);
+  B.s(CKG.tor(0.008, 0.003, 5, 10), 0xf5c542, [0, -0.058, -0.03]);
+  B.s(CKG.sph(0.024, 14, 10), (x, y) => Math.abs(y) < 0.003 ? 0xb8871f : 0xf5c542, [0, -0.082, -0.03]);
+}
+function ckScrunchie(B) {
+  const g = CKG.tor(0.047, 0.02, 10, 36), a = g.attributes.position;
+  for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), z = a.getZ(i), ang = Math.atan2(y, x), k = 1 + 0.12 * Math.sin(ang * 14); const rr = Math.hypot(x, y), rc = 0.047 + (rr - 0.047) * k; a.setXYZ(i, Math.cos(ang) * rc, Math.sin(ang) * rc, z * k); }
+  g.computeVertexNormals();
+  B.s(g, (x, y, z, i) => { const h = Math.sin(i * 12.9898) * 43758.5453, r = h - Math.floor(h); return r > 0.86 ? 0xffffff : r > 0.6 ? 0xffa6d6 : r > 0.35 ? 0xe86ad0 : 0xff5fa2; }, [0, 0, -0.03]);
+}
+
+/* ---------- baking an item once, and an instance of it for each cat that wears it ---------- */
+function ckMat() {
+  return ckMat.M || (ckMat.M = {
+    m: new THREE.MeshLambertMaterial({ vertexColors: true }),
+    s: new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 70, specular: 0x5a5a5a }),
+    g: new THREE.MeshBasicMaterial({ vertexColors: true }),
+    l: new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, opacity: 0.8, shininess: 120, specular: 0xffffff }),
+    f: new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending, depthWrite: false }),
+    cape: new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }),
+    glow: new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xffe68a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8 }),
+  });
+}
+function ckBake(it) {
+  if (it.geo || !it.build) return it.geo;
+  const B = ckB(); it.build(B);
+  const G = it.geo = {}; for (const k of ['m', 's', 'g', 'l', 'f']) G[k] = ckMerge(B.parts[k]);
+  if (B.cape) G.cape = ckCapeGeo(B.cape);
+  it.sprite = B.sprite; it.anim = B.anim; it.hideClasp = B.hideClasp; it.flamePivot = B.flamePivot || null;
+  return G;
+}
+function ckInstance(it) {                                              // one or two meshes (plus a cape sheet of its own, which ripples)
+  const G = ckBake(it), M = ckMat(), obj = new THREE.Group(); obj.userData.ck = it.id; obj.userData.base = new THREE.Vector3();
+  const add = (geo, mat) => { if (!geo) return null; const o = new THREE.Mesh(geo, mat); obj.add(o); return o; };
+  add(G.m, M.m); const shiny = add(G.s, M.s); add(G.g, M.g); const lens = add(G.l, M.l); if (lens) lens.renderOrder = 2;
+  const flame = add(G.f, M.f); if (flame) { flame.visible = false; flame.renderOrder = 3; flame.userData.ckFlame = 1; if (it.flamePivot) flame.position.fromArray(it.flamePivot); }
+  let cape = null;
+  if (G.cape) { const g = G.cape.clone(); g.userData = { ck: G.cape.userData.ck }; g.boundingSphere = G.cape.boundingSphere.clone(); g.attributes.position.setUsage(THREE.DynamicDrawUsage);
+    cape = new THREE.Mesh(g, M.cape); cape.frustumCulled = false; cape.userData.ckCape = 1; obj.add(cape); }
+  if (it.sprite) { const sp = new THREE.Sprite(M.glow); sp.position.fromArray(it.sprite.pos); sp.scale.setScalar(it.sprite.scale); obj.add(sp); }
+  return { id: it.id, it, obj, flame, cape, clasp: it.hideClasp ? shiny : null, bob: it.anim === 'bob' };
+}
+function ckCenter(inst, out) {                                        // the middle of an item (its own space): where the sparkles go
+  let s = inst.cape ? inst.cape.geometry.boundingSphere : null; inst.obj.children.forEach(o => { if (!s && o.geometry && o.geometry.boundingSphere && !o.isSprite) s = o.geometry.boundingSphere; });
+  return s ? out.copy(s.center) : out.set(0, 0.1, 0);
+}
+
+/* ---------- dressing a rig: her in Free roam (and so her clones on the motorcycle and in Treetop Hop), or the Closet's model ---------- */
+function closetDress(R, outfit) {
+  if (!R || !R.head || !R.body) return;
+  outfit = outfit || ckState().outfit;
+  const W = R.ck || (R.ck = {});
+  for (const s of CK_SLOTS) {
+    const v = outfit[s.id], want = s.id === 'hat' ? (v && v !== 'none' && v !== 'crown' ? v : null) : v || null, cur = W[s.id];
+    if (cur && cur.id === want) continue;
+    if (cur) { if (cur.obj.parent) cur.obj.parent.remove(cur.obj); if (cur.cape) cur.cape.geometry.dispose(); W[s.id] = null; }
+    const it = want && CK_BY_ID[want]; if (!it || !it.build) continue;
+    const inst = ckInstance(it), par = s.id === 'hat' || s.id === 'specs' ? R.head : s.id === 'tail' ? R.tail[Math.min(R.tail.length - 1, it.seg || 3)] : R.body;
+    par.add(inst.obj); W[s.id] = inst;
+  }
+  if (R.crown) R.crown.visible = !outfit.hat || outfit.hat === 'crown';   // her own gold crown, unless another hat's on (or she's gone bare-headed)
+  if (W.cape && W.cape.clasp) W.cape.clasp.visible = !W.collar;          // (a collar covers the cape's chain)
+  if (R === walk.rig) closetTodSync(R);
+}
+function closetTodSync(R) {                                            // outdoors at night her fur is tinted to the sky: her new things too (todActors keeps the list)
+  if (!R.todMats || !R.todF || !R.ck) return;
+  const map = R.ckTod || (R.ckTod = new Map());
+  for (const s of CK_SLOTS) { const w = R.ck[s.id]; if (!w) continue;
+    w.obj.traverse(o => { const m0 = o.material; if (!o.isMesh || !m0 || !m0.color || m0.isMeshBasicMaterial || (m0.userData && m0.userData.c0)) return;
+      let m = map.get(m0); if (!m) { m = m0.clone(); m.userData = { c0: m0.color.clone(), e0: m0.emissive ? m0.emissive.clone() : null }; map.set(m0, m); R.todMats.push(m); }
+      m.color.copy(m.userData.c0).multiply(R.todF); if (m.userData.e0) m.emissive.copy(m.userData.e0).multiply(R.todF); o.material = m; }); }
+}
+function closetRedress() {                                             // after the Closet: her (and, mid Treetop Hop, her clone up there) in the saved outfit
+  const S = ckState();
+  if (walk.rig) closetDress(walk.rig, S.outfit);
+  if (state === 'hop' && HOP.cat && HOP.cat.rig && walk.rig && typeof hopCatSet === 'function') { hopCatSet(walk.rig.g.clone(true)); if (HOP.phase === 'over' && typeof hopOverWallet === 'function') hopOverWallet(); }
+  ckCardHat(true);
+}
+
+/* ---------- every frame (Closet shut): the cape ripples as she runs, the jetpack fires as she jumps, the photo cat's hat ---------- */
+function ckWear(W, dt, amt, fire, t) {
+  W.amt = (W.amt || 0) + (amt - (W.amt || 0)) * Math.min(1, dt * 4);
+  if (W.cape && W.cape.cape) ckCapeStep(W.cape.cape.geometry, W.amt, t);
+  if (W.pack && W.pack.flame) { const f = W.pack.flame; f.visible = fire; if (fire) f.scale.set(0.9 + Math.random() * 0.2, 0.9 + Math.random() * 0.2, 0.75 + Math.random() * 0.5); }
+  if (W.hat && W.hat.bob) W.hat.obj.position.y = W.hat.obj.userData.base.y + Math.sin(t * 2.2) * 0.009;
+}
+function closetTick(dt) {
+  try {
+    const R = walk.rig, W = R && R.ck;
+    if (W && (W.cape || W.pack || W.hat)) {
+      if (state === 'hop' || state === 'bike') ckCloneFx(dt, W);
+      else if (walk.on) ckWear(W, dt, Math.min(1, Math.hypot(walk.vel.x, walk.vel.z) / 6 + (walk.grounded ? 0 : 0.4)), !walk.grounded && !walk.climb && walk.vy > -3, clock);
+    }
+    ckCardHat(false);
+    if (state === 'hop' && HOP.ui && !HOP.ui.ckLink) ckHopLink();
+  } catch (e) { if (!closetTick.err) { closetTick.err = 1; console.error(e); } }
+}
+function ckCloneFx(dt, W) {                                           // her clone on the motorcycle / up the trees: its cape shares her sheet (so it ripples too), its own flames
+  const C = ckCloneFx, root = state === 'hop' ? HOP.cat && HOP.cat.rig : typeof BIKE !== 'undefined' && BIKE.rider;
+  if (!root) return;
+  if (C.root !== root) { C.root = root; C.flames = []; root.traverse(o => { if (o.userData && o.userData.ckFlame) C.flames.push(o); }); }
+  let amt = 0.05, fire = false;
+  if (state === 'hop') { fire = HOP.phase === 'fly'; amt = fire ? 1 : HOP.phase === 'charge' ? 0.2 : 0.05; }
+  else { const B = BIKE, sp = +B.speed || 0; amt = Math.min(1, 0.25 + sp / 22); fire = !!B.air; }
+  ckWear(W, dt, amt, false, clock);
+  for (let i = 0; i < C.flames.length; i++) { const f = C.flames[i]; f.visible = fire; if (fire) f.scale.set(0.9 + Math.random() * 0.2, 0.9 + Math.random() * 0.2, 0.75 + Math.random() * 0.5); }
+}
+function ckCardHat(force) {                                            // Classic, Chaos and Mouse modes: her hat on the photo of the real Princess, like the Rat King's crown
+  const C = ckCardHat, S = ckState(), v = S.outfit.hat, want = v && v !== 'none' && CK_BY_ID[v] && CK_BY_ID[v].build ? v : null;
+  if (force || C.id !== want) {
+    if (C.obj && C.obj.parent) C.obj.parent.remove(C.obj);
+    C.obj = null; C.id = want;
+    if (want) {
+      const inst = ckInstance(CK_BY_ID[want]); C.obj = new THREE.Group(); C.obj.add(inst.obj); C.inst = inst;
+      if (!catCard.geometry.boundingBox) catCard.geometry.computeBoundingBox();
+      C.y = catCard.position.y - catBounce + catCard.geometry.boundingBox.max.y * catCard.scale.y - 0.48 + (CK_BY_ID[want].cardLift || 0);   // (on top of her head in the photo, between her ears)
+      C.obj.position.set(0.05, C.y, 0.02); C.obj.scale.setScalar(2.3); C.obj.rotation.x = 0.12; cat.add(C.obj);
+    }
+  }
+  if (!C.obj) return;
+  const show = gameMode !== 'walk' && catCard.visible && cat.visible && !(catCrown && catCrown.visible && catCrown.userData.claimed);
+  C.obj.visible = show; if (!show) return;
+  C.obj.position.y = C.y + catBounce; C.obj.rotation.y = Math.sin(clock * 0.8) * 0.12; C.obj.rotation.z = -0.1 + Math.sin(clock * 1.7) * 0.03;
+  if (C.inst.bob) C.inst.obj.position.y = Math.sin(clock * 2.2) * 0.009;
+}
+function ckHopLink() {                                                 // Treetop Hop's results card: a way to spend the fish
+  const u = HOP.ui; u.ckLink = true; const wal = u.Wal && u.Wal.parentElement; if (!wal) return;
+  const b = document.createElement('button'); b.className = 'ck-hoplink'; b.textContent = '👗 Spend your fish in Kitty’s Closet'; wal.after(b);
+  b.addEventListener('click', e => { e.stopPropagation(); if (HOP.active && HOP.phase === 'over' && HOP.overT > 0.4) closetOpen(null); });
+}
+
+/* ---------- the Closet screen: a dressing room drawn by the main renderer into a window of the screen, the catalogue beside it ---------- */
+const CK = {
+  on: false, built: false, from: null, tab: 'hat', sel: null, prev: {}, view: 'full', act: null, rig: null, scene: null, cam: null, ui: null, cards: {},
+  t: 0, spin: 0, spinV: 0, idleT: 9, drag: null, yaw: 0.6, camT: new THREE.Vector3(0, 0.47, 0), camD: 3, rect: { x: 0, y: 0, w: 1, h: 1 }, rectDirty: true,
+  fishTo: 0, fishShown: 0, hinted: false, thumbQ: [],
+  anim: { hop: 0, sq: 0, tilt: 0, flick: 0, wave: 0, lookT: 0, lookY: 0, lookX: 0, blinkT: 2, pop: 1, popObj: null, popC: new THREE.Vector3() },
+  v: new THREE.Vector3(), v2: new THREE.Vector3(), v3: new THREE.Vector3(), sz: new THREE.Vector2(), col: new THREE.Color(),
+};
+const CK_VIEWS = {   // where the camera looks for each kind of thing (yaw: how she turns to show it; r: how much to fit in)
+  full: { yaw: 0.62, el: 0.2, r: 0.8, at: 'root', off: [0, 0.47, 0] },
+  head: { yaw: 0.45, el: 0.2, r: 0.42, at: 'head', off: [0, 0.15, -0.02] },
+  face: { yaw: 0.28, el: 0.1, r: 0.3, at: 'head', off: [0, 0.01, 0.02] },
+  neck: { yaw: 0.42, el: 0.16, r: 0.4, at: 'head', off: [0, -0.13, -0.04] },
+  back: { yaw: 2.5, el: 0.42, r: 0.68, at: 'root', off: [0, 0.5, -0.02] },
+  tail: { yaw: 2.3, el: 0.22, r: 0.42, at: 'tail', off: [0, 0.02, 0] },
+};
+function ckSfx(n) {   // the game's own little synth (tone / noise): Settings' sound switch covers it
+  if (!actx) return;
+  try {
+    if (n === 'open') [784, 988, 1175, 1568].forEach((f, i) => tone(f, f * 1.01, 0.16, 'triangle', 0.028, i * 0.06));
+    else if (n === 'tab') tone(1250, 1050, 0.05, 'triangle', 0.025);
+    else if (n === 'try') { tone(480, 920, 0.08, 'triangle', 0.04); tone(1568, 1572, 0.32, 'sine', 0.03, 0.07); tone(2093, 2097, 0.4, 'sine', 0.02, 0.13); noise(0.1, 0.025, 5000); }
+    else if (n === 'buy') { noise(0.06, 0.06, 7000); tone(1319, 1321, 0.08, 'square', 0.018, 0.02); tone(2637, 2640, 0.16, 'square', 0.016, 0.1); tone(3136, 3140, 0.55, 'triangle', 0.035, 0.18); [0.25, 0.33, 0.41].forEach((d, i) => tone(2400 + i * 300, 2500 + i * 300, 0.07, 'sine', 0.02, d)); }
+    else if (n === 'wear') { tone(880, 1320, 0.12, 'triangle', 0.035); tone(1320, 1760, 0.2, 'sine', 0.025, 0.09); }
+    else if (n === 'off') tone(720, 430, 0.14, 'triangle', 0.03);
+    else if (n === 'nope') tone(200, 160, 0.09, 'square', 0.03);
+    else if (n === 'poke') { tone(520, 800, 0.12, 'sine', 0.04); tone(800, 640, 0.12, 'sine', 0.03, 0.11); }
+    else if (n === 'close') [1175, 988, 784].forEach((f, i) => tone(f, f * 0.99, 0.12, 'triangle', 0.022, i * 0.05));
+    else if (n === 'coin') tone(2200 + Math.random() * 600, 2600, 0.06, 'sine', 0.015);
+  } catch (e) {}
+}
+function ckTexOf(w, h, draw) { const t = canvasTex(w, h, draw, 1, 1); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t; }
+function ckStarTex() {
+  return ckStarTex.t || (ckStarTex.t = ckTexOf(64, 64, (c) => { const g = c.createRadialGradient(32, 32, 0, 32, 32, 30); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.18, 'rgba(255,255,255,.8)'); g.addColorStop(0.45, 'rgba(255,255,255,.12)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g; c.fillRect(0, 0, 64, 64); c.fillStyle = '#fff'; c.beginPath(); c.moveTo(32, 1); c.quadraticCurveTo(35, 29, 63, 32); c.quadraticCurveTo(35, 35, 32, 63); c.quadraticCurveTo(29, 35, 1, 32); c.quadraticCurveTo(29, 29, 32, 1); c.fill(); }));
+}
+function ckBuildScene() {
+  const S = CK.scene = new THREE.Scene(); S.background = new THREE.Color(0xf6d3e3);
+  CK.cam = new THREE.PerspectiveCamera(32, 1, 0.05, 40);
+  S.add(new THREE.HemisphereLight(0xfff6fb, 0xe4bcd2, 0.74));
+  const key = new THREE.DirectionalLight(0xffffff, 0.6); key.position.set(1.6, 3.2, 2.6); S.add(key);
+  const rim = new THREE.DirectionalLight(0xffc4e8, 0.42); rim.position.set(-2.4, 2.2, -2.4); S.add(rim);
+  // the wall behind: pink and cream stripes over a panelled dado, curving round behind her
+  const wall = ckTexOf(512, 512, (c, w, h) => {
+    for (let x = 0; x < w; x += 64) { c.fillStyle = '#ffdbe9'; c.fillRect(x, 0, 32, h); c.fillStyle = '#fff2f7'; c.fillRect(x + 32, 0, 32, h); c.fillStyle = 'rgba(240,190,90,.55)'; c.fillRect(x + 31, 0, 2, h); }
+    for (let y = 30; y < h * 0.7; y += 60) for (let x = 16; x < w; x += 64) { c.fillStyle = 'rgba(255,111,174,.35)'; c.font = '18px serif'; c.fillText('♥', x - 7, y + ((x / 64) % 2) * 30); }
+    const dy = h * 0.74; c.fillStyle = '#f5a9cb'; c.fillRect(0, dy, w, h - dy); c.fillStyle = '#fff4f8'; c.fillRect(0, dy - 6, w, 8);
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 3; for (let x = 8; x < w; x += 128) c.strokeRect(x, dy + 16, 112, h - dy - 30);
+    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(120,40,90,.28)'); g.addColorStop(0.35, 'rgba(120,40,90,0)'); g.addColorStop(1, 'rgba(120,40,90,.12)'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+  });
+  wall.wrapS = THREE.RepeatWrapping; wall.repeat.set(9, 1);
+  const wm = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.4, 5.2, 56, 1, true, Math.PI / 2 - 0.35, Math.PI + 0.7), new THREE.MeshBasicMaterial({ map: wall, side: THREE.BackSide }));
+  wm.position.y = 2.44; S.add(wm);
+  // the floor: a round pink rug
+  const rug = ckTexOf(256, 256, (c) => { const g = c.createRadialGradient(128, 128, 10, 128, 128, 128); g.addColorStop(0, '#ffe3ef'); g.addColorStop(0.55, '#ffc4dc'); g.addColorStop(0.62, '#fff4f8'); g.addColorStop(0.66, '#f59cc3'); g.addColorStop(1, '#e98ab5');
+    c.fillStyle = g; c.fillRect(0, 0, 256, 256); c.strokeStyle = 'rgba(255,255,255,.6)'; c.setLineDash([4, 8]); c.lineWidth = 3; c.beginPath(); c.arc(128, 128, 96, 0, Math.PI * 2); c.stroke(); });
+  const fl = new THREE.Mesh(new THREE.CircleGeometry(4.4, 56), new THREE.MeshBasicMaterial({ map: rug })); fl.rotation.x = -Math.PI / 2; fl.position.y = -0.16; S.add(fl);
+  // the static set, merged: velvet pedestal, curtains, hat boxes (matte) and all the gold (shiny)
+  const B = ckB(), gold = 0xf2c14a;
+  B.m(CKG.cyl(0.62, 0.64, 0.1, 56), (x, y) => y > 0.049 ? 0xff9cc8 : 0xf07ab0, [0, -0.05, 0]);
+  B.m(CKG.cyl(0.7, 0.74, 0.07, 56), (x, y) => y > 0.034 ? 0xfff4f8 : 0xf6e2ea, [0, -0.125, 0]);
+  B.s(CKG.tor(0.625, 0.016, 8, 72), gold, [0, 0, 0], [Math.PI / 2, 0, 0]);
+  B.s(CKG.tor(0.705, 0.012, 8, 72), gold, [0, -0.09, 0], [Math.PI / 2, 0, 0]);
+  B.s(CKG.cyl(0.03, 0.03, 7.4, 10), gold, [0, 3.42, -2.1], [0, 0, Math.PI / 2]);
+  // fairy lights: a thin wire strung across the back wall (the bulbs twinkle, below)
+  const wire = []; for (let i = 0; i <= 24; i++) { const u = i / 24; wire.push(new THREE.Vector3(-2.9 + u * 5.8, 2.16 - Math.sin(u * Math.PI) * 0.4, -3.05 + Math.sin(u * Math.PI) * 0.25)); }
+  B.m(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(wire), 72, 0.006, 4, false), 0x7a5a6a);
+  const M = ckMat(); S.add(new THREE.Mesh(ckMerge(B.parts.m), M.m), new THREE.Mesh(ckMerge(B.parts.s), M.s));
+  // the wings, left and right: velvet curtains gathered at gold tie-backs, hat boxes on one side, a tall mirror on the other.
+  // They slide in or out to frame the window, whatever its shape (in ckMeasure)
+  CK.wings = [-1, 1].map(sx => {
+    const W = ckB(), grp = new THREE.Group(), g = new THREE.PlaneGeometry(1.35, 3.6, 28, 14), a = g.attributes.position, cols = [];
+    for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), u = (x + 0.675) / 1.35, yy = y + 1.8, gather = Math.exp(-Math.pow((yy - 1.15) / 0.55, 2)) * 0.5 + (yy < 1.15 ? 0.18 : 0);
+      const edge = sx < 0 ? u : 1 - u, nx = x + (sx < 0 ? -1 : 1) * edge * gather * 1.35 * 0.55, ph = Math.sin(u * Math.PI * 9);
+      a.setXYZ(i, nx, y, ph * 0.07 * (1 - gather * 0.6)); const k = 0.72 + 0.28 * (ph * 0.5 + 0.5); cols.push(k); }
+    g.computeVertexNormals();
+    W.m(g, (x, y, z, i) => CK.col.setRGB(0.86 * cols[i], 0.2 * cols[i] + 0.03, 0.5 * cols[i] + 0.03).getHex(), [0, 1.64, 0], [0, -sx * 0.4, 0]);
+    W.s(CKG.tor(0.07, 0.018, 6, 16), gold, [-sx * 0.07, 1.0, 0.28], [0, -sx * 0.4, 0], [1, 1.5, 1]);
+    W.s(CKG.sph(0.05, 10, 8), gold, [-sx * 0.09, 0.86, 0.3]);
+    if (sx < 0) for (const [x, y, z, r, h, c, rc, ry] of [[0.62, -0.01, 0.45, 0.3, 0.3, 0x9fe3cf, 0xff6fae, 0], [0.65, 0.25, 0.45, 0.22, 0.22, 0xffb3d1, 0xffffff, 0.4], [0.61, 0.44, 0.48, 0.14, 0.15, 0xc9a8ff, 0xffd23a, -0.3]]) {   // hat boxes, with ribbons
+      W.m(CKG.cyl(r, r, h, 28), c, [x, y, z], [0, ry, 0]);
+      W.m(CKG.cyl(r * 1.04, r * 1.04, h * 0.18, 28), (xx, yy) => yy > 0 ? 0xffffff : c, [x, y + h * 0.42, z], [0, ry, 0]);
+      W.m(CKG.cyl(r * 1.005, r * 1.005, h * 0.14, 28, true), rc, [x, y - h * 0.05, z], [0, ry, 0]);
+    }
+    else {                                                              // an oval mirror on a stand
+      W.s(CKG.tor(1, 0.06, 8, 48), gold, [-0.72, 1.08, -0.3], [0, -0.4, 0], [0.46, 0.7, 0.8]);
+      W.s(CKG.cyl(0.025, 0.035, 0.56, 10), gold, [-0.72, 0.1, -0.3]);
+      W.s(CKG.cyl(0.22, 0.26, 0.05, 20), gold, [-0.72, -0.14, -0.3]);
+      W.s(CKG.sph(0.05, 10, 8), 0xff6fae, [-0.72, 1.83, -0.3]);
+    }
+    grp.add(new THREE.Mesh(ckMerge(W.parts.m), M.m), new THREE.Mesh(ckMerge(W.parts.s), M.s)); grp.position.set(sx * 2.1, 0, -2.0); S.add(grp); return grp;
+  });
+  // the mirror's glass, a soft sheen
+  const glass = ckTexOf(128, 192, (c, w, h) => { const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#f4ecff'); g.addColorStop(0.5, '#dcd2f7'); g.addColorStop(1, '#f9e3f1'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,255,255,.75)'; c.beginPath(); c.moveTo(w * 0.15, h * 0.55); c.lineTo(w * 0.55, h * 0.12); c.lineTo(w * 0.68, h * 0.12); c.lineTo(w * 0.28, h * 0.55); c.fill(); c.beginPath(); c.moveTo(w * 0.3, h * 0.7); c.lineTo(w * 0.7, h * 0.27); c.lineTo(w * 0.74, h * 0.27); c.lineTo(w * 0.34, h * 0.7); c.fill(); });
+  const gm = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ map: glass })); gm.position.set(-0.724, 1.08, -0.31); gm.rotation.y = -0.4; gm.scale.set(0.46, 0.7, 1); CK.wings[1].add(gm);
+  // the spotlight: a soft beam from above, and a pool of light on the velvet
+  const beamTex = ckTexOf(8, 128, (c, w, h) => { const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(0.6, 'rgba(255,255,255,.25)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h); });
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.9, 3.6, 36, 1, true), new THREE.MeshBasicMaterial({ map: beamTex, color: 0xfff0f7, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false }));
+  beam.position.y = 1.8; beam.renderOrder = 4; S.add(beam);
+  const poolTex = ckTexOf(128, 128, (c) => { const g = c.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(0.7, 'rgba(255,255,255,.3)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, 128, 128); });
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(0.64, 40), new THREE.MeshBasicMaterial({ map: poolTex, color: 0xfff3f9, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false })); pool.rotation.x = -Math.PI / 2; pool.position.y = 0.002; pool.renderOrder = 1; S.add(pool);
+  // her: a model of her own, in the saved outfit (no floor shadow of hers: a soft one on the velvet)
+  const R = CK.rig = makeWalker(); scene.remove(R.g); scene.remove(R.shadow); R.shadow.geometry.dispose(); R.shadow.material.dispose();
+  R.g.visible = true; S.add(R.g);
+  const sh = CK.shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), softShadowMat(0.3)); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.004; sh.renderOrder = 2; sh.scale.set(0.8, 1.35, 1); S.add(sh);
+  // twinkles: fairy-light bulbs along the wire, and a little magic dust drifting round her (one Points, recoloured each frame)
+  { const n = 36, P = new Float32Array(n * 3), C = new Float32Array(n * 3), base = [], ph = [];
+    for (let i = 0; i < n; i++) {
+      if (i < 20) { const u = (i + 0.5) / 20; P[i * 3] = -2.9 + u * 5.8; P[i * 3 + 1] = 2.13 - Math.sin(u * Math.PI) * 0.4; P[i * 3 + 2] = -3.03 + Math.sin(u * Math.PI) * 0.25; base.push(new THREE.Color([0xfff0a8, 0xffb3d9, 0xb8f0ff, 0xd9c2ff][i % 4])); }
+      else { const a = Math.random() * Math.PI * 2, r = 0.55 + Math.random() * 0.7; P[i * 3] = Math.cos(a) * r; P[i * 3 + 1] = 0.1 + Math.random() * 1.3; P[i * 3 + 2] = Math.sin(a) * r * 0.8 - 0.1; base.push(new THREE.Color(i % 2 ? 0xffffff : 0xffd6ea)); }
+      ph.push([Math.random() * 6.28, 1.2 + Math.random() * 2.4]);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3));
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.1, map: ckStarTex(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    pts.frustumCulled = false; pts.renderOrder = 5; S.add(pts); CK.tw = { g, P, C, base, ph, n }; }
+  // the try-on puff: a pool of sparkles
+  { const n = 64, P = new Float32Array(n * 3), C = new Float32Array(n * 3), V = new Float32Array(n * 3), L = new Float32Array(n), base = [];
+    for (let i = 0; i < n; i++) { P[i * 3 + 1] = -99; base.push(new THREE.Color()); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3));
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.075, map: ckStarTex(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    pts.frustumCulled = false; pts.renderOrder = 6; S.add(pts); CK.puff = { g, P, C, V, L, base, n, i: 0 }; }
+}
+function ckPuffAt(p, n, big) {                                         // a burst of pink, gold and white sparkles
+  const F = CK.puff, cols = [0xff6fae, 0xffd23a, 0xffffff, 0xc9a8ff, 0x8fe3ff];
+  for (let k = 0; k < n; k++) { const i = F.i; F.i = (F.i + 1) % F.n; const a = Math.random() * Math.PI * 2, e = Math.random() * 2 - 1, s = (0.5 + Math.random() * 0.9) * (big ? 1.7 : 1), c = Math.sqrt(1 - e * e);
+    F.P[i * 3] = p.x; F.P[i * 3 + 1] = p.y; F.P[i * 3 + 2] = p.z; F.V[i * 3] = Math.cos(a) * c * s; F.V[i * 3 + 1] = e * s * 0.8 + 0.5; F.V[i * 3 + 2] = Math.sin(a) * c * s; F.L[i] = 0.7 + Math.random() * 0.5; F.base[i].setHex(cols[(Math.random() * cols.length) | 0]); }
+}
+function ckFxStep(dt) {
+  const F = CK.puff; let live = false;
+  for (let i = 0; i < F.n; i++) { if (F.L[i] <= 0) continue; live = true; F.L[i] -= dt * 1.1; const j = i * 3, k = Math.max(0, Math.min(1, F.L[i] * 1.6));
+    F.V[j] *= 0.95; F.V[j + 1] = F.V[j + 1] * 0.95 - dt * 0.9; F.V[j + 2] *= 0.95; F.P[j] += F.V[j] * dt; F.P[j + 1] += F.V[j + 1] * dt; F.P[j + 2] += F.V[j + 2] * dt;
+    F.C[j] = F.base[i].r * k; F.C[j + 1] = F.base[i].g * k; F.C[j + 2] = F.base[i].b * k; if (F.L[i] <= 0) F.P[j + 1] = -99; }
+  if (live || F.was) { F.g.attributes.position.needsUpdate = true; F.g.attributes.color.needsUpdate = true; } F.was = live;
+  const T = CK.tw, t = CK.t;
+  for (let i = 0; i < T.n; i++) { const ph = T.ph[i], p = ph[0], w = ph[1], b = 0.25 + 0.75 * Math.pow(Math.max(0, Math.sin(t * w + p)), 3), j = i * 3;
+    if (i >= 20) { T.P[j + 1] += dt * 0.06; if (T.P[j + 1] > 1.5) T.P[j + 1] = 0.05; }
+    T.C[j] = T.base[i].r * b; T.C[j + 1] = T.base[i].g * b; T.C[j + 2] = T.base[i].b * b; }
+  T.g.attributes.color.needsUpdate = true; T.g.attributes.position.needsUpdate = true;
+}
+
+/* ---------- the page: an awning with the wallet, the dressing-room window, the catalogue ---------- */
+function ckCss() {
+  if (ckCss.done) return; ckCss.done = true;
+  const st = document.createElement('style'); st.textContent = `
+.icon-bar{gap:8px}.icon-bar .ib{flex:1 1 0;min-width:0;max-width:84px;padding:9px 3px 7px;position:relative}
+.ib .ck-dot{position:absolute;top:-5px;right:-5px;width:14px;height:14px;border-radius:50%;background:var(--danger);border:2.5px solid var(--ink)}
+.ck-pbtn{background:#c9a8ff;font-size:19px;padding:10px 16px}
+.ck-over{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 10px;margin:-2px 0 0;padding:8px 12px;border-radius:14px;background:#fff1c9;border:2px dashed #e0a92a;font:800 14px var(--body);color:#6e3a5c}
+.ck-over b{font-family:var(--display);font-weight:400;font-size:18px;color:var(--cheese-deep)}
+#hopUI .ck-hoplink{display:block;margin:8px auto 0;background:none;color:#b0467e;font:800 13.5px system-ui,sans-serif;text-decoration:underline;text-underline-offset:3px;padding:6px 4px}
+body.closet-open>*:not(#stage):not(#closet):not(#ckFx):not(.ach-toast):not(.cam-toast){visibility:hidden!important}
+body.closet-open #stage canvas{transform:none!important;filter:none!important}
+body.closet-open #stage::after{display:none!important}
+body.closet-open .ach-toast{z-index:60}body.closet-open .cam-toast{z-index:60}
+#closet{position:fixed;inset:0;z-index:45;display:grid;grid-template-columns:100%;grid-template-rows:auto minmax(0,1fr) minmax(0,1.32fr);grid-template-areas:"top" "stage" "panel";color:var(--ink);font:500 14px/1.3 var(--body);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#closet[hidden]{display:none}
+#closet button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.ck-top{grid-area:top;position:relative;z-index:2;display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 8px) max(12px,env(safe-area-inset-right,0px)) 7px max(12px,env(safe-area-inset-left,0px));background:repeating-linear-gradient(90deg,#ff6fae 0 22px,#ff8fc0 22px 44px);border-bottom:3px solid var(--ink)}
+.ck-top::after{content:'';position:absolute;left:0;right:0;top:100%;height:12px;margin-top:3px;background:radial-gradient(circle at 11px 0,#ff6fae 8.5px,var(--ink) 9px 11px,transparent 11.5px) 0 0/22px 12px repeat-x;pointer-events:none}
+.ck-title{flex:1;min-width:0;margin:0;font:400 clamp(21px,6.2vw,30px)/1.05 var(--display);color:#fff;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;text-shadow:0 3px 0 var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 0 4px}
+.ck-x{flex:none;width:44px;height:44px;border-radius:50%;border:3px solid var(--ink);background:var(--paper);color:var(--ink);font:800 19px/1 var(--body)!important;box-shadow:0 3px 0 var(--ink);cursor:pointer;display:grid;place-items:center;padding:0}
+.ck-x:active{transform:translateY(3px);box-shadow:0 0 0 var(--ink)}
+.ck-wallet{flex:none;display:flex;align-items:center;gap:5px;background:var(--paper);border:3px solid var(--ink);border-radius:999px;padding:6px 12px 5px 9px;box-shadow:0 3px 0 var(--ink);font:400 19px/1 var(--display);color:var(--ink);font-variant-numeric:tabular-nums}
+.ck-wallet.spend{animation:ckSpend .55s ease}.ck-wallet.gain{animation:ckGain .6s ease}
+@keyframes ckSpend{20%{transform:scale(1.14) rotate(-5deg);background:#ffd23a}60%{transform:scale(.95) rotate(2deg)}}
+@keyframes ckGain{30%{transform:scale(1.15);background:#b8f5b0}}
+#ckStage{grid-area:stage;position:relative;touch-action:none;cursor:grab;overflow:hidden;min-height:0}
+#ckStage:active{cursor:grabbing}
+.ck-cap{position:absolute;left:50%;top:18px;transform:translateX(-50%);opacity:0;pointer-events:none;background:#fff;border:3px solid var(--ink);border-radius:18px;padding:6px 15px 5px;font:400 clamp(18px,5vw,23px)/1.1 var(--display);color:var(--cheese-deep);box-shadow:3px 4px 0 var(--ink);white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis}
+.ck-cap::after{content:'';position:absolute;left:50%;bottom:-11px;margin-left:-8px;border:8px solid transparent;border-top-color:var(--ink);border-bottom:0}
+.ck-cap.show{animation:ckCap 1.9s cubic-bezier(.2,1.5,.4,1) forwards}
+@keyframes ckCap{0%{opacity:0;transform:translateX(-50%) scale(.4) rotate(-8deg)}12%{opacity:1;transform:translateX(-50%) scale(1.06) rotate(-3deg)}20%,80%{opacity:1;transform:translateX(-50%) scale(1) rotate(-3deg)}100%{opacity:0;transform:translateX(-50%) translateY(-8px) rotate(-3deg)}}
+.ck-hint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);background:rgba(45,19,40,.66);color:#fff;border-radius:999px;padding:5px 13px;font:800 12.5px var(--body);pointer-events:none;transition:opacity .6s;white-space:nowrap}
+.ck-hint.off{opacity:0}
+.ck-panel{grid-area:panel;position:relative;display:flex;flex-direction:column;min-height:0;background:var(--paper);border-top:3px solid var(--ink);border-radius:24px 24px 0 0;box-shadow:0 -5px 0 rgba(45,19,40,.16);padding:10px max(12px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 10px) max(12px,env(safe-area-inset-left,0px))}
+.ck-tabs{flex:none;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 9px;margin:0 -2px}.ck-tabs::-webkit-scrollbar{display:none}
+.ck-tab{flex:1 0 auto;min-width:50px;position:relative;display:grid;justify-items:center;gap:1px;padding:5px 5px 4px;border:2.5px solid var(--ink);border-radius:14px;background:#fff;color:var(--ink);font:800 10.5px/1.1 var(--body)!important;box-shadow:0 3px 0 var(--ink);cursor:pointer}
+.ck-tab b{font:400 20px/1.15 var(--body);display:block}
+.ck-tab.on{background:var(--cheese);transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.ck-tab.worn::after{content:'';position:absolute;top:4px;right:5px;width:8px;height:8px;border-radius:50%;background:#43c46b;border:1.5px solid var(--ink)}
+.ck-grid{flex:1 1 auto;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));grid-auto-rows:max-content;gap:10px;padding:6px 4px 12px;align-content:start;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain}
+.ck-card{position:relative;display:grid;justify-items:center;align-content:start;gap:3px;padding:7px 5px 7px;background:#fff;border:2.5px solid var(--ink);border-radius:16px;box-shadow:3px 3px 0 var(--ink);color:var(--ink);font:800 12px/1.15 var(--body)!important;cursor:pointer;min-height:0;text-align:center}
+.ck-card:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.ck-card.sel{background:#ffe1ee;outline:3px solid var(--cheese);outline-offset:1px}
+.ck-card[hidden]{display:none}
+.ck-th{width:62px;height:62px;position:relative;display:grid;place-items:center;border-radius:50%;background:radial-gradient(circle at 50% 38%,#fff 0,#ffeaf3 62%,#ffd3e6 100%);font-size:32px;line-height:1}
+.ck-th canvas{position:absolute;inset:-6px;width:74px;height:74px;opacity:0;transition:opacity .3s}
+.ck-card.th-ok .ck-th canvas{opacity:1}.ck-card.th-ok .ck-th i{visibility:hidden}
+.ck-th i{font-style:normal}
+.ck-nm{min-height:2.3em;display:flex;align-items:center}
+.ck-tag{font:800 11.5px/1 var(--body);background:#ffd23a;border:2px solid var(--ink);border-radius:999px;padding:3px 8px 3px;white-space:nowrap}
+.ck-tag.own{background:#b8f0b4}.ck-tag.wear{background:var(--cheese);color:#fff}.ck-tag.poor{background:#fff3c4;color:#8a6a5a;border-color:#8a6a5a}
+.ck-act{flex:none;display:grid;gap:7px;padding-top:9px;border-top:2px dashed rgba(45,19,40,.2)}
+.ck-info{display:grid;gap:2px;min-height:2.6em}
+.ck-info b{font:400 19px/1.05 var(--display);color:var(--cheese-deep)}
+.ck-info span{font:600 12.5px/1.3 var(--body);color:#7a5a6a}
+.ck-main{font-size:20px!important;padding:11px 14px}
+.ck-main:disabled{background:#eee3e9;color:#8a7f86;border-color:#a898a1;box-shadow:0 3px 0 #a898a1;cursor:default}
+.ck-main.wear{background:#8fdc8a}.ck-main.off{background:#fff}.ck-main.shake{animation:ckNo .4s}
+@keyframes ckNo{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.ck-links{display:flex;justify-content:center;align-items:center;gap:6px;font:800 13.5px var(--body);color:#8a4a70}
+.ck-links .link-btn{padding:6px 4px;color:#7a3fb8}
+#ckFx{position:fixed;inset:0;z-index:47;pointer-events:none;overflow:hidden}
+#ckFx .cf{position:absolute;top:0;left:0;width:9px;height:14px;border-radius:2px}
+#ckFx .coin{position:absolute;top:0;left:0;font-size:24px;line-height:1;filter:drop-shadow(0 2px 0 rgba(45,19,40,.5))}
+@media (orientation:landscape) and (min-width:560px){
+  #closet{grid-template-columns:minmax(0,1fr) min(46%,440px);grid-template-rows:auto minmax(0,1fr);grid-template-areas:"stage top" "stage panel"}
+  .ck-top{border-left:3px solid var(--ink);padding-right:max(12px,env(safe-area-inset-right,0px))}
+  .ck-top::after{display:none}
+  .ck-panel{border-radius:0;border-top:0;border-left:3px solid var(--ink);box-shadow:none;padding-left:12px}
+  .ck-hint{bottom:14px}
+}
+@media (orientation:landscape) and (min-width:560px) and (max-height:520px){
+  .ck-top{padding-top:calc(env(safe-area-inset-top,0px) + 5px);padding-bottom:5px}.ck-title{font-size:21px}.ck-x{width:38px;height:38px}.ck-wallet{font-size:16px;padding:4px 10px 3px 8px}
+  .ck-panel{padding-top:7px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 7px)}
+  .ck-tab{padding:3px 4px}.ck-tab span{display:none}.ck-tab b{font-size:19px}.ck-tabs{padding-bottom:6px}
+  .ck-grid{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}.ck-card{min-height:0;padding:6px 4px}.ck-th{width:52px;height:52px;font-size:26px}.ck-th canvas{inset:-5px;width:62px;height:62px}.ck-nm{min-height:0;font-size:11px}
+  .ck-info{min-height:0}.ck-info span{display:none}.ck-info b{font-size:17px}.ck-main{font-size:17px!important;padding:7px 12px}.ck-act{gap:4px;padding-top:6px}.ck-links{font-size:12.5px}.ck-links .link-btn{padding:3px 4px}
+}
+@media (max-width:370px){.ck-grid{grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px}.ck-title{font-size:20px}.ck-wallet{font-size:17px;padding:5px 9px 4px 7px}.ck-tab{min-width:44px}}
+@media (orientation:portrait) and (max-height:700px){#closet{grid-template-rows:auto minmax(0,.9fr) minmax(0,1.38fr)}.ck-card{padding:5px 4px 6px;gap:2px}.ck-th{width:50px;height:50px;font-size:26px}.ck-th canvas{inset:-5px;width:60px;height:60px}.ck-nm{min-height:2.1em;font-size:11px}.ck-info{min-height:0}.ck-info b{font-size:17px}.ck-info span{font-size:11.5px}.ck-main{font-size:18px!important;padding:8px 12px}.ck-act{gap:5px;padding-top:7px}.ck-links .link-btn{padding:4px}.ck-tab{padding:3px 4px}.ck-tab b{font-size:18px}.ck-tabs{padding-bottom:7px}}
+@media (prefers-reduced-motion:reduce){.ck-cap.show{animation-duration:2.2s}}`;
+  document.head.appendChild(st);
+}
+function ckBuildUI() {
+  ckCss();
+  const root = document.createElement('section'); root.id = 'closet'; root.hidden = true; root.setAttribute('aria-label', 'Kitty’s Closet');
+  root.innerHTML = `<div class="ck-top"><button class="ck-x" id="ckClose" aria-label="Close the Closet">✕</button><h2 class="ck-title">Kitty’s Closet</h2><div class="ck-wallet" aria-label="Fish"><span>🐟</span><b id="ckFish">0</b></div></div>
+<div id="ckStage" aria-label="Princess Kitty on the fitting-room pedestal. Drag to spin her."><div class="ck-cap" id="ckCap"></div><div class="ck-hint" id="ckHint">👆 Drag to spin her round</div></div>
+<div class="ck-panel"><div class="ck-tabs" id="ckTabs" role="tablist"></div><div class="ck-grid" id="ckGrid"></div>
+<div class="ck-act"><div class="ck-info"><b id="ckName"></b><span id="ckBlurb"></span></div><button class="btn ck-main" id="ckMain"></button>
+<div class="ck-links"><button class="link-btn" id="ckSurprise">🎲 Surprise me!</button><span aria-hidden="true">·</span><button class="link-btn" id="ckUndo">↺ Undo try-ons</button></div></div></div>`;
+  document.body.appendChild(root);
+  const fx = document.createElement('div'); fx.id = 'ckFx'; document.body.appendChild(fx);
+  const q = id => root.querySelector('#' + id), u = CK.ui = { root, fx, tabs: {} };
+  for (const k of ['Close', 'Fish', 'Stage', 'Cap', 'Hint', 'Tabs', 'Grid', 'Name', 'Blurb', 'Main', 'Surprise', 'Undo']) u[k] = q('ck' + k);
+  u.wallet = root.querySelector('.ck-wallet');
+  for (const s of CK_SLOTS) {
+    const b = document.createElement('button'); b.className = 'ck-tab'; b.setAttribute('role', 'tab'); b.innerHTML = `<b>${s.ic}</b><span>${s.name}</span>`;
+    b.addEventListener('click', () => ckTab(s.id)); u.Tabs.appendChild(b); u.tabs[s.id] = b;
+  }
+  for (const it of CK_ITEMS) {
+    const b = document.createElement('button'); b.className = 'ck-card'; b.hidden = true;
+    b.innerHTML = `<span class="ck-th"><i>${it.ic}</i><canvas width="128" height="128"></canvas></span><span class="ck-nm"></span><span class="ck-tag"></span>`;
+    b.querySelector('.ck-nm').textContent = it.name; b.setAttribute('aria-label', it.name);
+    b.addEventListener('click', () => ckPick(it.id)); u.Grid.appendChild(b);
+    CK.cards[it.id] = { el: b, tag: b.querySelector('.ck-tag'), cv: b.querySelector('canvas') };
+  }
+  u.Close.addEventListener('click', closetClose);
+  u.Main.addEventListener('click', ckMain);
+  u.Surprise.addEventListener('click', ckSurprise);
+  u.Undo.addEventListener('click', ckUndo);
+  const st = u.Stage;   // drag to spin her; a tap (no drag) and she does a happy little hop
+  st.addEventListener('pointerdown', e => { e.preventDefault(); CK.drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, t: performance.now(), tm: performance.now(), moved: false }; CK.spinV = 0; try { st.setPointerCapture(e.pointerId); } catch (x) {} });
+  st.addEventListener('pointermove', e => { const d = CK.drag; if (!d || d.id !== e.pointerId) return; const dx = e.clientX - d.x, now = performance.now(), dts = Math.max(0.008, (now - d.tm) / 1000); d.x = e.clientX; d.tm = now; if (Math.abs(e.clientX - d.x0) > 8) d.moved = true;
+    CK.spin += dx * 0.013; CK.spinV = THREE.MathUtils.clamp(CK.spinV * 0.4 + dx * 0.013 / dts * 0.6, -9, 9); CK.idleT = 0;   /* (a flick keeps her turning a little) */ if (d.moved && !CK.hinted) { CK.hinted = true; u.Hint.classList.add('off'); } });
+  const up = e => { const d = CK.drag; if (!d || d.id !== e.pointerId) return; CK.drag = null; if (performance.now() - d.tm > 90) CK.spinV = 0; if (!d.moved && e.type === 'pointerup' && performance.now() - d.t < 500) ckPoke(); };
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) st.addEventListener(t, up);
+  st.addEventListener('contextmenu', e => e.preventDefault());
+  if (window.ResizeObserver) try { new ResizeObserver(() => { CK.rectDirty = true; }).observe(st); } catch (e) {}
+  CK.thumbQ = CK_ITEMS.map(it => it.id);
+}
+function ckBuild() { ckBuildUI(); ckBuildScene(); CK.built = true; }
+
+/* ---------- open, close ---------- */
+function closetOpen(from) {
+  if (CK.on) return;
+  try { initAudio(); } catch (e) {}
+  try { if (!CK.built) ckBuild(); }
+  catch (e) { console.error(e); if (CK.ui && CK.ui.root) CK.ui.root.remove(); CK.ui = null; CK.built = false; camToast('The Closet is stuck shut... try again in a moment', 2600); return; }
+  const S = ckState(), u = CK.ui;
+  CK.on = true; CK.from = from || null;
+  if (from && $(from)) $(from).hidden = true;
+  document.body.classList.add('closet-open'); u.root.hidden = false;
+  CK.prev = Object.assign({}, S.outfit); closetDress(CK.rig, CK.prev);
+  CK.sel = null; CK.tab = CK.tab || 'hat'; CK.view = 'full'; CK.spin = 0; CK.spinV = 0; CK.idleT = 9;
+  CK.fishTo = CK.fishShown = ckWallet(); u.Fish.textContent = CK.fishShown;
+  CK.rectDirty = true; ckMeasure(); ckAim(true);
+  Object.assign(CK.anim, { hop: 0.001, sq: 0, tilt: 0, flick: 0, wave: 1, lookT: 0.4, blinkT: 1.5, pop: 1, popObj: null });
+  u.Cap.classList.remove('show'); u.Hint.classList.toggle('off', CK.hinted);
+  ckRefresh(); ckSfx('open');
+  setTimeout(() => { if (CK.on) ckCaption(pickOf(['Welcome to my closet!', 'What shall I wear?', 'Ooh, shopping!', 'Dress me up!'])); }, 350);
+  try { u.Close.focus({ preventScroll: true }); } catch (e) {}
+}
+function closetClose() {
+  if (!CK.on) return;
+  CK.on = false; CK.drag = null; ckPopEnd();
+  const u = CK.ui; u.root.hidden = true; document.body.classList.remove('closet-open'); u.fx.innerHTML = '';
+  renderer.setScissorTest(false); renderer.getSize(CK.sz); renderer.setViewport(0, 0, CK.sz.x, CK.sz.y);
+  if (CK.from && $(CK.from)) { $(CK.from).hidden = false; const f = CK.from === 'pauseScreen' ? $('resumeBtn') : CK.from === 'overScreen' ? $('againBtn') : $('closetBtn'); try { if (f) f.focus({ preventScroll: true }); } catch (e) {} }
+  closetRedress(); ckDot(); ckSfx('close');
+}
+function pickOf(a) { return a[(Math.random() * a.length) | 0]; }
+function ckMeasure() {
+  const r = CK.ui.Stage.getBoundingClientRect(); renderer.getSize(CK.sz);
+  CK.rect.x = Math.max(0, r.left); CK.rect.w = Math.max(1, Math.min(CK.sz.x, r.right) - CK.rect.x);
+  CK.rect.y = Math.max(0, CK.sz.y - r.bottom); CK.rect.h = Math.max(1, Math.min(CK.sz.y, CK.sz.y - r.top) - CK.rect.y); CK.rectDirty = false;
+  if (CK.wings) { const asp = CK.rect.w / CK.rect.h, vf = CK.cam.fov * Math.PI / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * asp), d = CK_VIEWS.full.r / Math.sin(Math.min(vf, hf) / 2);
+    const W = THREE.MathUtils.clamp((d * Math.cos(CK_VIEWS.full.el) + 2) * Math.tan(hf / 2), 1.25, 3.2); CK.wings[0].position.x = -W; CK.wings[1].position.x = W; }
+}
+function ckKey(e) {   // (capture: while the Closet's open, the game underneath hears no keys)
+  if (!CK.on) return;
+  e.stopImmediatePropagation();
+  if (e.key === 'Escape' && !e.repeat) { e.preventDefault(); closetClose(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); CK.spin += e.key === 'ArrowLeft' ? -0.35 : 0.35; CK.idleT = 0; }
+}
+
+/* ---------- the catalogue ---------- */
+function ckTab(id) {
+  if (CK.tab === id) return; CK.tab = id; ckSfx('tab');
+  const slot = CK_SLOTS.find(s => s.id === id); CK.view = slot ? slot.view : 'full'; CK.idleT = 9; CK.fit = 0; CK.sel = null;
+  CK.ui.Grid.scrollTop = 0; ckRefresh();
+}
+function ckPick(id) {
+  const it = CK_BY_ID[id]; if (!it) return;
+  CK.sel = id; ckTryOn(it); ckRefresh();
+}
+function ckTryOn(it, quiet) {                                          // on it goes: a puff of sparkles, a pop, a happy hop and a word from her
+  const R = CK.rig, A = CK.anim;
+  if (it.slot === 'hat') { if (it.id === 'crown') delete CK.prev.hat; else CK.prev.hat = it.id; } else CK.prev[it.slot] = it.id;
+  closetDress(R, CK.prev);
+  const w = R.ck[it.slot], obj = w ? w.obj : it.id === 'crown' ? R.crown : null;
+  CK.view = (CK_SLOTS.find(s => s.id === it.slot) || {}).view || 'full'; CK.fit = it.fit || 0; CK.idleT = 9;
+  if (A.popObj && A.popObj !== obj) ckPopEnd();
+  if (obj) { A.popObj = obj; A.pop = 0; A.popBase = obj === R.crown ? null : obj.userData.base; if (w) ckCenter(w, A.popC); else A.popC.set(0, 0.03, 0); obj.scale.setScalar(0.01);
+    R.g.updateMatrixWorld(true); const p = obj.localToWorld(CK.v.copy(A.popC)); ckPuffAt(p, 26); }
+  A.hop = 1; A.tilt = 1; A.flick = 1; A.lookT = 1.2; A.lookY = 0; A.lookX = -0.05;
+  if (!quiet) { ckCaption(it.say && Math.random() < 0.6 ? it.say : pickOf(CK_LINES)); ckSfx('try'); }
+  if (!CK.hinted) { CK.hintN = (CK.hintN || 0) + 1; if (CK.hintN >= 3) { CK.hinted = true; CK.ui.Hint.classList.add('off'); } }
+}
+function ckPopEnd() { const A = CK.anim, o = A.popObj; if (!o) return; o.scale.setScalar(1); if (A.popBase) o.position.copy(A.popBase); A.popObj = null; }
+function ckCaption(text) { const c = CK.ui.Cap; c.textContent = text; c.classList.remove('show'); void c.offsetWidth; c.classList.add('show'); }
+function ckPoke() { const A = CK.anim; if (A.hop > 0) return; A.hop = 1; A.flick = 1; A.tilt = 1; ckSfx('poke'); ckCaption(pickOf(['Mrrp?', 'Hee hee!', 'Purrr...', 'Boop!', 'Mew!', 'Do I look cute?'])); }
+function ckPrevDiffers() { const S = ckState(); return CK_SLOTS.some(s => (CK.prev[s.id] || null) !== (S.outfit[s.id] || null)); }
+function ckPrevOwned() { const S = ckState(); return CK_SLOTS.every(s => { const v = CK.prev[s.id]; return !v || v === 'none' || S.owned.has(v); }); }
+function ckRefresh() {
+  const S = ckState(), u = CK.ui, w = ckWallet(), sel = CK.sel && CK_BY_ID[CK.sel];
+  for (const s of CK_SLOTS) { const t = u.tabs[s.id], on = CK.tab === s.id; t.classList.toggle('on', on); t.setAttribute('aria-selected', on ? 'true' : 'false');
+    t.classList.toggle('worn', s.id === 'hat' ? !!S.outfit.hat && S.outfit.hat !== 'none' : !!S.outfit[s.id]); }
+  for (const it of CK_ITEMS) { const c = CK.cards[it.id], show = it.slot === CK.tab; c.el.hidden = !show; if (!show) continue;
+    const own = S.owned.has(it.id), worn = ckWornId(S.outfit, it.slot) === it.id;
+    c.tag.className = 'ck-tag' + (worn ? ' wear' : own ? ' own' : w < it.price ? ' poor' : ''); c.tag.textContent = worn ? '💖 Wearing' : own ? '✓ Owned' : '🐟 ' + it.price;
+    c.el.classList.toggle('sel', CK.sel === it.id); c.el.setAttribute('aria-pressed', CK.sel === it.id ? 'true' : 'false'); }
+  let label = '', act = null, cls = '', name = '', blurb = '';
+  if (sel) {
+    name = sel.name; blurb = sel.blurb;
+    const own = S.owned.has(sel.id), worn = ckWornId(S.outfit, sel.slot) === sel.id;
+    if (!own) { if (w >= sel.price) { label = 'Buy for 🐟 ' + sel.price; act = 'buy'; } else { label = 'Need ' + (sel.price - w) + ' more 🐟'; blurb = 'Earn fish by playing: every game fills the piggy bank 🐟'; } }
+    else if (worn) { label = sel.id === 'crown' ? 'Take off (bare head)' : 'Take off'; act = 'off'; cls = 'off'; }
+    else { label = 'Wear it 💖'; act = 'wear'; cls = 'wear'; }
+  } else if (ckPrevDiffers() && ckPrevOwned()) { name = 'What a look!'; blurb = 'All of this is yours already.'; label = 'Wear this look ✨'; act = 'look'; cls = 'wear'; }
+  else { name = 'Try things on!'; blurb = 'Tap anything to see it on Princess Kitty. Trying on is free!'; label = 'Pick something to try on'; }
+  u.Name.textContent = name; u.Blurb.textContent = blurb;
+  u.Main.textContent = label; u.Main.disabled = !act; u.Main.className = 'btn ck-main' + (cls ? ' ' + cls : ''); CK.act = act;
+  u.Undo.disabled = !ckPrevDiffers(); u.Undo.style.opacity = u.Undo.disabled ? 0.45 : 1;
+}
+function ckMain() {
+  const S = ckState(), it = CK.sel && CK_BY_ID[CK.sel], A = CK.anim;
+  if (CK.act === 'buy' && it) {
+    const w = ckWallet(); if (S.owned.has(it.id)) return;
+    if (w < it.price) { ckSfx('nope'); ckRefresh(); return; }
+    ckSetWallet(w - it.price); S.owned.add(it.id); S.spent += it.price; ckWearSaved(it); ckSave();
+    ckCelebrate(it); ckCheckAch();
+  } else if (CK.act === 'wear' && it) {
+    ckWearSaved(it); ckSave(); ckSfx('wear'); ckTryOn(it, true); ckCaption(pickOf(['Looking good!', 'Perfect!', 'I love it!', 'So me!'])); ckCheckAch();
+  } else if (CK.act === 'off' && it) {
+    if (it.slot === 'hat') { if (it.id === 'crown') S.outfit.hat = 'none'; else delete S.outfit.hat; } else delete S.outfit[it.slot];
+    if (S.outfit[it.slot] === undefined) delete CK.prev[it.slot]; else CK.prev[it.slot] = S.outfit[it.slot];
+    closetDress(CK.rig, CK.prev); ckSave(); ckSfx('off'); A.flick = 1; ckCaption(pickOf(['Maybe later...', 'Off it comes!', 'Back to basics.']));
+  } else if (CK.act === 'look') {
+    for (const s of CK_SLOTS) { const v = CK.prev[s.id]; if (v) S.outfit[s.id] = v; else delete S.outfit[s.id]; }
+    ckSave(); ckSfx('wear'); A.hop = 1; A.wave = 1; ckPuffAt(CK.rig.g.localToWorld(CK.v.set(0, 0.55, 0)), 36, true); ckCaption('Outfit saved! 💖'); ckCheckAch();
+  } else { ckSfx('nope'); const m = CK.ui.Main; m.classList.remove('shake'); void m.offsetWidth; m.classList.add('shake'); return; }
+  ckRefresh();
+}
+function ckWearSaved(it) {                                             // what she's trying on becomes what she wears (for that slot)
+  const S = ckState();
+  if (it.slot === 'hat') { if (it.id === 'crown') delete S.outfit.hat; else S.outfit.hat = it.id; } else S.outfit[it.slot] = it.id;
+  if (S.outfit[it.slot] === undefined) delete CK.prev[it.slot]; else CK.prev[it.slot] = S.outfit[it.slot];
+  closetDress(CK.rig, CK.prev);
+}
+function ckUndo() {
+  if (!ckPrevDiffers()) return;
+  CK.prev = Object.assign({}, ckState().outfit); closetDress(CK.rig, CK.prev); CK.sel = null; CK.view = 'full'; ckSfx('off'); CK.anim.flick = 1; ckCaption('Back to my usual!'); ckRefresh();
+}
+function ckSurprise() {
+  const S = ckState(), mine = CK_ITEMS.filter(it => it.build && S.owned.has(it.id));
+  if (!mine.length) { ckSfx('nope'); ckCaption('Buy a few things first!'); CK.anim.flick = 1; return; }
+  let next = null;
+  for (let tries = 0; tries < 6; tries++) {
+    next = {};
+    for (const s of CK_SLOTS) { const opts = mine.filter(it => it.slot === s.id); if (opts.length && Math.random() < 0.8) next[s.id] = pickOf(opts).id; }
+    if (!Object.keys(next).length) next[mine[0].slot] = mine[0].id;
+    if (CK_SLOTS.some(s => (next[s.id] || null) !== (CK.prev[s.id] || null))) break;
+  }
+  CK.prev = next; closetDress(CK.rig, CK.prev); CK.sel = null; CK.view = 'full'; CK.idleT = 9;
+  const A = CK.anim; A.hop = 1; A.flick = 1; A.tilt = 1; ckPuffAt(CK.rig.g.localToWorld(CK.v.set(0, 0.55, 0.05)), 40, true); ckSfx('try'); ckCaption(pickOf(['Ta-da! ✨', 'Surprise!', 'How about this?', 'Mix and match!']));
+  ckRefresh();
+}
+function ckCelebrate(it) {                                             // bought! confetti, fish flying out of the wallet, a cha-ching, a happy dance
+  const A = CK.anim, u = CK.ui; ckSfx('buy'); A.hop = 1; A.wave = 1; A.flick = 1; A.tilt = 1;
+  ckPuffAt(CK.rig.g.localToWorld(CK.v.set(0, 0.6, 0.05)), 48, true);
+  ckCaption(pickOf(['It’s mine! 💖', 'Best. Purchase. Ever.', 'Ooh, I love it!', 'Treat yourself!']));
+  u.wallet.classList.remove('spend'); void u.wallet.offsetWidth; u.wallet.classList.add('spend');
+  const wr = u.wallet.getBoundingClientRect(), sr = u.Stage.getBoundingClientRect(), cx = sr.left + sr.width / 2, cy = sr.top + sr.height * 0.55, fx = u.fx;
+  if (!fx.animate) return;
+  for (let i = 0; i < 7; i++) {
+    const c = document.createElement('span'); c.className = 'coin'; c.textContent = '🐟'; fx.appendChild(c);
+    const x0 = wr.left + wr.width / 2 - 12, y0 = wr.top + wr.height / 2 - 12, x1 = cx - 12 + (Math.random() - 0.5) * 80, y1 = cy - 12 + (Math.random() - 0.5) * 40, mx = (x0 + x1) / 2 + (Math.random() - 0.5) * 120, my = Math.min(y0, y1) - 60 - Math.random() * 60;
+    const an = c.animate([{ transform: `translate(${x0}px,${y0}px) scale(.6) rotate(0deg)`, opacity: 1 }, { transform: `translate(${mx}px,${my}px) scale(1.2) rotate(200deg)`, opacity: 1 }, { transform: `translate(${x1}px,${y1}px) scale(.3) rotate(420deg)`, opacity: 0 }],
+      { duration: 700 + i * 50, delay: i * 70, easing: 'cubic-bezier(.3,.1,.4,1)', fill: 'backwards' });
+    an.onfinish = () => c.remove(); setTimeout(() => ckSfx('coin'), i * 70 + 650);
+  }
+  const cols = ['#ff6fae', '#ffd23a', '#8a5cff', '#6fe0bf', '#8fd6ff', '#ffffff'];
+  for (let i = 0; i < 44; i++) {
+    const d = document.createElement('i'); d.className = 'cf'; d.style.background = cols[i % cols.length]; fx.appendChild(d);
+    const x = sr.left + Math.random() * sr.width, y0 = sr.top - 20, y1 = sr.top + sr.height * (0.6 + Math.random() * 0.5), r = (Math.random() - 0.5) * 900;
+    const an = d.animate([{ transform: `translate(${x}px,${y0}px) rotate(0deg)`, opacity: 1 }, { transform: `translate(${x + (Math.random() - 0.5) * 140}px,${y1}px) rotate(${r}deg)`, opacity: 0.1 }],
+      { duration: 1300 + Math.random() * 900, delay: Math.random() * 250, easing: 'cubic-bezier(.2,.6,.5,1)', fill: 'backwards' });
+    an.onfinish = () => d.remove();
+  }
+}
+function ckCheckAch() {                                              // (two at once: the second waits its turn, so the toasts don't pile up)
+  const S = ckState(), due = [];
+  if ([...S.owned].filter(id => id !== 'crown').length >= 6) due.push('fashionista');
+  if (S.outfit.hat !== 'none' && ['collar', 'cape', 'pack', 'specs', 'tail'].every(s => S.outfit[s])) due.push('dressedNines');
+  if (S.spent >= 1000) due.push('bigSpender');
+  due.filter(id => !achDone[id] && !(ckCheckAch.q || (ckCheckAch.q = new Set())).has(id)).forEach((id, i) => { ckCheckAch.q.add(id); setTimeout(() => { ckCheckAch.q.delete(id); unlock(id); }, 400 + i * 2600); });
+}
+function ckDot() {                                                     // the title's Closet button: a red dot when there's something new she can afford
+  const b = $('closetBtn'), d = b && b.querySelector('.ck-dot'); if (!d) return;
+  const S = ckState(), w = ckWallet(); d.hidden = !CK_ITEMS.some(it => !S.owned.has(it.id) && it.price <= w);
+}
+
+/* ---------- each frame while it's open: her, the camera, the sparkles, the thumbnails, then the dressing room is drawn ---------- */
+function ckAim(snap) {                                                 // the camera: the view for what she's trying on, fitted to the window's shape
+  const V = CK_VIEWS[CK.view] || CK_VIEWS.full, R = CK.rig, t = CK.v2;
+  if (V.at === 'head') R.head.getWorldPosition(t); else if (V.at === 'tail') R.tail[3].getWorldPosition(t); else t.set(0, 0, 0);
+  t.x += V.off[0]; t.y += V.off[1]; t.z += V.off[2];
+  if (V.at === 'root') t.set(V.off[0], V.off[1], V.off[2]);
+  const cam = CK.cam, asp = CK.rect.w / CK.rect.h, vf = cam.fov * Math.PI / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * asp), r = Math.max(V.r, CK.view === 'head' && CK.fit ? CK.fit : 0);
+  const d = r / Math.sin(Math.min(vf, hf) / 2), k = snap ? 1 : 1 - Math.exp(-CK.dt * 3.2);
+  CK.camT.lerp(t, k); CK.camD += (d - CK.camD) * k;
+  if (Math.abs(cam.aspect - asp) > 1e-4) { cam.aspect = asp; cam.updateProjectionMatrix(); }
+  CK.el = CK.el == null || snap ? V.el : CK.el + (V.el - CK.el) * k;
+  cam.position.set(CK.camT.x, CK.camT.y + Math.sin(CK.el) * CK.camD, CK.camT.z + Math.cos(CK.el) * CK.camD); cam.lookAt(CK.camT);
+  if (snap) CK.yaw = V.yaw;
+}
+function ckAnim(dt) {                                                  // her, alive: breathing, blinking, looking about, tail swaying, and the happy hop
+  const R = CK.rig, A = CK.anim, V = CK_VIEWS[CK.view] || CK_VIEWS.full, t = CK.t;
+  if (!CK.drag) { CK.spin += CK.spinV * dt; CK.spinV *= Math.exp(-dt * 3.5); CK.idleT += dt;
+    if (CK.idleT > 1.6) { const home = Math.round(CK.spin / (Math.PI * 2)) * Math.PI * 2; CK.spin += (home - CK.spin) * Math.min(1, dt * 1.3); if (Math.abs(home - CK.spin) < 1e-3) CK.spin = 0; } }
+  CK.yaw += (V.yaw - CK.yaw) * Math.min(1, dt * 2.6);
+  let hopY = 0; if (A.hop > 0) { A.hop = Math.max(0, A.hop - dt / 0.52); const k = 1 - A.hop; hopY = Math.sin(k * Math.PI) * 0.12; if (A.hop === 0) A.sq = 1; }
+  A.sq = Math.max(0, A.sq - dt * 4.5);
+  R.g.position.y = hopY; R.g.rotation.y = CK.yaw + CK.spin;
+  R.body.scale.set(1 + A.sq * 0.1, 1 - A.sq * 0.14 + Math.sin(t * 2.1) * 0.012, 1 + A.sq * 0.05); R.body.position.y = 0;
+  const air = Math.min(1, hopY / 0.08);
+  R.legs[0].rotation.x = R.legs[1].rotation.x = -0.55 * air; R.legs[2].rotation.x = R.legs[3].rotation.x = 0.55 * air;
+  if (A.wave > 0) { A.wave = Math.max(0, A.wave - dt / 1.4); if (hopY < 0.01) R.legs[1].rotation.x = -Math.sin(Math.min(1, (1 - A.wave) * 1.6) * Math.PI) * 1.2 - Math.sin(t * 16) * 0.25 * Math.sin((1 - A.wave) * Math.PI); }
+  A.lookT -= dt; if (A.lookT <= 0) { A.lookT = 1.6 + Math.random() * 2.4; const toCam = Math.random() < 0.45 || V.at === 'head';
+    A.lookY = toCam ? THREE.MathUtils.clamp(-Math.atan2(Math.sin(CK.yaw + CK.spin), Math.cos(CK.yaw + CK.spin)), -0.6, 0.6) : (Math.random() - 0.5) * 1.0; A.lookX = (Math.random() - 0.6) * 0.3; }
+  const hk = Math.min(1, dt * 3); R.head.rotation.y += (A.lookY - R.head.rotation.y) * hk; R.head.rotation.x += (A.lookX - R.head.rotation.x) * hk;
+  if (A.tilt > 0) A.tilt = Math.max(0, A.tilt - dt / 1.1); R.head.rotation.z = Math.sin((1 - A.tilt) * Math.PI) * 0.32 * (A.tilt > 0 ? 1 : 0);
+  A.flick = Math.max(0, A.flick - dt * 1.1);
+  for (let i = 0; i < R.tail.length; i++) { const sg = R.tail[i]; sg.rotation.x = (i ? 0.2 : 0.75) + A.flick * 0.3 * Math.sin(t * 17 - i * 0.9); sg.rotation.y = Math.sin(t * 2.2 - i * 0.55) * (0.1 + i * 0.03) * (1 + A.flick * 1.8); }
+  A.blinkT -= dt; const shut = A.blinkT < 0.13; if (A.blinkT <= 0) A.blinkT = 2.2 + Math.random() * 3.2;
+  if (R.lids[0].visible !== shut) { R.peepers.forEach(e => { e.visible = !shut; }); R.lids.forEach(l => { l.visible = shut; }); }
+  if (A.popObj) { A.pop = Math.min(1, A.pop + dt / 0.55); const p = A.pop, s = p < 1 ? 1 + Math.sin(p * Math.PI * 1.5) * (1 - p) * 0.5 - (1 - p) * (1 - p) * 0.9 : 1, o = A.popObj;
+    o.scale.setScalar(Math.max(0.01, s)); if (A.popBase) o.position.copy(A.popBase).addScaledVector(A.popC, 1 - s); if (p >= 1) ckPopEnd(); }
+  ckWear(R.ck, dt, Math.min(1, Math.abs(CK.spinV) * 0.12 + (hopY > 0.01 ? 0.7 : 0) + 0.04), hopY > 0.02 && !!(R.ck.pack && R.ck.pack.flame), t);
+  CK.shadow.rotation.z = R.g.rotation.y; const ss = 1 - hopY * 1.5; CK.shadow.scale.set(0.8 * ss, 1.35 * ss, 1); CK.shadow.material.opacity = 0.3 * ss;
+}
+function ckThumbStep() {                                               // real little pictures of each thing for the cards: one or two a frame, while it's open
+  if (!CK.thumbQ.length) return;
+  let T = CK.th;
+  if (!T) { T = CK.th = { scene: new THREE.Scene(), cam: new THREE.PerspectiveCamera(30, 1, 0.01, 10), rt: new THREE.WebGLRenderTarget(256, 256), buf: new Uint8Array(256 * 256 * 4), holder: new THREE.Group(), box: new THREE.Box3() };
+    T.scene.add(new THREE.HemisphereLight(0xffffff, 0xd9c0cc, 0.85)); const d = new THREE.DirectionalLight(0xffffff, 0.55); d.position.set(1, 2, 2.5); T.scene.add(d); T.scene.add(T.holder);
+    T.tmp = document.createElement('canvas'); T.tmp.width = T.tmp.height = 256; T.img = T.tmp.getContext('2d').createImageData(256, 256); }
+  const DIRS = { hat: [0.5, 0.42, 1], specs: [0.35, 0.2, 1], collar: [0.35, 0.6, 1], cape: [0.6, 0.75, -1], pack: [0.8, 0.9, -0.55], tail: [1, 0.45, 0.3] };
+  renderer.getClearColor(CK.col); const ca = renderer.getClearAlpha();
+  for (let n = 0; n < 2 && CK.thumbQ.length; n++) {
+    const it = CK_BY_ID[CK.thumbQ.shift()], card = CK.cards[it.id]; if (!it || !card) continue;
+    let obj, capeGeo = null;
+    if (it.id === 'crown') { obj = CK.rig.crown.clone(true); obj.visible = true; obj.position.set(0, 0, 0); obj.rotation.set(-0.14, 0, 0); }
+    else { const inst = ckInstance(it); obj = inst.obj; if (inst.clasp) inst.clasp.visible = true; capeGeo = inst.cape && inst.cape.geometry; }
+    T.holder.add(obj); T.holder.updateMatrixWorld(true); T.box.setFromObject(T.holder);
+    let c = T.box.getCenter(CK.v), r = Math.max(0.02, T.box.getSize(CK.v2).length() * 0.5); const dir = CK.v3.fromArray(DIRS[it.slot] || [0.5, 0.4, 1]).normalize();
+    if (it.thumb) { c.fromArray(it.thumb); r = it.thumb[3]; }   // (a backpack: its straps are as big as she is, so frame the bag)
+    T.cam.position.copy(c).addScaledVector(dir, r / Math.sin(15 * Math.PI / 180) * 0.98); T.cam.near = r * 0.2; T.cam.far = r * 20; T.cam.updateProjectionMatrix(); T.cam.lookAt(c);
+    renderer.setRenderTarget(T.rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(T.scene, T.cam);
+    renderer.readRenderTargetPixels(T.rt, 0, 0, 256, 256, T.buf); renderer.setRenderTarget(null);
+    const D = T.img.data, row = 256 * 4; for (let y = 0; y < 256; y++) D.set(T.buf.subarray((255 - y) * row, (256 - y) * row), y * row);
+    T.tmp.getContext('2d').putImageData(T.img, 0, 0); const g = card.cv.getContext('2d'); g.clearRect(0, 0, 128, 128); g.drawImage(T.tmp, 0, 0, 128, 128); card.el.classList.add('th-ok');
+    T.holder.remove(obj); if (capeGeo) capeGeo.dispose();
+  }
+  renderer.setClearColor(CK.col, ca);
+}
+function closetFrame(dt) {
+  const C = CK; C.dt = dt; C.t += dt;
+  try {
+    if (C.rectDirty) ckMeasure();
+    ckThumbStep(); ckAnim(dt); ckAim(false); ckFxStep(dt);
+    if (C.fishShown !== C.fishTo) { const d = C.fishTo - C.fishShown, st = Math.max(1, Math.ceil(Math.abs(d) * Math.min(1, dt * 3.5)));
+      if (d > 0 && C.fishShown + st >= C.fishTo) { C.ui.wallet.classList.remove('gain'); void C.ui.wallet.offsetWidth; C.ui.wallet.classList.add('gain'); }
+      C.fishShown += Math.sign(d) * Math.min(Math.abs(d), st); C.ui.Fish.textContent = C.fishShown; }
+    const r = C.rect; renderer.setScissorTest(true); renderer.setScissor(r.x, r.y, r.w, r.h); renderer.setViewport(r.x, r.y, r.w, r.h);
+    renderer.render(C.scene, C.cam);
+  } catch (e) { if (!closetFrame.err) { closetFrame.err = 1; console.error(e); } }
+  renderer.setScissorTest(false); renderer.getSize(C.sz); renderer.setViewport(0, 0, C.sz.x, C.sz.y);
+}
+
+/* ---------- fish from the other games: game-over pay, and a little something for every new trophy ---------- */
+function closetAchPay(id) {                                            // (from unlock(): +10 fish for every new achievement)
+  try { const n = ckWallet() + 10; ckSetWallet(n); if (CK.on) { CK.fishTo = n; ckRefresh(); } ckDot(); return ' · +10 🐟'; } catch (e) { return ''; }
+}
+function closetGameOverPay(mouse, val) {                               // Classic and Chaos: a fish per 50 points; Mouse mode: 3 per mushroom (up to 150 a game)
+  try {
+    const n = Math.min(150, mouse ? (val | 0) * 3 : Math.floor((val | 0) / 50)), el = $('ckOverFish'); if (!el) return;
+    if (n > 0) ckSetWallet(ckWallet() + n);
+    el.hidden = n <= 0; el.querySelector('b').textContent = n; ckDot();
+  } catch (e) {}
+}
+(function ckBoot() {                                                   // the Closet's buttons: on the title, on the pause card, on the game-over card
+  try {
+    ckCss();
+    const upd = $('updBtn');
+    if (upd && !$('closetBtn')) { const b = document.createElement('button'); b.className = 'ib'; b.id = 'closetBtn'; b.setAttribute('aria-label', 'Kitty’s Closet');
+      b.innerHTML = '<span class="ib-i">👗</span><span class="ib-l">Closet</span><i class="ck-dot" hidden></i>'; upd.after(b); b.addEventListener('click', () => closetOpen('startScreen')); }
+    const rb = $('resumeBtn');
+    if (rb && !$('closetPauseBtn')) { const b = document.createElement('button'); b.className = 'btn ck-pbtn'; b.id = 'closetPauseBtn'; b.textContent = '👗 Kitty’s Closet'; rb.after(b); b.addEventListener('click', () => closetOpen('pauseScreen')); }
+    const ag = $('againBtn');
+    if (ag && !$('ckOverFish')) { const d = document.createElement('div'); d.className = 'ck-over'; d.id = 'ckOverFish'; d.hidden = true;
+      d.innerHTML = '<span>+<b>0</b> 🐟 into the piggy bank</span><button class="link-btn chaos-link">👗 Spend in the Closet</button>'; ag.before(d);
+      d.querySelector('button').addEventListener('click', () => closetOpen('overScreen')); }
+    addEventListener('keydown', ckKey, true);
+    addEventListener('resize', () => { CK.rectDirty = true; });
+    ckDot();
+  } catch (e) { console.error(e); }
+})();
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - UPPER.UF + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
@@ -14404,7 +15892,7 @@ function startWalk() {
   Object.assign(walk, { on: true, vy: 0, grounded: true, face: Math.PI, phase: 0, batT: 0, squash: 0, fp: false, jumpQ: -1, burnCD: 0, look: null, tableHops: 0, meowRun: 0, lastMeow: -9, meowT: 0, puff: 0, inBox: false, free: false, climb: null, treeT: -9, treesSeen: new Set(), farSaid: false, honked: false, launchH: 0, fenceHint: false });
   catTail.visible = false;
   walk.vel.set(0, 0, 0); walk.stick.x = walk.stick.y = 0;
-  resetLaundry(); resetSliderScene(); resetDucks();
+  resetLaundry(); resetSliderScene(); resetDucks(); roamRestoreWorld();
   walk.pos.set(0.9, 0, 4.4); walk.pos.y = surfaceTop(walk.pos.x, walk.pos.z, 0.9);
   walk.rig.g.visible = true; walk.rig.shadow.visible = true; cat.visible = false;
   fcStart(); Object.assign(fc, { dist0: 3.3, el0: 20, zoom: 1, tilt: 0, yaw: 0 });
@@ -14883,6 +16371,7 @@ function walkSwipe() {                                               // swipe at
   if (knockDoor(paw)) return;
   if (garageSwipe(paw)) return;                                      // our garage door: up it goes
   if (bikeSwipe(paw)) return;                                        // the motorcycle in there: ride!
+  if (questSwipe(paw)) return;                                       /* (Aunty-ji's lost thing: into her mouth) */
   if (auntySwipe(paw)) return;
   if (bagSwipe(paw)) return;                                          // a bin bag (pop) or the kitchen bin (over)
   if (upPropSwipe(paw)) return;                                      // the dining table's things                                       // Aunty-ji (she will have something to say)                                        // our front door: knock knock
@@ -15427,9 +16916,9 @@ function walkRoamOK(nx, nz) {                                        // the yard
   return true;                                                        // anywhere else outdoors (the solid chain-link keeps her in the yard till she climbs over it)
 }
 function fenceCrossed(ox, oz) {                                       // she's just gone over a fence for the first time: out she goes
-  if (!walk.free && YARD.holeX !== undefined && walk.pos.z > YARD.FZ + 0.35 && Math.abs(walk.pos.x - YARD.holeX) < 2.5) { walk.free = true; showWalkName('🕳️ Through the hole in the fence... the wild bank behind the yard!'); tone(660, 990, 0.2, 'triangle', 0.035); return; }   /* (the secret way out: no 'out of bounds' notice) */
-  const p = walk.pos; if (walk.free || !YARD_FENCES.some(F => segCross(ox, oz, p.x, p.z, F))) return;
-  walk.free = true; const fresh = !achDone.notAGlitch; unlock('notAGlitch');
+  if (!walk.free && YARD.holeX !== undefined && walk.pos.z > YARD.FZ + 0.35 && Math.abs(walk.pos.x - YARD.holeX) < 2.5) { walk.free = true; roamSave({ free: 1 }); showWalkName('🕳️ Through the hole in the fence... the wild bank behind the yard!'); tone(660, 990, 0.2, 'triangle', 0.035); return; }   /* (the secret way out: no 'out of bounds' notice) */
+  const p = walk.pos; if ((walk.free && achDone.notAGlitch) || !YARD_FENCES.some(F => segCross(ox, oz, p.x, p.z, F))) return;   /* (out already, by the hole or a remembered visit: hopping the fence still earns the trophy) */
+  walk.free = true; roamSave({ free: 1 }); const fresh = !achDone.notAGlitch; unlock('notAGlitch');
   showWalkName('🚧 Notice: out of bounds'); tone(523, 1047, 0.3, 'triangle', 0.04);
 }
 function coonInSights() {
@@ -15439,7 +16928,7 @@ function coonInSights() {
 }
 function shatterSlider(at) {
   if (!sliderGlass.some(g => g.visible)) return;
-  unlock('glassBreak'); noise(0.6, 0.3, 5200); noise(0.25, 0.2, 2500);
+  unlock('glassBreak'); roamSave({ slider: 1 }); noise(0.6, 0.3, 5200); noise(0.25, 0.2, 2500);
   for (let i = 0; i < 12; i++) tone(2400 + Math.random() * 3200, 1800 + Math.random() * 2000, 0.08 + Math.random() * 0.2, 'triangle', 0.03, 0.02 + i * 0.035 + Math.random() * 0.05);   // tinkle tinkle
   shake = Math.max(shake, reduceMotion ? 0.05 : 0.35); showWalkName('💥 The slider shattered!');
   const mat = new THREE.MeshPhongMaterial({ color: 0xd6ebf5, transparent: true, opacity: 0.45, shininess: 140, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
@@ -15705,6 +17194,7 @@ function frame(now) {
   reflFrame++;
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = Math.max(now, last);   // never a backwards step (rAF stamps can trail performance.now())
   if (state !== 'paused' && state !== 'levelup') clock += dt;   /* (catnip, raves, disco... hold still while paused) */
+  if (CK.on) { closetFrame(dt); return; } closetTick(dt);   /* (Kitty's Closet: while it's open only the dressing room is drawn; otherwise capes flutter, jetpacks fire) */
   if (state === 'hop') { updateHop(dt); renderHop(); return; } hopPill();   /* (Treetop Hop: its own little world; in Free roam, the 🌳 button on a tree top) */
   if (state === 'bike') markFound('ride');                            /* (found the motorcycle: it gets a button on the title screen) */
   if (state === 'bike') { if (typeof updateBike === 'function') { updateBike(dt); renderBike(); } return; }   // out on the motorcycle: its own little world
@@ -15788,6 +17278,7 @@ function frame(now) {
   updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateZombies(dt); ammoChip(); updateYardGate(dt); updateGarage(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
 
   if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && (camera.position.z >= ROOM.visDepth - 0.05 || !inRoomXZ(camera.position.x, camera.position.z) || upstairsView(camera.position)));   // (or out in the yard, round the front, or upstairs)
+  updateQuests(dt);                                                   /* (Aunty-ji's little quests: the lost thing, the tracker) */
   updateUpperLights();   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
   if (state !== 'tvgame') { const hid = cullBegin(); renderer.render(scene, camera); cullEnd(hid); }           // (the room is hidden behind the full-screen TV)
