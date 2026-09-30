@@ -371,6 +371,8 @@
     .float{animation-duration:.6s}
     #flash.on{animation-duration:.15s}
   }
+#walkAmmo{position:fixed;right:calc(128px + env(safe-area-inset-right,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px));z-index:7;pointer-events:none;background:rgba(31,23,18,.72);color:#f4c13d;font:800 13px system-ui,sans-serif;padding:4px 10px;border-radius:12px;letter-spacing:1px;white-space:nowrap}#walkAmmo.low{color:#ff6a4a}
+@media (max-width:360px){#walkAmmo{bottom:calc(196px + env(safe-area-inset-bottom,0px))}}
 .hud .icon-btn{position:relative}.hud .icon-btn::after{content:'';position:absolute;inset:-9px}
 .modes .link-btn{padding:9px 2px;margin:-5px 0}
 @media (max-width:360px){#walkSwipe{right:calc(118px + env(safe-area-inset-right,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px))}}
@@ -4103,7 +4105,14 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       run(Y.XR, VD + IN(6), Y.XR, FZ);                                                                          // down the middle
       run(Y.XL0, VD - 26, Y.XL0, VD + 0.2); run(Y.XL0, VD + 0.2, Y.XL1, FZ);                                    // down the neighbours' side
       run(Y.XL0, VD + 0.2, Y.HL, VD + 0.2, true);                                                               // across the side yard, with the gate
-      run(-44, FZ, 44, FZ);                                                                                      // across the back (the lots behind share it)
+      { const hx = Y.XL1 + 8.5; YARD.holeX = hx;                                                             // across the back (the lots behind share it)... with a hole torn low in it, round the back by the shed
+        run(-44, FZ, hx - 0.6, FZ); run(hx + 0.6, FZ, 44, FZ);
+        { const t = linkTex.clone(); t.needsUpdate = true; t.repeat.set(1.2 / 0.31, (FH - 1.05) / 0.31);                 // the mesh still spans the gap up top (she slips through underneath)
+          const top = new THREE.Mesh(new THREE.PlaneGeometry(1.2, FH - 1.05), new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.06, side: THREE.DoubleSide, depthWrite: false, fog: false })); top.position.set(hx, 1.0 + (FH - 1.05) / 2, FZ); yard.add(top);
+          const t2 = linkTex.clone(); t2.needsUpdate = true; t2.repeat.set(1.0 / 0.31, 0.85 / 0.31);
+          const flap = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: t2, transparent: true, alphaTest: 0.06, side: THREE.DoubleSide, depthWrite: false, fog: false })); flap.rotation.set(0.12, -1.0, 0.05, 'YXZ'); flap.position.set(hx + 0.6 - 0.45 * Math.cos(1.0), 0.5, FZ - 0.45 * Math.sin(1.0)); yard.add(flap);   /* (the torn flap, swung into the yard like a little door) */
+          const dirt = new THREE.Mesh(new THREE.CircleGeometry(1, 18), new THREE.MeshBasicMaterial({ color: 0x5a4128, transparent: true, opacity: 0.42, depthWrite: false })); dirt.rotation.x = -Math.PI / 2; dirt.scale.set(0.75, 1.3, 1); dirt.position.set(hx, 0.025, FZ - 0.2); dirt.renderOrder = 1; dirt.userData.keep = true; yard.add(dirt);   /* (a worn patch where she squeezes through) */
+          yBox(posts, 0.07, 0.07, 1.2, 0xa9afb5, hx, FH, FZ, Math.PI / 2); } }
       run(Y.HR + 1.3, VD + IN(6), Y.HR + 1.3, FZ);                                                              // the far side of next door's yard (number 24's right beside it)
       bakeYard(posts);
       // bushes along the fences and tall leafy trees behind them: lumpy blobs, lighter on top, in one instanced mesh
@@ -4115,10 +4124,11 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const leaves = [], trunks = [], BUSH = [0x3c7431, 0x4a8638, 0x57963f, 0x335f2a, 0x42803a], LEAF = [0x7fae4c, 0x6a9a40, 0x94bf5a, 0x5c8a38, 0x4f8a3a], DARK = [0x2f5a28, 0x3a6a2e, 0x2a4f24, 0x44753a, 0x4a7a36];
       const bush = (x, z, r0, b, pal) => { YARD_BUSHES.push([x, z, r0 * 1.1, (b || 0) + r0 * 1.6]); const n = 2 + (rnd() * 2 | 0); for (let k = 0; k < n; k++) { const r = r0 * (0.7 + rnd() * 0.5); leaves.push([x + (rnd() - 0.5) * 1.4, (b || 0) + r * 0.72, z + (rnd() - 0.5) * 1.0, r, (pal || BUSH)[rnd() * (pal || BUSH).length | 0]]); } };
       const tree = (x, z, h, b) => { b = b || 0; trunks.push([x, z, h, b]); for (let k = 0; k < 7; k++) { const r = 2 + rnd() * 1.7; leaves.push([x + (rnd() - 0.5) * 4.6, b + h + (rnd() - 0.3) * 3.2, z + (rnd() - 0.5) * 4.6, r, LEAF[rnd() * LEAF.length | 0]]); } };
-      for (let x = -52; x < 52; x += 2.1 + rnd() * 1.3) bush(x, FZ + 1.0, 1.1 + rnd() * 0.55);               // a hedge of bushes right behind the back fence...
+      for (let x = -52; x < 52; x += 2.1 + rnd() * 1.3) { const l0 = leaves.length, b0 = YARD_BUSHES.length; bush(x, FZ + 1.0, 1.1 + rnd() * 0.55); if (Math.abs(x - YARD.holeX) < 2.3) { leaves.length = l0; YARD_BUSHES.length = b0; } }   // a hedge of bushes right behind the back fence (with a gap behind the hole, so you can see through)...
       for (let z = FZ + 2.6; z < FZ + 15.5; z += 2.3 + rnd()) for (let x = -56; x < 56; x += 2.6 + rnd() * 2) bush(x, z, 0.9 + rnd() * 0.65, hillY(z) - 0.25, DARK);   // ...undergrowth all the way up the bank...
       for (const zo of [3.4, 6.8, 10.4, 14, 18]) for (let x = -56 + rnd() * 4; x < 56; x += 4.6 + rnd() * 3.4) { const z = FZ + zo + (rnd() - 0.5) * 1.6; tree(x, z, 7 + rnd() * 5, hillY(z)); }   // ...and trees crowding the slope
-      for (let z = VD - 24; z < FZ - 0.5; z += 2.1 + rnd() * 1.1) bush(yardXL(z) - 1.15, z, 0.95 + rnd() * 0.5);   // bushes all down the north side (between us and 30 & 32)
+      for (let z = VD - 24; z < FZ - 0.5; z += 2.1 + rnd() * 1.1) { const l0 = leaves.length, b0 = YARD_BUSHES.length; bush(yardXL(z) - 1.15, z, 0.95 + rnd() * 0.5); leaves.length = l0; YARD_BUSHES.length = b0; }   // (no bushes down the north side any more: a clear run from the shed round to the front; the cedars and trees stay)
+      { const hx = YARD.holeX; leaves.push([hx - 0.78, 0.52, FZ - 0.72, 0.74, BUSH[1]], [hx - 1.55, 0.42, FZ - 0.5, 0.62, BUSH[0]]); YARD_BUSHES.push([hx - 1.1, FZ - 0.6, 0.95, 1.2]); }   // (a bush half hiding the hole in the fence)
       for (let z = VD + 16; z < FZ - 2; z += 6.5 + rnd() * 4) tree(yardXL(z) - 4 - rnd() * 3, z, 8.5 + rnd() * 4);   // (their trees, behind their house)
       for (const [x, z, h] of [[Y.XR + 7, FZ - 6, 10.5], [Y.XR + 14, FZ - 13, 9], [Y.HR + 7, VD + 14, 10], [Y.HR + 9, FZ - 4, 11]]) tree(x, z, h);
       for (let z = VD + 15; z < FZ - 2; z += 4.2 + rnd() * 2.5) tree(yardXL(z) - 6.5 - rnd() * 4, z, 8 + rnd() * 4);   // more trees in 30 & 32's yard...
@@ -4172,13 +4182,11 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           line(z0 + 0.35, false, 0xf2f2ee); line(z1 - 0.35, false, 0xf2f2ee); line((z0 + z1) / 2, true, 0xf4c430); bakeYard(lines);
           const gb = new THREE.Group(); gb.userData.name = 'Highway barrier'; povEndWall.add(gb); yBox(gb, 170, 0.32, 0.12, 0xb8bcc0, 0, RY + 0.75, z1 + 0.6); for (let x = -84; x < 85; x += 3) yBox(gb, 0.12, 0.8, 0.12, 0x8e9296, x, RY + 0.4, z1 + 0.66); bakeYard(gb);   // (the barrier's solid)
           yardLife = yardLife || {}; yardLife.cars = [];
-          for (const [lane, col, x0, sp] of [[z0 + 2.3, 0xc0392b, -60, 13], [z1 - 2.3, 0x2e6fb0, 40, -15]]) {
+          for (const [lane, col, x0, sp, kind, plate] of [[z0 + 2.3, 0xc0392b, -60, 13, 'sedan', 'PAWS 88'], [z1 - 2.3, 0x2e6fb0, 40, -15, 'suv', 'NYAN 1']]) {
             const car = new THREE.Group(); car.userData.name = 'A car on the off-ramp'; car.userData.noWalk = true; povEndWall.add(car);
-            yBox(car, 4.2, 1.0, 1.8, col, 0, 0.75, 0); yBox(car, 2.3, 0.8, 1.6, col, -0.2, 1.6, 0); yBox(car, 2.1, 0.62, 1.64, 0x2a3440, -0.2, 1.62, 0);
-            for (const [wx, wz] of [[-1.3, -0.9], [1.3, -0.9], [-1.3, 0.9], [1.3, 0.9]]) { const w = yCyl(car, 0.38, 0.38, 0.28, 0x1b1b1d, wx, 0.38, wz, 14); w.rotation.x = Math.PI / 2; }
-            yBox(car, 0.08, 0.2, 0.4, 0xfff2b0, 2.12, 0.9, 0.55); yBox(car, 0.08, 0.2, 0.4, 0xfff2b0, 2.12, 0.9, -0.55);
-            bakeYard(car); car.children[0].position.y = -0.95; car.position.set(x0, RY + 0.95, lane); if (sp < 0) car.rotation.y = Math.PI;   // (its middle is the pivot)
-            yardLife.cars.push({ g: car, sp, v: sp, lane, honkT: 0, hx: 2.1, hz: 0.9, home: car.position.clone(), ry: car.rotation.y });
+            car.position.set(x0, RY + 0.95, lane); if (sp < 0) car.rotation.y = Math.PI;                            // (its middle is the pivot)
+            const wk = carBuild(car, kind, col, plate, { lift: 0.95, yaw: Math.PI / 2, s: [0.4, 0.35, 0.35], bnd: [-1e5, 1e5, z0 + 0.4, z1 + 0.25] });   // (a little one, nose along the ramp; its bits stay on the road)
+            yardLife.cars.push({ g: car, sp, v: sp, lane, honkT: 0, hx: 2.1, hz: 0.9, home: car.position.clone(), ry: car.rotation.y, wk });
           }
         }
       }
@@ -4641,19 +4649,11 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
   const Y = YARD, FZ = Y.FZ, XR = Y.XR, grp = (name, walk) => { const g = new THREE.Group(); g.userData.name = name; if (!walk) g.userData.noWalk = true; povEndWall.add(g); return g; };
   const block = (x0, x1, z0, z1) => YARD_BLOCKS.push([x0, x1, z0, z1]);
   const shadow = (x, z, rx, rz) => { const m = new THREE.Mesh(new THREE.CircleGeometry(1, 24), yardShadowMat()); m.rotation.x = -Math.PI / 2; m.scale.set(rx, rz, 1); m.position.set(x, 0.006, z); m.userData.noWalk = true; povEndWall.add(m); return m; };
-  const parkedCar = (x, z, ry, col) => {                              // a car parked in a driveway, full size (1.8 m by 4.8 m, like the garage it sits at). Touch it and... well
-    const car = grp('Parked car'), GL = 0x2a3440, TR = 0x222224, PY = 1.7;
-    yBox(car, 4.5, 1.45, 12, col, 0, 1.38, 0); yBox(car, 4.54, 0.36, 12.08, TR, 0, 0.72, 0);                       // the body, and its dark sills and bumpers
-    yBox(car, 3.9, 1.1, 5.9, GL, 0, 2.66, -0.6); yBox(car, 4.0, 0.24, 5.2, col, 0, 3.33, -0.7);                    // the glass all round, and the roof
-    for (const px of [-1.86, 1.86]) for (const pz of [-3.44, 2.24]) yBox(car, 0.22, 1.1, 0.22, col, px, 2.66, pz); // (its pillars)
-    yBox(car, 4.58, 0.95, 0.05, 0x1c1c1e, 0, 1.5, -0.55); for (const sx of [-1, 1]) yBox(car, 0.3, 0.2, 0.34, col, sx * 2.35, 2.3, 1.95);   // a door seam, the mirrors
-    for (const [wx, wz] of [[-2.0, -3.9], [2.0, -3.9], [-2.0, 3.9], [2.0, 3.9]]) {
-      yCyl(car, 0.8, 0.8, 0.56, 0x1b1b1d, wx, 0.8, wz, 16).rotation.z = Math.PI / 2; yCyl(car, 0.44, 0.44, 0.6, 0xa4a7ab, wx, 0.8, wz, 12).rotation.z = Math.PI / 2; }   // tyres and silver wheels
-    for (const sx of [-1.55, 1.55]) { yBox(car, 0.95, 0.34, 0.06, 0xfff2b0, sx, 1.78, 6.02); yBox(car, 0.85, 0.3, 0.06, 0xb3202a, sx, 1.82, -6.02); }   // head and tail lights
-    for (const sz of [-1, 1]) yBox(car, 1.25, 0.45, 0.05, 0xf2f2ee, 0, 1.12, sz * 6.07);                           // (plain plates)
-    bakeYard(car); car.children[0].position.y = -PY; car.position.set(x, PY, z); car.rotation.y = ry;   // (its middle is the pivot)
+  const parkedCar = (x, z, ry, col, kind, plate, bnd) => {             // a car parked in a driveway, full size (1.8 m by 4.8 m, like the garage it sits at). Touch it and... well
+    const car = grp('Parked car'), PY = 1.7; car.position.set(x, PY, z); car.rotation.y = ry;               // (its middle is the pivot)
+    const wk = carBuild(car, kind || 'sedan', col, plate || 'PURR 123', { lift: PY, bnd });                  // (bnd: where its bits mustn't fly, say through a house front)
     const sh = Math.abs(Math.sin(ry)) > 0.7 ? shadow(x, z, 6.6, 2.8) : shadow(x, z, 2.8, 6.6);
-    yardLife.cars.push({ g: car, parked: true, hx: 2.25, hz: 6.0, up: 2.0, dn: 1.9, home: car.position.clone(), ry, sh });
+    yardLife.cars.push({ g: car, parked: true, hx: 2.25, hz: 6.0, up: wk.top - PY + 0.25, dn: 1.9, home: car.position.clone(), ry, sh, wk });
   };
   // -- the garden shed, backed up to the neighbours' fence toward the back, doors facing the yard: sage boards, white trim, a Z-brace, a window box
   const SZ = FZ - 11, SX = yardXL(SZ) + 2.3;
@@ -4733,10 +4733,10 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     for (const side of [0, 1]) for (let z = VD + 3.2; z < FZ - 1.5; z += 1.25 + rnd() * 0.5) {
       if (side && z > VD + 8.4 && z < VD + 15.6) continue;                                          // (the vegetable bed's there)
-      if (!side && Math.abs(z - SZ) < 3.2) continue;                                                // (and the shed)
+      const MB = side ? mounds : [], BB = side ? blooms : [];                                         /* (none along the north fence: that's her way round the side; the dice still roll, so the rest stay put) */
       if (z > FZ - 7) continue;                                                                     // (the back corners are under the trees)
-      const x = side ? XR - 0.75 - rnd() * 0.3 : yardXL(z) + 0.75 + rnd() * 0.3, r = 0.45 + rnd() * 0.25; mounds.push([x, r * 0.55, z, r, [0x3f7a36, 0x467f3a, 0x3a6f31][rnd() * 3 | 0]]);
-      const nb = 3 + (rnd() * 4 | 0), c = cols[rnd() * cols.length | 0]; for (let k = 0; k < nb; k++) { const a = rnd() * 6.28; blooms.push([x + Math.cos(a) * r * 0.6, r * 0.95 + rnd() * 0.15, z + Math.sin(a) * r * 0.6, 0.11 + rnd() * 0.06, rnd() < 0.8 ? c : cols[rnd() * cols.length | 0]]); }
+      const x = side ? XR - 0.75 - rnd() * 0.3 : yardXL(z) + 0.75 + rnd() * 0.3, r = 0.45 + rnd() * 0.25; MB.push([x, r * 0.55, z, r, [0x3f7a36, 0x467f3a, 0x3a6f31][rnd() * 3 | 0]]);
+      const nb = 3 + (rnd() * 4 | 0), c = cols[rnd() * cols.length | 0]; for (let k = 0; k < nb; k++) { const a = rnd() * 6.28; BB.push([x + Math.cos(a) * r * 0.6, r * 0.95 + rnd() * 0.15, z + Math.sin(a) * r * 0.6, 0.11 + rnd() * 0.06, rnd() < 0.8 ? c : cols[rnd() * cols.length | 0]]); }
     }
     const inst = (list, geo, name) => { const im = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), list.length); im.userData.name = name; im.userData.noWalk = true;
       const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3(), CC = new THREE.Color(), E = new THREE.Euler();
@@ -4789,7 +4789,7 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     { const sp = grp('Spruce', true), SX = Y.HL - 21, SZ = zF - 17; yCyl(sp, 0.25, 0.35, 2, 0x4a3a2e, SX, 1, SZ, 8);   // and a tall blue spruce past it, in front of 30 & 32
       for (let k = 0; k < 5; k++) { const cn = new THREE.Mesh(new THREE.ConeGeometry(2.4 - k * 0.42, 3.2, 10), yMat([0x3f5f4a, 0x4a6a55][k % 2])); cn.position.set(SX, 2.6 + k * 1.9, SZ); sp.add(cn); }
       bakeYard(sp); shadow(SX, SZ, 2.6, 2.6); }
-    parkedCar(XR - 5.8, zF - 8.6, 0, 0xa59e90);                                                              // our champagne sedan, nosed in to the garage
+    parkedCar(XR - 5.8, zF - 8.6, 0, 0xa59e90, 'sedan', 'PURR 123', [-1e5, 1e5, -1e5, zF - 0.6]);            // our champagne sedan, nosed in to the garage
     bakeYard(cb); }
   // -- the neighbours: semis like ours (two houses joined down the middle, mirror images of each other), to scale from the satellite view:
   // 30 & 32 to the north (grey roof, white siding over brick, set further back than us), 22 & 24 to the south past next door, and four
@@ -4840,8 +4840,8 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     semi(3, 41, z1 - 28, z1, 1, pal(0x7f5646, 0xdfe5e8, 0x4f5358, 0xf0ede6, 0x6a2a4a, 0x2a2a2a));
     semi(47, 85, z1 - 28, z1, 1, pal(0x9c6e52, 0xe9d9c3, 0x6b4a3a, 0xe8e4dc, 0x3a5a6a, 0x5a3a2a));
     tqMerge(HT, hood);                                                                                          // (the street's textures: a handful of draws)
-    parkedCar(Y.HR + 24.3 + 3.9, zF - 13, 0, 0xb03a2e);                                                          // 22 & 24's red car
-    parkedCar(20, zF - 41.2, Math.PI / 2, 0xf2f2ee);                                                             // and a white one parked at the far curb
+    parkedCar(Y.HR + 24.3 + 3.9, zF - 13, 0, 0xb03a2e, 'suv', 'MEOW 42', [-1e5, 1e5, -1e5, VD - 56.6]);          // 22 & 24's red car
+    parkedCar(20, zF - 41.2, Math.PI / 2, 0xf2f2ee, 'sedan', 'HISS 7', [-1e5, 1e5, zF - 55.4, 1e5]);             // and a white one parked at the far curb
   }
   // -- life: butterflies round the flower beds, a few birds wheeling overhead
   yardLife = Object.assign(yardLife || {}, { butterflies: [], birds: [], chirpT: 3 });
@@ -8052,7 +8052,7 @@ function bikeSwipe(paw) {                                             // a swipe
 function startBikeGame() {                                            // into the motorcycle game (the house holds still while she's out riding)
   if (typeof startBike !== 'function' || state !== 'playing' || !walk.on) return;
   todAudioStop(); todActorsReset();
-  state = 'bike'; walk.stick.x = walk.stick.y = 0; walk.vel.set(0, 0, 0); document.body.classList.add('biking'); $('walkUI').hidden = true; ui.hud.hidden = true; if (UPPER.aunty) hideBubbles(UPPER.aunty);
+  state = 'bike'; walk.stick.x = walk.stick.y = 0; walk.vel.set(0, 0, 0); document.body.classList.add('biking'); $('walkUI').hidden = true; ui.hud.hidden = true; ammoChip(); if (UPPER.aunty) hideBubbles(UPPER.aunty);
   const rider = walk.rig.g.clone(true); rider.position.set(0, 0, 0); rider.rotation.set(0, 0, 0); rider.scale.setScalar(1); rider.visible = true;
   tone(80, 160, 0.5, 'sawtooth', 0.04); noise(0.4, 0.05, 600);                                            // (vroom)
   if (ZN && ZN.hud) ZN.hud.hidden = true; if (ZN && ZN.flashEl) ZN.flashEl.style.opacity = 0; if (TOD && TOD.flashEl) { TOD.flashEl.style.opacity = 0; TOD.flashOn = false; }
@@ -8075,16 +8075,224 @@ function yardShadowMat() {                                            // a soft 
   yardShadowMat.m = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -1 }); yardShadowMat.m.userData.shadow = true;
   return yardShadowMat.m;
 }
+// ---- the cars: a sedan and an SUV built properly (a sloped hood and trunk, a raked glasshouse on its pillars, doors, wheel arches, wheels, lights,
+// bumpers, plates), each one baked mesh (one draw, lit like the rest of the yard). Touch one and it blows apart: the parts are that same mesh's
+// vertices, moved about on the CPU, so it's still one draw in pieces, and nothing at all once the wreck has come to rest. All made at load
+function carKind(k) {                                                 // the two body styles, in car units (4.5 wide, 12 long, the nose to +z, the tyres on the ground at y 0)
+  const K = carKind.K || (carKind.K = {
+    sedan: { wr: 0.8, wz: 3.85, sill: 0.5, belt: 2.05, hoodF: 1.74, hoodB: 2.02, hoodZ: 2.4, ws: [0.55, 3.28], rb: [-2.55, 3.28], rw: [-4.22, 2.1], deck: 2.02, taper: 0.84, dF: 2.75, dM: -0.3, dR: -2.8, sillH: 0.22 },
+    suv: { wr: 0.9, wz: 3.75, sill: 0.72, belt: 2.45, hoodF: 2.1, hoodB: 2.42, hoodZ: 2.65, ws: [1.05, 3.7], rb: [-4.95, 3.7], rw: [-5.6, 2.5], deck: 0, taper: 0.9, dF: 2.6, dM: -0.2, dR: -2.55, sillH: 0.42 } });
+  return K[k] || K.sedan;
+}
+function carFont(ch) {                                                // a 3-by-5 pixel font for the number plates (the rows, top to bottom)
+  const F = carFont.F || (carFont.F = { A: '010101111101101', C: '111100100100111', E: '111100110100111', H: '101101111101101', I: '111010010010111', K: '101101110101101',
+    M: '101111111101101', N: '110101101101101', O: '111101101101111', P: '111101111100100', R: '110101110101101', S: '111100111001111', T: '111010010010010', U: '101101101101111',
+    W: '101101111111101', Y: '101101010010010', 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001011001111', 4: '101101111001001',
+    5: '111100111001111', 6: '111100111101111', 7: '111001001010010', 8: '111101111101111', 9: '111101111001111' });
+  return F[ch];
+}
+function carMake(kind, col, plate) {                                  // one car's parts, merged: positions, normals and plain colours, and which piece each vertex flies off with
+  const K = carKind(kind), suv = kind === 'suv', out = [], pcs = [], R = Math.random;
+  const E = new THREE.Euler(), M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), UZ = new THREE.Vector3(0, 0, 1);
+  const PC = k => pcs.push({ k }) - 1;                                // (a new piece)
+  const add = (g, hex, pc) => { const n = g.index ? g.toNonIndexed() : g; if (n !== g) g.dispose(); out.push([n, hex, pc]); return n; };
+  const box = (w, h, d, x, y, z, hex, pc, rx, ry) => { const g = new THREE.BoxGeometry(w, h, d); if (rx || ry) g.applyMatrix4(M4.makeRotationFromEuler(E.set(rx || 0, ry || 0, 0))); g.translate(x, y, z); return add(g, hex, pc); };
+  const bar = (a, b, w, h, hex, pc) => { V.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const g = new THREE.BoxGeometry(w, h, V.length()); g.applyMatrix4(M4.makeRotationFromQuaternion(Q.setFromUnitVectors(UZ, V.normalize())));
+    g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); return add(g, hex, pc); };
+  const prof = (pts, x0, x1, hex, pc, bev) => {                       // a side outline ([z, y] points) pushed out across x0..x1, its edges a little bevelled
+    const b = bev || 0, g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([z, y]) => new THREE.Vector2(z, y))), { depth: Math.max(0.005, x1 - x0 - 2 * b), bevelEnabled: b > 0, bevelThickness: b, bevelSize: b, bevelOffset: -b, bevelSegments: 1, curveSegments: 4 });
+    g.rotateY(-Math.PI / 2); g.translate(x1 - b, 0, 0); return add(g, hex, pc); };
+  const cyl = (r, w, x, y, z, hex, pc, seg) => { const g = new THREE.CylinderGeometry(r, r, w, seg); g.rotateZ(Math.PI / 2); g.translate(x, y, z); return add(g, hex, pc); };
+  const warp = (g, f) => { const p = g.attributes.position; for (let i = 0; i < p.count; i++) { V.fromBufferAttribute(p, i); f(V); p.setXYZ(i, V.x, V.y, V.z); } g.computeVertexNormals(); return g; };
+  const SHELL = PC('shell'), HOOD = PC('hood'), TRUNK = PC('trunk'), ROOF = PC('roof'), GLASS = PC('glass'), FB = PC('bumper'), RB = PC('bumper');
+  const DOOR = [PC('door'), PC('door'), PC('door'), PC('door')], WHEEL = [PC('wheel'), PC('wheel'), PC('wheel'), PC('wheel')];
+  const C = col, DK = 0x1c1c1e, TR = 0x222224, GL = 0x2a3440, CH = 0xc4c8cc, IN = 0x3a3632, LT = 0xfff2b0, RD = 0xb3202a, WH = 0xf2f2ee;
+  const { wr, wz, sill, belt, hoodF, hoodB, hoodZ, ws, rb, rw, deck, taper, dF, dM, dR, sillH } = K, ar = wr + 0.18, a0 = Math.asin((sill - wr) / ar);
+  const hoodY = z => hoodB + (hoodF - hoodB) * (z - hoodZ) / (5.72 - hoodZ);
+  const arch = (zc, r, aa) => { const p = []; for (let k = 0; k <= 10; k++) { const a = aa + (Math.PI - 2 * aa) * k / 10; p.push([zc + r * Math.cos(a), wr + r * Math.sin(a)]); } return p; };   // (front to back, over the top)
+  const tp = v => { v.x *= 1 + (taper - 1) * THREE.MathUtils.clamp((v.y - belt) / (ws[1] - belt), 0, 1); };   // the glasshouse leans in toward the roof
+  const crown = (w, h) => v => { v.y += h * Math.max(0, 1 - (v.x / w) ** 2); };
+  // the shell (what's left when the rest has gone): the front wings and rear quarters round the wheel arches, the sills, the floor, the engine, the seats
+  const wing = [[5.72, sill + 0.14], ...arch(wz, ar, a0), [dF, sill + 0.18], [dF, hoodY(dF) - 0.03], [5.6, hoodF - 0.03], [5.72, hoodF - 0.16]];
+  const tq = deck || belt, qtr = [[dR, sill + 0.18], ...arch(-wz, ar, a0), [-5.72, sill + 0.14], [-5.72, tq - 0.16], [-5.6, tq - 0.03], [dR, belt]];
+  for (const sx of [-1, 1]) { const x0 = sx > 0 ? 1.97 : -2.25, x1 = x0 + 0.28;
+    prof(wing, x0, x1, C, SHELL, 0.05); prof(qtr, x0, x1, C, SHELL, 0.05);
+    box(0.24, sillH, dF - dR + 0.1, sx * 2.1, sill + sillH / 2 - 0.02, (dF + dR) / 2, TR, SHELL);            // the sills (an SUV's black cladding)
+    if (suv) for (const zc of [wz, -wz]) { const ro = ar + 0.2; prof(arch(zc, ro, Math.asin((sill - wr) / ro)).concat(arch(zc, ar, a0).reverse()), sx > 0 ? 2.21 : -2.3, sx > 0 ? 2.3 : -2.21, DK, SHELL); }   // (and black arch flares)
+  }
+  box(3.96, 0.3, 11.3, 0, sill + 0.13, 0, TR, SHELL);                                                          // the floor pan
+  for (const zc of [wz, -wz]) box(3.24, ar + 0.04, 2 * ar + 0.04, 0, wr + ar / 2 + 0.02, zc, TR, SHELL);     // the wheel wells (no daylight through the arches)
+  box(3.9, 0.1, 5.6 - hoodZ, 0, sill + 0.35, (hoodZ + 5.6) / 2, TR, SHELL);                                  // the engine bay...
+  box(2.5, 0.8, 2.2, 0, sill + 0.8, (hoodZ + 5.5) / 2, 0x55585c, SHELL); box(1.7, 0.1, 1.3, 0, sill + 1.25, (hoodZ + 5.5) / 2, 0x9a2420, SHELL);   // ...its engine (a red cam cover)
+  box(3.5, hoodF - sill - 0.45, 0.16, 0, (hoodF + sill) / 2 - 0.05, 5.52, DK, SHELL);                         // the radiator
+  box(3.94, hoodB - sill - 0.3, 0.14, 0, (hoodB + sill) / 2 + 0.1, hoodZ - 0.02, TR, SHELL);                 // the bulkhead
+  box(3.8, 0.42, 0.85, 0, belt - 0.12, hoodZ - 0.5, IN, SHELL);                                              // the dashboard
+  for (const sx of [-1, 1]) { box(1.3, 0.38, 1.3, sx * 0.95, belt - 0.95, dM + 1.0, IN, SHELL); box(1.25, 1.35, 0.28, sx * 0.95, belt - 0.2, dM + 0.28, IN, SHELL, -0.18); }   // the front seats
+  box(3.6, 0.38, 1.3, 0, belt - 0.95, dR + 0.45, IN, SHELL); box(3.6, 1.25, 0.28, 0, belt - 0.25, dR - 0.3, IN, SHELL, -0.2);   // the back seat
+  box(0.2, 0.16, 0.5, 1.25, sill + 0.08, -5.75, 0x3a3a3c, SHELL);                                             // the tail pipe
+  // the four doors: a shut line, the chrome under the window, a handle; the mirrors ride on the front ones
+  for (const sx of [-1, 1]) { const x0 = sx > 0 ? 1.97 : -2.25, x1 = x0 + 0.28, lo = sill + sillH - 0.04, xo = sx * 2.25;
+    for (const [pc, zf, zb] of [[DOOR[sx > 0 ? 0 : 1], dF, dM], [DOOR[sx > 0 ? 2 : 3], dM, dR]]) {
+      prof([[zf, lo], [zf, belt], [zb + 0.02, belt], [zb + 0.02, lo]], x0, x1, C, pc, 0.04);
+      box(0.03, belt - lo - 0.06, 0.05, xo + sx * 0.005, (belt + lo) / 2, zf - 0.01, DK, pc);
+      box(0.06, 0.06, zf - zb, xo - sx * 0.02, belt - 0.02, (zf + zb) / 2, CH, pc);
+      box(0.07, 0.09, 0.42, xo + sx * 0.02, belt - 0.34, zb + 0.55, CH, pc);
+    }
+    const fd = DOOR[sx > 0 ? 0 : 1]; box(0.36, 0.3, 0.46, sx * 2.47, belt + 0.2, dF - 0.42, C, fd); box(0.26, 0.08, 0.16, sx * 2.3, belt + 0.12, dF - 0.36, DK, fd);
+    box(0.03, belt - lo - 0.06, 0.05, xo + sx * 0.005, (belt + lo) / 2, dR + 0.03, DK, DOOR[sx > 0 ? 2 : 3]);
+  }
+  // the glasshouse: the glass all round (it bursts), and the roof on its pillars (it flies)
+  warp(prof([[hoodZ - 0.06, belt - 0.03], ws, rb, rw, [rw[0], belt - 0.03]], -1.99, 1.99, GL, GLASS, 0.03), tp);
+  const rfw = 2.06 * taper; warp(prof([[ws[0] + 0.14, ws[1] - 0.05], [ws[0] - 0.1, ws[1] + 0.13], [rb[0] + 0.12, rb[1] + 0.13], [rb[0] - 0.18, rb[1] - 0.05]], -2.06, 2.06, C, ROOF, 0.05), v => { tp(v); crown(rfw, 0.07)(v); });
+  for (const sx of [-1, 1]) { const xb = sx * 2.0, xt = sx * 2.0 * taper, p0 = sx > 0 ? 1.96 : -2.04, p1 = p0 + 0.08;
+    bar([xb, belt - 0.02, hoodZ - 0.05], [xt, ws[1] - 0.03, ws[0] + 0.07], 0.13, 0.2, C, ROOF);              // the A pillars
+    bar([xb, belt, dM - 0.02], [xt, ws[1], dM - 0.02], 0.08, 0.28, DK, ROOF);                                 // the B pillars
+    if (suv) { bar([xb, belt, dR + 0.05], [xt, ws[1], dR + 0.05], 0.08, 0.24, DK, ROOF); warp(prof([[-4.45, belt - 0.01], [-4.6, rb[1] - 0.01], [rb[0], rb[1] - 0.01], [rw[0], rw[1]], [rw[0], belt - 0.01]], p0, p1, C, ROOF), tp); }
+    else warp(prof([[dR + 0.2, belt - 0.01], [rb[0] + 0.5, rb[1] - 0.01], [rb[0], rb[1] - 0.01], [rw[0] + 0.04, rw[1]], [rw[0] + 0.04, belt - 0.01]], p0, p1, C, ROOF), tp);   // (the C pillars)
+  }
+  if (suv) { for (const sx of [-1, 1]) { bar([sx * 1.45, ws[1] + 0.26, ws[0] - 0.5], [sx * 1.45, rb[1] + 0.26, rb[0] + 0.4], 0.12, 0.08, DK, ROOF); for (const z of [ws[0] - 0.6, rb[0] + 0.5]) box(0.12, 0.16, 0.24, sx * 1.45, ws[1] + 0.18, z, DK, ROOF); }
+    box(3.2, 0.1, 0.45, 0, rb[1] + 0.1, rb[0] - 0.12, C, ROOF, -0.12); }                                       // (roof rails and a spoiler)
+  // the hood, and the trunk lid (or the SUV's tailgate)
+  warp(prof([[hoodZ, hoodB], [5.64, hoodF], [5.76, hoodF - 0.07], [5.72, hoodF - 0.15], [hoodZ, hoodB - 0.13]], -2.2, 2.2, C, HOOD, 0.04), crown(2.2, 0.09));
+  if (!suv) warp(prof([[rw[0] - 0.03, rw[1] + 0.02], [-5.64, deck], [-5.76, deck - 0.07], [-5.72, deck - 0.15], [rw[0] - 0.03, rw[1] - 0.12]], -2.2, 2.2, C, TRUNK, 0.04), crown(2.2, 0.06));
+  else { prof([[-5.6, 1.32], [-5.6, belt + 0.04], [-5.78, belt + 0.02], [-5.84, 1.32]], -1.9, 1.9, C, TRUNK, 0.04); box(1.3, 0.08, 0.04, 0, 2.05, -5.83, CH, TRUNK); }
+  const plateAt = (y, z, d, pc) => {                                  // a white plate, its letters in blue pixels
+    box(1.22, 0.42, 0.04, 0, y, z, WH, pc); const n = plate.length, px = Math.min(0.036, 1.06 / (n * 4 - 1)), W = (n * 4 - 1) * px;
+    for (let i = 0; i < n; i++) { const gl = carFont(plate[i]); if (!gl) continue;
+      for (let r = 0; r < 5; r++) for (let c0 = 0; c0 < 3;) { if (gl[r * 3 + c0] !== '1') { c0++; continue; } let c1 = c0; while (c1 < 3 && gl[r * 3 + c1] === '1') c1++;
+        const g = new THREE.PlaneGeometry((c1 - c0) * px, px * 1.02); if (d < 0) g.rotateY(Math.PI);
+        g.translate(d * (-W / 2 + (i * 4 + (c0 + c1) / 2) * px), y + (2 - r) * px, z + d * 0.028); add(g, 0x1f3a7a, pc); c0 = c1; } } };
+  // the front: its fascia, grille, headlights and indicators, the air intake, the plate
+  const fT = hoodF - 0.15, fz = y => y > sill + 0.55 ? 6.02 - 0.1 * (y - sill - 0.55) / (fT - sill - 0.55) : 6.02, ft = -Math.atan2(0.1, fT - sill - 0.55);
+  prof([[5.62, sill + 0.06], [5.62, fT], [5.92, fT - 0.02], [6.02, sill + 0.55], [6.08, sill + 0.3], [6.0, sill + 0.04]], -2.2, 2.2, C, FB, 0.08);
+  { const g0 = sill + 0.62, g1 = fT - 0.12, gw = suv ? 2.5 : 2.0; box(gw, g1 - g0, 0.08, 0, (g0 + g1) / 2, fz((g0 + g1) / 2) + 0.01, DK, FB, ft);
+    for (let k = 1; k <= 2; k++) { const y = g0 + (g1 - g0) * k / 3; box(gw, 0.05, 0.06, 0, y, fz(y) + 0.05, CH, FB, ft); } }
+  for (const sx of [-1, 1]) { const y = fT - 0.2; box(0.82, 0.24, 0.08, sx * 1.62, y, fz(y) + 0.01, LT, FB, ft); box(0.3, 0.12, 0.08, sx * 1.95, y - 0.26, fz(y - 0.26) + 0.01, 0xf29a30, FB, ft); }
+  box(2.8, 0.22, 0.08, 0, sill + 0.2, 6.06, DK, FB); plateAt(sill + 0.56, 6.1, 1, FB);
+  // the back: its fascia, the tail lights, a black bumper strip, the plate (on an SUV the lights run up the corners and the plate's on the tailgate)
+  const rT = suv ? 1.3 : deck - 0.15, rz = y => y > sill + 0.55 ? -6.0 + 0.08 * (y - sill - 0.55) / (rT - sill - 0.55) : -6.0, rt = Math.atan2(0.08, rT - sill - 0.55);
+  prof([[-5.62, sill + 0.06], [-5.62, rT], [-5.92, rT - 0.02], [-6.0, sill + 0.55], [-6.08, sill + 0.3], [-6.0, sill + 0.04]], -2.2, 2.2, C, RB, 0.08);
+  box(3.9, 0.18, 0.08, 0, sill + 0.22, -6.08, DK, RB);
+  if (suv) { for (const sx of [-1, 1]) { box(0.32, belt - 1.34, 0.12, sx * 2.04, (belt + 1.34) / 2, -5.78, RD, RB); box(0.33, 0.12, 0.13, sx * 2.04, 1.62, -5.78, WH, RB); } plateAt(1.72, -5.86, -1, TRUNK); }
+  else { for (const sx of [-1, 1]) { const y = rT - 0.22; box(0.95, 0.3, 0.08, sx * 1.58, y, rz(y) - 0.01, RD, RB, rt); box(0.3, 0.14, 0.08, sx * 0.95, y - 0.02, rz(y) - 0.01, WH, RB, rt); }
+    box(1.3, 0.06, 0.06, 0, rT - 0.22, rz(rT - 0.22) - 0.01, CH, RB, rt); plateAt(sill + 0.62, -6.03, -1, RB); }
+  // the wheels: tyres, silver wheels with five spokes, the hub
+  [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sz], i) => { const pc = WHEEL[i], x = sx * 1.93, z = sz * wz; pcs[pc].r = wr;
+    cyl(wr, 0.52, x, wr, z, 0x1b1b1d, pc, 18); cyl(wr * 0.6, 0.545, x, wr, z, 0xa4a7ab, pc, 14); cyl(wr * 0.15, 0.58, x, wr, z, 0x5a5d61, pc, 8);
+    for (let k = 0; k < 5; k++) { const a = k * 1.2566; box(0.03, wr * 0.36, 0.1, x + sx * 0.275, wr + Math.cos(a) * wr * 0.33, z + Math.sin(a) * wr * 0.33, 0x6f7276, pc, a); } });
+  // glass shards, folded away to nothing till the windows burst
+  for (let k = 0; k < 14; k++) { const y = belt + 0.2 + R() * (ws[1] - belt - 0.35), z = rw[0] + 0.4 + R() * (hoodZ - rw[0] - 0.8), x = (k % 2 ? 1.99 : -1.99) * (1 + (taper - 1) * (y - belt) / (ws[1] - belt)), s = 0.16 + R() * 0.2, a = [];
+    for (let j = 0; j < 3; j++) { const an = j * 2.1 + R() * 0.7; a.push(x + (R() - 0.5) * 0.1, y + Math.sin(an) * s, z + Math.cos(an) * s); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); g.computeVertexNormals(); add(g, 0xa8c8dc, PC('shard')); }
+  // all merged, piece by piece (each piece's vertices in one run), and each piece's middle and thinnest side (it comes to rest lying on that)
+  out.sort((a, b) => a[2] - b[2]);
+  let n = 0; for (const o of out) n += o[0].attributes.position.count;
+  const pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3), alb = new Float32Array(n * 3), cc = new THREE.Color(); let at = 0, top = 0;
+  for (const [g, hex, pc] of out) { const p = g.attributes.position, q = g.attributes.normal, P = pcs[pc]; cc.setHex(hex); if (P.n === undefined) { P.a = at; P.n = 0; } P.n += p.count;
+    for (let i = 0; i < p.count; i++, at++) { const j = at * 3; pos[j] = p.getX(i); pos[j + 1] = p.getY(i); pos[j + 2] = p.getZ(i); nrm[j] = q.getX(i); nrm[j + 1] = q.getY(i); nrm[j + 2] = q.getZ(i);
+      alb[j] = cc.r; alb[j + 1] = cc.g; alb[j + 2] = cc.b; if (pos[j + 1] > top) top = pos[j + 1]; }
+    g.dispose(); }
+  for (const P of pcs) { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let j = P.a * 3, e = (P.a + P.n) * 3; j < e; j += 3) { x0 = Math.min(x0, pos[j]); x1 = Math.max(x1, pos[j]); y0 = Math.min(y0, pos[j + 1]); y1 = Math.max(y1, pos[j + 1]); z0 = Math.min(z0, pos[j + 2]); z1 = Math.max(z1, pos[j + 2]); }
+    P.c = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]; const ex = x1 - x0, ey = y1 - y0, ez = z1 - z0; P.thin = ex <= ey && ex <= ez ? 0 : ey <= ez ? 1 : 2; }
+  return { pos, nrm, alb, pcs, top };
+}
+function carBuild(g, kind, col, plate, o) {                          // a car into its group: one baked mesh, and all it needs to blow apart later (o: lift, yaw, s scale, bnd [x0, x1, z0, z1] in the world)
+  YARD_SUN = YARD_SUN || new THREE.Vector3(-0.45, 0.78, -0.43).normalize();
+  const M = carMake(kind, col, plate), n = M.pos.length / 3, geo = new THREE.BufferGeometry(), s = o.s || [1, 1, 1];
+  const pa = new THREE.BufferAttribute(new Float32Array(M.pos), 3), ca = new THREE.BufferAttribute(new Float32Array(n * 3), 3); pa.setUsage(THREE.DynamicDrawUsage); ca.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('position', pa); geo.setAttribute('color', ca);
+  const mesh = new THREE.Mesh(geo, _yardMat || (_yardMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }))); mesh.raycast = nearRaycast;
+  mesh.position.y = -o.lift; mesh.rotation.y = o.yaw || 0; mesh.scale.set(s[0], s[1], s[2]); g.add(mesh);
+  const W = { mesh, geo, pos: pa.array, col: ca.array, base: M.pos, nrm: M.nrm, alb: M.alb, pcs: M.pcs, yaw: g.rotation.y + mesh.rotation.y, sc: s[1], top: M.top * s[1],
+    bw: o.bnd || null, bnd: [-1e5, 1e5, -1e5, 1e5], r: new Float32Array(9), live: false, g: 22, gy: 0.03, dec: 3.2, sp0: 1.3 };
+  for (const P of W.pcs) Object.assign(P, { p: new THREE.Vector3(), v: new THREE.Vector3(), w: new THREE.Vector3(), q: new THREE.Quaternion(), rq: new THREE.Quaternion(), s: 1, m: 0, b: 0, t: 0, ch: 1, h: 0, sp: 0, ra: 0, wb: 0, rolled: false });
+  carWreckReset(W); return W;
+}
+function carPose(W, P) {                                              // a piece's vertices where it is now, lit by the yard's sun as it's turned now (and scorched); returns its lowest point
+  const q = P.q, r = W.r, x = q.x, y = q.y, z = q.z, w = q.w;
+  r[0] = 1 - 2 * (y * y + z * z); r[1] = 2 * (x * y - w * z); r[2] = 2 * (x * z + w * y);
+  r[3] = 2 * (x * y + w * z); r[4] = 1 - 2 * (x * x + z * z); r[5] = 2 * (y * z - w * x);
+  r[6] = 2 * (x * z - w * y); r[7] = 2 * (y * z + w * x); r[8] = 1 - 2 * (x * x + y * y);
+  const B = W.base, N = W.nrm, A = W.alb, pa = W.pos, ca = W.col, s = P.s, cx = P.c[0], cy = P.c[1], cz = P.c[2], px = P.p.x, py = P.p.y, pz = P.p.z;
+  const co = Math.cos(W.yaw), si = Math.sin(W.yaw), S = YARD_SUN, ch = P.ch; let lo = Infinity;
+  for (let i = P.a * 3, e = (P.a + P.n) * 3; i < e; i += 3) {
+    const bx = (B[i] - cx) * s, by = (B[i + 1] - cy) * s, bz = (B[i + 2] - cz) * s;
+    const Y = py + r[3] * bx + r[4] * by + r[5] * bz; pa[i] = px + r[0] * bx + r[1] * by + r[2] * bz; pa[i + 1] = Y; pa[i + 2] = pz + r[6] * bx + r[7] * by + r[8] * bz; if (Y < lo) lo = Y;
+    const nx = r[0] * N[i] + r[1] * N[i + 1] + r[2] * N[i + 2], ny = r[3] * N[i] + r[4] * N[i + 1] + r[5] * N[i + 2], nz = r[6] * N[i] + r[7] * N[i + 1] + r[8] * N[i + 2];
+    const k = (0.6 + 0.42 * Math.max(0, (nx * co + nz * si) * S.x + ny * S.y + (nz * co - nx * si) * S.z) + 0.06 * Math.max(0, ny) - 0.1 * Math.max(0, -ny)) * ch;   // (the same light as bakeYard's)
+    ca[i] = Math.min(1, A[i] * k); ca[i + 1] = Math.min(1, A[i + 1] * k); ca[i + 2] = Math.min(1, A[i + 2] * k);
+  }
+  return lo;
+}
+function carGround(W, P, snap) {                                      // pose a piece and keep it out of the ground (snap: set it right down on it); returns how far it was lifted
+  const d = W.gy - carPose(W, P); if (d <= 0 && !snap) return 0;
+  const pa = W.pos; for (let i = P.a * 3 + 1, e = (P.a + P.n) * 3; i < e; i += 3) pa[i] += d; P.p.y += d; return d;
+}
+function carWreckReset(W) {                                           // every part back in its place, the paint clean: a whole car again
+  for (const P of W.pcs) { P.m = 0; P.p.set(P.c[0], P.c[1], P.c[2]); P.q.identity(); P.s = P.k === 'shard' ? 0 : 1; P.ch = 1; carPose(W, P); }
+  W.live = false; W.geo.attributes.position.needsUpdate = true; W.geo.attributes.color.needsUpdate = true;
+  W.geo.computeBoundingSphere(); W.geo.computeBoundingBox(); W.mesh.frustumCulled = true;
+}
+function carBlowApart(c) {                                            // the bang: each part gets its kick (out from the middle, away from her, and up), a spin, and a scorching
+  const W = c.wk; if (!W) return; const m = W.mesh, sc = W.sc, R = Math.random;
+  const T = carBlowApart.T || (carBlowApart.T = { v: new THREE.Vector3(), e: new THREE.Euler(),   // [out, +random, up, +random, spin, scorch, away from her]
+    K: { shell: [0, 0, 5, 2, 1.5, 0.5, 1], roof: [5, 3, 18, 5, 7, 0.55, 2], hood: [4, 3, 12, 5, 9, 0.6, 3], trunk: [4, 3, 12, 5, 9, 0.6, 3], door: [7, 4, 8, 4, 7, 0.6, 3], wheel: [5, 3, 6, 5, 10, 0.85, 3], shard: [5, 7, 4, 10, 16, 1, 2], bumper: [6, 3, 6, 4, 6, 0.6, 3] } });
+  const V = T.v, E = T.e; m.updateWorldMatrix(true, false); m.worldToLocal(V.copy(walk.pos)); const hx = V.x, hz = V.z;   // (where she is, in the car's own frame)
+  if (W.bw) { const b = W.bw, B = W.bnd; B[0] = B[2] = Infinity; B[1] = B[3] = -Infinity;             // (what the bits mustn't fly through: a house front, the off-ramp's edges)
+    for (let k = 0; k < 4; k++) { m.worldToLocal(V.set(b[k & 1], 0, b[2 + (k >> 1)])); B[0] = Math.min(B[0], V.x); B[1] = Math.max(B[1], V.x); B[2] = Math.min(B[2], V.z); B[3] = Math.max(B[3], V.z); } }
+  W.g = 22 / sc; W.dec = 3.2 / sc; W.sp0 = 1.3 / sc; W.gy = 0.03 / sc; W.live = true; m.frustumCulled = false;
+  for (const P of W.pcs) {
+    const k = P.k, px = P.c[0], pz = P.c[2]; P.p.set(px, P.c[1], pz); P.q.identity(); P.b = 0; P.t = 0; P.rolled = false; P.s = 1; P.m = 1;
+    if (k === 'glass') { P.s = 0; P.m = 0; carPose(W, P); continue; }                                       // (the windows just burst)
+    let ax = px - hx, az = pz - hz; const al = Math.hypot(ax, az) || 1; ax /= al; az /= al;                 // away from her...
+    let ox = k === 'roof' ? (R() < 0.5 ? -1 : 1) : px, oz = k === 'roof' ? (R() - 0.5) * 0.8 : k === 'door' || k === 'wheel' ? pz * 0.25 : pz; const ol = Math.hypot(ox, oz) || 1; ox /= ol; oz /= ol;   // ...and out from the middle (the roof off to one side)
+    const t = T.K[k] || T.K.bumper, out = t[0] + R() * t[1], up = t[2] + R() * t[3];
+    P.v.set((ox * out + ax * t[6]) / sc, up / sc, (oz * out + az * t[6]) / sc); P.w.set((R() - 0.5) * t[4], (R() - 0.5) * t[4], (R() - 0.5) * t[4]); P.ch = t[5] + (R() - 0.5) * 0.1;
+    if (k === 'shell') P.rq.setFromEuler(E.set(0, (R() - 0.5) * 0.5, 0, 'YXZ'));                            // (the shell lands the right way up; the rest lie flat, any old how)
+    else { const f = R() < 0.5 ? 1 : -1; P.rq.setFromEuler(E.set(P.thin === 2 ? f * 1.5708 : P.thin === 1 && f < 0 ? Math.PI : 0, R() * 6.283, P.thin === 0 ? f * 1.5708 : 0, 'YXZ')); }
+  }
+}
+function carWreckStep(W, dt) {                                        // the bits in the air: arcs and spins, a bounce or two, wheels rolling off on their own; each settles flat and stops
+  if (!W || !W.live) return; dt = Math.min(dt, 0.05);
+  const T = carWreckStep.T || (carWreckStep.T = { q: new THREE.Quaternion(), e: new THREE.Euler() }), B = W.bnd, G = W.g, sc = W.sc; let busy = false;
+  for (const P of W.pcs) {
+    if (!P.m) continue; busy = true; P.t += dt; const p = P.p, v = P.v;
+    if (P.m === 2) {                                                   // a wheel, rolling along on its tyre, slowing and wobbling
+      P.sp -= W.dec * dt; P.h += P.wb * dt; P.ra += P.sp / P.r * dt; v.y -= G * dt;
+      p.x += Math.sin(P.h) * P.sp * dt; p.z += Math.cos(P.h) * P.sp * dt; p.y += v.y * dt;
+      P.q.slerp(T.q.setFromEuler(T.e.set(P.ra, P.h, 0, 'YXZ')), Math.min(1, dt * 12));
+      if (p.x < B[0] || p.x > B[1]) { p.x = Math.max(B[0], Math.min(B[1], p.x)); P.h = -P.h; P.sp *= 0.6; }
+      if (p.z < B[2] || p.z > B[3]) { p.z = Math.max(B[2], Math.min(B[3], p.z)); P.h = Math.PI - P.h; P.sp *= 0.6; }
+      if (P.sp < W.sp0 || P.t > 8) { P.m = 3; v.set(Math.sin(P.h) * P.sp, 0, Math.cos(P.h) * P.sp); P.rq.setFromEuler(T.e.set(0, P.h, Math.random() < 0.5 ? 1.5708 : -1.5708, 'YXZ')); }   // (and over it goes)
+    } else {
+      v.y -= G * dt; p.addScaledVector(v, dt);
+      if (P.m === 1) { const q = P.q, w = P.w, h = dt * 0.5, x = q.x, y = q.y, z = q.z, s = q.w;                   // (tumbling)
+        q.set(x + h * (w.x * s + w.y * z - w.z * y), y + h * (w.y * s + w.z * x - w.x * z), z + h * (w.z * s + w.x * y - w.y * x), s - h * (w.x * x + w.y * y + w.z * z)).normalize(); }
+      else { const f = Math.exp(-6 * dt); v.x *= f; v.z *= f; P.q.slerp(P.rq, Math.min(1, dt * 5)); }             // (settling: sliding to a stop, and flopping flat)
+      if (p.x < B[0] || p.x > B[1]) { p.x = Math.max(B[0], Math.min(B[1], p.x)); v.x *= -0.4; }
+      if (p.z < B[2] || p.z > B[3]) { p.z = Math.max(B[2], Math.min(B[3], p.z)); v.z *= -0.4; }
+    }
+    if (carGround(W, P) > 0 && v.y < 0) {                               // it hit the ground
+      if (P.m === 1 && P.k === 'wheel' && !P.rolled) { const hs = Math.hypot(v.x, v.z) * sc; P.rolled = true; P.m = 2; P.h = hs > 0.5 ? Math.atan2(v.x, v.z) : Math.random() * 6.283; P.sp = (4 + Math.min(7, hs)) / sc; P.ra = 0; P.wb = (Math.random() - 0.5) * 0.9; v.y = 0; }
+      else if (P.m === 1) { v.y *= -0.3; v.x *= 0.6; v.z *= 0.6; P.w.multiplyScalar(0.5); if (++P.b >= 3 || v.y * sc < 2.2) P.m = 3; }
+      else v.y = 0;
+      if (P.m === 3 && P.q.angleTo(P.rq) < 0.015 && Math.hypot(v.x, v.z) * sc < 0.1) { P.q.copy(P.rq); carGround(W, P, true); P.m = 0; }   // (at rest)
+    }
+    if (P.m && P.m !== 2 && P.t > 9) { P.q.copy(P.rq); carGround(W, P, true); P.m = 0; }
+  }
+  W.geo.attributes.position.needsUpdate = true; W.geo.attributes.color.needsUpdate = true;
+  if (!busy) { W.live = false; W.geo.computeBoundingSphere(); W.geo.computeBoundingBox(); W.mesh.frustumCulled = true; }   // (all still: a wreck, costing nothing)
+}
 function carTouched(c) {                                              // is she touching this car (any side, or the roof)?
   const g = c.g, p = walk.pos, dx = p.x - g.position.x, dz = p.z - g.position.z, cs = Math.cos(g.rotation.y), sn = Math.sin(g.rotation.y);
   const lx = dx * cs - dz * sn, lz = dx * sn + dz * cs;
   return Math.abs(lx) < c.hx + 0.45 && Math.abs(lz) < c.hz + 0.45 && p.y < g.position.y + (c.up || 1.25) && p.y > g.position.y - (c.dn || 1.6);
 }
 const booms = [], boomTex = {};                                       // (the fire and smoke puff textures, made on the first bang)
-function carBoom(c) {                                                 // she touched a car. The car loses: she's indestructible
-  const g = c.g, at = g.position.clone(), dx = at.x - walk.pos.x, dz = at.z - walk.pos.z, d = Math.hypot(dx, dz) || 1;
-  c.boom = { t: 0, v: new THREE.Vector3(dx / d * 8, 17 + Math.random() * 4, dz / d * 8), w: new THREE.Vector3((Math.random() - 0.5) * 7, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 7) };
-  if (c.sh) c.sh.visible = false;
+function carBoom(c) {                                                 // she touched a car. The car loses: she's indestructible (it blows apart: hood, doors, roof, wheels, glass everywhere)
+  const g = c.g, at = g.position.clone();
+  c.boom = c.boom0 || (c.boom0 = { t: 0 }); c.boom.t = 0; carBlowApart(c);                                    // (its parts were made with it: nothing new but the fire)
   if (!boomTex.fire) { const T = (a, b) => canvasTex(64, 64, (cx, w, h) => { const gr = cx.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, a); gr.addColorStop(0.45, b); gr.addColorStop(1, 'rgba(0,0,0,0)'); cx.fillStyle = gr; cx.fillRect(0, 0, w, h); }, 1, 1);
     boomTex.fire = T('rgba(255,250,215,1)', 'rgba(255,140,40,.8)'); boomTex.smoke = T('rgba(58,54,50,.95)', 'rgba(72,68,64,.55)'); }
   for (let k = 0; k < 7; k++) {                                        // a billow of soft fire and smoke puffs (sprites: no hard edges)
@@ -8099,12 +8307,10 @@ function carBoom(c) {                                                 // she tou
   const lines = ['💥 KABOOM! Kitty: 1, car: 0', '💥 She didn\'t even flinch.', '💥 Another one for the scrapyard!', '💥 Indestructible. Obviously.'];
   showWalkName(achDone.indestructible ? lines[(walk.booms = (walk.booms || 0) + 1) % lines.length] : '💥 KABOOM!'); unlock('indestructible');
 }
-function flyCar(c, dt) {                                              // up, over and away, tumbling, till it's a twinkle over the rooftops
-  const b = c.boom, g = c.g; b.t += dt;
-  if (g.visible) {
-    b.v.y -= 9 * dt; g.position.addScaledVector(b.v, dt); g.rotation.x += b.w.x * dt; g.rotation.y += b.w.y * dt; g.rotation.z += b.w.z * dt;
-    if (b.t > 3.2) { g.visible = false; burst(g.position.clone(), 0xffffff, 6, 1.5, 1.5, 0.5); tone(1800, 2600, 0.18, 'triangle', 0.03); }   // ✨ ding
-  } else if (!c.parked && b.t > 8) { c.boom = null; g.visible = true; g.rotation.set(0, c.ry, 0); g.position.copy(c.home); g.position.x = c.sp > 0 ? -95 : 95; c.v = c.sp; }   // (a fresh one comes down the ramp)
+function flyCar(c, dt) {                                              // blown apart: the bits fly, bounce and settle into a wreck (the off-ramp's gets cleared, and a fresh car comes down)
+  const b = c.boom; b.t += dt; carWreckStep(c.wk, dt);
+  if (!c.parked && b.t > 11) { burst(c.g.position.clone(), 0xffffff, 6, 1.5, 1.5, 0.5); tone(1800, 2600, 0.18, 'triangle', 0.03);   // ✨ ding
+    carWreckReset(c.wk); c.boom = null; c.g.rotation.set(0, c.ry, 0); c.g.position.copy(c.home); c.g.position.x = c.sp > 0 ? -95 : 95; c.v = c.sp; }
 }
 function updateBooms(dt) {
   for (let i = booms.length - 1; i >= 0; i--) {
@@ -8114,9 +8320,9 @@ function updateBooms(dt) {
     if (k > 2.6) { povEndWall.remove(B.fire, B.smoke); B.fire.material.dispose(); B.smoke.material.dispose(); booms.splice(i, 1); }
   }
 }
-function resetCars() {                                                // a fresh Free roam: every car back where it was (and no fire still hanging about)
+function resetCars() {                                                // a fresh Free roam: every car back where it was, in one piece (and no fire still hanging about)
   for (const B of booms) { povEndWall.remove(B.fire, B.smoke); B.fire.material.dispose(); B.smoke.material.dispose(); } booms.length = 0;
-  for (const c of (yardLife && yardLife.cars) || []) { c.boom = null; c.g.visible = true; c.g.position.copy(c.home); c.g.rotation.set(0, c.ry, 0); if (c.sh) c.sh.visible = true; if (!c.parked) c.v = c.sp; }
+  for (const c of (yardLife && yardLife.cars) || []) { c.boom = null; if (c.wk) carWreckReset(c.wk); c.g.visible = true; c.g.position.copy(c.home); c.g.rotation.set(0, c.ry, 0); if (c.sh) c.sh.visible = true; if (!c.parked) c.v = c.sp; }
 }
 // ---- the time of day and the weather outside: morning, midday, golden hour, dusk and night come round in a loop, each with its own sky and light over the whole outdoors;
 // now and then it rains (streaks, splashes, a hiss on the roof, the odd thunderclap) or snows. None of it falls indoors.
@@ -8638,6 +8844,36 @@ function catSplash(dt) {                                               // runnin
   burst(new THREE.Vector3(x, p.y + 0.05, z), 0xd6e4f2, 3, 1.4, 2.2, 0.05);
   if (T.rings) { const r = T.rings.find(r => r.t > 0.7); if (r) { r.t = 0.25; r.m.position.set(x, p.y + 0.03, z); } }
 }
+function zAim() {                                                     // zombie night with the gun: a crosshair on whichever zombie she'd hit
+  const gr = gunRig, show = ZN && ZN.on && walk.on && gr.state === 'cat' && gr.ammo > 0 && state === 'playing';
+  let R = ZN && ZN.reticle;
+  if (!show) { if (R) R.visible = false; return; }
+  if (!R) { const tex = canvasTex(128, 128, (c, w, h) => { c.clearRect(0, 0, w, h); c.strokeStyle = '#ff3b3b'; c.lineWidth = 7; c.beginPath(); c.arc(64, 64, 38, 0, 7); c.stroke();
+      c.lineWidth = 6; for (const [a, b, e, f] of [[64, 6, 64, 30], [64, 98, 64, 122], [6, 64, 30, 64], [98, 64, 122, 64]]) { c.beginPath(); c.moveTo(a, b); c.lineTo(e, f); c.stroke(); } c.fillStyle = '#ff3b3b'; c.beginPath(); c.arc(64, 64, 5, 0, 7); c.fill(); }, 1, 1);
+    R = ZN.reticle = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true })); R.renderOrder = 12; scene.add(R); }
+  const h = gunHand(), fx = Math.sin(walk.face), fz = Math.cos(walk.face); let best = null, bd = 16;
+  for (const q of ZN.z) if (zAlive(q) && q.st !== 'stagger' && !(q.st === 'rise' && q.t <= 1.4)) { const dx = q.x - h.x, dz = q.z - h.z, al = dx * fx + dz * fz; if (al > 0 && al < bd && Math.abs(dx * fz - dz * fx) < 1.3) { bd = al; best = q; } }
+  R.visible = true;
+  if (best) { R.position.set(best.x, 1.35 * best.sc, best.z); R.scale.setScalar(0.75 + Math.sin(clock * 10) * 0.05); R.material.opacity = 1; }
+  else { R.position.set(h.x + fx * 6, 1.1, h.z + fz * 6); R.scale.setScalar(0.5); R.material.opacity = 0.45; }   /* (nothing in her sights: a faint marker straight ahead) */
+}
+function ammoChip() {                                                 // Free roam: the rounds left as a little strip by the buttons (the floating badge is for the room view)
+  const las = laser.state === 'cat', on = walk.on && (gunRig.state === 'cat' || las) && state === 'playing';
+  let el = ammoChip.el; if (!el) { if (!on) return; el = ammoChip.el = document.createElement('div'); el.id = 'walkAmmo'; document.body.appendChild(el); }
+  const n = las ? laser.ammo : gunRig.ammo, max = las ? LASER_SHOTS : GUN_ROUNDS, txt = on ? (las ? '🔴 ' : '🔫 ') + '●'.repeat(Math.max(0, n)) + '○'.repeat(Math.max(0, max - n)) : '';
+  if (txt !== ammoChip.t) { ammoChip.t = txt; el.textContent = txt; el.hidden = !on; el.classList.toggle('low', n <= 1); }
+}
+function rigMerge(root, protect) {                                    // one mesh per material in each part of her (her eyes and lids stay separate: they blink)
+  const groups = []; root.traverse(o => { if (o.isGroup || o === root) groups.push(o); });
+  for (const par of groups) { const by = new Map();
+    for (const o of par.children) { if (!o.isMesh || o.children.length || protect.has(o) || Array.isArray(o.material) || !o.geometry.attributes.normal || o.userData.keep) continue; if (!by.has(o.material)) by.set(o.material, []); by.get(o.material).push(o); }
+    for (const [m, list] of by) { if (list.length < 2) continue;
+      const geos = list.map(o => { o.updateMatrix(); const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); g.applyMatrix4(o.matrix); return g; }), uv = geos.every(g => g.attributes.uv);
+      let n = 0; for (const g of geos) n += g.attributes.position.count; const P = new Float32Array(n * 3), N = new Float32Array(n * 3), U = uv ? new Float32Array(n * 2) : null; let at = 0;
+      for (const g of geos) { P.set(g.attributes.position.array, at * 3); N.set(g.attributes.normal.array, at * 3); if (U) U.set(g.attributes.uv.array, at * 2); at += g.attributes.position.count; g.dispose(); }
+      const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.BufferAttribute(P, 3)); mg.setAttribute('normal', new THREE.BufferAttribute(N, 3)); if (U) mg.setAttribute('uv', new THREE.BufferAttribute(U, 2)); mg.computeBoundingSphere();
+      const mesh = new THREE.Mesh(mg, m); mesh.renderOrder = list[0].renderOrder; for (const o of list) par.remove(o); par.add(mesh); } }
+}
 function zHud() {
   if (!ZN.hud) { const d = ZN.hud = document.createElement('div'); d.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,26,14,.78);color:#d8ff9a;font:700 15px system-ui,sans-serif;padding:7px 16px;border-radius:18px;border:2px solid #7fbf3a;text-shadow:0 1px 2px #000;white-space:nowrap'; document.body.appendChild(d); }
   ZN.hud.hidden = !ZN.on || state !== 'playing'; if (ZN.hud.hidden) return;
@@ -8685,7 +8921,7 @@ function zKill(q, how) {
   if (q.boss && (q.hp || 0) > 1) { q.hp--; q.inv = clock + 0.9; q.st = 'stagger'; q.t = 0;          // the Groundskeeper takes three
     const l = dd || 1, nx = q.x + (q.x - walk.pos.x) / l, nz = q.z + (q.z - walk.pos.z) / l; if (inOurYard(nx, nz)) { q.x = nx; q.z = nz; }
     burst(new THREE.Vector3(q.x, 2.4, q.z), 0x8fcf4a, 10, 3, 2, 0.35); zSfx(how === 'stomp' ? 'crack' : 'thwack', dd, q); zSfx('growl', dd, q, 0.5);
-    showWalkName(`👹 The Groundskeeper staggers! ${q.hp} more hit${q.hp > 1 ? 's' : ''}!`); return; }
+    showWalkName('👹 The Groundskeeper staggers!'); return; }
   q.st = 'die'; q.t = 0; ZN.kills++; q.dir = how === 'stomp' ? 0 : 1;
   burst(new THREE.Vector3(q.x, 1.2 * q.sc, q.z), 0x8fcf4a, q.boss ? 28 : 14, q.boss ? 4 : 3, 2, 0.35); zSfx(how === 'stomp' ? 'crack' : 'thwack', dd, q); zSfx('gurgle', dd, q, q.boss ? 0.6 : 1);
   zAmmoDrop(q);
@@ -8701,7 +8937,7 @@ function zombieSwipe(paw) {
   if (!best) return false; zKill(best, 'swipe'); return true;
 }
 function updateZombies(dt) {
-  if (!walk.on || state !== 'playing') { if (ZN && ZN.hud) ZN.hud.hidden = true; return; }
+  if (!walk.on || state !== 'playing') { if (ZN && ZN.hud) ZN.hud.hidden = true; if (ZN && ZN.reticle) ZN.reticle.visible = false; return; }
   if (!ZN) ZN = { on: false, cool: false };
   todActors(dt);
   { const q = walk.pos, onT = !ZN.on && SLIDER && TOD && walk.grounded && Math.hypot(q.x - (SLIDER.DX - 4.6), q.z - (SLIDER.VD + 3.6)) < 0.85 && q.y > 1.3 && q.y < 2;   /* the secret: sit on the patio table for 10 seconds and zombie night comes, rain or shine */
@@ -8723,7 +8959,7 @@ function updateZombies(dt) {
         q.g.visible = true; q.mound.position.set(s[0], 0.03, s[1]); q.mound.material.opacity = 0.9; zSfx('dig', Math.hypot(p.x - s[0], p.z - s[1]), q); setTimeout(() => zSfx('groan', 6, q), 1900); q.broke = false; } }
     if (ZN.wave === 3 && !ZN.bossUp && ZN.left <= 5 && inYard && ZN.boss.st === 'off') { const s = zSpawnSpot(), q = ZN.boss;   // wave 3: the boss claws his way up
       if (s) { ZN.bossUp = true; Object.assign(q, { st: 'rise', t: 0, x: s[0], z: s[1], sp: 0.8, hp: 3, inv: 0, slamCD: clock + 3, broke: false }); zReset(q); q.g.visible = true; q.mound.position.set(s[0], 0.03, s[1]); q.mound.material.opacity = 0.95;
-        zSfx('dig', 0, q); zSfx('growl', 0, q, 0.5); setTimeout(() => zSfx('groan', 2, q, 0.5), 1600); showWalkName('👹 The ground shakes... THE GROUNDSKEEPER rises! Three hits to bring him down!'); } }
+        zSfx('dig', 0, q); zSfx('growl', 0, q, 0.5); setTimeout(() => zSfx('groan', 2, q, 0.5), 1600); showWalkName('👹 The ground shakes... THE GROUNDSKEEPER rises!'); } }
     if (ZN.left <= 0 && alive === 0 && !(ZN.wave === 3 && !ZN.bossUp)) { if (!ZN.breakT) { ZN.breakT = 5.5; ZN.waves++; showWalkName(`🧟 Wave ${ZN.wave} cleared!`); if (ZN.waves >= 3) { zEnd(true, '🏆 Three waves down!'); } }
       else { const b0 = Math.ceil(ZN.breakT); if ((ZN.breakT -= dt) <= 0) { ZN.breakT = 0; zNextWave(); zSfx('groan', 3); } else if (Math.ceil(ZN.breakT) !== b0 && b0 <= 4) tone(b0 === 1 ? 880 : 520, b0 === 1 ? 880 : 520, 0.12, 'square', 0.03); } }
   }
@@ -8760,7 +8996,7 @@ function updateZombies(dt) {
     else if (q.st === 'sink') { zSinkFx(q, dt); zPose(q, dt, d); if (q.body.position.y < -2.2 * q.sc) { q.st = 'off'; q.g.visible = false; zReset(q); } }
     q.g.position.set(q.x, 0, q.z); q.g.rotation.y = q.face;
     if (q.mound.material.opacity > 0 && q.st !== 'rise') q.mound.material.opacity = Math.max(0, q.mound.material.opacity - dt * 0.08); q.mound.visible = q.mound.material.opacity > 0; }
-  zUpdateAmmo(dt);
+  zUpdateAmmo(dt); zAim();
   for (const q of ZN.z) { if (q.st === 'off' && q.mound.material.opacity > 0) { q.mound.material.opacity = Math.max(0, q.mound.material.opacity - dt * 0.08); q.mound.visible = q.mound.material.opacity > 0; }
     const h = q.heave; if (!h || !h.visible) continue;   /* the heaved-up ground fades with the churned earth */
     h.material.opacity = Math.min(1, q.mound.material.opacity * 1.2); if (h.material.opacity < 0.02 && q.st !== 'rise') h.visible = false; }
@@ -9797,7 +10033,7 @@ const ACHIEVEMENTS = [
     ['mosaicSmash', '🪞', 'Seven years bad luck', 'In Free roam, leap into the mosaic mirror art and bring it crashing down'],
     ['coonShot', '🎯', 'Trash panda down', 'In Free roam, shoot the raccoon taunting you at the slider'],
     ['catscape', '🪟', 'The Great Catscape', 'In Free roam, leap out of an upstairs back window. Aunty-ji is already calling downstairs'],
-    ['zombieBoss', '👹', 'Groundskeeper down', 'On zombie night, bring down the giant Groundskeeper in wave 3 (it takes three hits)'],
+    ['zombieBoss', '👹', 'Groundskeeper down', 'On zombie night, bring down the giant Groundskeeper in wave 3'],
     ['zombieNight', '🧟', 'Night of the Living Dead', 'In Free roam, survive zombie night in the backyard (it only happens when it rains at night)'],
     ['glassBreak', '💥', 'Slider smasher', 'Shatter the sliding glass door'],
     ['copsCalled', '🚨', 'Someone called the cops', 'Stick around until the sirens show up after the raccoon incident'],
@@ -9833,7 +10069,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-30 01:21';                                              // stamped when the site is published
+const BUILD = '2026-09-30 08:41';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -10824,8 +11060,10 @@ function whack(m) {
 const GUN_ROUNDS = 7;
 const gunRig = (() => {
   const held = makePistol(); held.scale.setScalar(1.8); held.visible = false; scene.add(held);
-  const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xfff1b0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-  flash.position.copy(held.userData.muzzle).z += IN(1.2); flash.scale.setScalar(IN(9)); flash.visible = false; held.add(flash);
+  const flashTex = canvasTex(64, 64, (c, w, h) => { c.clearRect(0, 0, w, h); c.translate(32, 32); c.fillStyle = 'rgba(255,214,120,.95)'; for (let k = 0; k < 7; k++) { c.rotate(Math.PI * 2 / 7); c.beginPath(); c.moveTo(-3, 0); c.lineTo(0, -30 + (k % 2) * 9); c.lineTo(3, 0); c.fill(); }   /* a spiky muzzle burst */
+    const g2 = c.createRadialGradient(0, 0, 0, 0, 0, 16); g2.addColorStop(0, 'rgba(255,255,240,1)'); g2.addColorStop(0.5, 'rgba(255,220,130,.9)'); g2.addColorStop(1, 'rgba(255,160,60,0)'); c.fillStyle = g2; c.beginPath(); c.arc(0, 0, 16, 0, 7); c.fill(); }, 1, 1);
+  const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, color: 0xffffff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  flash.position.copy(held.userData.muzzle).z += IN(1.6); flash.scale.setScalar(IN(15)); flash.visible = false; held.add(flash);
   const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe07a, transparent: true, opacity: 0 });
   const tracers = Array.from({ length: 12 }, () => { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), tracerMat.clone()); l.visible = false; l.frustumCulled = false; scene.add(l); return { l, life: 0 }; });
   const starTex = canvasTex(64, 64, (g, w, h) => {                   // four-point twinkle
@@ -10847,7 +11085,7 @@ function showFireBtn() {
   g.fillStyle = '#1f1712'; g.beginPath(); g.arc(64, 64, 58, 0, 7); g.fill();
   g.fillStyle = las ? '#ff3b4e' : n <= 1 ? '#e2452c' : '#f4c13d'; g.beginPath(); g.arc(64, 64, 50, 0, 7); g.fill();
   g.fillStyle = '#1f1712'; g.font = '800 72px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(n), 64, 70);
-  ammoTex.needsUpdate = true; ammoTag.visible = gunRig.state === 'cat' || las; ammoPop = 1;
+  ammoTex.needsUpdate = true; ammoTag.visible = (gunRig.state === 'cat' || las) && !walk.on; ammoPop = 1; ammoChip();
 }
 let bannerFreeAt = 0;
 addEventListener('blur', () => { for (const k in heist.keys) heist.keys[k] = false; });   // (a key held as the window loses focus doesn't stay 'held')
@@ -11132,7 +11370,7 @@ function chaosGunTargets() {
 }
 function fireGun() {
   const gr = gunRig; if (gr.state !== 'cat' || gr.ammo <= 0 || state !== 'playing') return;
-  gr.ammo--; gr.recoil = 1; gr.flash.visible = true; gr.flashT = 0.07; catFlinch = Math.max(catFlinch, 0.2);
+  gr.ammo--; gr.recoil = 1; gr.flash.visible = true; gr.flash.material.opacity = 1; gr.flashT = 0.08; gr.flash.material.rotation = Math.random() * 6.28; gr.flash.scale.setScalar(IN(13 + Math.random() * 7)); catFlinch = Math.max(catFlinch, 0.2);
   sfx.gunshot(); shake = Math.max(shake, reduceMotion ? 0.05 : 0.3); vibrate(40);
   if (walk.on && walk.rig && !coonInSights() && sliderGlass.some(g => g.visible)) {   // aimed at the slider (no raccoon there): out goes the glass
     const h = gunHand(), fx = Math.sin(walk.face), fz = Math.cos(walk.face), S = SLIDER, t = fz > 0.25 ? (S.VD - IN(2) - h.z) / fz : -1, gx = h.x + fx * t;
@@ -11230,7 +11468,7 @@ function updateGun(dt) {
     s.last = k; s.sp.position.copy(s.spot); s.sp.scale.setScalar(0.28 * Math.sin(k * Math.PI)); s.sp.material.rotation = k * 1.5;
   }
   for (const t of gr.tracers) if (t.life > 0) { t.life -= dt; t.l.material.opacity = Math.max(0, t.life / 0.2); if (t.life <= 0) t.l.visible = false; }
-  if (gr.flashT > 0) { gr.flashT -= dt; if (gr.flashT <= 0) gr.flash.visible = false; }
+  if (gr.flashT > 0) { gr.flashT -= dt; gr.flash.material.opacity = Math.min(1, gr.flashT / 0.04); if (gr.flashT <= 0) gr.flash.visible = false; }
   if (gr.state === 'cat') {
     gr.recoil = Math.max(0, gr.recoil - dt * 6);
     const hand = gunHand();
@@ -11243,7 +11481,7 @@ function updateGun(dt) {
       gr.held.localToWorld(_gG.copy(_gGrip)); gr.held.position.add(hand.clone().sub(_gG));
     } else gr.held.scale.setScalar(1.8);
     ammoPop = Math.max(0, ammoPop - dt * 4);
-    ammoTag.position.set(hand.x + 0.75, hand.y + 0.55 + Math.sin(clock * 3) * 0.05, hand.z + 0.1); ammoTag.scale.setScalar(0.85 * (1 + ammoPop * 0.35));
+    ammoTag.position.set(hand.x + 0.75, hand.y + 0.55 + Math.sin(clock * 3) * 0.05, hand.z + 0.1); ammoTag.scale.setScalar(0.85 * (1 + ammoPop * 0.35)); if (walk.on) ammoTag.visible = false;
     gr.held.rotateX(-gr.recoil * 0.5); gr.held.translateZ(-gr.recoil * 0.12);
   } else if (gr.state === 'tossed') {
     const o = gr.held; gr.v.y -= 9.8 * dt; o.position.addScaledVector(gr.v, dt);
@@ -12907,6 +13145,7 @@ function makeWalker(dark) {                                          // dark = t
     const e = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0x19e6d0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     e.position.set(sx * 0.07, 0.02, 0.15); e.scale.setScalar(0.14); head.add(e); eyes.push(e);
   }
+  rigMerge(g, new Set([...peepers, ...lids]));
   return { g, body, head, legs, tail, shadow, eyes, peepers, lids };
 }
 function walkNear(x, y, z) {                                          // the solid things within a few metres of her: her feelers only test these (not every mesh in the world)
@@ -12922,14 +13161,18 @@ function walkMeshesAt(x, y, z) { const N = walkNear.N; return N && N.ok && Math.
 function cullBegin() {                                                // left out of this frame's draw: what the camera can't see anyway (put back straight after)
   if (!walk.on || !povEndWall) return null; const C = cullBegin;
   if (!C.ready) { C.ready = true; C.down = []; C.downSmall = []; C.hid = []; const box = new THREE.Box3(), v = new THREE.Vector3(), sz = new THREE.Vector3();
-    for (const o of scene.children) { if (o === povEndWall || !o.userData.name || o.isLight) continue; let lit = false; o.traverse(q => { if (q.isLight) lit = true; }); if (lit) continue;   /* (never anything with a light in it: that would recompile every shader) */
+    C.downLit = [];
+    for (const o of scene.children) { if (o === povEndWall || !o.userData.name || o.isLight) continue; let lit = false; o.traverse(q => { if (q.isLight) lit = true; });
+      if (lit) { box.setFromObject(o); if (!box.isEmpty()) { box.getCenter(v); if (inRoomXZ(v.x, v.z) && v.y < CEIL_H) o.traverse(q => { if ((q.isMesh || q.isSprite) && !q.isLight) C.downLit.push(q); }); } continue; }   /* (a lamp: hide its shades and bulbs, never the light itself, which would recompile every shader) */
       box.setFromObject(o); if (box.isEmpty()) continue; box.getCenter(v); box.getSize(sz); if (!inRoomXZ(v.x, v.z) || v.y > CEIL_H) continue;
       C.down.push(o); if (Math.max(sz.x, sz.y, sz.z) < 1.0) C.downSmall.push(o); }
-    C.front = povEndWall.children.filter(o => o.userData.name === 'Front door' || o.userData.name === 'Garage' || o.userData.name === 'Motorcycle'); }
+    C.front = povEndWall.children.filter(o => o.userData.name === 'Front door' || o.userData.name === 'Garage' || o.userData.name === 'Motorcycle' || o.userData.name === 'Garage door'); C.garage = C.front.filter(o => o.userData.name !== 'Front door'); }
   const c = camera.position, U = UPPER, hid = C.hid; hid.length = 0;
   const hide = o => { if (o.visible) { o.visible = false; hid.push(o); } };
   const inHouse = c.x > YARD.HL - 0.3 && c.x < YARD.HR + 0.3 && c.z > U.zF - 0.3 && c.z < U.zB + 0.3;
-  if (c.y > CEIL_H + 0.3 && inUpper(c.x, c.z)) C.down.forEach(hide);                                                   // upstairs: the floor hides the whole living room
+  const upCam = c.y > CEIL_H + 0.3 && inUpper(c.x, c.z);
+  if (upCam) { C.down.forEach(hide); C.downLit.forEach(hide); C.garage.forEach(hide);   // upstairs: the floor hides the whole living room, and the garage is walled in below the flat (the tall front door isn't: it shows down the hall)
+    if (U.props) for (const q of U.props) { const o = q.g.position; if ((o.x - c.x) ** 2 + (o.z - c.z) ** 2 > (110 * q.r + 6) ** 2) hide(q.g); } }   /* (little dishes far down the flat: specks) */
   else if (!inHouse && SLIDER && Math.hypot(c.x - SLIDER.DX, c.z - SLIDER.VD) > 6) C.downSmall.forEach(hide);          // out in the yard, well back: the little things through the slider
   if (!inHouse && U.props) for (const q of U.props) hide(q.g);                                                         // outdoors: the upstairs dishes are specks through the windows
   if (c.z > U.zB + 0.5) C.front.forEach(hide);                                                                           // out back: the front door, the garage and the bike are round the other side
@@ -13099,7 +13342,7 @@ function updateWalk(dt) {
       p.x = nx; p.z = nz; return true;
     };
     tryMove(p.x + dx, p.z + dz) || tryMove(p.x + dx, p.z) || tryMove(p.x, p.z + dz);
-    if (yardOpen()) fenceCrossed(ox0, oz0);
+    fenceCrossed(ox0, oz0);
   }
   // up and down: stand on whatever is under her; step up small ledges, fall off big ones
   if (walk.grounded) {
@@ -13644,13 +13887,14 @@ function updateRaccoon(dt) {
   coon.t += dt;
   if (coon.state === 'hidden') {
     if (coon.dead) return;                                             // (it's not coming back)
-    const atWin = walk.pos.z > SLIDER.VD - 3.2 && walk.pos.z < SLIDER.VD + 1.5 && Math.abs(walk.pos.x - SLIDER.DX) < 3.5 && walk.pos.y < CEIL_H;   // she's come up to the slider...
+    const atWin = walk.pos.z > SLIDER.VD - 3.2 && walk.pos.z < SLIDER.VD - 0.25 && Math.abs(walk.pos.x - SLIDER.DX) < 3.5 && walk.pos.y < CEIL_H;   // she's come up to the slider...
     if (atWin && !coon.atWin && clock > (coon.cool || 0) && (!TOD || TOD.nightF > 0.4)) coon.next = Math.random() < 0.45 ? 0.8 + Math.random() * 1.4 : Infinity;   // ...and now and then (not every time) out it pops
     if (!atWin) coon.next = Infinity; coon.atWin = atWin;
     if (!coon.firstDone && walk.pos.z > DOOR2_Z && inRoomXZ(walk.pos.x, walk.pos.z) && walk.pos.y < CEIL_H) { coon.firstDone = true; coon.firstAt = clock + 0.8; }
-    if (coon.firstAt && clock >= coon.firstAt) { coon.firstAt = 0; coon.next = 0; }   /* (its first visit: the moment she's past the room's second doorway) */                 // (never off on its own: only ever while she's there at the glass)
+    if (coon.firstAt && clock >= coon.firstAt) { if (walk.pos.z > SLIDER.VD - 0.25) coon.firstAt = clock + 3; else { coon.firstAt = 0; coon.next = 0; } }   /* (its first visit: the moment she's past the room's second doorway) */                 // (never off on its own: only ever while she's there at the glass)
     if (ZN && ZN.on) { coon.next = Infinity; return; }                 /* (zombie night: even the raccoon stays well away) */
     coon.next -= dt; if (coon.next > 0) return;
+    if (walk.pos.z > SLIDER.VD - 0.25) { coon.next = Infinity; return; }   /* (she's already outside: no show; its first visit waits till she's back in) */
     coon.from.set(home.x + 5.5, home.y, home.z + 2.4); coon.to.copy(home); coon.sawGun = false; pos.copy(coon.from); g.visible = true; coon.swipes = 0; coonSet('arrive'); chitter(3);
   }
   if (ZN && ZN.on && !coon.dead && coon.state !== 'flee' && coon.state !== 'dying' && coon.state !== 'hidden') { coon.from.copy(pos); coon.to.set(home.x + 7, home.y, home.z + 2.5); coonSet('flee'); }   /* (it bolts when the dead rise) */
@@ -14035,6 +14279,7 @@ function walkRoamOK(nx, nz) {                                        // the yard
   return true;                                                        // anywhere else outdoors (the solid chain-link keeps her in the yard till she climbs over it)
 }
 function fenceCrossed(ox, oz) {                                       // she's just gone over a fence for the first time: out she goes
+  if (!walk.free && YARD.holeX !== undefined && walk.pos.z > YARD.FZ + 0.35 && Math.abs(walk.pos.x - YARD.holeX) < 2.5) { walk.free = true; showWalkName('🕳️ Through the hole in the fence... the wild bank behind the yard!'); tone(660, 990, 0.2, 'triangle', 0.035); return; }   /* (the secret way out: no 'out of bounds' notice) */
   const p = walk.pos; if (walk.free || !YARD_FENCES.some(F => segCross(ox, oz, p.x, p.z, F))) return;
   walk.free = true; const fresh = !achDone.notAGlitch; unlock('notAGlitch');
   showWalkName('🚧 Notice: out of bounds'); tone(523, 1047, 0.3, 'triangle', 0.04);
@@ -14389,7 +14634,7 @@ function frame(now) {
   candleLight.intensity = (0.32 + flick / flames.length * 0.1) * lit / flames.length;
   for (const d of discoGlints) d.gl.material.opacity = Math.max(0, Math.sin(clock * d.speed + d.phase) - 0.75) * 3.2;   // disco sparkle
   if (sliderDisco) updateSliderDisco(dt);
-  updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateZombies(dt); updateYardGate(dt); updateGarage(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
+  updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateZombies(dt); ammoChip(); updateYardGate(dt); updateGarage(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
 
   if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && (camera.position.z >= ROOM.visDepth - 0.05 || !inRoomXZ(camera.position.x, camera.position.z) || upstairsView(camera.position)));   // (or out in the yard, round the front, or upstairs)
   updateUpperLights();   // the end wall + door: only from inside the room
