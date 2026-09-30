@@ -3778,8 +3778,9 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
         const Y = 0xf6cf2a, O = 0xf58a2c, G = 0x6fd16a, B = 0x3f7fe6, P = 0xe24aa8, U = 0xa77ae0, W = 0xf1f0ec, S = 0xf29a72;
         const army = [[W, 'sailor'], [Y, 'sailor'], [W, 'helmet'], [Y, 'hair'], [Y, 'cowboy'], [Y, 0], [G, 'flower'], [B, 0], [Y, 'pirate'], [S, 0],
                       [Y, 'bucket'], [O, 0], [Y, 0], [O, 0], [Y, 'smile'], [G, 0], [U, 0], [S, 0], [G, 0], [B, 0], [Y, 0], [P, 0], [Y, 'cap'], [O, 0], [Y, 0], [G, 0]];
-        const beak = new THREE.MeshPhongMaterial({ color: 0xff7a1a, shininess: 60 }), eyeW = basic(0xffffff), eyeB = basic(0x111111);
-        const hatM = c => new THREE.MeshPhongMaterial({ color: c, shininess: 40 });
+        const dm = c => new THREE.MeshPhongMaterial({ color: c, shininess: 80, specular: 0x555555 });   /* (one finish for every part, so each duck fuses into a single mesh: a draw call, not four) */
+        const beak = dm(0xff7a1a), eyeW = dm(0xffffff), eyeB = dm(0x111111);
+        const hatM = c => dm(c);
         army.forEach(([col, hat], i) => {
           const d = new THREE.Group(); d.userData.name = 'Rubber duck'; d.userData.noWalk = true; povEndWall.add(d);
           const mat = new THREE.MeshPhongMaterial({ color: col, shininess: 80, specular: 0x555555 }), sc = 0.8 + (i % 5 === 2 ? 0.35 : Math.random() * 0.25);
@@ -3797,7 +3798,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
           else if (hat === 'pirate') { M(new THREE.CylinderGeometry(0.04, 0.066, 0.04, 3), hatM(0x151515), 0, 0.2, 0.045).rotation.y = Math.PI / 6; M(new THREE.SphereGeometry(0.009, 6, 5), eyeW, 0, 0.205, 0.08); }
           else if (hat === 'cap') { M(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 14), hatM(0x2f6fd6), 0, 0.19, 0.04); M(new THREE.SphereGeometry(0.03, 8, 6), hatM(0x2f6fd6), 0, 0.2, 0.0).scale.set(1, 0.4, 1); }
           else if (hat === 'flower') { M(new THREE.SphereGeometry(0.014, 8, 6), hatM(0xff7aa8), -0.012, 0.2, 0.04); M(new THREE.SphereGeometry(0.014, 8, 6), hatM(0xff7aa8), 0.012, 0.2, 0.04); }
-          else if (hat === 'smile') M(new THREE.CircleGeometry(0.02, 12), basic(0xfff3a0), 0.075, 0.05, 0.03).rotation.y = Math.PI / 2;
+          else if (hat === 'smile') M(new THREE.CircleGeometry(0.02, 12), dm(0xfff3a0), 0.075, 0.05, 0.03).rotation.y = Math.PI / 2;
           const row = i % 5, colI = Math.floor(i / 5), hx = WTABLE.x - 0.52 + row * 0.26 + (colI % 2) * 0.12, hz = WTABLE.z - 0.95 + colI * 0.34 + (Math.random() - 0.5) * 0.06;
           d.scale.setScalar(sc); d.position.set(hx, WTABLE.h, hz); d.rotation.y = Math.PI / 2 + (Math.random() - 0.5) * 0.35;
           ducks.push({ g: d, home: d.position.clone(), yaw: d.rotation.y, state: 'table', v: new THREE.Vector3(), w: new THREE.Vector3(), hop: 0, hopDelay: 0 });
@@ -6355,14 +6356,21 @@ const BIKE_KINDS = {   // hw/hl: half width/length · bot..top: the slab that hu
   bar:  { n: 10, hw: 1.05, hl: 0.22, bot: 1.12, top: 1.6 },
   coon: { n: 4, hw: 0.4, hl: 0.3, bot: 0, top: 0.5, soft: 1 },
   ramp: { n: 3, hw: 0.95, hl: 1.6, bot: 0, top: 1.0, ramp: 1 },
+  tram: { n: 3, hw: 1.0, hl: 6.1, bot: 0, top: 3.3, solid: 1 },     // the 504 King coming the other way: too tall to hop (off a ramp, her roof's a road)
+  arrow: { n: 4, hw: 0.95, hl: 1.5, bot: 0, top: 2.95 },           // roadwork: the arrow board on its trailer...
+  work: { n: 12, hw: 0.98, hl: 5.0, bot: 0, top: 1.05 },           // ...then 10 m stretches of barrels, the lane shut
+  sign: { n: 3, hw: 0.7, hl: 0.3, bot: 0, top: 2.9, deco: 1 },     // (ROAD WORK AHEAD on the boulevard: scenery)
+  bin: { n: 8, hw: 0.5, hl: 0.55, bot: 0, top: 0.62, soft: 1 },    // garbage day: a bin knocked over into the road
+  curb: { n: 8, hw: 0, hl: 0, bot: 0, top: 0, deco: 1 },           // (the rest of the bins, out at both curbs: scenery)
 };
-const BIKE_CH = { C: 'car', c: 'cone', s: 'saw', p: 'hole', h: 'bar' };
+const BIKE_CH = { C: 'car', c: 'cone', s: 'saw', p: 'hole', h: 'bar', g: 'bin' };
 const BIKE_ROWS = [   // lane patterns (left, mid, right), sorted by the difficulty that unlocks them · C parked car, O oncoming, B bus, c cones, s sawhorse, p pothole, h low barrier, . open road
   ['C..', 0], ['.C.', 0], ['c..', 0], ['.s.', 0], ['...', 0], ['h..', 0], ['CC.', 0], ['.p.', 0.05], ['C.C', 0.05], ['.h.', 0.1],
   ['Cc.', 0.15], ['C.s', 0.15], ['cc.', 0.2], ['O..', 0.2], ['ccc', 0.25], ['.B.', 0.25], ['CCc', 0.3], ['hhh', 0.3], ['CCh', 0.35],
   ['B.C', 0.4], ['CcC', 0.4], ['ChC', 0.45], ['CsC', 0.5], ['Bh.', 0.5], ['OCc', 0.55], ['cOc', 0.6], ['sCh', 0.6], ['hch', 0.65],
   ['CpC', 0.7], ['OpO', 0.75], ['hCs', 0.8], ['BsO', 0.85],
 ];
+const BIKE_LN_NAME = ['left lane', 'middle lane', 'right lane'], BIKE_BINS = [['#2f8f4e', '#236b3a'], ['#2d6fd1', '#1f4f9a'], ['#5d5a62', '#3f3d44']];   // (Toronto's green, blue and grey bins)
 const BIKE_NICE = ['Nice jump!', 'Purrfect!', 'Wheee!'], BIKE_OOF = ['Wipeout!', 'Meow-ch!', 'Cat-astrophe!', 'Oof, kitty!'];
 const BIKE = {
   built: false, active: false, phase: 'off', opts: null, t: 0, rider: null, ln: ['.', '.', '.'],
@@ -6463,6 +6471,62 @@ function bikeBusGeom() {   // a red-and-white city bus, seen mostly from behind
   for (const s of [-1, 1]) { P.push([G.box(0.2, 0.3, 0.04), '#ff2d55', s * 0.75, 0.95, -3.61]); for (const z of [-2.4, 2.4]) P.push([G.cyl(0.4, 0.4, 0.3, 10), '#2b2530', s * 0.9, 0.4, z, 0, 0, Math.PI / 2]); }
   return bikeMerge(P);
 }
+function bikeTramGeom() {   // a TTC streetcar, front at +z: red and white, a black window band, three sections, a pantograph (its sign and headlights are a lit child mesh)
+  const G = bikeG, red = '#d8232a', white = '#f2eeea', glass = '#23262f', P = [
+    [G.box(1.86, 0.34, 11.9), '#3a3640', 0, 0.3, 0], [G.box(2.0, 0.96, 12.2), red, 0, 0.93, 0], [G.box(2.02, 0.13, 12.22), white, 0, 1.46, 0],
+    [G.box(1.99, 0.94, 12.14), glass, 0, 1.99, 0], [G.box(2.0, 0.5, 12.2), red, 0, 2.71, 0], [G.box(1.86, 0.2, 12.0), white, 0, 3.05, 0],
+    [G.box(1.72, 1.02, 0.06), glass, 0, 2.0, 6.08], [G.box(2.02, 0.24, 0.24), '#3a3640', 0, 0.32, 6.08], [G.box(1.72, 1.02, 0.06), glass, 0, 2.0, -6.08]];
+  for (let k = 0; k < 9; k++) P.push([G.box(2.03, 0.94, 0.14), red, 0, 1.99, -5.2 + k * 1.3]);                                   // window pillars
+  for (const z of [-2.03, 2.03]) P.push([G.box(2.05, 2.55, 0.34), '#4a4650', 0, 1.62, z]);                                    // the bendy joints
+  for (const s of [-1, 1]) for (const z of [-4.05, 0.6, 4.3]) P.push([G.box(0.04, 1.86, 0.98), '#bdb8bf', s * 1.01, 1.36, z], [G.box(0.05, 0.78, 0.7), glass, s * 1.02, 1.95, z]);   // doors
+  for (const z of [-4.6, 0, 4.6]) P.push([G.box(1.7, 0.36, 1.7), '#2b2530', 0, 0.2, z]);                                       // bogies
+  for (const z of [-3.9, 3.9]) P.push([G.box(1.3, 0.3, 1.9), '#d6d1d8', 0, 3.3, z]);                                           // roof gear
+  P.push([G.box(0.9, 0.12, 0.9), '#5d5866', 0, 3.2, 0.9], [G.box(0.07, 0.07, 0.92), '#3a3640', 0, 3.55, 1.05, -0.709], [G.box(0.07, 0.07, 0.625), '#3a3640', 0, 4.09, 1.2, 0.876],
+    [G.box(1.3, 0.06, 0.14), '#3a3640', 0, 4.36, 1.0], [G.box(0.1, 0.08, 0.1), '#3a3640', 0.68, 4.32, 1.0], [G.box(0.1, 0.08, 0.1), '#3a3640', -0.68, 4.32, 1.0]);   // the pantograph, up on the wire
+  return bikeMerge(P);
+}
+function bikeArrowGeom() {   // an arrow board on its trailer, facing the traffic (-z); the lamps are a lit child mesh that blinks
+  const G = bikeG, P = [
+    [G.box(1.5, 0.26, 2.2), '#ffb000', 0, 0.62, 0.25], [G.box(1.6, 0.1, 2.3), '#3a3640', 0, 0.45, 0.25], [G.box(0.12, 0.1, 0.6), '#3a3640', 0, 0.45, 1.55],
+    [G.box(0.14, 1.3, 0.14), '#5d5866', 0, 1.35, -0.5], [G.box(1.9, 1.16, 0.12), '#1d1b22', 0, 2.3, -0.6],
+    [G.box(1.98, 0.07, 0.16), '#ffb000', 0, 2.91, -0.6], [G.box(1.98, 0.07, 0.16), '#ffb000', 0, 1.69, -0.6], [G.box(0.36, 0.5, 0.5), '#5d5866', 0, 1.0, 0.7]];
+  for (const s of [-1, 1]) P.push([G.cyl(0.26, 0.26, 0.16, 10), '#2b2530', s * 0.82, 0.26, 0.3, 0, 0, Math.PI / 2],
+    [G.cone(0.18, 0.52, 8), '#ff7a1a', s * 0.72, 0.28, -1.3], [G.cyl(0.11, 0.13, 0.08, 8), '#fff4f8', s * 0.72, 0.3, -1.3], [G.box(0.38, 0.04, 0.38), '#ff7a1a', s * 0.72, 0.02, -1.3]);
+  for (let i = 0; i < 5; i++) P.push([G.box(0.29, 0.24, 0.03), i & 1 ? '#fff4f8' : '#ff5a1a', -0.58 + i * 0.29, 0.62, -0.87]);   // reflective stripes
+  return bikeMerge(P);
+}
+function bikeWorkGeom(v) {   // 10 m of shut lane: striped barrels down both edges, the work in between (a heap of dirt and a shovel, or a jersey barrier and pipes)
+  const G = bikeG, P = [];
+  for (const s of [-1, 1]) for (let k = -2; k <= 2; k++) { const x = s * 0.7, z = k * 2;
+    P.push([G.cyl(0.26, 0.29, 0.9, 8), '#ff6a13', x, 0.5, z], [G.cyl(0.273, 0.28, 0.11, 8), '#fff4f8', x, 0.72, z], [G.cyl(0.283, 0.288, 0.11, 8), '#fff4f8', x, 0.44, z], [G.cyl(0.36, 0.36, 0.06, 8), '#2b2530', x, 0.03, z]); }
+  if (v === 0) P.push([G.ball(1, 1), '#8a6a4a', 0, 0.02, 0.6, 0, 0, 0, 0.55, 0.5, 1.5], [G.ball(1, 0), '#7a5c3e', 0.05, 0.02, -1.6, 0, 0.6, 0, 0.4, 0.34, 0.6],
+    [G.box(0.05, 1.0, 0.05), '#8a5a3a', 0.12, 0.62, 0.3, 0.35, 0, 0.3], [G.box(0.24, 0.3, 0.03), '#9da3ab', 0.03, 0.2, 0.2, 0.35, 0, 0.3], [G.box(0.9, 0.04, 0.9), '#4a4450', 0, 0.02, 3.2]);
+  else P.push([G.box(0.5, 0.25, 3.2), '#d9d4cc', 0, 0.12, -1.0], [G.box(0.26, 0.6, 3.2), '#d9d4cc', 0, 0.55, -1.0],
+    [G.cyl(0.18, 0.18, 2.6, 8), '#8d8894', -0.2, 0.18, 2.6, Math.PI / 2], [G.cyl(0.18, 0.18, 2.6, 8), '#8d8894', 0.2, 0.18, 2.6, Math.PI / 2], [G.cyl(0.18, 0.18, 2.6, 8), '#a39ea8', 0, 0.48, 2.6, Math.PI / 2]);
+  return bikeMerge(P);
+}
+function bikeWorkSignGeom() {   // the stand for ROAD WORK AHEAD (the orange diamond is a child mesh), weighed down with sandbags
+  const G = bikeG; return bikeMerge([[G.box(0.08, 1.9, 0.08), '#8d8894', 0, 0.95, 0], [G.box(0.06, 0.06, 1.0), '#8d8894', 0, 0.06, 0.1], [G.box(0.9, 0.06, 0.06), '#8d8894', 0, 0.06, 0],
+    [G.box(0.36, 0.14, 0.24), '#a08a60', 0.35, 0.12, 0], [G.box(0.36, 0.14, 0.24), '#a08a60', -0.35, 0.12, 0], [G.box(0.26, 0.12, 0.3), '#8f7b52', 0, 0.12, 0.45]]);
+}
+function bikeBinGeom(c, yaw) {   // a bin knocked over into the road: lid flung open, a bag and some litter spilling out toward her
+  const G = bikeG, a = BIKE_BINS[c][0], b = BIKE_BINS[c][1], P = [
+    [G.box(0.6, 0.6, 0.9), a, 0, 0.3, 0.1], [G.box(0.64, 0.64, 0.08), b, 0, 0.32, 0.56], [G.box(0.66, 0.05, 0.62), b, 0, 0.03, -0.62, 0, 0.3, 0],
+    [G.cyl(0.08, 0.08, 0.06, 8), '#1c1a20', 0.24, 0.1, 0.52, 0, 0, Math.PI / 2], [G.cyl(0.08, 0.08, 0.06, 8), '#1c1a20', -0.24, 0.1, 0.52, 0, 0, Math.PI / 2],
+    [G.ball(0.26, 1), '#1f1d24', 0.12, 0.2, -0.46, 0, 0, 0, 1, 0.75, 1.1], [G.box(0.16, 0.02, 0.12), '#f4f1ee', -0.3, 0.02, -0.7, 0, 0.5], [G.box(0.12, 0.02, 0.16), '#ffd24d', 0.35, 0.02, -0.85, 0, 1.1],
+    [G.ball(0.07, 0), '#c0392b', -0.1, 0.06, -0.9]];
+  const g = bikeMerge(P); g.rotateY(yaw); g.computeBoundingSphere(); return g;
+}
+function bikeCurbGeom(v) {   // garbage day: bins out at the curb on both sides (a green, a blue, a grey, and a bag)
+  const G = bikeG, P = [];
+  for (const s of [-1, 1]) {
+    const order = (v + (s > 0 ? 0 : 1)) & 1 ? [2, 0, 1] : [1, 2, 0];
+    for (let i = 0; i < 3; i++) { const c = order[i], h = c ? 1.0 : 0.72, w = c ? 0.6 : 0.46, z = (i - 1) * 0.78, x = s * 4.25;
+      P.push([G.box(w, h, w), BIKE_BINS[c][0], x, h / 2 + 0.1, z], [G.box(w + 0.06, 0.07, w + 0.08), BIKE_BINS[c][1], x, h + 0.14, z]); }
+    P.push([G.ball(0.27, 1), '#1f1d24', s * 4.3, 0.3, 1.45, 0, 0, 0, 1, 0.85, 1]);
+  }
+  return bikeMerge(P);
+}
 function bikeObstacleGeoms() {
   const G = bikeG, cone = [], saw = [], bar = [], coon = [];
   for (const x of [-0.62, 0, 0.62]) cone.push([G.cone(0.2, 0.55, 8), '#ff7a1a', x, 0.3, 0], [G.cyl(0.13, 0.155, 0.09, 8), '#fff4f8', x, 0.3, 0], [G.box(0.42, 0.05, 0.42), '#ff7a1a', x, 0.025, 0]);
@@ -6484,7 +6548,8 @@ function bikeObstacleGeoms() {
   for (const z of [-0.9, 0, 0.9]) ramp.push([G.box(1.9, 0.02, 0.24), '#d63a82', 0, (z + 1.6) / 3.2 + 0.012, z, -Math.atan2(1, 3.2)]);
   const colours = ['#ff6b6b', '#4fa3ff', '#ffd24d', '#7fdcb4', '#b28dff'];
   return { car: colours.map(bikeCarGeom), bus: [bikeBusGeom()], cone: [bikeMerge(cone)], saw: [bikeMerge(saw)], hole: [bikeMerge(hole)],
-    bar: [bikeMerge(bar)], coon: [bikeMerge(coon)], ramp: [bikeMerge(ramp)] };
+    bar: [bikeMerge(bar)], coon: [bikeMerge(coon)], ramp: [bikeMerge(ramp)], tram: [bikeTramGeom()], arrow: [bikeArrowGeom()], work: [bikeWorkGeom(0), bikeWorkGeom(1)],
+    sign: [bikeWorkSignGeom()], bin: [bikeBinGeom(0, 0.35), bikeBinGeom(1, -0.45), bikeBinGeom(2, 0.15), bikeBinGeom(1, 2.7)], curb: [bikeCurbGeom(0), bikeCurbGeom(1)] };
 }
 
 /* ---------- building the street (once, on the first ride) ---------- */
@@ -6552,7 +6617,7 @@ function bikeBuild() {
     for (let i = 0; i < K.n; i++) {
       const m = add(og[k][i % og[k].length], mat, 0, 0, 0); m.visible = false;
       const o = { kind: k, mesh: m, geos: og[k], on: false, x: 0, y: 0, z: 0, vz: 0, vx: 0, vy: 0, vzf: 0, spin: 0, flyT: 0, hit: false, cleared: false, run: false, wait: 0,
-        hw: K.hw, hl: K.hl, bot: K.bot, top: K.top, solid: !!K.solid, soft: !!K.soft, ramp: !!K.ramp };
+        hw: K.hw, hl: K.hl, bot: K.bot, top: K.top, solid: !!K.solid, soft: !!K.soft, ramp: !!K.ramp, deco: !!K.deco, warned: false };
       B.pools[k].push(o); B.obs.push(o);
     }
   }
@@ -6568,14 +6633,14 @@ function bikeBuild() {
     const g = new THREE.Group(); g.add(new THREE.Mesh(geo, mat), new THREE.Mesh(ring, halo)); g.visible = false; S.add(g);
     B.powers.push({ kind, mesh: g, on: false, x: 0, y: 0, z: 0 });
   }
-  bikeEnvBuild(S);   // the sky's clock, the weather, the headlight and the record banner
+  bikeEnvBuild(S); bikeFxBuild(S);   // the sky's clock, the weather, the headlight and the record banner
   // warm every shader up front so the first cone doesn't hitch
   S.traverse(o => { if (o.isMesh || o.isGroup) o.userData.vis = o.visible, o.visible = true; });
   rv.scaleG.add(rv.cat); renderer.compile(S, bikeCam); rv.scaleG.remove(rv.cat);
   S.traverse(o => { if (o.userData.vis !== undefined) o.visible = o.userData.vis; });
   bikeBuildUI();
   addEventListener('keydown', bikeKey, true);
-  document.addEventListener('visibilitychange', () => { const B = BIKE; if (document.hidden && B.active && B.phase === 'ride') { B.phase = 'count'; B.count = 3.2; B.countShown = 0; B.resumeSpd = B.speed; B.speed = 0; }   /* (away mid-ride: it waits for her) */
+  document.addEventListener('visibilitychange', () => { const B = BIKE; if (document.hidden && B.active && (B.phase === 'ride' || B.phase === 'count')) bikePause();   /* (away mid-ride: it waits for her, paused) */
     bikeEngineSet(BIKE.speed || 0); bikeRainSnd(); });
   B.built = true;
 }
@@ -6629,6 +6694,32 @@ function bikeBuildUI() {
 @keyframes bkCount{0%{opacity:0;transform:scale(1.8)}20%{opacity:1;transform:scale(1)}70%{opacity:1}100%{opacity:0;transform:scale(.8)}}
 @keyframes bkPulse{to{transform:translateX(-50%) scale(1.07)}}
 @keyframes bkIn{from{transform:scale(.7);opacity:0}}
+#bikeUI .bk-x svg{display:block;width:20px;height:20px;margin:auto;fill:#fff4f8}
+#bikeUI .bk-pcard{width:min(290px,100%)}
+#bikeUI .bk-pcard .bk-cap{margin:6px 0 6px;font-size:12px}
+#bikeUI.paused .bk-pads,#bikeUI.paused .bk-msg,#bikeUI.paused .bk-count{visibility:hidden}
+#bikeUI .bk-btn.rev{display:flex;align-items:center;justify-content:center;gap:10px;background:#1fae74;box-shadow:0 4px 0 #13805a;font-size:18px}
+#bikeUI .bk-tram{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 172px);transform:translateX(-50%);display:none;padding:3px;border-radius:16px;background:repeating-linear-gradient(-45deg,#ffc400 0 10px,#2d1328 10px 20px);box-shadow:0 4px 14px rgba(45,19,40,.35)}
+#bikeUI .bk-tram b{display:block;font-weight:400;font-size:18px;white-space:nowrap;padding:5px 14px;border-radius:13px;background:#e0303a;animation:bkFlash .3s steps(1) infinite}
+#bikeUI .bk-tram span{font:700 12px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;opacity:.9}
+@keyframes bkFlash{50%{background:#2d1328}}
+#bikeUI .bk-tabs{display:flex;gap:4px;margin:10px 0 0;padding:4px;border-radius:14px;background:#f3d7e5}
+#bikeUI .bk-tabs button{flex:1;padding:7px 4px;border-radius:11px;color:#9a4f7c;font-size:15px;background:transparent}
+#bikeUI .bk-tabs button.on{background:#fff;color:#d63a82;box-shadow:0 2px 0 #e7b9d0}
+#bikeUI .bk-ups{display:none;margin:10px 0 4px}
+#bikeUI .bk-shop.ups .bk-ups{display:block}
+#bikeUI .bk-shop.ups .bk-swatches,#bikeUI .bk-shop.ups #bikeShopAct{display:none}
+#bikeUI .bk-up{display:flex;align-items:center;gap:10px;background:#fff;border-radius:14px;padding:8px 10px;margin-bottom:8px;box-shadow:0 0 0 2px #f3d7e5}
+#bikeUI .bk-up-ic{font-size:24px;width:30px;text-align:center;flex:none}
+#bikeUI .bk-up-t{flex:1;min-width:0;text-align:left}
+#bikeUI .bk-up-t b{display:block;font-size:16px;font-weight:400;line-height:1.1}
+#bikeUI .bk-up-t small{display:block;font:600 11px/1.25 system-ui,sans-serif;opacity:.65;margin-top:2px}
+#bikeUI .bk-pips{display:flex;gap:4px;margin-top:5px}
+#bikeUI .bk-pips i{width:18px;height:6px;border-radius:3px;background:#f3d7e5}
+#bikeUI .bk-pips i.on{background:#ff6fae}
+#bikeUI .bk-up-buy{flex:none;min-width:76px;padding:9px 10px;border-radius:12px;background:#ff6fae;color:#fff4f8;font-size:15px;box-shadow:0 3px 0 #d63a82;white-space:nowrap}
+#bikeUI .bk-up-buy:disabled{opacity:.45;cursor:default}
+#bikeUI .bk-up-buy.max{background:#2d1328;box-shadow:0 3px 0 #000;opacity:1}
 #bikeUI .bk-card{position:relative;max-height:calc(100% - 12px);overflow-y:auto;overscroll-behavior:contain}
 #bikeUI .bk-card>:not(.bk-conf){position:relative;z-index:1}
 #bikeUI .bk-rec{display:none;position:relative;z-index:1;margin:8px auto 2px;padding:6px 18px 5px;border-radius:16px;color:#fff;font-size:26px;line-height:1.05;letter-spacing:.03em;text-shadow:0 2px 0 rgba(45,19,40,.45);background:linear-gradient(90deg,#ff6fae,#ffc93c,#8a5cff,#ff6fae);background-size:300% 100%;box-shadow:0 4px 0 #2d1328;width:max-content;max-width:100%;animation:bkStamp .7s cubic-bezier(.2,1.7,.4,1) both,bkShine 2.4s linear infinite}
@@ -6681,24 +6772,29 @@ function bikeBuildUI() {
   ui.id = 'bikeUI';
   ui.innerHTML = `<div id="bikeArea"></div>
 <div class="bk-top"><div class="bk-panel bk-score"><b id="bikeScore">0</b><div class="bk-sub"><svg viewBox="0 0 24 16"><path d="M2 8c3-5 9-6 14-3l6-3v12l-6-3c-5 3-11 2-14-3z" fill="#ffb347"/><circle cx="7" cy="7" r="1.3" fill="#2d1328"/></svg><b id="bikeTreats">0</b><i>·</i><span id="bikeDist">0 m</span></div></div>
-<div class="bk-right"><div class="bk-panel bk-speed"><b id="bikeSpeed">0</b><small>km/h</small><span class="bk-bar"><i id="bikeSpeedBar"></i></span></div><button class="bk-x" id="bikeExit" aria-label="Exit">&#x2715;</button></div></div>
+<div class="bk-right"><div class="bk-panel bk-speed"><b id="bikeSpeed">0</b><small>km/h</small><span class="bk-bar"><i id="bikeSpeedBar"></i></span></div><button class="bk-x" id="bikePauseBtn" aria-label="Pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.4"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.4"/></svg></button></div></div>
 <div class="bk-panel bk-power" id="bikePower"><span id="bikePowerName">Magnet</span><span class="bk-bar"><i id="bikePowerBar"></i></span></div>
 <div class="bk-warn" id="bikeWarn">one more bump and it's a wipeout!</div>
+<div class="bk-tram" id="bikeTram"><b>&#x1F68B; Streetcar! <span id="bikeTramLane">middle lane</span></b></div>
 <div class="bk-msg" id="bikeMsg"></div><div class="bk-count" id="bikeCount"></div>
 <div class="bk-pads">${arrow('L', 'M15 5l-7 7 7 7')}${arrow('U', 'M5 15l7-7 7 7')}${arrow('D', 'M5 9l7 7 7-7')}${arrow('R', 'M9 5l7 7-7 7')}</div>
 <div class="bk-rp"><div class="bk-rp-bar top"></div><div class="bk-rp-bar bot"></div><div class="bk-rp-tag"><i></i>REPLAY<small>slow-mo</small></div><div class="bk-rp-skip">tap to skip</div></div>
+<div class="bk-over" id="bikePauseOv"><div class="bk-card bk-pcard"><h2>Paused</h2><div class="bk-cap" id="bikePauseSub"></div><button class="bk-btn" id="bikeResume">&#x25B6;&#xFE0E; Resume</button><button class="bk-btn alt" id="bikeQuit">Back to the garage</button></div></div>
 <div class="bk-over" id="bikeOver"><div class="bk-card" id="bikeCard"><div class="bk-conf">${Array.from({ length: 18 }, (_, i) => `<i style="left:${(i * 5.7 + 1) % 100}%;background:${['#ff6fae', '#ffc93c', '#8a5cff', '#6fe0bf', '#8fd6ff'][i % 5]};animation-delay:${(-((i * 0.37) % 2.6)).toFixed(2)}s"></i>`).join('')}</div>
 <h2 id="bikeTitle">Wipeout!</h2><div class="bk-rec" id="bikeRec">NEW RECORD!<small id="bikeRecSub"></small></div><div class="bk-final" id="bikeFinal">0</div><div class="bk-cap">score &middot; best <span id="bikeOS">0</span></div>
 <div class="bk-stats"><div><b id="bikeOT">0</b><span>treats</span></div><div><b id="bikeOD">0 m</b><span>distance</span></div><div><b id="bikeOB">0 m</b><span>best distance</span></div></div>
 <div class="bk-new" id="bikeNew">New best score!</div><div class="bk-bank" id="bikeBank">+<b id="bikeGain">0</b> fish into the piggy bank</div>
-<button class="bk-btn" id="bikeAgain">Ride again</button><button class="bk-btn paint" id="bikeShopBtn"><span>&#x1F3A8;</span> Paint shop <span class="bk-purse-sm">&#x1F41F; <b id="bikeWal">0</b></span></button><button class="bk-btn alt" id="bikeGarage">Back to the garage</button></div>
-<div class="bk-shop" id="bikeShop"><div class="bk-shop-head"><h2>Paint shop</h2><span class="bk-purse">&#x1F41F; <b id="bikeShopWal">0</b></span></div>
+<button class="bk-btn rev" id="bikeRevive">Keep riding <span class="bk-purse-sm">&#x1F41F; <b id="bikeRevCost">25</b></span></button><button class="bk-btn" id="bikeAgain">Ride again</button><button class="bk-btn paint" id="bikeShopBtn"><span>&#x1F3A8;</span> Paint &amp; upgrades <span class="bk-purse-sm">&#x1F41F; <b id="bikeWal">0</b></span></button><button class="bk-btn alt" id="bikeGarage">Back to the garage</button></div>
+<div class="bk-shop" id="bikeShop"><div class="bk-shop-head"><h2 id="bikeShopH">Paint shop</h2><span class="bk-purse">&#x1F41F; <b id="bikeShopWal">0</b></span></div>
+<div class="bk-tabs" id="bikeTabs"><button class="on" data-t="paint" tabindex="-1">&#x1F3A8; Paint</button><button data-t="ups" tabindex="-1">&#x1F527; Upgrades</button></div>
 <div class="bk-swatches" id="bikeSwatches">${BIKE_PAINTS.map(p => `<button class="bk-sw" data-id="${p.id}" tabindex="-1"><i style="background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.75) 0 9%,rgba(255,255,255,0) 10%),linear-gradient(155deg,${p.main} 0 46%,${p.stripe} 46% 53%,${p.dark} 53%)"></i><span>${p.name}</span><small></small></button>`).join('')}</div>
+<div class="bk-ups" id="bikeUps">${BIKE_UPS.map(d => `<div class="bk-up" data-id="${d.id}"><span class="bk-up-ic">${d.icon}</span><div class="bk-up-t"><b>${d.name}</b><small>${d.desc}</small><span class="bk-pips">${d.price.map(() => '<i></i>').join('')}</span></div><button class="bk-up-buy" data-id="${d.id}" tabindex="-1"></button></div>`).join('')}</div>
 <button class="bk-btn" id="bikeShopAct">Ride</button><button class="bk-btn alt" id="bikeShopDone">Done</button></div></div>`;
   document.body.appendChild(ui);
   const $ = id => ui.querySelector('#' + id), u = BIKE.ui = { root: ui };
   for (const k of ['Area', 'Score', 'Treats', 'Dist', 'Speed', 'SpeedBar', 'Power', 'PowerName', 'PowerBar', 'Warn', 'Msg', 'Count', 'Over', 'Title', 'Final', 'OT', 'OD', 'OB', 'New',
-    'Card', 'Rec', 'RecSub', 'OS', 'Bank', 'Gain', 'Wal', 'ShopBtn', 'Shop', 'ShopWal', 'Swatches', 'ShopAct', 'ShopDone']) u[k] = $('bike' + k);
+    'Card', 'Rec', 'RecSub', 'OS', 'Bank', 'Gain', 'Wal', 'ShopBtn', 'Shop', 'ShopWal', 'Swatches', 'ShopAct', 'ShopDone',
+    'PauseBtn', 'PauseOv', 'PauseSub', 'Resume', 'Quit', 'Revive', 'RevCost', 'Tram', 'TramLane', 'Tabs', 'Ups', 'ShopH']) u[k] = $('bike' + k);
   const hush = e => { e.preventDefault(); e.stopPropagation(); }, sw = BIKE.sw, area = u.Area;
   // swipes live on our own full-screen layer; one gesture = one move, fired as soon as it clears 30px
   area.addEventListener('pointerdown', e => { if (!BIKE.active) return; hush(e); if (BIKE.phase === 'replay') { bikeReplayEnd(); return; } sw.id = e.pointerId; sw.x = e.clientX; sw.y = e.clientY; sw.done = false; try { area.setPointerCapture(e.pointerId); } catch (x) {} });
@@ -6712,9 +6808,11 @@ function bikeBuildUI() {
   area.addEventListener('pointerup', up); area.addEventListener('pointercancel', up);
   for (const b of ui.querySelectorAll('.bk-pads button')) b.addEventListener('pointerdown', e => { if (!BIKE.active) return; hush(e); bikeAct(b.dataset.a); });
   const tap = (el, fn) => el.addEventListener('click', e => { e.stopPropagation(); if (BIKE.active) fn(); });
-  tap($('bikeExit'), exitBike); tap($('bikeGarage'), () => { if (BIKE.overT > 0.35) exitBike(); }); tap($('bikeAgain'), () => { if (BIKE.overT > 0.35) startBike(BIKE.opts); });   // (a beat's grace: the tap that skipped the replay mustn't land on a button)
+  tap(u.PauseBtn, bikePause); tap(u.Resume, bikeResume); tap(u.Quit, exitBike); tap(u.Revive, () => { if (BIKE.overT > 0.35) bikeRevive(); }); tap($('bikeGarage'), () => { if (BIKE.overT > 0.35) exitBike(); }); tap($('bikeAgain'), () => { if (BIKE.overT > 0.35) startBike(BIKE.opts); });   // (a beat's grace: the tap that skipped the replay mustn't land on a button)
   tap($('bikeShopBtn'), () => { if (BIKE.overT > 0.35) bikeShopOpen(); }); tap($('bikeShopAct'), bikeShopAct); tap($('bikeShopDone'), bikeShopClose);
   u.Swatches.addEventListener('click', e => { const b = e.target.closest('.bk-sw'); e.stopPropagation(); if (b && BIKE.active) bikeShopPick(b.dataset.id); });
+  u.Tabs.addEventListener('click', e => { const b = e.target.closest('button'); e.stopPropagation(); if (b && BIKE.active && BIKE.shop) bikeShopTab(b.dataset.t); });
+  u.Ups.addEventListener('click', e => { const b = e.target.closest('.bk-up-buy'); e.stopPropagation(); if (b && BIKE.active) bikeUpBuy(b.dataset.id); });
   ui.addEventListener('pointerdown', e => { if (BIKE.active) e.stopPropagation(); });   // nothing leaks through to the yard
 }
 function bikeSay(text, hot, quiet) {
@@ -6733,9 +6831,12 @@ function bikeHud(dt) {   // dom writes, ten times a second at most
   if (kmh !== u.kmh) { u.kmh = kmh; u.Speed.textContent = kmh; u.SpeedBar.style.transform = 'scaleX(' + Math.min(1, B.speed / 34).toFixed(3) + ')'; }
   const pw = B.nip > 0 ? 'Catnip' : B.magnet > 0 ? 'Magnet' : '';
   if (pw !== u.pw) { u.pw = pw; u.Power.style.display = pw ? 'flex' : 'none'; if (pw) u.PowerName.textContent = pw; }
-  if (pw) u.PowerBar.style.transform = 'scaleX(' + (B.nip > 0 ? B.nip / 5 : B.magnet / 8).toFixed(3) + ')';
+  if (pw) u.PowerBar.style.transform = 'scaleX(' + (B.nip > 0 ? B.nip / B.nipMax : B.magnet / B.magMax).toFixed(3) + ')';
   const warn = B.phase === 'ride' && B.runT - B.stumbleT < 6;
   if (warn !== u.warn) { u.warn = warn; u.Warn.style.display = warn ? 'block' : 'none'; }
+  const tw = B.tramWarn > 0 && B.phase === 'ride', cp = B.phase === 'ride' || B.phase === 'count';   /* the streetcar's coming; the pause button only while she's riding */
+  if (tw !== u.tw) { u.tw = tw; u.Tram.style.display = tw ? 'block' : 'none'; }
+  if (cp !== u.cp) { u.cp = cp; u.PauseBtn.style.visibility = cp ? '' : 'hidden'; }
 }
 
 /* ---------- sound: a putt-putt engine, a light beat, and blips (all optional, none may throw) ---------- */
@@ -6766,6 +6867,9 @@ function bikeSfx(n) {
     else if (n === 'buy') { tone(1318, 1318, 0.07, 'square', 0.025); tone(1760, 1760, 0.3, 'square', 0.025, 0.07); bikeHit(0.02, 0.25, 0.03, 6000); }   // ka-ching
     else if (n === 'thunder') { bikeHit(0.5 + Math.random() * 0.8, 1.8, 0.05, 150, 'lowpass', 0.7); bikeHit(0.8 + Math.random(), 1.4, 0.03, 90, 'lowpass', 0.7); }   // (far off: a low rumble)
     else if (n === 'slowboom') { tone(95, 32, 1.1, 'sine', 0.1); bikeHit(0, 1.0, 0.05, 380, 'lowpass', 0.7); }   // the impact, in slow motion
+    else if (n === 'bell') { for (let i = 0; i < 2; i++) { const d = i * 0.24; tone(1480, 1472, 0.6, 'sine', 0.045, d); tone(3710, 3690, 0.25, 'sine', 0.012, d); tone(2230, 2220, 0.42, 'triangle', 0.01, d); } }   // ding ding: the streetcar
+    else if (n === 'revive') for (let i = 0; i < 5; i++) { const f = 523 * Math.pow(2, i / 4); tone(f, f * 1.01, 0.16, 'triangle', 0.035, i * 0.06); }   // back in the saddle
+    else if (n === 'gold') { tone(1760, 2640, 0.12, 'sine', 0.035); tone(2640, 2640, 0.2, 'triangle', 0.015, 0.06); }   // a golden fish
   } catch (e) {}
 }
 function bikeEngineOn() {                                             // a proper motorbike: a V-twin's uneven pulse through a little overdrive, the exhaust burbling on each firing, the wind picking up with speed
@@ -6796,7 +6900,7 @@ function bikeEngineSet(s) {   // revs follow the road speed through five gears (
     let gear = 0; while (s >= BANDS[gear + 1]) gear++;
     let rpm = riding ? 3200 + (s - BANDS[gear]) / Math.max(1, Math.min(BANDS[gear + 1], 34) - BANDS[gear]) * 4200 : 1150;
     B.rev = Math.max(0, (B.rev || 0) - 0.1); rpm += (B.air ? 1800 : 0) + B.rev * 2600;                              // (in the air, or a blip)
-    const f = rpm / 60, hid = document.hidden, v = hid ? 0 : 0.012 + (riding ? 0.006 : 0);
+    const f = rpm / 60, hid = document.hidden || !!B.paused, v = hid ? 0 : 0.012 + (riding ? 0.006 : 0);
     if (riding && gear !== e.gear) { if (gear > e.gear) { e.g.gain.setValueAtTime(v * 0.35, t); bikeHit(0, 0.06, 0.05, 500, 'lowpass'); } e.gear = gear; }   // a change up: the throttle cuts, clunk
     e.a.frequency.setTargetAtTime(f, t, 0.07); e.b.frequency.setTargetAtTime(f / 2, t, 0.07); e.mod.frequency.setTargetAtTime(f, t, 0.07);
     e.lp.frequency.setTargetAtTime(480 + rpm * 0.16, t, 0.1); e.nbp.frequency.setTargetAtTime(300 + rpm * 0.05, t, 0.1);
@@ -6833,7 +6937,7 @@ function bikeSpawn(kind, x, z, vz) {
   const pool = BIKE.pools[kind];
   for (let i = 0; i < pool.length; i++) {
     const o = pool[i]; if (o.on) continue;
-    o.on = true; o.x = x; o.y = 0; o.z = z; o.vz = vz || 0; o.vx = 0; o.flyT = 0; o.hit = o.cleared = o.run = o.nm = false;
+    o.on = true; o.x = x; o.y = 0; o.z = z; o.vz = vz || 0; o.vx = 0; o.flyT = 0; o.hit = o.cleared = o.run = o.nm = o.warned = false;
     const m = o.mesh; m.geometry = o.geos[(Math.random() * o.geos.length) | 0]; m.position.set(x, 0, z); m.rotation.set(0, vz < 0 ? Math.PI : 0, 0); m.visible = true;
     return o;
   }
@@ -6842,7 +6946,7 @@ function bikeSpawn(kind, x, z, vz) {
 function bikeOff(o) { o.on = false; o.mesh.visible = false; }
 function bikeTreat(x, y, z) {
   const F = BIKE.fish;
-  for (let i = 0; i < F.length; i++) { const t = F[i]; if (t.on) continue; t.on = true; t.x = x; t.y = y; t.z = z; t.pop = 0; t.mesh.scale.setScalar(1); t.mesh.position.set(x, y, z); t.mesh.visible = true; return; }
+  for (let i = 0; i < F.length; i++) { const t = F[i]; if (t.on) continue; t.on = true; t.x = x; t.y = y; t.z = z; t.pop = 0; t.gold = BIKE.gold; t.mesh.geometry = t.gold ? BIKE.fx.goldGeo : BIKE.fx.fishGeo; t.mesh.scale.setScalar(1); t.mesh.position.set(x, y, z); t.mesh.visible = true; return; }
 }
 function bikeTreatLine(L, ch, at, ahead, S) {   // a straight line on open road, an arc over low stuff, a low line under barriers, a sky arc off a ramp
   const B = BIKE, x = bikeLaneX(L);
@@ -6852,9 +6956,9 @@ function bikeTreatLine(L, ch, at, ahead, S) {   // a straight line on open road,
   else for (let i = -3; i <= 3; i++) { const u = i / 3.4; bikeTreat(x, 0.62 + 1.3 * (1 - u * u), ahead + i * 1.7); }
 }
 function bikeRow() {   // one row of the road, BIKE_AHEAD out. rows sit in track distance; movers are placed so they arrive on time
-  const B = BIKE, S = Math.max(B.speed, 13), d = Math.min(1, Math.max(0, (B.rowAt - 60) / 2200)), ln = B.ln;
+  const B = BIKE, S = Math.max(B.speed, B.resumeSpd || 0, 13), d = Math.min(1, Math.max(0, (B.rowAt - 60) / 2200)), ln = B.ln, sh = B.shut;
   let at = B.rowAt, gap = Math.max(11.5, S * (1.3 - 0.45 * d)) + Math.random() * 4, ramp = false;
-  if (at > 160 && !B.lastRamp && Math.random() < 0.07 + 0.05 * d) {   // a ramp, launching you over a pair of parked cars
+  if (at > 160 && !B.lastRamp && at > Math.max(sh[0], sh[1], sh[2]) + 10 && Math.random() < 0.07 + 0.05 * d) {   // a ramp, launching you over a pair of parked cars (never beside roadwork)
     ramp = true; const r = (Math.random() * 3) | 0;
     for (let k = 0; k < 3; k++) ln[k] = k === r ? 'R' : Math.random() < 0.3 + 0.5 * d ? 'C' : '.';
     gap = Math.max(gap, 2.2 * S + 6);
@@ -6864,14 +6968,21 @@ function bikeRow() {   // one row of the road, BIKE_AHEAD out. rows sit in track
     const p = BIKE_ROWS[i][0], flip = Math.random() < 0.5;
     for (let k = 0; k < 3; k++) ln[k] = p[flip ? 2 - k : k];
     if (p.indexOf('B') >= 0) { at += 4; gap += 5; }
+    at = bikeSetPiece(at, d, ln);   // Toronto: now and then roadwork shuts a lane or two, or the 504 comes the other way
   }
   B.lastRamp = ramp;
   const ahead = at - B.dist, c0 = 2 + 0.2 * S;
   for (let L = 0; L < 3; L++) {   // movers mustn't ghost through anything: buses need an empty lane behind them, oncoming cars claim the lane ahead
+    if (ln[L] === 'W') continue;
+    if (at < sh[L]) { ln[L] = 'X'; continue; }   /* (a shut lane: nothing else goes in it, movers included) */
     if (ln[L] === 'B' && B.laneLast[L] > at - ahead * 3 / S - 9) ln[L] = 'C';
-    if (ln[L] !== '.' && ln[L] !== 'O' && at < B.laneBlock[L]) ln[L] = '.';
+    if (ln[L] !== '.' && ln[L] !== 'O' && ln[L] !== 'T' && at < B.laneBlock[L]) ln[L] = '.';
   }
-  if (!/[.cspRhp]/.test(ln[0] + ln[1] + ln[2])) ln[(Math.random() * 3) | 0] = '.';   // belt and braces: there is always a way through
+  if (!/[.cspRhp]/.test(ln[0] + ln[1] + ln[2])) { let L = (Math.random() * 3) | 0; for (let k = 0; k < 3 && (ln[L] === 'X' || ln[L] === 'W'); k++) L = (L + 1) % 3; ln[L] = '.'; }   // belt and braces: there is always a way through (and never through roadwork)
+  if (at < B.binsTo && Math.random() < 0.55) {   // garbage day: a bin knocked over into an open lane (soft: a stumble, or hop it)
+    let L = (Math.random() * 3) | 0; for (let k = 0; k < 3 && (ln[L] !== '.' || at - 4 < B.laneBlock[L]); k++) L = (L + 1) % 3;
+    if (ln[L] === '.' && at - 4 >= B.laneBlock[L]) ln[L] = 'g';
+  }
   for (let L = 0; L < 3; L++) {
     const ch = ln[L], x = bikeLaneX(L);
     if (ch === 'C' || ch === 'R') {
@@ -6881,14 +6992,19 @@ function bikeRow() {   // one row of the road, BIKE_AHEAD out. rows sit in track
     } else if (ch === 'O') {
       const ex = ahead * 5 / S; bikeSpawn('car', x, ahead + ex, -5);
       B.laneBlock[L] = Math.max(B.laneBlock[L], at + ex + 8); B.laneLast[L] = Math.max(B.laneLast[L], B.laneBlock[L]);
-    } else if (ch === 'B') {
+    } else if (ch === 'T') {   // the streetcar: timed so its nose meets her where a parked car would
+      const a2 = ahead + 4.35, ex = a2 * 5 / S; bikeSpawn('tram', x, a2 + ex, -5);
+      B.laneBlock[L] = Math.max(B.laneBlock[L], at + 4.35 + ex + 13); B.laneLast[L] = Math.max(B.laneLast[L], B.laneBlock[L]);
+    } else if (ch === 'W') bikeWorkSpawn(x, ahead);
+    else if (ch === 'B') {
       const zb = ahead - ahead * 3 / S; bikeSpawn('bus', x, zb, 3); B.laneLast[L] = Math.max(B.laneLast[L], at + 4);
       for (const t of B.fish) if (t.on && Math.abs(t.x - x) < 0.5 && t.z > zb - 5) { t.on = false; t.mesh.visible = false; }   // no fish baked into the bus
     }
-    else if (ch !== '.') { bikeSpawn(BIKE_CH[ch], x, ahead, 0); B.laneLast[L] = Math.max(B.laneLast[L], at + 1); }
+    else if (ch !== '.' && ch !== 'X') { bikeSpawn(BIKE_CH[ch], x, ahead, 0); B.laneLast[L] = Math.max(B.laneLast[L], at + 1); }
   }
-  // the odd raccoon, waiting at the curb to scurry across right in front of you
-  if (d > 0.04 && Math.random() < 0.13 && B.lastGap > 12 && Math.max(B.laneBlock[0], B.laneBlock[1], B.laneBlock[2]) < at - 7) {
+  if (at < B.binsTo && Math.random() < 0.75) bikeSpawn('curb', 0, ahead + (Math.random() - 0.5) * 3, 0);   // (the rest of the bins, out at the curb)
+  // the odd raccoon, waiting at the curb to scurry across right in front of you (more of them on garbage day)
+  if (d > 0.04 && Math.random() < (at < B.binsTo ? 0.3 : 0.13) && B.lastGap > 12 && Math.max(B.laneBlock[0], B.laneBlock[1], B.laneBlock[2]) < at - 7) {
     const side = Math.random() < 0.5 ? -1 : 1, o = bikeSpawn('coon', side * 4.3, ahead - 7, 0);
     if (o) { o.vx = -side * (3.4 + S * 0.06); o.wait = S * (1.2 + Math.random() * 0.8); o.mesh.rotation.y = -side * Math.PI / 2; }
   }
@@ -6898,20 +7014,48 @@ function bikeRow() {   // one row of the road, BIKE_AHEAD out. rows sit in track
     const p = B.powers[Math.random() < 0.6 ? 0 : 1]; p.on = true; p.x = bikeLaneX(pl); p.y = 0.95; p.z = ahead; p.mesh.position.set(p.x, p.y, p.z); p.mesh.visible = true;
     B.powerAt = at + 520 + Math.random() * 320; B.laneLast[pl] = Math.max(B.laneLast[pl], at + 1);
   }
-  if (Math.random() < 0.82) {   // one line of fish per row, favouring the ramp
+  if (Math.random() < 0.82 + 0.09 * B.ups.luck) {   // one line of fish per row, favouring the ramp (more with lucky fish)
     let tl = -1, cnt = 0;
     for (let L = 0; L < 3; L++) {
       const ch = ln[L]; if (L === pl || at - 6 < B.laneBlock[L] || '.cspRh'.indexOf(ch) < 0) continue;
       if (ch === 'R') { tl = L; break; } if (Math.random() * ++cnt < 1) tl = L;
     }
-    if (tl >= 0) bikeTreatLine(tl, ln[tl], at, ahead, S);
+    if (tl >= 0) { B.gold = Math.random() < 0.1 * B.ups.luck; bikeTreatLine(tl, ln[tl], at, ahead, S); B.gold = false; }   /* (lucky: now and then a line of golden 2x fish) */
   }
   B.rowAt = at + gap; B.lastGap = gap;
+}
+function bikeSetPiece(at, d, ln) {   // past 300 m: roadwork shutting a lane or two for a stretch, a streetcar coming the other way, garbage day. returns where the row sits (roadwork gets a little room)
+  const B = BIKE, sh = B.shut, t0 = Math.max(300, B.dist0 + 110);   /* (a head start gets a clear run-in first) */
+  if (at > t0 && at >= B.workAt && Math.random() < 0.045 + 0.05 * d) {
+    const two = d > 0.2 && Math.random() < 0.35, L0 = two ? (Math.random() < 0.5 ? 0 : 1) : (Math.random() * 3) | 0, L1 = L0 + (two ? 1 : 0), a2 = at + 8;
+    let ok = true; for (let L = L0; L <= L1; L++) if (a2 < B.laneBlock[L] + 4 || a2 < B.laneLast[L] + 4) ok = false;   /* (nothing moving through it, nothing parked in it) */
+    if (ok) {
+      const nseg = 3 + ((Math.random() * (1.6 + 1.5 * d)) | 0), end = a2 + 1.7 + 10 * nseg + 1;
+      B.wkSeg = nseg; B.wkSigned = false; B.workAt = a2 + 280 + Math.random() * 260;
+      B.wkDir = L0 === 0 ? 1 : L1 === 2 ? 0 : Math.random() < 0.5 ? 0 : 1;          /* the arrow points at the open road (0: toward +x, screen-left) */
+      B.wkSide = L0 === 0 ? 1 : L1 === 2 ? -1 : Math.random() < 0.5 ? 1 : -1;        /* and the sign stands on that side's boulevard */
+      for (let L = 0; L < 3; L++) if (L >= L0 && L <= L1) { ln[L] = 'W'; sh[L] = end; B.laneBlock[L] = Math.max(B.laneBlock[L], end); B.laneLast[L] = Math.max(B.laneLast[L], end); } else ln[L] = '.';
+      return a2;
+    }
+  }
+  if (at > t0 + 20 && at >= B.tramAt && Math.random() < 0.05 + 0.06 * d) {   // ding ding: the 504 King, usually down the middle
+    let L = Math.random() < 0.5 ? 1 : Math.random() < 0.5 ? 0 : 2;
+    for (let k = 0; k < 3 && at < sh[L] + 8; k++) L = (L + 1) % 3;
+    if (at >= sh[L] + 8) { ln[L] = 'T'; B.tramAt = at + 220 + Math.random() * 260; }
+  }
+  if (at > t0 && at >= B.binAt && Math.random() < 0.05) { B.binsTo = at + 90 + Math.random() * 70; B.binAt = at + 650 + Math.random() * 550; }   // garbage day on this stretch
+  return at;
+}
+function bikeWorkSpawn(x, ahead) {   // roadwork: the arrow board on its trailer, 10 m stretches of barrels behind it, and (once per closure) the sign on the boulevard well before
+  const B = BIKE, o = bikeSpawn('arrow', x, ahead, 0);
+  if (o) o.mesh.children[0].geometry = B.fx.arrowGeo[B.wkDir];
+  for (let k = 0; k < B.wkSeg; k++) bikeSpawn('work', x, ahead + 6.7 + 10 * k, 0);
+  if (!B.wkSigned) { B.wkSigned = true; bikeSpawn('sign', B.wkSide * 4.1, ahead - 34, 0); }
 }
 
 /* ---------- the ride ---------- */
 function bikeAct(a) {
-  const B = BIKE; if (B.phase !== 'ride') return;
+  const B = BIKE; if (B.phase !== 'ride' || B.paused) return;
   if (a === 'L' || a === 'R') {
     const nl = B.lane + (a === 'L' ? -1 : 1);
     if (nl < 0 || nl > 2) { B.wob = Math.max(B.wob, 0.2); bikeSfx('nope'); return; }   // that's the curb, kitty
@@ -6920,18 +7064,18 @@ function bikeAct(a) {
   else if (a === 'D') { if (B.air) { B.slam = true; B.fly = false; B.vy = Math.min(B.vy, -14); } B.duck = 0.75; bikeSfx('tuck'); }
 }
 function bikeJump() { const B = BIKE; B.vy = 9; B.air = true; B.duck = 0; B.jumpBuf = 0; B.slam = false; bikeSfx('jump'); }
-function bikeLaunch() { const B = BIKE; B.vy = 12; B.air = B.fly = true; B.slam = false; B.duck = 0; bikeSay('Big air!'); bikeSfx('ramp'); }
+function bikeLaunch() { const B = BIKE; B.vy = 12; B.air = B.fly = true; B.slam = false; B.duck = 0; B.kick = 1; bikeSay('Big air!'); bikeSfx('ramp'); }
 function bikeLand() {
   const B = BIKE, wasFly = B.fly;
   B.y = B.ground; B.vy = 0; B.air = B.fly = B.slam = false; bikeSfx('land');
   if (B.ground > 0.5) bikeSay('Roof ride!', false, true); else if (wasFly) bikeSay('Stuck the landing!', false, true);
-  if (B.rain > 0.3 && B.ground < 0.1) bikeSplash(16);
+  bikeDust(); if (B.rain > 0.3 && B.ground < 0.1) bikeSplash(16);
   if (B.jumpBuf > 0) bikeJump();
 }
 function bikeStumble(msg) {   // first bump is a wobble; a second inside six seconds is a wipeout
   const B = BIKE; if (B.safeT > 0) return;
   if (B.runT - B.stumbleT < 6) { bikeCrash(null); return; }
-  B.stumbleT = B.runT; B.wob = 0.6; B.safeT = 0.5; B.shake = Math.max(B.shake, 0.3); B.speed *= 0.85;
+  B.stumbleT = B.runT; B.wob = 0.6; B.safeT = 0.5; B.shake = Math.max(B.shake, 0.3); B.speed *= 0.85; B.hitStop = 0.06; bikeBuzz(40);
   bikeSay(msg, true); bikeSfx('stumble');
 }
 function bikeKnock(o) {   // bonk: off it goes, tumbling into the sky
@@ -6943,7 +7087,7 @@ function bikeCrash(o) {
   const B = BIKE, rv = B.rv; if (B.phase !== 'ride') return;
   B.phase = 'crash'; B.crashT = 0; B.crashAt = B.t; B.crashO = o && o.solid ? o : null; B.shake = 0.9; B.side = Math.random() < 0.5 ? -1 : 1;
   B.rvx = B.side * 1.2; B.rvy = 8.5; B.rvz = 5.5 + B.speed * 0.15; B.rspin = 10; B.bvy = B.air ? B.vy : 4; B.bz = -3;
-  B.speed = 0; B.go = 0; B.duck = 0;
+  B.crashSpd = B.speed; B.speed = 0; B.go = 0; B.duck = 0; B.tramWarn = 0; bikeBuzz(120);
   bikeScene.attach(rv.mount);   // kitty parts ways with the bike, in world space
   bikeEngineOff(); bikeSfx('crash'); bikeSay(BIKE_OOF[(Math.random() * BIKE_OOF.length) | 0], true);
 }
@@ -6963,17 +7107,18 @@ function bikeCrashStep(dt) {   // the bike skids back and flops over; kitty some
   if (m.y < floor) { m.y = floor; B.rvy = B.rvy < -3 ? -B.rvy * 0.35 : 0; B.rvz *= 0.5; B.rvx *= 0.5; B.rspin *= 0.4; }
 }
 function bikeGameOver() {   // the card: score, treats, distance against her best (a proper fanfare when she beats it), the fish banked
-  const B = BIKE, u = B.ui, sc = bikeScore(), dm = Math.floor(B.dist); let best = 0, fresh = false;
+  const B = BIKE, u = B.ui, sc = bikeScore(), dm = Math.floor(B.dist); let best = 0;
   try { best = parseInt(localStorage.getItem('catguard.bikeBest'), 10) || 0; } catch (e) {}
-  if (sc > best) { fresh = true; best = sc; try { localStorage.setItem('catguard.bikeBest', String(sc)); } catch (e) {} }
-  const bd = parseInt(bikeLoad('catguard.bikeBestDist', '0'), 10) || 0, rec = dm > bd && bd > 0;   // (the very first ride just sets the mark)
+  const fresh = sc > B.bestS0;   /* (against her bests from before this ride: kept riding or not, it's all one ride) */
+  if (sc > best) { best = sc; try { localStorage.setItem('catguard.bikeBest', String(sc)); } catch (e) {} }
+  const bd = parseInt(bikeLoad('catguard.bikeBestDist', '0'), 10) || 0, b0 = B.bestD0, rec = dm > b0 && b0 > 0;   // (the very first ride just sets the mark)
   if (dm > bd) bikeSave('catguard.bikeBestDist', dm);
   const gain = bikeBank();
   B.phase = 'over'; B.overT = 0;
   u.Title.textContent = rec ? 'What a ride!' : BIKE_OOF[(Math.random() * BIKE_OOF.length) | 0]; u.Final.textContent = sc;
   u.OT.textContent = B.treats; u.OD.textContent = dm + ' m'; u.OB.textContent = Math.max(dm, bd) + ' m'; u.OS.textContent = best;
   u.New.style.display = fresh && !rec ? '' : 'none';
-  u.Rec.style.display = rec ? 'block' : 'none'; u.RecSub.textContent = rec ? dm + ' m \u00b7 ' + (dm - bd) + ' m past your old best' : '';
+  u.Rec.style.display = rec ? 'block' : 'none'; u.RecSub.textContent = rec ? dm + ' m \u00b7 ' + (dm - b0) + ' m past your old best' : '';
   u.Card.classList.toggle('rec', rec); u.Gain.textContent = gain; u.Bank.style.display = gain > 0 ? '' : 'none'; bikeOverWallet();
   u.Over.classList.remove('shop'); u.Over.classList.add('on');
   if (rec) bikeSfx('record');
@@ -6986,7 +7131,7 @@ function bikeRide(dt) {
   const target = (13 + 17 * (1 - Math.exp(-B.runT / 110))) * (B.nip > 0 ? 1.3 : 1);   // 13 → ~30, gently
   B.speed += (target - B.speed) * Math.min(1, dt * 2.5);
   B.magnet = Math.max(0, B.magnet - dt); { const had = B.nip > 0; B.nip = Math.max(0, B.nip - dt); if (had && B.nip === 0) B.nipGrace = 0.9; } B.nipGrace = Math.max(0, (B.nipGrace || 0) - dt); B.duck = Math.max(0, B.duck - dt);
-  B.jumpBuf = Math.max(0, B.jumpBuf - dt); B.safeT = Math.max(0, B.safeT - dt); B.comboT -= dt; if (B.comboT < 0) B.combo = 0;
+  B.jumpBuf = Math.max(0, B.jumpBuf - dt); B.safeT = Math.max(0, B.safeT - dt); B.comboT -= dt; if (B.comboT < 0) B.combo = 0; B.inv = Math.max(0, B.inv - dt); B.tramWarn = Math.max(0, B.tramWarn - dt);
   B.prevX = B.x; B.x += (bikeLaneX(B.lane) - B.x) * Math.min(1, dt * 13);
   B.prevY = B.y;   // hop physics: floaty off a ramp, heavy on a slam
   if (B.air || B.y > B.ground + 1e-3) {
@@ -7016,6 +7161,8 @@ function bikeWorld(dt) {   // scroll everything toward the camera, and check wha
     }
     if (o.z < BIKE_BEHIND || Math.abs(o.x) > 14) { bikeOff(o); continue; }
     m.position.x = o.x; m.position.z = o.z;
+    if (o.deco) continue;   // (scenery: the roadwork sign, the bins at the curb)
+    if (o.kind === 'tram' && ride && !o.warned && o.z > 0 && o.z - o.hl < (B.speed + 5) * 1.5) { o.warned = true; B.tramWarn = 1.8; B.ui.TramLane.textContent = BIKE_LN_NAME[THREE.MathUtils.clamp(Math.round(1 - o.x / BIKE_LANE), 0, 2)]; bikeSfx('bell'); }   // ding ding, 1.5 s out
     if (ride && !o.hit && !o.nm && !o.ramp && !o.soft && o.z < -(o.hl + BIKE_PHL) && B.y < o.top) { o.nm = true; const gap = Math.abs(o.x - B.x) - (o.hw + BIKE_PHW);   /* a close shave: +2 fish */
       if (gap < 0.45 && gap > -0.02) { B.treats += 2; bikeSay('Close shave! +2 🐟', false, true); tone(1200, 380, 0.22, 'sine', 0.02); } }
     if (!ride || o.hit || Math.abs(o.z) > o.hl + BIKE_PHL || Math.abs(o.x - B.x) > o.hw + BIKE_PHW) continue;
@@ -7026,9 +7173,9 @@ function bikeWorld(dt) {   // scroll everything toward the camera, and check wha
       continue;
     }
     if (B.y + h <= o.bot) { if (!o.cleared) { o.cleared = true; bikeSay('Limbo kitty!', false, true); } continue; }
-    if (B.nip > 0 || B.nipGrace > 0) { bikeKnock(o); continue; }   // catnip zoomies: bonk everything out of the way (and a beat after it wears off)
+    if (B.nip > 0 || B.nipGrace > 0 || B.inv > 0) { bikeKnock(o); continue; }   // catnip zoomies: bonk everything out of the way (and a beat after it wears off)
     o.hit = true;
-    if (o.soft) { if (o.kind === 'coon') bikeKnock(o); bikeStumble(o.kind === 'hole' ? 'Pothole!' : 'Sorry, raccoon!'); }
+    if (o.soft) { if (o.kind !== 'hole') bikeKnock(o); bikeStumble(o.kind === 'hole' ? 'Pothole!' : o.kind === 'bin' ? 'Garbage day!' : 'Sorry, raccoon!'); }
     else if (Math.abs(o.x - B.prevX) > o.hw + BIKE_PHW - 0.02) { B.lane = THREE.MathUtils.clamp(Math.round(1 - (o.x + Math.sign(B.prevX - o.x) * BIKE_LANE) / BIKE_LANE), 0, 2); bikeStumble('Watch out!'); }   // slid into its side: bounce back
     else if (Math.abs(bikeLaneX(B.lane) - o.x) > 1 && Math.abs(o.x - B.x) > o.hw * 0.55) bikeStumble('Close one!');   // clipped it on the way out
     else bikeCrash(o);
@@ -7040,11 +7187,11 @@ function bikeWorld(dt) {   // scroll everything toward the camera, and check wha
     const m = t.mesh; t.z -= d; m.rotation.y += dt * 4;
     if (t.pop > 0) {   // gulp: shrink and hop away
       t.pop -= dt; m.scale.setScalar(Math.max(0, t.pop) * 6); m.position.set(t.x, t.y += dt * 6, t.z); if (t.pop <= 0) { t.on = false; m.visible = false; } continue; }
-    if (B.magnet > 0 && ride && t.z < 18 && t.z > -1) { const k = Math.min(1, dt * 7); t.x += (B.x - t.x) * k; t.y += (B.y + 0.7 - t.y) * k; t.z -= t.z * Math.min(1, dt * 3); }
+    if (B.magnet > 0 && ride && t.z < 18 + 5 * B.ups.mag && t.z > -1) { const k = Math.min(1, dt * 7); t.x += (B.x - t.x) * k; t.y += (B.y + 0.7 - t.y) * k; t.z -= t.z * Math.min(1, dt * 3); }
     if (t.z < BIKE_BEHIND) { t.on = false; m.visible = false; continue; }
     m.position.set(t.x, t.y, t.z);
     if (ride && Math.abs(t.z) < 0.9 && Math.abs(t.x - B.x) < 0.8 && t.y > B.y - 0.3 && t.y < B.y + h + 0.35) {
-      t.pop = 0.2; B.treats++; B.combo = B.comboT > 0 ? B.combo + 1 : 0; B.comboT = 0.4; bikeSfx('treat');
+      t.pop = 0.2; B.treats += t.gold ? 2 : 1; B.combo = B.comboT > 0 ? B.combo + 1 : 0; B.comboT = 0.4; bikeSfx(t.gold ? 'gold' : 'treat');
     }
   }
   for (let i = 0; i < B.powers.length; i++) {
@@ -7053,7 +7200,7 @@ function bikeWorld(dt) {   // scroll everything toward the camera, and check wha
     if (p.z < BIKE_BEHIND) { p.on = false; p.mesh.visible = false; continue; }
     if (ride && Math.abs(p.z) < 1.1 && Math.abs(p.x - B.x) < 0.9 && p.y > B.y - 0.4 && p.y < B.y + h + 0.4) {
       p.on = false; p.mesh.visible = false; bikeSfx('power');
-      if (p.kind === 'magnet') { B.magnet = 8; bikeSay('Magnet!'); } else { B.nip = 5; bikeSay('Catnip zoomies!'); }
+      if (p.kind === 'magnet') { B.magnet = B.magMax = 8 + 2 * B.ups.mag; bikeSay('Magnet!'); } else { B.nip = B.nipMax = 5 + 1.5 * B.ups.nip; bikeSay('Catnip zoomies!'); }
     }
   }
   for (let i = 0; i < B.scen.length; i++) {
@@ -7078,6 +7225,7 @@ function bikePose(dt) {   // lean into lane changes, wheelie on hops, tuck on du
     rv.root.position.set(B.x, B.y, 0);
   } else rv.root.position.set(B.x, B.y, rv.root.position.z);
   rv.roll.rotation.z = B.lean; rv.pitch.rotation.x = B.pitch;
+  rv.body.visible = !(B.inv > 0) || ((B.t * 12) | 0) % 2 === 0;   // (just back on after a wipeout: blinking, and untouchable)
   const spin = B.speed * dt / 0.3; rv.wf.rotation.x += spin; rv.wr.rotation.x += spin;
   const lift = Math.max(0, B.y - B.ground), s = 1 / (1 + lift * 0.35);
   rv.shadow.position.y = B.ground - B.y + 0.03; rv.shadow.scale.set(s * 0.7, s * 1.4, 1);
@@ -7088,22 +7236,23 @@ function bikeCamStep(dt) {   // chase cam, a little higher and wider in portrait
   const B = BIKE, cam = bikeCam, port = cam.aspect < 0.9;
   if (B.shop) { bikeShopCam(); return; }
   B.camX += (B.x * 0.55 - B.camX) * Math.min(1, dt * 5);
-  B.shake = Math.max(0, B.shake - dt * 1.2);
-  const sh = B.shake * B.shake * 1.4, lift = Math.min(B.phase === 'ride' ? B.y : 0, 5);
-  cam.position.set(B.camX + (Math.random() - 0.5) * sh, (port ? 5.0 : 3.4) + lift * 0.7 + (Math.random() - 0.5) * sh, port ? -6.6 : -6.2);
+  B.shake = Math.max(0, B.shake - dt * 1.2); B.kick = Math.max(0, B.kick - dt * 2.4);
+  const kk = B.kick * B.kick, sh = B.shake * B.shake * 1.4, lift = Math.min(B.phase === 'ride' ? B.y : 0, 5);
+  cam.position.set(B.camX + (Math.random() - 0.5) * sh, (port ? 5.0 : 3.4) + lift * 0.7 - kk * 0.35 + (Math.random() - 0.5) * sh, (port ? -6.6 : -6.2) - kk * 1.2);   /* (a ramp kicks the camera back) */
   BIKE_LOOK.set(B.camX * 0.5, (port ? 0.85 : -0.25) + lift * 0.6, 12); cam.lookAt(BIKE_LOOK);
-  const fov = (port ? 72 : 56) + Math.max(0, B.speed - 13) * 0.35 + (B.nip > 0 ? 6 : 0);
+  const fov = (port ? 72 : 56) + Math.max(0, B.speed - 13) * 0.35 + (B.nip > 0 ? 6 : 0) + kk * 12;
   if (Math.abs(cam.fov - fov) > 0.05) { cam.fov += (fov - cam.fov) * Math.min(1, dt * 4); cam.updateProjectionMatrix(); }
 }
 function bikeKey(e) {
   const B = BIKE; if (!B.active) return;
   const k = e.key, a = k === 'ArrowLeft' || k === 'a' || k === 'A' ? 'L' : k === 'ArrowRight' || k === 'd' || k === 'D' ? 'R'
     : k === 'ArrowUp' || k === 'w' || k === 'W' || k === ' ' || k === 'Spacebar' ? 'U' : k === 'ArrowDown' || k === 's' || k === 'S' ? 'D'
-    : k === 'Escape' ? 'X' : k === 'Enter' ? 'E' : null;
+    : k === 'Escape' ? 'X' : k === 'p' || k === 'P' ? 'P' : k === 'Enter' ? 'E' : null;
   if (!a) return;
   e.preventDefault(); e.stopPropagation();
-  if (B.phase === 'replay' && !B.shop) { if (!e.repeat) bikeReplayEnd(); }   /* any key (Esc too) skips the replay */
-  else if (a === 'X') { if (B.shop) bikeShopClose(); else exitBike(); }
+  if (B.paused) { if (!e.repeat && (a === 'X' || a === 'P' || a === 'E' || k === ' ')) bikeResume(); }   /* (Esc, P, Enter or space: back to it) */
+  else if (B.phase === 'replay' && !B.shop) { if (!e.repeat) bikeReplayEnd(); }   /* any key (Esc too) skips the replay */
+  else if (a === 'X' || a === 'P') { if (B.shop) { if (a === 'X') bikeShopClose(); } else if (B.phase === 'ride' || B.phase === 'count') bikePause(); else if (a === 'X') exitBike(); }   /* Esc pauses a ride; after a wipeout it's home time */
   else if (B.phase === 'over') { if (!B.shop && (a === 'E' || k === ' ') && B.overT > 0.6) startBike(B.opts); }   // enter or space: ride again
   else if (a !== 'E' && !e.repeat) bikeAct(a);
 }
@@ -7135,7 +7284,7 @@ function bikeWallet() { return Math.max(0, parseInt(bikeLoad('catguard.fish', '0
 function bikeOwned() { let a = []; try { a = JSON.parse(bikeLoad('catguard.bikePaints', '[]')); } catch (e) {} if (!Array.isArray(a)) a = []; if (a.indexOf('pink') < 0) a.push('pink'); return a; }
 function bikePaintDef(id) { return BIKE_PAINTS.find(p => p.id === id) || BIKE_PAINTS[0]; }
 function bikePaintId() { const id = bikeLoad('catguard.bikePaint', 'pink'); return BIKE_PAINTS.some(p => p.id === id) && bikeOwned().indexOf(id) >= 0 ? id : 'pink'; }
-function bikeBank() { const B = BIKE; if (B.banked) return 0; B.banked = true; const n = B.treats | 0; if (n > 0) bikeSave('catguard.fish', bikeWallet() + n); return n; }   // this ride's fish go in the wallet (once)
+function bikeBank() { const B = BIKE; if (B.banked) return 0; B.banked = true; const n = (B.treats | 0) - (B.bankedN | 0); B.bankedN = B.treats | 0; if (n > 0) bikeSave('catguard.fish', bikeWallet() + n); return Math.max(0, n); }   // this ride's fish go in the wallet (once)
 function bikePaintApply(id) {   // swap the bike's painted body for this colour (each paint's geometry is built the first time, then kept)
   const B = BIKE, rv = B.rv; if (!rv || !rv.bodyMesh || rv.paint === id) return;
   const C = B.paintGeo || (B.paintGeo = {});
@@ -7144,13 +7293,14 @@ function bikePaintApply(id) {   // swap the bike's painted body for this colour 
 }
 
 /* ---------- the paint shop: a showroom turntable behind a sheet of swatches ---------- */
-function bikeOverWallet() { const u = BIKE.ui; if (u && u.Wal) u.Wal.textContent = bikeWallet(); }
+function bikeOverWallet() { const B = BIKE, u = B.ui; if (!u || !u.Wal) return; const w = bikeWallet(), c = bikeReviveCost(); u.Wal.textContent = w;   /* (and whether she can afford to keep riding) */
+  u.Revive.style.display = B.revives < 3 ? '' : 'none'; u.RevCost.textContent = c; u.Revive.disabled = w < c; }
 function bikeShopOpen() {   // kitty dusts herself off and climbs back on, the bike turns on the spot, out come the paint samples
   const B = BIKE, rv = B.rv; if (B.phase !== 'over' || B.shop) return;
   B.shop = true; B.shopSel = bikePaintId(); B.lean = B.pitch = B.y = 0; B.shopVO = '';
   rv.body.add(rv.mount); rv.mount.position.set(0, 0.74, -0.1); rv.mount.rotation.set(0, 0, 0); rv.mount.scale.set(1, 1, 1);
   for (const o of B.obs) o.mesh.visible = false; for (const t of B.fish) t.mesh.visible = false; for (const p of B.powers) p.mesh.visible = false;
-  B.ui.Over.classList.add('shop'); B.ui.root.classList.add('shopping'); bikeShopDraw(); bikeSfx('swish');
+  B.ui.Over.classList.add('shop'); B.ui.root.classList.add('shopping'); bikeShopTab('paint', true); bikeShopDraw(); bikeSfx('swish');
 }
 function bikeShopClose() {
   const B = BIKE; if (!B.shop) return;
@@ -7169,7 +7319,7 @@ function bikeShopDraw() {   // wallet, swatch states (riding / owned / price), t
   }
   u.ShopAct.disabled = sel.id === cur || (!mine && wal < sel.price);
   u.ShopAct.textContent = sel.id === cur ? 'Riding this one ✓' : mine ? 'Ride in ' + sel.name : wal >= sel.price ? 'Buy for 🐟 ' + sel.price : 'Need 🐟 ' + (sel.price - wal) + ' more';
-  bikePaintApply(sel.id);
+  bikeUpsDraw(wal); bikePaintApply(sel.id);
 }
 function bikeShopPick(id) { const B = BIKE; if (!B.shop || B.shopSel === id) return; B.shopSel = id; bikeSfx('swish'); bikeShopDraw(); }
 function bikeShopAct() {   // buy it (fish out of the wallet), or just ride in one she already owns
@@ -7361,7 +7511,7 @@ function bikeSprayStep(dt, spd, rain) {   // a rooster tail of spray off the bac
 function bikeRainSnd() {   // a soft hiss under everything while it rains (quiet: it's weather, not a waterfall); silent while the tab is hidden
   const B = BIKE; if (!actx) return;
   try {
-    const t = actx.currentTime, lv = B.active && !document.hidden ? B.rain || 0 : 0; let r = B.rainSnd;
+    const t = actx.currentTime, lv = B.active && !document.hidden && !B.paused ? B.rain || 0 : 0; let r = B.rainSnd;
     if (!r) {
       if (lv < 0.01) return;
       r = B.rainSnd = {}; r.n = actx.createBufferSource(); r.n.buffer = bikeNoiseBuf(); r.n.loop = true;
@@ -7382,11 +7532,11 @@ function bikeRunStart() {   // a fresh run: the weather's rolled (about a third 
   B.shop = false; B.shopVO = ''; B.rp = null; B.banked = false; B.passedBest = false;
   rv.root.rotation.y = 0; bikeCam.clearViewOffset(); u.Over.classList.remove('shop'); u.root.classList.remove('rp', 'shopping'); u.Card.classList.remove('rec');
   bikePaintApply(bikePaintId());
-  B.bestD0 = parseInt(bikeLoad('catguard.bikeBestDist', '0'), 10) || 0; if (B.bestD0 >= 30) bikeMarkSet(B.bestD0);
+  B.bestD0 = parseInt(bikeLoad('catguard.bikeBestDist', '0'), 10) || 0; if (B.bestD0 >= 30) bikeMarkSet(B.bestD0); B.passedBest = B.dist > B.bestD0; B.bestS0 = parseInt(bikeLoad('catguard.bikeBest', '0'), 10) || 0;
   const at = Math.random() < 0.3 ? (Math.random() < 0.45 ? 0 : 150 + Math.random() * 650) : Infinity;
   B.rainAt = at; B.rainEnd = at + 700 + Math.random() * 1500; B.rain = at === 0 ? 1 : 0;
   bikeRainOff(); E.flash = 0; E.boltT = 4 + Math.random() * 8; E.wetK = -1; E.sprayAcc = 0; E.spray.life.fill(0); E.spray.pos.fill(-50); E.spray.attr.needsUpdate = true;
-  bikeRecInit(); bikeEnv(0, 0, 0);
+  bikeRecInit(); bikeFxReset(); bikeEnv(0, 0, B.dist);
 }
 
 /* ---------- the instant replay: a ring buffer of the last few seconds (rig, camera, every pooled thing on the road), played back slow from a new angle ---------- */
@@ -7406,7 +7556,7 @@ function bikeRecord() {   // one frame of tape (at most 100 a second)
   v(c.position.x, c.position.y, c.position.z); a[i++] = c.quaternion.x; a[i++] = c.quaternion.y; a[i++] = c.quaternion.z; a[i++] = c.quaternion.w; a[i++] = c.fov;   // 29-36: the chase cam
   v(B.roadTex.offset.y, B.walkTex.offset.y, B.lawnTex.offset.y);                                                                                         // 37-39
   for (const o of B.obs) { const q = o.mesh; a[i++] = q.visible ? 1 : 0; v(q.position.x, q.position.y, q.position.z); v(q.rotation.x, q.rotation.y, q.rotation.z); a[i++] = o.geos.indexOf(q.geometry); }
-  for (const t of B.fish) { const q = t.mesh; a[i++] = q.visible ? 1 : 0; v(q.position.x, q.position.y, q.position.z); a[i++] = q.rotation.y; a[i++] = q.scale.x; }
+  for (const t of B.fish) { const q = t.mesh; a[i++] = q.visible ? (t.gold ? 2 : 1) : 0; v(q.position.x, q.position.y, q.position.z); a[i++] = q.rotation.y; a[i++] = q.scale.x; }
   for (const P of B.powers) { const q = P.mesh; a[i++] = q.visible ? 1 : 0; v(q.position.x, q.position.y, q.position.z); a[i++] = q.rotation.y; a[i++] = 0; }
   for (const s of B.scen) { a[i++] = s.position.z; a[i++] = s.geometry.userData.house !== undefined ? s.geometry.userData.house : -1; }
 }
@@ -7424,7 +7574,7 @@ function bikeSnap(a, b, f) {   // lay a moment of the tape back over the world, 
   for (const o of B.obs) { const q = o.mesh, vis = n[i] > 0.5; g = (a[i] > 0.5) !== (b[i] > 0.5) || Math.abs(a[i + 3] - b[i + 3]) > 6 ? snap : f; i++; q.visible = vis;
     if (vis) { q.position.set(L(), L(), L()); q.rotation.set(L(), L(), L()); const gi = n[i++]; if (gi >= 0 && o.geos[gi]) q.geometry = o.geos[gi]; } else i += 7; }
   for (const t of B.fish) { const q = t.mesh, vis = n[i] > 0.5; g = (a[i] > 0.5) !== (b[i] > 0.5) || Math.abs(a[i + 3] - b[i + 3]) > 6 ? snap : f; i++; q.visible = vis;
-    if (vis) { q.position.set(L(), L(), L()); q.rotation.y = L(); q.scale.setScalar(Math.max(0.001, L())); } else i += 5; }
+    if (vis) { q.geometry = n[i - 1] > 1.5 ? B.fx.goldGeo : B.fx.fishGeo; q.position.set(L(), L(), L()); q.rotation.y = L(); q.scale.setScalar(Math.max(0.001, L())); } else i += 5; }
   for (const p of B.powers) { const q = p.mesh, vis = n[i] > 0.5; g = (a[i] > 0.5) !== (b[i] > 0.5) || Math.abs(a[i + 3] - b[i + 3]) > 6 ? snap : f; i++; q.visible = vis;
     if (vis) { q.position.set(L(), L(), L()); q.rotation.y = L(); i++; } else i += 5; }
   for (const s of B.scen) { g = Math.abs(a[i] - b[i]) > 6 ? snap : f; const h = n[i + 1]; s.position.z = L(); if (h >= 0) s.geometry = B.houses[h]; i++; }
@@ -7470,6 +7620,146 @@ function bikeReplayEnd() {   // back to how things lay after the crash, then the
   B.ui.root.classList.remove('rp'); bikeCam.fov = z[36]; bikeCam.updateProjectionMatrix(); B.phase = 'crash'; bikeCamStep(0); bikeGameOver();
 }
 
+/* ---------- pause, keep riding, and the little touches (dust, speed streaks, a buzz, a jolt) ---------- */
+function bikeBuzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }   // (phones only; never mind if it can't)
+function bikePause() {   // everything holds still (world, clocks, weather, the tape), the engine goes quiet, and a little card offers the way back or home
+  const B = BIKE, u = B.ui; if (!B.active || B.paused || B.shop || (B.phase !== 'ride' && B.phase !== 'count')) return;
+  B.paused = true; B.pauseDrawn = false; B.sw.id = -1;
+  u.PauseSub.textContent = Math.floor(B.dist) + ' m · ' + B.treats + ' fish';
+  u.PauseOv.classList.add('on'); u.root.classList.add('paused'); bikeEngineSet(B.speed); bikeRainSnd();
+}
+function bikeResume() {   // back to it, after a quick 3, 2, 1 (the traffic waits for GO too)
+  const B = BIKE, u = B.ui; if (!B.paused) return;
+  B.paused = false; u.PauseOv.classList.remove('on'); u.root.classList.remove('paused');
+  if (B.phase === 'ride') { B.resumeSpd = B.speed; B.speed = 0; }
+  B.phase = 'count'; B.count = 3; B.countShown = 0; B.go = 0; B.engT = 0;
+  if (typeof initAudio === 'function') initAudio();
+}
+function bikeReviveCost() { return 25 << (BIKE.revives | 0); }   // 25, 50, 100 fish
+function bikeRevive() {   // keep riding: fish out of the wallet, the road round her cleared, kitty back in the saddle, blinking and untouchable for a moment, then 2, 1, GO
+  const B = BIKE, u = B.ui, rv = B.rv; if (!B.active || B.phase !== 'over' || B.shop || B.revives >= 3) return;
+  const cost = bikeReviveCost(), w = bikeWallet(); if (w < cost) { bikeSfx('nope'); return; }
+  bikeSave('catguard.fish', w - cost); B.revives++; B.banked = false;   // (the fish banked at the card stay banked: bikeBank only adds what's new)
+  for (const o of B.obs) if (o.on && (o.flyT > 0 || o.hit || Math.abs(o.z) < 70 || o.kind === 'arrow' || o.kind === 'work' || o.kind === 'sign')) bikeOff(o);   // (roadwork goes as a whole)
+  const x = bikeLaneX(B.lane);
+  rv.body.add(rv.mount); rv.mount.position.set(0, 0.74, -0.1); rv.mount.rotation.set(0, 0, 0); rv.mount.scale.set(1, 1, 1); rv.root.position.set(x, 0, 0); rv.root.rotation.y = 0;
+  Object.assign(B, { phase: 'count', count: 2, countShown: 0, x, prevX: x, fromLane: B.lane, y: 0, prevY: 0, vy: 0, ground: 0, air: false, fly: false, slam: false, lean: 0, pitch: 0,
+    duck: 0, tuck: 0, jumpBuf: 0, wob: 0, stumbleT: -99, safeT: 0, inv: 2.2, speed: 0, go: 0, resumeSpd: Math.max(13, B.crashSpd * 0.85), crashT: 0, crashO: null,
+    shake: 0, kick: 0, overT: 0, nipGrace: 0, tramWarn: 0, hitStop: 0, goMsg: 'Keep riding!' });
+  bikeRecInit();   // a fresh tape, so the next wipeout replays properly
+  u.Over.classList.remove('on', 'shop'); u.root.classList.remove('rp', 'shopping'); u.Card.classList.remove('rec'); u.Msg.classList.remove('pop');
+  u.sc = u.tr = u.dm = u.kmh = u.pw = u.warn = u.tw = u.cp = null; bikeHud(1);
+  bikeEngineOn(); bikeEngineSet(0); bikeSfx('revive'); bikeBuzz(30); bikeCamStep(1);
+}
+function bikeFxBuild(S) {   // made once, with the street: landing dust, speed streaks, golden fish, and the lit bits of the Toronto pieces (the streetcar's sign and headlights, the arrow boards, the roadwork sign)
+  const B = BIKE, G = bikeG, F = B.fx = { stK: 0 };
+  { const N = 40, g = new THREE.BufferGeometry(), pa = new THREE.BufferAttribute(new Float32Array(N * 3).fill(-50), 3); pa.setUsage(THREE.DynamicDrawUsage); g.setAttribute('position', pa);
+    F.dust = { N, pos: pa.array, vel: new Float32Array(N * 3), attr: pa, age: 9, gy: 0 };
+    F.dustPts = new THREE.Points(g, new THREE.PointsMaterial({ map: B.env.glowTex, color: 0xbfa98e, size: 0.5, transparent: true, opacity: 0, depthWrite: false }));
+    F.dustPts.frustumCulled = false; F.dustPts.visible = false; S.add(F.dustPts); }
+  { const N = F.nSt = 40, p = new Float32Array(N * 6), c = new Float32Array(N * 6); F.st = new Float32Array(N * 3);   // streaks: bright at the head, fading up the tail (added on)
+    for (let i = 0; i < N; i++) { c[i * 6] = 0.85; c[i * 6 + 1] = 0.92; c[i * 6 + 2] = 1; bikeStreakSeed(i); F.st[i * 3 + 2] = 3 + Math.random() * 29; }
+    const g = F.stGeo = new THREE.BufferGeometry(), pa = new THREE.BufferAttribute(p, 3); pa.setUsage(THREE.DynamicDrawUsage); g.setAttribute('position', pa); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    F.stLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    F.stLines.frustumCulled = false; F.stLines.visible = false; S.add(F.stLines); }
+  F.fishGeo = B.fish[0].mesh.geometry;   // golden fish: the same fish in gold, with a sparkle (same material, so no new shader)
+  F.goldGeo = bikeMerge([[G.ball(0.28, 1), '#fff27a', 0, 0, 0.02, 0, 0, 0, 0.32, 0.7, 1], [G.cone(0.19, 0.27, 4), '#ffc400', 0, 0, -0.3, Math.PI / 2, 0, 0, 0.35, 1, 1],
+    [G.cone(0.09, 0.16, 3), '#ffc400', 0, 0.2, 0, 0, 0, 0, 0.4, 1, 1], [G.ball(0.035, 0), '#2d1328', 0.08, 0.05, 0.16], [G.ball(0.035, 0), '#2d1328', -0.08, 0.05, 0.16],
+    [G.box(0.05, 0.3, 0.05), '#fffbe8', 0, 0.42, 0, 0, 0, 0.785], [G.box(0.3, 0.05, 0.05), '#fffbe8', 0, 0.42, 0, 0, 0, 0.785]]);
+  F.flashMat = new THREE.MeshBasicMaterial({ vertexColors: true });   // the arrow boards' lamps, all blinking together
+  const lamps = s => { const P = []; for (const [x, y] of [[-0.72, 0], [-0.54, 0], [-0.36, 0], [-0.18, 0], [0, 0], [0.18, 0], [0.36, 0], [0.54, 0], [0.72, 0], [0.58, 0.14], [0.58, -0.14], [0.44, 0.28], [0.44, -0.28], [0.3, 0.42], [0.3, -0.42]])
+    P.push([G.box(0.11, 0.11, 0.03), '#ffb020', s * x, 2.3 + y, -0.68]); return bikeMerge(P); };
+  F.arrowGeo = [lamps(1), lamps(-1)];
+  for (const o of B.pools.arrow) o.mesh.add(new THREE.Mesh(F.arrowGeo[0], F.flashMat));
+  { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const x = cv.getContext('2d');   // the streetcar's destination sign (top) and a headlight (bottom left)
+    x.fillStyle = '#16141a'; x.fillRect(0, 0, 256, 60); x.fillStyle = '#ffb000'; x.font = 'bold 40px "Arial Narrow", Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('504 KING', 128, 31);
+    const gr = x.createRadialGradient(64, 96, 0, 64, 96, 29); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.6, '#fff4c8'); gr.addColorStop(1, '#ffd98a'); x.fillStyle = gr; x.beginPath(); x.arc(64, 96, 28, 0, 7); x.fill();
+    F.tramMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), alphaTest: 0.5 });
+    const pos = [], uv = [], quad = (cx, cy, w, h, u0, v0, u1, v1) => { const a = cx - w / 2, b = cx + w / 2, c = cy - h / 2, d = cy + h / 2, z = 6.14;
+      pos.push(a, c, z, b, c, z, b, d, z, a, c, z, b, d, z, a, d, z); uv.push(u0, v0, u1, v0, u1, v1, u0, v0, u1, v1, u0, v1); };
+    quad(0, 2.68, 1.5, 0.34, 0, 0.53, 1, 1); quad(0.66, 0.95, 0.3, 0.3, 0.14, 0.03, 0.36, 0.47); quad(-0.66, 0.95, 0.3, 0.3, 0.14, 0.03, 0.36, 0.47);
+    const g = F.tramGeo = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeBoundingSphere();
+    for (const o of B.pools.tram) o.mesh.add(new THREE.Mesh(g, F.tramMat)); }
+  { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 128; const x = cv.getContext('2d'), dia = r => { x.beginPath(); x.moveTo(64, 64 - r); x.lineTo(64 + r, 64); x.lineTo(64, 64 + r); x.lineTo(64 - r, 64); x.closePath(); x.fill(); };
+    x.fillStyle = '#1d1b22'; dia(62); x.fillStyle = '#ff8a1a'; dia(55); x.fillStyle = '#1d1b22'; x.font = 'bold 19px Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText('ROAD', 64, 43); x.fillText('WORK', 64, 64); x.fillText('AHEAD', 64, 85);
+    F.signMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), alphaTest: 0.5 });
+    const g = F.signGeo = new THREE.PlaneGeometry(1.3, 1.3); g.rotateY(Math.PI); g.translate(0, 1.95, -0.06);
+    for (const o of B.pools.sign) o.mesh.add(new THREE.Mesh(g, F.signMat)); }
+}
+function bikeFxReset() { const F = BIKE.fx; if (!F) return; F.dust.age = 9; F.dustPts.visible = false; F.stK = 0; F.stLines.visible = false; }
+function bikeDust() {   // a puff of dust where she lands (grey spray on a wet road), dimmer after dark
+  const B = BIKE, F = B.fx; if (!F) return;
+  const D = F.dust, r = B.rv.root.position, k = Math.min(1, B.sun.intensity / 0.55); D.age = 0; D.gy = B.ground + 0.05;
+  F.dustPts.material.color.setHex(B.rain > 0.3 ? 0xc3cad4 : 0xbfa98e).multiplyScalar(0.35 + 0.65 * k);
+  for (let i = 0; i < D.N; i++) { const j = i * 3, a = Math.random() * 6.2832, s = 1.2 + Math.random() * 2.2;
+    D.pos[j] = r.x + Math.cos(a) * 0.3; D.pos[j + 1] = D.gy + Math.random() * 0.15; D.pos[j + 2] = r.z + (Math.random() - 0.5) * 1.2;
+    D.vel[j] = Math.cos(a) * s; D.vel[j + 1] = 0.4 + Math.random() * 1.2; D.vel[j + 2] = Math.sin(a) * s * 0.6 - B.speed * 0.15; }
+}
+function bikeStreakSeed(i) {   // a streak out toward the edge of the view, a way down the road
+  const S = BIKE.fx.st, j = i * 3, dz = 16 + Math.random() * 16, a = Math.random() * 6.2832, r = dz * (0.3 + Math.random() * 0.25);
+  S[j] = Math.cos(a) * r * 1.25; S[j + 1] = Math.sin(a) * r * 0.75 - dz * 0.18; S[j + 2] = dz;
+  const cy = bikeCam ? bikeCam.position.y : 3.4; if (cy + S[j + 1] < 1.2) { S[j + 1] = 0.25 + Math.random() * 0.9 - cy; S[j] = (S[j] < 0 ? -1 : 1) * (3.4 + Math.random() * 2.5); }   // (low ones skim along the curbs, never through her lane)
+}
+function bikeStreakStep(dt, spd, k) {
+  const F = BIKE.fx, S = F.st, A = F.stGeo.attributes.position, p = A.array, c = bikeCam.position, v = spd * 1.4 + 12, len = 1.5 + spd * 0.13;
+  for (let i = 0; i < F.nSt; i++) {
+    const j = i * 3; S[j + 2] -= v * dt; if (S[j + 2] < 2.5) bikeStreakSeed(i);
+    const q = i * 6, x = c.x + S[j], y = c.y + S[j + 1], z = c.z + S[j + 2];
+    p[q] = x; p[q + 1] = y; p[q + 2] = z; p[q + 3] = x; p[q + 4] = y; p[q + 5] = z + len;
+  }
+  A.needsUpdate = true; F.stLines.material.opacity = 0.6 * k;
+}
+function bikeFxStep(dt, spd) {   // the dust settles, the streaks rush past (flat out, or on catnip), the arrow boards blink
+  const B = BIKE, F = B.fx; if (!F) return;
+  const D = F.dust;
+  if (D.age < 0.9) {
+    D.age += dt; const p = D.pos, v = D.vel, k = Math.min(1, dt * 3.5), bz = -spd * 0.45;
+    for (let i = 0; i < D.N; i++) { const j = i * 3; v[j] -= v[j] * k; v[j + 1] -= 2.2 * dt; v[j + 2] += (bz - v[j + 2]) * k; p[j] += v[j] * dt; p[j + 1] = Math.max(D.gy, p[j + 1] + v[j + 1] * dt); p[j + 2] += v[j + 2] * dt; }
+    D.attr.needsUpdate = true; const m = F.dustPts.material; m.opacity = 0.5 * Math.max(0, 1 - D.age / 0.9); m.size = 0.4 + D.age * 1.5;
+  }
+  F.dustPts.visible = D.age < 0.9;
+  const want = B.phase === 'ride' ? Math.max(Math.min(1, Math.max(0, (spd - 23) / 5)), B.nip > 0 ? 1 : 0) : 0;
+  F.stK += (want - F.stK) * Math.min(1, dt * 4); if (want === 0 && F.stK < 0.02) F.stK = 0;
+  F.stLines.visible = F.stK > 0.02; if (F.stLines.visible) bikeStreakStep(dt, spd, F.stK);
+  F.flashMat.color.setScalar(Math.sin(B.t * 8) > -0.1 ? 1 : 0.1);
+}
+
+/* ---------- upgrades: bought with fish in the shop's second tab, kept in localStorage ---------- */
+const BIKE_UPS = [
+  { id: 'nip', icon: '\u{1F33F}', name: 'Longer catnip', desc: '+1.5 s of zoomies a level', price: [80, 160, 320] },
+  { id: 'mag', icon: '\u{1F9F2}', name: 'Stronger magnet', desc: '+2 s and a longer reach a level', price: [80, 160, 320] },
+  { id: 'head', icon: '\u{1F680}', name: 'Head start', desc: 'Start 150 m in, then 300 m', price: [150, 300] },
+  { id: 'luck', icon: '\u{1F340}', name: 'Lucky fish', desc: 'More fish rows, and golden 2× fish', price: [120, 240] },
+];
+function bikeUps() {   // her upgrade levels (a missing, garbled or blocked store is just no upgrades)
+  const u = { nip: 0, mag: 0, head: 0, luck: 0 }; let s = null;
+  try { s = JSON.parse(bikeLoad('catguard.bikeUps', '{}')); } catch (e) {}
+  if (s && typeof s === 'object') for (const d of BIKE_UPS) u[d.id] = Math.max(0, Math.min(d.price.length, parseInt(s[d.id], 10) || 0));
+  return u;
+}
+function bikeUpBuy(id) {   // the next level, fish out of the wallet
+  const B = BIKE, d = BIKE_UPS.find(x => x.id === id); if (!B.shop || !d) return;
+  const ups = bikeUps(), lv = ups[id], w = bikeWallet();
+  if (lv >= d.price.length || w < d.price[lv]) { bikeSfx('nope'); return; }
+  bikeSave('catguard.fish', w - d.price[lv]); ups[id] = lv + 1; bikeSave('catguard.bikeUps', JSON.stringify(ups)); B.ups = ups;
+  bikeSfx('buy'); bikeSay(d.name + '!'); bikeShopDraw();
+}
+function bikeShopTab(t, quiet) {   // Paint | Upgrades
+  const B = BIKE, u = B.ui; B.shopTab = t === 'ups' ? 'ups' : 'paint';
+  for (const b of u.Tabs.children) b.classList.toggle('on', b.dataset.t === B.shopTab);
+  u.Shop.classList.toggle('ups', B.shopTab === 'ups'); u.ShopH.textContent = B.shopTab === 'ups' ? 'Upgrades' : 'Paint shop'; u.Shop.scrollTop = 0;
+  if (!quiet) bikeSfx('swish');
+}
+function bikeUpsDraw(wal) {   // each upgrade: its level pips, and the next level's price (or Max)
+  const u = BIKE.ui, ups = bikeUps();
+  for (const row of u.Ups.children) {
+    const d = BIKE_UPS.find(x => x.id === row.dataset.id), lv = ups[d.id], max = lv >= d.price.length, b = row.querySelector('.bk-up-buy'), pips = row.querySelectorAll('.bk-pips i');
+    for (let k = 0; k < pips.length; k++) pips[k].classList.toggle('on', k < lv);
+    b.classList.toggle('max', max); b.disabled = max || wal < d.price[lv]; b.textContent = max ? 'Max' : '\u{1F41F} ' + d.price[lv];
+  }
+}
+
 /* ---------- the interface the game calls ---------- */
 function startBike(opts) {
   opts = opts || {};
@@ -7480,24 +7770,30 @@ function startBike(opts) {
   B.rider.position.set(0, 0, 0); B.rider.rotation.set(0, 0, 0); rv.scaleG.scale.setScalar(opts.riderScale || 1); rv.scaleG.add(B.rider);
   rv.body.add(rv.mount); rv.mount.position.set(0, 0.74, -0.1); rv.mount.rotation.set(0, 0, 0); rv.mount.scale.set(1, 1, 1);
   Object.assign(B, { resumeSpd: 0, nipGrace: 0, lastCyc: undefined, active: true, phase: 'count', count: 3, countShown: 0, lane: 1, fromLane: 1, x: 0, prevX: 0, y: 0, prevY: 0, vy: 0, ground: 0,
-    air: false, fly: false, slam: false, lean: 0, pitch: 0, duck: 0, tuck: 0, jumpBuf: 0, stumbleT: -99, wob: 0, safeT: 0, runT: 0, speed: 0, go: 1,
+    air: false, fly: false, slam: false, lean: 0, pitch: 0, duck: 0, tuck: 0, jumpBuf: 0, stumbleT: -99, wob: 0, safeT: 0, runT: 0, speed: 0, go: 0,
     dist: 0, treats: 0, combo: 0, comboT: 0, magnet: 0, nip: 0, rowAt: 45, lastGap: 20, powerAt: 320, lastRamp: false, lastIdx: -1, crashT: 0, crashO: null,
-    shake: 0, camX: 0, msgT: -9, hudT: 0, beatT: 0.6, beatN: 0, overT: 0 });
+    shake: 0, camX: 0, msgT: -9, hudT: 0, beatT: 0.6, beatN: 0, overT: 0,
+    paused: false, pauseDrawn: false, hitStop: 0, kick: 0, inv: 0, revives: 0, bankedN: 0, crashSpd: 0, tramWarn: 0, goMsg: '', gold: false, nipMax: 5, magMax: 8, dist0: 0, bestS0: 0,
+    ups: bikeUps(), shut: [0, 0, 0], workAt: 0, tramAt: 0, binAt: 0, binsTo: 0, wkSeg: 0, wkDir: 0, wkSide: 1, wkSigned: true, shopTab: 'paint' });
   B.laneLast.fill(0); B.laneBlock.fill(0); B.sw.id = -1;
+  { const hs = [0, 150, 300][B.ups.head] || 0;   /* head start: 150 m or 300 m in, at the speed she'd have there */
+    if (hs) { let t = 0, dd = 0; while (dd < hs) { t += 0.05; dd += (13 + 17 * (1 - Math.exp(-t / 110))) * 0.05; }
+      Object.assign(B, { dist: hs, dist0: hs, runT: t, resumeSpd: 13 + 17 * (1 - Math.exp(-t / 110)), rowAt: hs + 45, powerAt: hs + 320, lastCyc: hs % 2100, goMsg: 'Head start! ' + hs + ' m' }); } }
   for (const o of B.obs) bikeOff(o);
   for (const t of B.fish) { t.on = false; t.mesh.visible = false; }
   for (const p of B.powers) { p.on = false; p.mesh.visible = false; }
   rv.root.position.set(0, 0, 0);
   while (B.rowAt - B.dist < BIKE_AHEAD) bikeRow();
-  u.root.classList.add('on'); u.Over.classList.remove('on'); u.Msg.classList.remove('pop'); u.Count.classList.remove('pop');
-  u.sc = u.tr = u.dm = u.kmh = u.pw = u.warn = null; bikeHud(1);
+  u.root.classList.add('on'); u.Over.classList.remove('on'); u.Msg.classList.remove('pop'); u.Count.classList.remove('pop'); u.PauseOv.classList.remove('on'); u.root.classList.remove('paused'); rv.body.visible = true;
+  u.sc = u.tr = u.dm = u.kmh = u.pw = u.warn = u.tw = u.cp = null; bikeHud(1);
   bikeEngineOn(); bikeEngineSet(0);
   bikeRunStart();
   bikeCamStep(1);
 }
 function bikeActive() { return BIKE.active; }
 function updateBike(dt) {
-  const B = BIKE; if (!B.active) return;
+  const B = BIKE; if (!B.active || B.paused) return;   // (paused: the whole ride holds its breath)
+  if (B.hitStop > 0) { B.hitStop -= dt; return; }   // (a bump lands with a jolt: a few frames' freeze)
   B.t += dt;
   let edt = dt, spd = B.speed, dist = B.dist;
   if (B.phase === 'replay') { bikeReplayStep(dt); if (B.rp) { edt = dt * B.rp.rate; spd = B.rp.spd; dist = B.rp.dist; } }   // (the weather plays back in slow motion too)
@@ -7505,13 +7801,13 @@ function updateBike(dt) {
     if (B.phase === 'count') {   // 3, 2, 1, GO!
       B.count -= dt; const n = Math.ceil(B.count);
       if (n > 0 && n !== B.countShown) { B.countShown = n; bikeCountPop(String(n)); bikeSfx('beep'); }
-      if (B.count <= 0) { B.phase = 'ride'; bikeCountPop('GO!'); bikeSfx('go'); if (B.resumeSpd) { B.speed = B.resumeSpd; B.resumeSpd = 0; } if (typeof initAudio === 'function') initAudio(); }
+      if (B.count <= 0) { B.phase = 'ride'; B.go = 1; bikeCountPop('GO!'); bikeSfx('go'); if (B.resumeSpd) { B.speed = B.resumeSpd; B.resumeSpd = 0; } if (B.goMsg) { bikeSay(B.goMsg, true); B.goMsg = ''; } if (typeof initAudio === 'function') initAudio(); }   /* (the traffic waited for GO too) */
     } else if (B.phase === 'ride') { bikeRide(dt); bikeBeat(dt); }
     else if (B.phase === 'crash') bikeCrashStep(dt);
     else B.overT += dt;
     bikeWorld(dt); bikePose(dt); bikeCamStep(dt); bikeHud(dt);
   }
-  bikeEnv(edt, spd, dist);
+  bikeEnv(edt, spd, dist); bikeFxStep(edt, spd);
   if (B.phase === 'ride' || B.phase === 'crash') bikeRecord();
   B.engT = (B.engT || 0) - dt; if (B.engT < 0) { B.engT = 0.1; bikeEngineSet(B.speed); bikeRainSnd(); }
   if (B.phase === 'crash' && B.crashT > 1.7) bikeReplayStart();   // she's landed: roll the tape (then the card)
@@ -7520,7 +7816,9 @@ function renderBike() {
   if (!bikeScene) return;
   renderer.getSize(BIKE_SIZE);
   const a = BIKE_SIZE.x / Math.max(1, BIKE_SIZE.y);
-  if (Math.abs(a - bikeCam.aspect) > 1e-3) { bikeCam.aspect = a; bikeCam.updateProjectionMatrix(); }
+  if (Math.abs(a - bikeCam.aspect) > 1e-3) { bikeCam.aspect = a; bikeCam.updateProjectionMatrix(); BIKE.pauseDrawn = false; }
+  if (BIKE.paused && BIKE.pauseDrawn) return;   // (paused: the last frame just stays up)
+  BIKE.pauseDrawn = BIKE.paused;
   renderer.render(bikeScene, bikeCam);
 }
 function bikeSaveRecords() {                                           // (best score and distance, saved even if she leaves before the card)
@@ -7530,9 +7828,9 @@ function bikeSaveRecords() {                                           // (best 
 }
 function exitBike() {
   const B = BIKE; if (!B.active) return;
-  if (B.phase === 'ride' || B.phase === 'crash' || B.phase === 'replay' || (B.phase === 'count' && B.dist > 0)) bikeSaveRecords();
+  if (B.phase === 'ride' || B.phase === 'crash' || B.phase === 'replay' || (B.phase === 'count' && B.dist > B.dist0)) bikeSaveRecords();
   B.active = false; B.phase = 'off';
-  B.ui.root.classList.remove('on'); B.ui.Over.classList.remove('on');
+  B.ui.root.classList.remove('on'); B.ui.Over.classList.remove('on'); B.paused = false; B.ui.PauseOv.classList.remove('on'); B.ui.root.classList.remove('paused');
   bikeEngineOff(); bikeRainOff(); bikeBank(); if (B.shop) bikeShopClose(); B.rp = null; B.ui.root.classList.remove('rp'); bikeCam.clearViewOffset();
   if (B.rider && B.rider !== B.rv.cat && B.rider.parent) B.rider.parent.remove(B.rider);   // hand the clone back
   B.rider = null;
@@ -7596,9 +7894,10 @@ function buildGarage(zF) {                                            // the gar
         const k = r > 0.85 && gg > 0.85 && bb > 0.85 ? 0.3 + 0.7 * ((0.5 + 0.5 * n3.y) ** 2) + 0.5 * d ** 8 : 0.6 + 0.42 * d + 0.06 * Math.max(0, n3.y) - 0.1 * Math.max(0, -n3.y) + 0.25 * d ** 16;
         C.setXYZ(i, Math.min(1, r * k), Math.min(1, gg * k), Math.min(1, bb * k)); } return g; };
     const M = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), body = new THREE.Group(); body.scale.setScalar(K); body.rotation.y = Math.PI; lean.add(body);   // (the same bike as the ride game's, scaled up; nose to the street)
-    const add = (g, m, z) => { const o = new THREE.Mesh(g, m); o.userData.keep = true; g.computeBoundingBox(); o.raycast = nearRaycast; if (z !== undefined) o.position.set(0, 0.3, z); body.add(o); return o; };
+    const add = (g, m, z) => { const o = new THREE.Mesh(g, m); o.userData.keep = true; o.userData.noWalk = true; g.computeBoundingBox(); o.raycast = nearRaycast;   /* (all those triangles: she bumps a simple box instead, below) */ if (z !== undefined) o.position.set(0, 0.3, z); body.add(o); return o; };
     add(bake(mg.body), M); add(mg.glow, M); const wg = bake(mg.wheel); add(wg, M, 0.56); add(wg, M, -0.56); }
-  { const ks = yBox(b, 0.08, 1.0, 0.08, 0x333333, -0.5, 0.45, -0.1); ks.rotation.z = -0.5; }                   // the kickstand
+  { const ks = yBox(b, 0.08, 1.0, 0.08, 0x333333, -0.5, 0.45, -0.1); ks.rotation.z = -0.5; }
+  { const col = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.0, 5.0), new THREE.MeshBasicMaterial({ visible: false })); col.position.set(0, 1.0, 0); col.userData.keep = true; col.userData.collider = true; b.add(col); }   // (what she actually bumps into: a plain box round the bike)                   // the kickstand
   bakeYard(b);
   { const sh = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 4.8), softShadowMat(0.35, true)); sh.rotation.x = -Math.PI / 2; sh.position.set(gx - 0.2, 0.03, zF + 6.4); sh.userData.noWalk = true; sh.renderOrder = 1; povEndWall.add(sh); }
 }
@@ -9534,7 +9833,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 23:12';                                              // stamped when the site is published
+const BUILD = '2026-09-30 01:21';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -9832,7 +10131,7 @@ function pawImpact(at) {                                              // Mouse m
   return !!(hit && ok(hit.object) && !hit.object.userData.wallpaper && interact(hit.object, hit.point, hit.face));   // (a sofa gets scratched, a pillow flies...)
 }
 function updateHeist(dt) {
-  const p = heist.player, pos = p.root.position;
+  const p = heist.player, pos = p.root.position; walkNear(pos.x, pos.y, pos.z);
   if (heist.lvlT > 0) { heist.lvlT -= dt; if (heist.lvlT <= 0 && heist.picks > 0) { openLevelUp(); return; } }
   // ---- steering: toward the finger on the floor, or the arrow keys (relative to the camera)
   _hD.set(0, 0, 0);
@@ -12453,7 +12752,8 @@ const _camRay = new THREE.Raycaster(), _camV = new THREE.Vector3(), _camP = new 
 function camHit(f, c) {                                               // Mouse mode's chase cam: the first solid thing between her and the camera (or null)
   _camV.subVectors(c, f); const L = _camV.length(); if (L < 0.01 || !walk.meshes.length) return null;
   _camRay.set(f, _camV.divideScalar(L)); _camRay.far = L;
-  return _camRay.intersectObjects(walk.meshes, false).find(h => { for (let q = h.object; q; q = q.parent) if (!q.visible) return false; return true; }) || null;
+  const N = walkNear.N, near = N && N.ok && L < N.r - 0.3 && f.distanceTo(N.c) < 0.6;   /* (the camera's never far: test only what's round her) */
+  return _camRay.intersectObjects(near ? N.list : walk.meshes, false).find(h => { for (let q = h.object; q; q = q.parent) if (!q.visible) return false; return true; }) || null;
 }
 function updateFreeCam(dt) {
   if (!fc.on) return;
@@ -12609,10 +12909,44 @@ function makeWalker(dark) {                                          // dark = t
   }
   return { g, body, head, legs, tail, shadow, eyes, peepers, lids };
 }
+function walkNear(x, y, z) {                                          // the solid things within a few metres of her: her feelers only test these (not every mesh in the world)
+  const N = walkNear.N || (walkNear.N = { list: [], c: new THREE.Vector3(), s: new THREE.Sphere(), r: 4.2, ok: false }), M = walk.meshes; if (!M) return;
+  N.list.length = 0; N.c.set(x, y, z); const UR = UPPER.root, up = !!UR && y > UPPER.UF - 0.6 && inUpper(x, z);   /* (up in the flat, only the flat's own things can touch her) */
+  for (let i = 0; i < M.length; i++) { const o = M[i], g = o.geometry;
+    if (up) { if (o.userData.inUp === undefined) { let f = false; for (let q = o; q; q = q.parent) if (q === UR) { f = true; break; } o.userData.inUp = f; } if (!o.userData.inUp) continue; }
+    if (!g.boundingSphere) g.computeBoundingSphere(); N.s.copy(g.boundingSphere).applyMatrix4(o.matrixWorld);
+    const rr = N.r + N.s.radius; if (N.s.center.distanceToSquared(N.c) < rr * rr) N.list.push(o); }
+  N.ok = true;
+}
+function walkMeshesAt(x, y, z) { const N = walkNear.N; return N && N.ok && Math.hypot(x - N.c.x, z - N.c.z) < N.r - 1.2 && Math.abs(y - N.c.y) < N.r - 0.4 ? N.list : walk.meshes; }
+function cullBegin() {                                                // left out of this frame's draw: what the camera can't see anyway (put back straight after)
+  if (!walk.on || !povEndWall) return null; const C = cullBegin;
+  if (!C.ready) { C.ready = true; C.down = []; C.downSmall = []; C.hid = []; const box = new THREE.Box3(), v = new THREE.Vector3(), sz = new THREE.Vector3();
+    for (const o of scene.children) { if (o === povEndWall || !o.userData.name || o.isLight) continue; let lit = false; o.traverse(q => { if (q.isLight) lit = true; }); if (lit) continue;   /* (never anything with a light in it: that would recompile every shader) */
+      box.setFromObject(o); if (box.isEmpty()) continue; box.getCenter(v); box.getSize(sz); if (!inRoomXZ(v.x, v.z) || v.y > CEIL_H) continue;
+      C.down.push(o); if (Math.max(sz.x, sz.y, sz.z) < 1.0) C.downSmall.push(o); }
+    C.front = povEndWall.children.filter(o => o.userData.name === 'Front door' || o.userData.name === 'Garage' || o.userData.name === 'Motorcycle'); }
+  const c = camera.position, U = UPPER, hid = C.hid; hid.length = 0;
+  const hide = o => { if (o.visible) { o.visible = false; hid.push(o); } };
+  const inHouse = c.x > YARD.HL - 0.3 && c.x < YARD.HR + 0.3 && c.z > U.zF - 0.3 && c.z < U.zB + 0.3;
+  if (c.y > CEIL_H + 0.3 && inUpper(c.x, c.z)) C.down.forEach(hide);                                                   // upstairs: the floor hides the whole living room
+  else if (!inHouse && SLIDER && Math.hypot(c.x - SLIDER.DX, c.z - SLIDER.VD) > 6) C.downSmall.forEach(hide);          // out in the yard, well back: the little things through the slider
+  if (!inHouse && U.props) for (const q of U.props) hide(q.g);                                                         // outdoors: the upstairs dishes are specks through the windows
+  if (c.z > U.zB + 0.5) C.front.forEach(hide);                                                                           // out back: the front door, the garage and the bike are round the other side
+  return hid;
+}
+function cullEnd(hid) { if (hid) for (let i = 0; i < hid.length; i++) hid[i].visible = true; }
+function perfAdapt(now) {                                             // slow device: draw at a lower resolution (and back up when there's room)
+  const P = perfAdapt; if (!P.last) { P.last = now; P.ema = 16; P.cap = Math.min(window.devicePixelRatio || 1, 1.75); P.r = P.cap; P.hold = now + 4000; return; }
+  const d = now - P.last; P.last = now; if (d <= 0 || d > 250 || document.hidden) return;     // (a stall, or a hidden tab: not a real frame)
+  P.ema += (d - P.ema) * 0.05; if (now < P.hold) return;
+  if (P.ema > 24 && P.r > 0.75) { P.r = Math.max(0.75, +(P.r - 0.2).toFixed(2)); renderer.setPixelRatio(P.r); P.hold = now + 2500; P.slow = true; }
+  else if (P.ema < 13 && P.r < P.cap) { P.r = Math.min(P.cap, +(P.r + 0.1).toFixed(2)); renderer.setPixelRatio(P.r); P.hold = now + 6000; P.slow = P.r < P.cap; }
+}
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
-  _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY + 0.5;
+  _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - UPPER.UF + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
-  for (const h of _wRay.intersectObjects(walk.meshes, false)) {
+  for (const h of _wRay.intersectObjects(walkMeshesAt(x, fromY, z), false)) {
     let shown = true; for (let q = h.object; q; q = q.parent) if (!q.visible) { shown = false; break; }
     if (shown) { walk.hitObj = h.object; top = h.point.y; break; }
   }
@@ -12642,7 +12976,7 @@ function sideBlocked(x, z, y, mx, mz, scale) {
   _hd.set(dx, 0, dz); _hr.camera = camera;
   for (const h of [0.4, 0.68]) for (const sd of [-0.17, 0, 0.17]) {
     _hr.set(_ho.set(x + dz * sd * g, y + h * g, z - dx * sd * g), _hd); _hr.far = 0.36 * g + ml;
-    for (const hit of _hr.intersectObjects(walk.meshes, false)) {
+    for (const hit of _hr.intersectObjects(walkMeshesAt(x, y, z), false)) {
       let shown = true; for (let q = hit.object; q; q = q.parent) if (!q.visible) { shown = false; break; }
       if (!shown || hit.object.userData.prop) continue;                // (loose things: she walks into those and knocks them flying)
       return true;
@@ -12696,7 +13030,7 @@ function startWalk() {
 const _wUp = new THREE.Vector3(0, 1, 0);
 function headRoom(x, z, y) {                                         // how high she can rise here before her head meets the underside of something
   _wRay.set(_wO.set(x, y + 0.3, z), _wUp); _wRay.far = 3;
-  for (const h of _wRay.intersectObjects(walk.meshes, false)) { let shown = true; for (let q = h.object; q; q = q.parent) if (!q.visible) { shown = false; break; } if (shown) return h.point.y - WALK.height - 0.01; }
+  for (const h of _wRay.intersectObjects(walkMeshesAt(x, y, z), false)) { let shown = true; for (let q = h.object; q; q = q.parent) if (!q.visible) { shown = false; break; } if (shown) return h.point.y - WALK.height - 0.01; }
   return Infinity;
 }
 function standMeshes(extra) {                                         // everything solid enough to stand on or bump into (Free roam, and the mouse in Mouse mode)
@@ -12707,7 +13041,7 @@ function standMeshes(extra) {                                         // everyth
     if (!o.isMesh) return;
     for (let q = o; q; q = q.parent) if (skip.has(q) || q.userData.noWalk) return;
     if (o.userData.name === 'Sky' || o.userData.name === 'Backyard lawn') return;
-    if (o.userData.table) { list.push(o); return; }                   // the acrylic table is see-through, but she can stand on it
+    if (o.userData.table || o.userData.collider) { list.push(o); return; }   // the acrylic table is see-through, but she can stand on it (and invisible stand-in colliders count too)
     if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
     const ws = new THREE.Vector3(); o.getWorldScale(ws); if (o.geometry.boundingSphere.radius * Math.max(ws.x, ws.y, ws.z) < 0.03) return;   // tiny decor (buttons, studs): nothing to stand on
     const m = o.material;
@@ -12732,7 +13066,7 @@ function endWalk() {
 function updateWalk(dt) {
   if (!walk.on || !walk.rig) return;
   cat.visible = false;
-  const K = heist.keys, p = walk.pos, W = walk.rig;
+  const K = heist.keys, p = walk.pos, W = walk.rig; walkNear(p.x, p.y, p.z);
   let sx = walk.stick.x, sy = walk.stick.y;
   if (walk.frozen) { sx = sy = 0; walk.jumpQ = -1; }                   // (stepping through the mirror)
   const kx = (K.arrowright || K.d ? 1 : 0) - (K.arrowleft || K.a ? 1 : 0), ky = (K.arrowdown || K.s ? 1 : 0) - (K.arrowup || K.w ? 1 : 0);
@@ -13972,9 +14306,9 @@ let last = performance.now(), clock = 0, reflFrame = 0;
 // each mirror reflection is a whole extra render of the room: the two mirrors take turns refreshing (one per frame),
 // which roughly halves their cost with no visible difference
 { const refl = []; scene.traverse(o => { if (o.getRenderTarget && o.onBeforeRender) refl.push(o); });
-  refl.forEach((o, i) => { const obr = o.onBeforeRender; o.onBeforeRender = function (...a) { if ((reflFrame + i) % 2) return; if (walk.on && camera.position.z > ROOM.visDepth + 0.3) return; obr.apply(this, a); }; }); }   // (every other frame; and not at all while she's out in the yard, where the mirrors are hidden behind the house wall)
+  refl.forEach((o, i) => { const obr = o.onBeforeRender; o.onBeforeRender = function (...a) { if ((reflFrame + i) % (perfAdapt.slow ? 4 : 2)) return; if (walk.on && (camera.position.z > ROOM.visDepth + 0.3 || camera.position.y > CEIL_H)) return;   /* (a slow device: the mirrors refresh half as often; none of it while she's upstairs) */ obr.apply(this, a); }; }); }   // (every other frame; and not at all while she's out in the yard, where the mirrors are hidden behind the house wall)
 function frame(now) {
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame); perfAdapt(now);
   reflFrame++;
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = Math.max(now, last);   // never a backwards step (rAF stamps can trail performance.now())
   if (state !== 'paused' && state !== 'levelup') clock += dt;   /* (catnip, raves, disco... hold still while paused) */
@@ -14060,7 +14394,7 @@ function frame(now) {
   if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && (camera.position.z >= ROOM.visDepth - 0.05 || !inRoomXZ(camera.position.x, camera.position.z) || upstairsView(camera.position)));   // (or out in the yard, round the front, or upstairs)
   updateUpperLights();   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
-  if (state !== 'tvgame') renderer.render(scene, camera);           // (the room is hidden behind the full-screen TV)
+  if (state !== 'tvgame') { const hid = cullBegin(); renderer.render(scene, camera); cullEnd(hid); }           // (the room is hidden behind the full-screen TV)
 }
 requestAnimationFrame(frame);
 { const hide = () => { const bl = document.getElementById('bootLoader'); if (bl && !bl.dataset.gone) { bl.dataset.gone = 1; bl.style.opacity = 0; bl.style.pointerEvents = 'none'; setTimeout(() => bl.remove(), 500); } };   /* (built: the loading screen fades away) */
