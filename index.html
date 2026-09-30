@@ -371,6 +371,9 @@
     .float{animation-duration:.6s}
     #flash.on{animation-duration:.15s}
   }
+.hud .icon-btn{position:relative}.hud .icon-btn::after{content:'';position:absolute;inset:-9px}
+.modes .link-btn{padding:9px 2px;margin:-5px 0}
+@media (max-width:360px){#walkSwipe{right:calc(118px + env(safe-area-inset-right,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px))}}
 </style>
 
 <div id="bootLoader" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#fbe3ee;color:#c2185b;font:700 18px system-ui,-apple-system,sans-serif;transition:opacity .45s">
@@ -790,7 +793,7 @@ function toggleDresserDoor(x) {
   if (!dresserDoors.length) return;
   let best = dresserDoors[0];
   for (const d of dresserDoors) if (Math.abs(d.x - x) < Math.abs(best.x - x)) best = d;
-  best.target = best.target ? 0 : best.maxOpen || -1.66; bonus(5);            // ~95°: square to the front, clear of its own contents and the neighbour's (the ones behind her box only open as far as the box lets them)
+  best.target = best.target ? 0 : best.maxOpen || -1.66; farmBonus('cupboard', 5);            // ~95°: square to the front, clear of its own contents and the neighbour's (the ones behind her box only open as far as the box lets them)
   if (best === catnip.door && best.target) { unlock('catnipFound'); if (catnipReady()) floatText(catnip.door.center.clone().setY(CAB_H + 0.4), 'Catnip!', 'warn'); }
   sfx.creak(); if (best.target) setTimeout(sfx.rustle, 220);
 }
@@ -951,7 +954,7 @@ function updateOneBlanket(b, dt, time) {
     const p = walk.pos, w = Math.sin(time * 9) * 0.05;
     b.lump.position.set(p.x, p.y + 0.3, p.z); b.lump.rotation.set(Math.sin(time * 6) * 0.08, walk.face, Math.cos(time * 5) * 0.08);
     b.lump.scale.set(0.36 * (1 + w), 0.74 * (1 - w), 0.56);
-    b.rumbleT -= dt; if (b.rumbleT <= 0) { b.rumbleT = 0.8 + Math.random() * 0.8; sfx.rumble(); }
+    b.rumbleT -= dt; if (b.rumbleT <= 0) { b.rumbleT = 0.8 + Math.random() * 0.8; if (state === 'playing') sfx.rumble(); }
   } else if (b.state === 'cat') {                                     // the cat thrashing about underneath
     b.rumbleT -= dt;
     const thrash = Math.sin(time * 13) * 0.5 + Math.sin(time * 7.3) * 0.5;
@@ -959,7 +962,7 @@ function updateOneBlanket(b, dt, time) {
     b.lump.position.z = CAT_POS.z + Math.cos(time * 4.3) * 0.02;
     b.lump.rotation.z = Math.sin(time * 6.2) * 0.1; b.lump.rotation.x = Math.cos(time * 5.4) * 0.08;
     b.lump.scale.set(BOX.w * 0.4 * (1 + Math.max(0, thrash) * 0.05), 0.95 * (1 + Math.sin(time * 9) * 0.06), BOX.d * 0.4 * (1 + Math.max(0, -thrash) * 0.05));
-    if (b.rumbleT <= 0) { b.rumbleT = 0.45 + Math.random() * 0.5; sfx.rumble(); }
+    if (b.rumbleT <= 0) { b.rumbleT = 0.45 + Math.random() * 0.5; if (state === 'playing') sfx.rumble(); }
   }
 }
 function resetBlanket() {
@@ -970,7 +973,10 @@ function resetBlanket() {
   }
   catCard.visible = catTail.visible = !isPov();
 }
-function toggleBlinds() { const r = windowRig; if (!r) return; r.target = r.target > 0.4 ? 0.06 : r.base; sfx.rattle(); bonus(5); }
+function farmBonus(key, pts, at) {                                     // a bonus for poking something: at most once every 8 seconds per thing (no farming the best score)
+  const T = farmBonus.t || (farmBonus.t = {}), k = T[key]; if (k && k.g === gameId && clock < k.t) return; T[key] = { g: gameId, t: clock + 8 }; bonus(pts, at);
+}
+function toggleBlinds() { const r = windowRig; if (!r) return; r.target = r.target > 0.4 ? 0.06 : r.base; sfx.rattle(); farmBonus('blinds', 5); }
 function updateBlinds(dt) {
   const r = windowRig; if (!r) return;
   r.c += (r.target - r.c) * Math.min(1, dt * 3);
@@ -1038,7 +1044,7 @@ function resetMirror() {
   for (const sh of m.shards) sh.mesh.visible = false;
 }
 // mini boxing gloves on strings under the sconce: idle sway, a big swing when batted
-function hitGloves() { if (gloveRig) { gloveRig.swing = 1; sfx.thump(); bonus(5); } }
+function hitGloves() { if (gloveRig) { gloveRig.swing = 1; sfx.thump(); farmBonus('gloves', 5); } }
 function updateGloves(dt, time) {
   const gr = gloveRig; if (!gr) return;
   gr.swing = Math.max(0, gr.swing - dt * 0.6);
@@ -1061,7 +1067,7 @@ function updateSteam(time) {                                          // a curli
   }
 }
 const starSpin = { home: 0, target: 0, wobble: 0 };
-function nudgeStar() { starSpin.target += 0.22; starSpin.wobble = 1; sfx.rustle(); bonus(5); }   // each tap turns it a little further round its stand
+function nudgeStar() { starSpin.target += 0.22; starSpin.wobble = 1; sfx.rustle(); farmBonus('star', 5); }   // each tap turns it a little further round its stand
 function updateStar(dt) {
   if (!starMesh) return;
   starSpin.wobble = Math.max(0, starSpin.wobble - dt * 2.5);
@@ -2790,7 +2796,8 @@ function scratchCouch(side, point, normal) {
   }
   d.level = Math.max(...d.marks.map(m => m.userData.level));
   sfx.scratch(mark.userData.level);
-  bonus(mark.userData.level >= 3 ? 15 : 5, point); if (mark.userData.level >= 3) unlock('sofa');
+  if (mark.userData.level < 3) bonus(5, point); else if (!mark.userData.paid) { mark.userData.paid = 1; bonus(15, point); }   /* (a spot shredded right through pays once) */
+  if (mark.userData.level >= 3) unlock('sofa');
 }
 function resetCouches() {
   for (const k of ['-1', '1']) { const d = couchDamage[k]; d.marks.concat(d.fluff).forEach(o => scene.remove(o)); d.marks = []; d.fluff = []; d.level = 0; }
@@ -3364,9 +3371,9 @@ function setRoomMode(m) {
   musicNext = 0; musicStep = 0;                                        // restart the music on the new groove
 }
 function hitRemote() {
-  sfx.remoteClick(); bonus(10);
+  sfx.remoteClick(); farmBonus('remote', 10);
   if (roomMode === 0) { setRoomMode(1); sfx.powerDown(); unlock('dark'); }
-  else if (roomMode === 1) { setRoomMode(2); sfx.bassDrop(); showBanner('Rave mode!'); unlock('rave'); raveUntil = clock + RAVE_SECS; danceUntil = clock + (gameMode === 'chaos' ? RAVE_SECS : 10); }   // every mouse drops what it's doing and dances (chaos: the whole party)
+  else if (roomMode === 1) { setRoomMode(2); sfx.bassDrop(); showBanner('Rave mode!'); unlock('rave'); raveUntil = clock + RAVE_SECS; if (gameMode === 'chaos' || clock > (hitRemote.cd || 0)) { danceUntil = clock + (gameMode === 'chaos' ? RAVE_SECS : 10); hitRemote.cd = clock + 45; } }   // every mouse drops what it's doing and dances (chaos: the whole party)
   else { setRoomMode(0); sfx.powerUp(); raveUntil = 0; danceUntil = Math.min(danceUntil, clock); }
 }
 function updateRoomFx(dt) {
@@ -8454,12 +8461,14 @@ class Mouse {
         this.faceToward(CAT_POS.x * 0.55 + camera.position.x * 0.45, CAT_POS.z * 0.55 + camera.position.z * 0.45, dt);   // (half to the cat, half to the camera, so we see her face)
         this.model.rotation.z = Math.sin(this.t * 6) * 0.08; bob = Math.abs(Math.sin(this.t * 5)) * 0.03;
         this.lineT -= dt; if (this.lineT <= 0) { this.lineT = 2.8; karenSay(this, KAREN_LECTURE[this.lineI++ % KAREN_LECTURE.length]); }
+        if (this.t > 15) this.setState('kLeave');                    /* (ignored long enough: she storms off) */
         break;
       }
       case 'kRant': {                                                  // "LET ME SPEAK TO A MANAGER!": stomping, hopping mad... straight at the camera (you're the manager)
         this.faceToward(camera.position.x, camera.position.z, dt); bob = Math.abs(Math.sin(this.t * 14)) * 0.09; this.model.rotation.z = Math.sin(this.t * 20) * 0.1;
         p.x += Math.sin(this.t * 3.1) * dt * 0.6;
         this.lineT -= dt; if (this.lineT <= 0) { this.lineT = 2.6; karenSay(this, KAREN_RANT[this.lineI++ % KAREN_RANT.length], true); }
+        if (this.t > 12) this.setState('kLeave');
         break;
       }
       case 'kLeave': {                                                 // storming off to the nearest hole
@@ -8784,7 +8793,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 21:34';                                              // stamped when the site is published
+const BUILD = '2026-09-29 21:41';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -9563,7 +9572,7 @@ function interact(o, point, face) {
     if (!pistolDoor || !pistolDoor.inside.visible) { startSwipe(point, true); setTimeout(() => toggleDresserDoor(pistolDoor ? pistolDoor.x : point.x), 90); tapShake(); return true; }
     return false;
   }
-  if (o.userData.tv) { startSwipe(point, true); if (tvBroken) tvSpark(); else { setTVMode((tvMode + 1) % 3); sfx.tvStatic(tvOn); bonus(5); } tapShake(); return true; }
+  if (o.userData.tv) { startSwipe(point, true); if (tvBroken) tvSpark(); else { setTVMode((tvMode + 1) % 3); sfx.tvStatic(tvOn); farmBonus('tv', 5); } tapShake(); return true; }
   if (o.userData.star) { startSwipe(point, true); setTimeout(nudgeStar, 90); tapShake(); return true; }
   if (o.userData.wallpaper) { if (!point) return false; startSwipe(point, true); const n = o.userData.normal; setTimeout(() => hitWallpaper(point, n), 90); tapShake(); return true; }
   if (gunReady() && ((o.userData.dresserDoor === pistolDoor) || (o.userData.dresser && point && Math.abs(point.x - pistolDoor.x) < pistolDoor.hinge.children[0].geometry.parameters.width * 0.8))) {
@@ -10122,7 +10131,8 @@ function fireGun() {
   const muzzle = gr.held.localToWorld(gr.held.userData.muzzle.clone());
   targets.forEach((m, i) => { tracer(muzzle, m.center.clone(), i * 25); setTimeout(() => shootMouse(m), 40 + i * 25); });
   if (smash) { tracer(muzzle, smash.pos.clone(), 0); setTimeout(() => { burst(smash.pos.clone(), 0xfff0a0, 6, 2, 2, 0.3); sfx.ricochet(); smash.hit(); }, 45); }
-  if (gr.ammo === 0) {                                              // last round: pinballs off four surfaces round the room, then into the TV
+  if (gr.ammo === 0 && walk.on) { const g0 = gameId; setTimeout(() => { if (g0 === gameId) tossGun(); }, 900); }   /* (Free roam: no trick shot round the living room) */
+  else if (gr.ammo === 0) {                                              // last round: pinballs off four surfaces round the room, then into the TV
     const sx = Math.random() < 0.5 ? -1 : 1, W = ROOM.halfW - 0.03;
     const hops = [
       new THREE.Vector3(sx * W, 1.3 + Math.random() * 0.6, 6.2 + Math.random()),              // side wall
@@ -10137,7 +10147,7 @@ function fireGun() {
       if (i < hops.length) { const h = hops[i]; setTimeout(() => { burst(h.clone(), 0xfff0a0, 6, 2, 2, 0.3); sfx.ricochet(); }, (i + 1) * STEP - 20); }
     }
     { const g0 = gameId; setTimeout(() => { if (g0 === gameId) breakTV(); }, path.length * STEP - 60); }
-    setTimeout(tossGun, path.length * STEP + 600);
+    { const g0 = gameId; setTimeout(() => { if (g0 === gameId) tossGun(); }, path.length * STEP + 600); }
   }
   showFireBtn();
 }
@@ -10688,7 +10698,7 @@ function updateCatnip(dt) {
   if (catCrown && catCrown.userData.claimed) catCrown.visible = k !== 'giant';
   // zen: purring, and a life back every few seconds (classic / chaos)
   if (k === 'zen') {
-    catnip.purrT -= dt; if (catnip.purrT <= 0) { catnip.purrT = 3.2; purr(2.6); }
+    catnip.purrT -= dt; if (catnip.purrT <= 0) { catnip.purrT = 3.2; if (state === 'playing') purr(2.6); }
     catnip.zenT -= dt;
     if (catnip.zenT <= 0) {
       catnip.zenT = 4;
@@ -10773,7 +10783,7 @@ function checkKaren() {
   if (!karenState.pending || mice.some(x => x.active && (x.boss || x.kind === 'karen'))) return;
   const m = spawnMouse({ safe: true, kind: 'karen' }); if (!m) return;
   karenState.pending = false;
-  Object.assign(m, { hp: 2, karenMad: false, karenLine: '', lineI: 0, lineT: 0, saidHi: false, willRetreat: false });
+  Object.assign(m, { hp: 3, karenMad: false, karenLine: '', lineI: 0, lineT: 0, saidHi: false, willRetreat: false });
   const T = karenTV(); m.root.position.set(T.x, T.top - 0.55, T.z); m.root.rotation.y = 0; m.setState('kRise');
   startCutscene(m);                                                   // everything stops: close-up on Karen
 }
@@ -10905,8 +10915,9 @@ function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } cat
 
 /* ---------- best score ---------- */
 const BEST_KEY = 'catguard.best';
-function getBest(mouse) { try { return +(localStorage.getItem(BEST_KEY + (mouse ? '.mouse' : '')) || 0); } catch (e) { return 0; } }   // (Mouse mode keeps its own best: mushrooms)
-function setBest(v, mouse) { try { localStorage.setItem(BEST_KEY + (mouse ? '.mouse' : ''), String(v)); } catch (e) {} }
+const bestKey = k => BEST_KEY + (k === true || k === 'mouse' ? '.mouse' : k === 'chaos' ? '.chaos' : '');
+function getBest(kind) { try { return +(localStorage.getItem(bestKey(kind)) || 0); } catch (e) { return 0; } }   // (Mouse mode keeps its own best: mushrooms)
+function setBest(v, kind) { try { localStorage.setItem(bestKey(kind), String(v)); } catch (e) {} }
 function showBestOnStart() { const b = getBest(); $('bestStart').textContent = b ? b : '—'; }
 showBestOnStart();
 
@@ -10999,8 +11010,8 @@ async function shareScore() {
 }
 function showGameOver() {
   state = 'over';
-  const mm = gameMode === 'mouse', val = mm ? heist.stolen : score, best = getBest(mm), isNew = val > best;
-  if (isNew) setBest(val, mm);
+  const mm = gameMode === 'mouse', bk = mm ? 'mouse' : gameMode === 'chaos' ? 'chaos' : '', val = mm ? heist.stolen : score, best = getBest(bk), isNew = val > best;
+  if (isNew) setBest(val, bk);
   $('overEyebrow').textContent = isNew && val > 0 ? 'New best!' : 'Game over';
   $('overTitle').textContent = endReason === 'heist' ? 'Heist complete!' : endReason === 'caught' ? 'The cat got you' : endReason === 'chaos' ? 'Chaos complete!' : endReason === 'cheese' ? (prizeMode === 'mushroom' ? 'The mushrooms are gone' : 'The cheese is gone') : 'Out of lives';
   $('overReason').textContent = ''; $('overReason').hidden = true;
@@ -11053,7 +11064,7 @@ $('overTitleBtn').addEventListener('click', () => { ui.over.hidden = true; quitT
 $('pauseBtn').addEventListener('click', pauseGame);
 $('resumeBtn').addEventListener('click', resumeGame);
 $('quitBtn').addEventListener('click', quitToTitle);
-document.addEventListener('visibilitychange', () => { if (document.hidden) { pauseGame(); todAudioStop(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { pauseGame(); todAudioStop(); if (actx) actx.suspend().catch(() => {}); } });
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape' || e.key === 'p') { state === 'playing' ? pauseGame() : resumeGame(); }
 });
@@ -13220,7 +13231,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   reflFrame++;
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = Math.max(now, last);   // never a backwards step (rAF stamps can trail performance.now())
-  clock += dt;
+  if (state !== 'paused' && state !== 'levelup') clock += dt;   /* (catnip, raves, disco... hold still while paused) */
   if (state === 'bike') { if (typeof updateBike === 'function') { updateBike(dt); renderBike(); } return; }   // out on the motorcycle: its own little world
 
   if (state === 'playing' || state === 'ending') {
