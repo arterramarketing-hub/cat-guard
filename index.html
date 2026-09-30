@@ -6863,7 +6863,7 @@ function buildGarage(zF) {                                            // the gar
         const k = r > 0.85 && gg > 0.85 && bb > 0.85 ? 0.3 + 0.7 * ((0.5 + 0.5 * n3.y) ** 2) + 0.5 * d ** 8 : 0.6 + 0.42 * d + 0.06 * Math.max(0, n3.y) - 0.1 * Math.max(0, -n3.y) + 0.25 * d ** 16;
         C.setXYZ(i, Math.min(1, r * k), Math.min(1, gg * k), Math.min(1, bb * k)); } return g; };
     const M = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), body = new THREE.Group(); body.scale.setScalar(K); body.rotation.y = Math.PI; lean.add(body);   // (the same bike as the ride game's, scaled up; nose to the street)
-    const add = (g, m, z) => { const o = new THREE.Mesh(g, m); o.userData.keep = true; if (z !== undefined) o.position.set(0, 0.3, z); body.add(o); return o; };
+    const add = (g, m, z) => { const o = new THREE.Mesh(g, m); o.userData.keep = true; g.computeBoundingBox(); o.raycast = nearRaycast; if (z !== undefined) o.position.set(0, 0.3, z); body.add(o); return o; };
     add(bake(mg.body), M); add(mg.glow, M); const wg = bake(mg.wheel); add(wg, M, 0.56); add(wg, M, -0.56); }
   { const ks = yBox(b, 0.08, 1.0, 0.08, 0x333333, -0.5, 0.45, -0.1); ks.rotation.z = -0.5; }                   // the kickstand
   bakeYard(b);
@@ -7019,6 +7019,7 @@ function bikeSwipe(paw) {                                             // a swipe
 }
 function startBikeGame() {                                            // into the motorcycle game (the house holds still while she's out riding)
   if (typeof startBike !== 'function' || state !== 'playing' || !walk.on) return;
+  todAudioStop();
   state = 'bike'; walk.stick.x = walk.stick.y = 0; walk.vel.set(0, 0, 0); document.body.classList.add('biking'); $('walkUI').hidden = true; ui.hud.hidden = true; if (UPPER.aunty) hideBubbles(UPPER.aunty);
   const rider = walk.rig.g.clone(true); rider.position.set(0, 0, 0); rider.rotation.set(0, 0, 0); rider.scale.setScalar(1); rider.visible = true;
   tone(80, 160, 0.5, 'sawtooth', 0.04); noise(0.4, 0.05, 600);                                            // (vroom)
@@ -7124,8 +7125,9 @@ function todInit() {
   const sky = skyRig.children.find(o => o.userData.name === 'Sky' && o !== cloudDome);
   const T = TOD = { i: 1, t: 0, sky, skies: { day: sky.material.map }, mats: [], scanT: 0, tint: new THREE.Color(1, 1, 1), last: new THREE.Color(-1, -1, -1), nightF: 0,
     wx: null, W: 0, wxT: 0, wxLeft: 0, flash: 0, boltT: 8, audio: null };
-  const layer = (r, ro) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 48, 24), new THREE.MeshBasicMaterial({ map: T.skies.day, side: THREE.BackSide, fog: false, depthWrite: false, transparent: true, opacity: 0 }));
+  const layer = (r, ro) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 48, 24), new THREE.MeshBasicMaterial({ map: T.skies.day, side: THREE.BackSide, fog: false, depthWrite: false, transparent: false, opacity: 0, blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor }));   /* (opaque pass: drawn just after the sky, never over the far houses) */
     m.renderOrder = ro; m.userData.name = 'Sky'; m.visible = false; skyRig.add(m); return m; };
+  ['morning', 'golden', 'dusk', 'night'].forEach((k, i) => setTimeout(() => todSkyTex(k), 1500 + i * 700));   /* (paint the other skies in the background, not mid-transition) */
   T.skyB = layer(59.7, -1.9); T.murk = layer(59.4, -1.8); T.murk.material.map = todSkyTex('overcast');
   // the street lamps and the porch lanterns, lit at dusk
   const G = T.nightG = new THREE.Group(); G.userData.name = 'Street lamps'; G.userData.noWalk = true; povEndWall.add(G);
@@ -7158,7 +7160,7 @@ function todInit() {
 }
 function todScan() {                                                   // which materials are "outdoors" (tinted by the time of day): everything out there but the sky, glows, the garage and the house's insides
   const T = TOD, inc = new Set(), exc = [], v = new THREE.Vector3();
-  const EXC = new Set(['Wall', 'Disco ball', 'Vertical blinds', 'Mosaic mirror art', 'Upstairs', 'Garage', 'Motorcycle']);
+  const EXC = new Set(['Wall', 'Disco ball', 'Vertical blinds', 'Mosaic mirror art', 'Upstairs', 'Garage', 'Motorcycle', 'Laundry', 'Zombies']);
   const ok = m => m && !Array.isArray(m) && m.color && !m.isSpriteMaterial && m.blending !== THREE.AdditiveBlending && !m.userData.noTod;
   for (const top of povEndWall.children) {
     if (top === skyRig) continue;
@@ -7171,6 +7173,7 @@ function todScan() {                                                   // which 
   for (const m of inc) if (!m.userData.tod0) m.userData.tod0 = m.color.clone();
   T.mats = [...inc]; T.last.setRGB(-1, -1, -1);
 }
+function todAudioStop() { const T = TOD; if (!T || !T.audio) return; try { T.audio.g.gain.setTargetAtTime(0, actx.currentTime, 0.08); T.audio.src.stop(actx.currentTime + 0.5); } catch (e) {} T.audio = null; }
 function todSay(s) { if (walk.on && state === 'playing' && typeof showWalkName === 'function') showWalkName(s); }
 function todWeather(kind) {                                            // start (or stop, with null) some weather
   const T = TOD; if (kind) { T.wx = kind; T.wxLeft = 70 + Math.random() * 90; T.murk.material.map = todSkyTex('overcast'); todSay(kind === 'rain' ? '🌧️ It\'s starting to rain...' : '❄️ It\'s snowing!'); }
@@ -7190,11 +7193,11 @@ function updateTOD(dt) {
   if (T.wx) { if (run) T.wxLeft -= dt; T.W = Math.max(0, Math.min(1, T.W + (T.wxLeft > 0 ? dt : -dt) / 8)); if (T.W <= 0 && T.wxLeft <= 0) T.wx = null; }
   const W = T.wx ? T.W : 0, rain = T.wx === 'rain', snow = T.wx === 'snow';
   const wt = rain ? [0.66, 0.7, 0.78] : snow ? [1.06, 1.08, 1.14] : [1, 1, 1];
-  if (rain && W > 0.8 && run && (T.boltT -= dt) <= 0) { T.boltT = 14 + Math.random() * 22; T.flash = 0.35; if (actx) setTimeout(() => { noise(1.8, 0.22, 110); noise(0.9, 0.12, 260); }, 400 + Math.random() * 1400); }   // thunder
+  if (rain && W > 0.8 && run && (T.boltT -= dt) <= 0) { T.boltT = 14 + Math.random() * 22; T.flash = 0.35; if (actx) setTimeout(() => { if (state === 'playing') { noise(1.8, 0.22, 110); noise(0.9, 0.12, 260); } }, 400 + Math.random() * 1400); }   // thunder
   if (T.flash > 0) T.flash = Math.max(0, T.flash - dt);
   const fl = T.flash > 0 && (T.flash > 0.25 || (T.flash > 0.08 && T.flash < 0.14)) ? 1.9 : 1;
   T.tint.setRGB(L(cur.tint[0], nxt.tint[0]) * (1 + (wt[0] - 1) * W) * fl, L(cur.tint[1], nxt.tint[1]) * (1 + (wt[1] - 1) * W) * fl, L(cur.tint[2], nxt.tint[2]) * (1 + (wt[2] - 1) * W) * fl);
-  if ((T.scanT -= dt) <= 0) { T.scanT = 12; todScan(); }
+  if ((T.scanT -= dt) <= 0 || T.nKids !== povEndWall.children.length) { T.scanT = 60; T.nKids = povEndWall.children.length; todScan(); }
   if (Math.abs(T.tint.r - T.last.r) + Math.abs(T.tint.g - T.last.g) + Math.abs(T.tint.b - T.last.b) > 0.004) { T.last.copy(T.tint);
     for (const m of T.mats) m.color.copy(m.userData.tod0).multiply(T.tint); }
   { const cl = [L(cur.cloud[0], nxt.cloud[0]), L(cur.cloud[1], nxt.cloud[1]), L(cur.cloud[2], nxt.cloud[2])], g = 1 - 0.35 * W * (rain ? 1 : 0.3);
@@ -7218,7 +7221,7 @@ function updateTOD(dt) {
       else { a[o] = x; a[o + 1] = y; a[o + 2] = z; a[o + 3] = x + 0.8 * sl; a[o + 4] = y + 0.8; a[o + 5] = z; } }
     A.needsUpdate = true;
     const B = T.splashM.geometry.attributes.position, b = B.array; T.splashM.material.opacity = 0.7 * W * dim;
-    for (let i = 0; i < b.length / 3; i++) if (Math.random() < dt * 7 || b[i * 3 + 1] === 0) { let x = c.x + (Math.random() - 0.5) * 24, z = c.z + (Math.random() - 0.5) * 24;
+    for (let i = 0; i < b.length / 3; i++) if (Math.random() < dt * 7 || b[i * 3 + 1] === 0) { let x = c.x + (Math.random() - 0.5) * 24, z = c.z + (Math.random() - 0.5) * 24; if (Math.hypot(x - c.x, z - c.z) < 2.5) x += Math.sign(x - c.x || 1) * 2.5;
       if (inside(x, z)) x = z = 1e4; b[i * 3] = x; b[i * 3 + 1] = 0.04 + Math.random() * 0.06; b[i * 3 + 2] = z; }
     B.needsUpdate = true; }
   if (T.snowM.visible) { const S = T.snow, A = T.snowM.geometry.attributes.position, a = A.array, tm = performance.now() / 1000;
@@ -7373,7 +7376,7 @@ function zGroan(vol) { const f = 70 + Math.random() * 40; tone(f, f * 0.7, 0.9, 
 function zHud() {
   if (!ZN.hud) { const d = ZN.hud = document.createElement('div'); d.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,26,14,.78);color:#d8ff9a;font:700 15px system-ui,sans-serif;padding:7px 16px;border-radius:18px;border:2px solid #7fbf3a;text-shadow:0 1px 2px #000;white-space:nowrap'; document.body.appendChild(d); }
   ZN.hud.hidden = !ZN.on || state !== 'playing'; if (ZN.hud.hidden) return;
-  ZN.hud.textContent = `🧟 Zombie night · Wave ${ZN.wave} · 💀 ${ZN.kills} · ${'❤️'.repeat(Math.max(0, ZN.hearts))}${'🖤'.repeat(Math.max(0, 3 - ZN.hearts))}`;
+  const txt = `🧟 Zombie night · Wave ${ZN.wave} · 💀 ${ZN.kills} · ${'❤️'.repeat(Math.max(0, ZN.hearts))}${'🖤'.repeat(Math.max(0, 3 - ZN.hearts))}`; if (txt !== ZN.hudTxt) { ZN.hudTxt = txt; ZN.hud.textContent = txt; }
 }
 function zSpawnSpot() {                                                // somewhere on our lawn a few metres from her, clear of the patio, shed and so on
   const p = walk.pos;
@@ -7384,23 +7387,36 @@ function zSpawnSpot() {                                                // somewh
     return [x, z]; }
   return null;
 }
+function zPool() {                                                    // the eight zombies, built once (ahead of time, at dusk, so the big moment doesn't stutter)
+  if (ZN.pool) return; ZN.root = new THREE.Group(); ZN.root.userData.noWalk = true; ZN.root.userData.name = 'Zombies'; scene.add(ZN.root); ZN.pool = true; ZN.z = [];
+  for (let i = 0; i < 8; i++) { const q = makeZombie(i); zReset(q); q.g.visible = false; q.mound.visible = false; ZN.root.add(q.g, q.mound); ZN.z.push(q); }
+}
+function zAbort() {                                                   // leaving Free roam mid-night: everything back underground, no win, no HUD
+  if (!ZN) return; ZN.on = false; ZN.cool = true; ZN.sitT = 0;
+  if (ZN.z) for (const q of ZN.z) { q.st = 'off'; q.g.visible = false; q.mound.visible = false; q.mound.material.opacity = 0; zReset(q); }
+  if (ZN.hud) ZN.hud.hidden = true; if (ZN.flashEl) ZN.flashEl.style.opacity = 0;
+}
 function zStart() {
-  if (!ZN.pool) { ZN.root = new THREE.Group(); ZN.root.userData.noWalk = true; ZN.root.userData.name = 'Zombies'; scene.add(ZN.root); ZN.pool = true; ZN.z = [];
-    for (let i = 0; i < 8; i++) { const q = makeZombie(i); zReset(q); q.g.visible = false; ZN.root.add(q.g, q.mound); ZN.z.push(q); } }
+  zPool();
   Object.assign(ZN, { on: true, wave: 0, kills: 0, hearts: 3, left: 0, spawnT: 1.5, breakT: 0, hurtT: 0, waves: 0 });
   zNextWave(); showWalkName('🧟 The ground is moving... ZOMBIES! Pounce on their heads or swipe them!'); zGroan(0.05); setTimeout(() => zGroan(0.04), 500);
 }
 function zNextWave() { ZN.wave++; ZN.left = 2 + ZN.wave * 2; ZN.spawnT = 1.2; ZN.breakT = 0; if (ZN.wave > 1) showWalkName(`🧟 Wave ${ZN.wave}! More of them are coming up...`); }
 function zEnd(won, why) {
   ZN.on = false; ZN.cool = true; for (const q of ZN.z) if (q.st !== 'off' && q.st !== 'die') { q.st = 'sink'; q.t = 0; }
-  if (won) { const fresh = !achDone.zombieNight; unlock('zombieNight'); showWalkName(`${why} You survived zombie night! ${ZN.kills} zombies bopped${fresh ? '' : ' (again)'}`); [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.16, 'triangle', 0.04, i * 0.1)); }
-  else { showWalkName(`🧟 The zombies got her! They sink back into the mud... (${ZN.kills} bopped)`); tone(300, 90, 0.8, 'sawtooth', 0.04); }
+  if (won && ZN.kills < 6) { showWalkName(`${why} Zombie night is over... but she only bopped ${ZN.kills}. Fight at least 6 for the achievement!`); won = null; }
+  else if (won) { const fresh = !achDone.zombieNight; unlock('zombieNight'); showWalkName(`${why} You survived zombie night! ${ZN.kills} zombies bopped${fresh ? '' : ' (again)'}`); [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.16, 'triangle', 0.04, i * 0.1)); }
+  else if (won === false) { showWalkName(`🧟 The zombies got her! They sink back into the mud... (${ZN.kills} bopped)`); tone(300, 90, 0.8, 'sawtooth', 0.04); }
   zHud();
 }
 function zKill(q, how) {
   q.st = 'die'; q.t = 0; ZN.kills++; q.dir = how === 'stomp' ? 0 : 1;
   burst(new THREE.Vector3(q.x, 1.2, q.z), 0x8fcf4a, 14, 3, 2, 0.35); noise(0.15, 0.3, 500); tone(180, 60, 0.3, 'square', 0.05); zGroan(0.025);
   if (how === 'stomp') { walk.vy = WALK.jumpV * 0.7; walk.grounded = false; walk.squash = 1; tone(660, 990, 0.1, 'triangle', 0.04); }
+}
+function zFlash() {                                                  // a red flash round the screen's edge when one gets her
+  if (!ZN.flashEl) { const d = ZN.flashEl = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:59;box-shadow:inset 0 0 90px 30px rgba(200,20,20,.75);opacity:0;transition:opacity .5s ease-out'; document.body.appendChild(d); }
+  const d = ZN.flashEl; d.style.transition = 'none'; d.style.opacity = 1; void d.offsetWidth; d.style.transition = 'opacity .6s ease-out'; d.style.opacity = 0;
 }
 function zombieSwipe(paw) {
   if (!ZN || !ZN.on) return false; let best = null, bd = 1.1;
@@ -7419,7 +7435,7 @@ function updateZombies(dt) {
   if (!ok) ZN.cool = false;                                           // (one rising per rainy night)
   if (!ZN.on && ok && !ZN.cool && inOurYard(p.x, p.z) && p.z > ROOM.visDepth + 2) zStart();
   if (ZN.on && !ok) zEnd(true, TOD.nightF > 0.8 ? '🌧️ The rain stops.' : '🌅 The sun comes up.');
-  if (!ZN.pool) return;
+  if (!ZN.pool) { if (TOD && TOD.nightF > 0.3) zPool(); return; }
   const inYard = inOurYard(p.x, p.z);
   if (ZN.on) {
     if (ZN.hurtT > 0) ZN.hurtT -= dt;
@@ -7438,20 +7454,22 @@ function updateZombies(dt) {
     else if (q.st === 'walk') {                                        // shamble toward her (they stay on our lawn)
       const want = Math.atan2(dx, dz); let da = want - q.face; da = Math.atan2(Math.sin(da), Math.cos(da)); q.face += da * Math.min(1, dt * 2.5);
       if (d > 0.5) { const sp = q.sp * (0.55 + 0.45 * Math.max(0, Math.sin(q.gp)));   /* (it lurches on the good leg, drags the bad one) */ let nx = q.x + Math.sin(q.face) * sp * dt, nz = q.z + Math.cos(q.face) * sp * dt;
-        if (!ZN.z.some(o => o !== q && (o.st === 'walk' || o.st === 'rise') && Math.hypot(o.x - nx, o.z - nz) < 0.8) && inOurYard(nx, nz) && nz > ROOM.visDepth + 1 && !YARD_BLOCKS.some(([x0, x1, z0, z1]) => nx > x0 && nx < x1 && nz > z0 && nz < z1)) { q.x = nx; q.z = nz; } }
+        const free = (x, z) => !ZN.z.some(o => o !== q && (o.st === 'walk' || o.st === 'rise') && Math.hypot(o.x - x, o.z - z) < 0.8) && inOurYard(x, z) && z > ROOM.visDepth + 1 && !YARD_BLOCKS.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1);
+        if (free(nx, nz)) { q.x = nx; q.z = nz; } else if (free(nx, q.z)) q.x = nx; else if (free(q.x, nz)) q.z = nz; }   /* (blocked: slide along it) */
       zPose(q, dt, d);
       if ((q.groanT -= dt) <= 0) { q.groanT = 3 + Math.random() * 5; if (d < 14) zGroan(0.03 * Math.max(0.2, 1 - d / 14)); }
       const hy = 1.85 * q.sc;                                          // (the top of its head)
       if (walk.vy < -0.5 && d < 0.8 && p.y > hy - 0.7 && p.y < hy + 0.45) zKill(q, 'stomp');
-      else if (ZN.on && d < 0.62 && p.y < 1.1 && ZN.hurtT <= 0) {       // it got her: a heart, and she's knocked back
-        ZN.hurtT = 1.6; ZN.hearts--; q.atk = 0.35; const ox = dx / (d || 1), oz = dz / (d || 1); walk.vel.set(ox * 7, 0, oz * 7); walk.vy = 5; walk.grounded = false; walk.flingT = clock + 0.6; walk.squash = 1;
+      else if (ZN.on && d < (p.y > 0.9 ? 1.75 : 0.62) && p.y < 2.0 && ZN.hurtT <= 0) {   /* (they reach up and grab at her on a perch, too) */       // it got her: a heart, and she's knocked back
+        ZN.hurtT = 1.6; ZN.hearts--; q.atk = 0.35; zFlash(); const ox = dx / (d || 1), oz = dz / (d || 1); walk.vel.set(ox * 7, 0, oz * 7); walk.vy = 5; walk.grounded = false; walk.flingT = clock + 0.6; walk.squash = 1;
         tone(900, 1700, 0.18, 'sawtooth', 0.04); noise(0.1, 0.25, 700); zGroan(0.05);
         if (ZN.hearts <= 0) zEnd(false); else showWalkName(ZN.hearts === 1 ? '🧟 Ouch! Last heart - careful!' : '🧟 A zombie got her! Ouch!'); }
       if (!ZN.on) { q.st = 'sink'; q.t = 0; } }
     else if (q.st === 'die') { if (zPose(q, dt, d)) { q.st = 'off'; q.g.visible = false; zReset(q); } }
     else if (q.st === 'sink') { zPose(q, dt, d); if (q.body.position.y < -2.2) { q.st = 'off'; q.g.visible = false; zReset(q); } }
     q.g.position.set(q.x, 0, q.z); q.g.rotation.y = q.face;
-    if (q.mound.material.opacity > 0 && q.st !== 'rise') q.mound.material.opacity = Math.max(0, q.mound.material.opacity - dt * 0.08); }
+    if (q.mound.material.opacity > 0 && q.st !== 'rise') q.mound.material.opacity = Math.max(0, q.mound.material.opacity - dt * 0.08); q.mound.visible = q.mound.material.opacity > 0; }
+  if (makeZombie.mat) { const k = 0.55, tn = TOD ? TOD.tint : null; if (tn) makeZombie.mat.color.setRGB(1 + (Math.min(1.2, tn.r) - 1) * k, 1 + (Math.min(1.2, tn.g) - 1) * k, 1 + (Math.min(1.2, tn.b) - 1) * k); }   /* (dimmed with the night, eyes still bright) */
   zHud();
 }
 function updateYardLife(dt) {                                         // the sky rides with the camera; clouds drift; butterflies flit; birds circle; birdsong outside
@@ -8515,7 +8533,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 20:22';                                              // stamped when the site is published
+const BUILD = '2026-09-29 20:56';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -10777,7 +10795,7 @@ $('overTitleBtn').addEventListener('click', () => { ui.over.hidden = true; quitT
 $('pauseBtn').addEventListener('click', pauseGame);
 $('resumeBtn').addEventListener('click', resumeGame);
 $('quitBtn').addEventListener('click', quitToTitle);
-document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { pauseGame(); todAudioStop(); } });
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape' || e.key === 'p') { state === 'playing' ? pauseGame() : resumeGame(); }
 });
@@ -11688,7 +11706,7 @@ function standMeshes(extra) {                                         // everyth
   return list;
 }
 function endWalk() {
-  stopDisco(); walk.napT = 0; coonHide();
+  zAbort(); todAudioStop(); stopDisco(); walk.napT = 0; coonHide();
   walk.on = false; walkPtr = null; walk.stick.x = walk.stick.y = 0;
   if (walk.poops) { walk.poops.forEach(o => freeMesh(o)); walk.poops = []; }
   MW.pushT = 0; { const rp = document.getElementById('mirrorRipple'); if (rp) rp.style.opacity = 0; }
