@@ -7242,24 +7242,133 @@ function updateTOD(dt) {
 // Waves get bigger; each zombie that reaches her costs a heart (three a night). Survive till the rain stops or the sun comes up, or clear three waves, for the achievement.
 var ZN = null;
 function zombieOK() { return !!TOD && TOD.nightF > 0.8 && TOD.wx === 'rain' && TOD.W > 0.7; }
-function makeZombie() {                                                // a shambling cartoon zombie, about twice her height: torn shirt, green skin, glowing eyes
-  const M = (hex, e) => { const m = new THREE.MeshLambertMaterial({ color: hex, emissive: new THREE.Color(hex).multiplyScalar(e === undefined ? 0.45 : e) }); m.userData.noTod = true; return m; };
-  const skin = M(0x7fa05a), shirt = M([0x6a4f7a, 0x4f6a78, 0x7a5a3e, 0x8a3a3a][Math.random() * 4 | 0]), pants = M(0x33384a), dark = M(0x1d1a18, 0.2), rot = M(0x5d7a40);
-  const B = (par, w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); par.add(o); return o; };
-  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
-  const legs = [-1, 1].map(s => { const l = new THREE.Group(); l.position.set(s * 0.16, 0.72, 0); body.add(l); B(l, 0.22, 0.72, 0.24, pants, 0, -0.36, 0); B(l, 0.24, 0.12, 0.34, dark, 0, -0.7, 0.05); return l; });
-  const torso = new THREE.Group(); torso.position.y = 0.72; torso.rotation.x = 0.18; body.add(torso);
-  B(torso, 0.56, 0.62, 0.3, shirt, 0, 0.31, 0); B(torso, 0.2, 0.14, 0.02, rot, 0.12, 0.2, 0.16); B(torso, 0.12, 0.2, 0.02, skin, -0.14, 0.42, 0.16);   // (rips in the shirt)
-  const arms = [-1, 1].map(s => { const a = new THREE.Group(); a.position.set(s * 0.36, 0.56, 0); torso.add(a); a.rotation.x = -1.45;   // (arms out in front, of course)
-    B(a, 0.16, 0.56, 0.16, shirt, 0, -0.22, 0); B(a, 0.13, 0.2, 0.13, skin, 0, -0.56, 0); for (const f of [-1, 0, 1]) B(a, 0.03, 0.1, 0.03, skin, f * 0.04, -0.7, 0.02); return a; });
-  const head = new THREE.Group(); head.position.set(0, 0.7, 0.04); torso.add(head); head.rotation.z = 0.25;
-  B(head, 0.4, 0.42, 0.38, skin, 0, 0.2, 0); B(head, 0.42, 0.1, 0.4, dark, 0, 0.42, -0.02); B(head, 0.18, 0.05, 0.02, dark, 0, 0.06, 0.2); B(head, 0.05, 0.06, 0.02, M(0xeeeedd, 0.5), 0.04, 0.05, 0.205);
-  B(head, 0.1, 0.08, 0.02, rot, -0.12, 0.3, 0.195);
-  for (const s of [-1, 1]) { const e = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xb6ff3a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-    e.position.set(s * 0.09, 0.2, 0.21); e.scale.setScalar(0.22); head.add(e); B(head, 0.06, 0.05, 0.02, M(0xd8ff7a, 1.2), s * 0.09, 0.2, 0.2); }
-  const mound = new THREE.Mesh(new THREE.CircleGeometry(0.7, 14), new THREE.MeshBasicMaterial({ color: 0x3a2a1c, transparent: true, opacity: 0, depthWrite: false })); mound.rotation.x = -Math.PI / 2; mound.renderOrder = 1; mound.material.userData.noTod = true;
-  return { g, body, legs, arms, torso, head, mound, st: 'off', t: 0, x: 0, z: 0, face: 0, sp: 1, ph: Math.random() * 7, groanT: 2 + Math.random() * 4 };
+function zMerge(parts, jit) {                                          // a zombie body part: merged pieces with baked light and a mottled, grubby finish
+  const g = bikeMerge(parts), N = g.attributes.normal, C = g.attributes.color, L = zMerge.L || (zMerge.L = new THREE.Vector3(0.35, 0.8, 0.5).normalize()), n = new THREE.Vector3();
+  let s = 1;
+  for (let i = 0; i < C.count; i++) { if (i % 3 === 0) s = 1 + (Math.random() - 0.5) * (jit === undefined ? 0.16 : jit); n.fromBufferAttribute(N, i);
+    const k = (0.48 + 0.55 * Math.max(0, n.dot(L)) + 0.12 * Math.max(0, n.y) - 0.14 * Math.max(0, -n.y)) * s;
+    C.setXYZ(i, Math.min(1, C.getX(i) * k), Math.min(1, C.getY(i) * k), Math.min(1, C.getZ(i) * k)); }
+  return g;
 }
+function makeZombie(idx) {                                             // a proper shambler, about twice her height: jointed limbs (hips, knees, shoulders, elbows), a hinged jaw, glowing eyes, rags that swing. Four kinds
+  const v = (idx || 0) % 4, K = [
+    { shirt: '#b9b4a0', pants: '#3a3d45', hair: '#2b2320', shoe: '#1c1a18', skin: '#8fa27a', tie: '#7a1f24', bare: 1 },        // the office worker (lost a shoe)
+    { shirt: '#2f6f73', pants: '#2f6f73', hair: null, shoe: '#d8d8d0', skin: '#9aa682', stripe: '#e8e8e0' },                   // the jogger (bald)
+    { shirt: '#8a3a3a', pants: '#34466a', hair: '#9a8a5a', shoe: '#4a3624', skin: '#8c9a70', plaid: '#5a2424', limp: 1 },       // the farmer (one arm hangs dead)
+    { shirt: '#6a4f7a', pants: null, hair: '#3a2a22', shoe: '#2a1a22', skin: '#94a88a', dress: 1 },                             // the lady in the purple dress
+  ][v];
+  const ROT = '#5d7a40', BONE = '#e6dfc8', DARK = '#1e1714', GORE = '#5a1c1c', BELT = '#2a1f18';
+  const mat = makeZombie.mat || (makeZombie.mat = new THREE.MeshBasicMaterial({ vertexColors: true })); mat.userData.noTod = true;
+  const Bx = (w, h, d) => new THREE.BoxGeometry(w, h, d), Cy = (a, b, h, n) => new THREE.CylinderGeometry(a, b, h, n || 8), Sp = (r, a, b) => new THREE.SphereGeometry(r, a || 10, b || 8), Co = (r, h, n) => new THREE.ConeGeometry(r, h, n || 5);
+  const P = (par, parts, x, y, z) => { const m = new THREE.Mesh(zMerge(parts), mat); m.position.set(x || 0, y || 0, z || 0); par.add(m); return m; };
+  const G = (par, x, y, z) => { const o = new THREE.Group(); o.position.set(x || 0, y || 0, z || 0); par.add(o); return o; };
+  const q = { v, kind: K, tat: [], legs: [], arms: [], ph: Math.random() * 7, loll: (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.6), sc: 0.93 + Math.random() * 0.14 };
+  const g = q.g = new THREE.Group(), body = q.body = G(g); body.scale.setScalar(q.sc);
+  // -- the pelvis (it bobs and rolls with the limp), the legs hanging off it
+  const pel = q.pel = G(body, 0, 0.95, 0);
+  if (K.dress) { const sk = [[Cy(0.19, 0.3, 0.46, 12), K.shirt, 0, -0.14, 0]]; for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; sk.push([Co(0.05, 0.12, 4), K.shirt, Math.sin(a) * 0.27, -0.42, Math.cos(a) * 0.27, Math.PI, 0, 0]); }   // (a skirt, its hem torn into points)
+    P(pel, sk); }
+  else P(pel, [[Bx(0.34, 0.2, 0.22), K.pants, 0, 0, 0], [Bx(0.35, 0.05, 0.23), BELT], [Bx(0.06, 0.045, 0.02), '#b8a060', 0, 0, 0.12]]);
+  for (const s of [-1, 1]) {
+    const hip = G(pel, s * 0.1, -0.05, 0), knee = G(hip, 0, -0.45, 0), leg = K.pants || K.skin;
+    const th = [[Cy(0.085, 0.07, 0.44, 8), leg, 0, -0.22, 0]]; if (s > 0 && K.pants) th.push([Bx(0.09, 0.08, 0.02), K.skin, 0, -0.4, 0.075], [Bx(0.1, 0.02, 0.025), K.pants, 0, -0.35, 0.074]);   // (a hole torn in the knee)
+    P(hip, th);
+    const sh = [[Cy(0.068, 0.05, 0.42, 8), K.dress ? K.skin : leg, 0, -0.21, 0]];
+    if (K.pants) for (let k = 0; k < 4; k++) { const a = k * 1.6; sh.push([Bx(0.035, 0.09, 0.012), K.pants, Math.sin(a) * 0.062, -0.43, Math.cos(a) * 0.062, 0, a, 0.2]); }   // (frayed cuffs)
+    if (K.dress && s < 0) sh.push([Cy(0.018, 0.018, 0.2, 5), BONE, 0.03, -0.24, 0.045], [Sp(0.05, 6, 5), ROT, 0.02, -0.12, 0.03]);   // (the bone showing through her shin)
+    if (K.bare && s > 0) { sh.push([Bx(0.1, 0.06, 0.2), K.skin, 0, -0.45, 0.05]); for (let k = 0; k < 5; k++) sh.push([Bx(0.018, 0.022, 0.035), K.skin, -0.036 + k * 0.018, -0.46, 0.16]); }   // (one bare foot, toes and all)
+    else sh.push([Bx(0.12, 0.085, 0.25), K.shoe, 0, -0.45, 0.06], [Bx(0.125, 0.02, 0.26), DARK, 0, -0.49, 0.06]);
+    P(knee, sh); q.legs.push({ hip, knee, s }); }
+  // -- the torso, hunched over on the pelvis; rags hanging off the hem
+  const tor = q.tor = G(pel, 0, 0.08, 0), TS = [[Cy(0.2, 0.17, 0.52, 10), K.shirt, 0, 0.26, 0, 0, 0, 0, 1, 1, 0.68], [Sp(0.15, 8, 6), K.shirt, 0, 0.12, 0.03, 0, 0, 0, 1.1, 0.8, 0.8]];
+  for (const s of [-1, 1]) TS.push([Sp(0.075, 8, 6), K.shirt, s * 0.2, 0.46, 0]);
+  TS.push([Bx(0.12, 0.14, 0.03), '#2a1d19', -0.09, 0.25, 0.125]); for (let k = 0; k < 3; k++) TS.push([Bx(0.12, 0.015, 0.02), BONE, -0.09, 0.2 + k * 0.045, 0.138, 0, 0, 0.12]);   // (a hole in the side: ribs)
+  TS.push([Bx(0.07, 0.05, 0.01), GORE, 0.08, 0.1, 0.14], [Bx(0.1, 0.08, 0.01), '#5a5040', 0.05, 0.36, 0.14]);   // (stains)
+  if (K.tie) TS.push([Bx(0.06, 0.28, 0.02), K.tie, 0.01, 0.3, 0.14, 0, 0, 0.1], [Bx(0.05, 0.04, 0.03), K.tie, 0, 0.46, 0.13], [Bx(0.2, 0.05, 0.05), K.shirt, 0, 0.5, 0.1]);
+  if (K.stripe) for (const s of [-1, 1]) TS.push([Bx(0.02, 0.5, 0.02), K.stripe, s * 0.18, 0.26, 0.04]);
+  if (K.plaid) { for (let k = 0; k < 4; k++) TS.push([Bx(0.36, 0.02, 0.01), K.plaid, 0, 0.1 + k * 0.11, 0.137]); for (let k = 0; k < 3; k++) TS.push([Bx(0.02, 0.46, 0.01), K.plaid, -0.1 + k * 0.1, 0.27, 0.138]); }
+  if (K.dress) TS.push([Bx(0.12, 0.1, 0.02), K.skin, 0, 0.47, 0.11, 0.3, 0, 0]);
+  TS.push([Cy(0.055, 0.065, 0.14, 8), K.skin, 0, 0.58, 0.01]);
+  P(tor, TS);
+  for (let k = 0; k < 5; k++) { const a = (k / 5 - 0.4) * Math.PI * 1.6, t = G(tor, Math.sin(a) * 0.17, 0.03, Math.cos(a) * 0.12); t.rotation.y = a;   // (rags, each swinging on its own)
+    P(t, [[Bx(0.06, 0.14 + (k % 2) * 0.06, 0.012), K.shirt, 0, -0.08, 0]], 0, 0, 0); q.tat.push(t); }
+  // -- the head: a lumpy skull, sunken eyes, rot, a bald patch of bone, a hinged jaw with teeth, and hair to suit
+  const head = q.head = G(tor, 0, 0.64, 0.02), H = [[Sp(0.13, 12, 10), K.skin, 0, 0.13, 0, 0, 0, 0, 1, 1.12, 1.08], [Bx(0.2, 0.035, 0.06), K.skin, 0, 0.175, 0.1]];
+  for (const s of [-1, 1]) H.push([Sp(0.036, 8, 6), DARK, s * 0.048, 0.135, 0.103]);
+  H.push([Bx(0.035, 0.055, 0.04), K.skin, 0, 0.1, 0.135, 0.2, 0, 0], [Sp(0.042, 7, 5), ROT, 0.085, 0.075, 0.085], [Sp(0.06, 8, 6), BONE, 0.06, 0.235, 0.02, 0, 0, 0, 1, 0.5, 1], [Bx(0.022, 0.065, 0.045), K.skin, -0.13, 0.12, 0]);
+  for (let k = 0; k < 5; k++) if (k !== 3) H.push([Bx(0.018, 0.028, 0.012), BONE, -0.036 + k * 0.018, 0.048, 0.118]);
+  if (K.hair && !K.dress && v === 0) for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2; H.push([Co(0.035, 0.09, 4), K.hair, Math.sin(a) * 0.08, 0.26, Math.cos(a) * 0.07 - 0.02, -0.4 + Math.cos(a) * -0.5, 0, Math.sin(a) * 0.6]); }
+  if (v === 2) for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; H.push([Co(0.03, 0.14, 4), K.hair, Math.sin(a) * 0.12, 0.2, Math.cos(a) * 0.11 - 0.02, Math.PI - Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5]); }   // (straw, sticking out everywhere)
+  if (v === 1) for (let k = 0; k < 3; k++) H.push([Bx(0.008, 0.08, 0.008), '#3a3230', -0.03 + k * 0.03, 0.29, -0.02, 0.3, 0, (k - 1) * 0.4]);   // (three hairs left)
+  if (K.dress) { H.push([Bx(0.26, 0.38, 0.09), K.hair, 0, 0.02, -0.1], [Sp(0.14, 10, 8), K.hair, 0, 0.18, -0.02, 0, 0, 0, 1.05, 0.9, 1.05]); for (const s of [-1, 1]) H.push([Bx(0.05, 0.3, 0.05), K.hair, s * 0.13, 0.02, 0.02, 0, 0, s * 0.1]); }
+  P(head, H);
+  q.jaw = G(head, 0, 0.065, 0.02); P(q.jaw, [[Bx(0.15, 0.045, 0.12), K.skin, 0, -0.025, 0.05], [Bx(0.1, 0.012, 0.07), GORE, 0, -0.001, 0.05], ...[0, 1, 2, 3].map(k => [Bx(0.016, 0.024, 0.012), BONE, -0.027 + k * 0.018, 0.005, 0.1])]);
+  q.eyes = [-1, 1].map(s => { const e = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xb6ff3a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); e.position.set(s * 0.048, 0.135, 0.13); e.scale.setScalar(0.16); head.add(e); return e; });
+  P(head, [[Sp(0.016, 6, 5), '#eaffb0', -0.048, 0.135, 0.125], [Sp(0.016, 6, 5), '#eaffb0', 0.048, 0.135, 0.125]], 0, 0, 0).material = makeZombie.eyeMat || (makeZombie.eyeMat = Object.assign(new THREE.MeshBasicMaterial({ vertexColors: true }), { userData: { noTod: true } }));
+  // -- the arms: shoulder, elbow, a clawed hand (the farmer's left one hangs dead)
+  for (const s of [-1, 1]) {
+    const sh = G(tor, s * 0.22, 0.46, 0), el = G(sh, 0, -0.3, 0), up = [[Cy(0.066, 0.056, 0.3, 8), K.dress ? K.skin : K.shirt, 0, -0.15, 0]];
+    if (K.dress) up.push([Cy(0.075, 0.07, 0.12, 8), K.shirt, 0, -0.04, 0]);
+    for (let k = 0; k < 3; k++) { const a = k * 2.1; if (!K.dress) up.push([Bx(0.03, 0.07, 0.01), K.shirt, Math.sin(a) * 0.058, -0.3, Math.cos(a) * 0.058, 0, a, 0]); }
+    P(sh, up);
+    const fa = [[Cy(0.052, 0.042, 0.27, 8), K.skin, 0, -0.135, 0], [Bx(0.075, 0.09, 0.035), K.skin, 0, -0.32, 0]];
+    if (v === 2 && s < 0) fa.push([Cy(0.016, 0.016, 0.16, 5), BONE, 0.03, -0.14, 0.03], [Sp(0.04, 6, 5), GORE, 0.02, -0.08, 0.03]);
+    for (let k = 0; k < 4; k++) { const x = -0.027 + k * 0.018; fa.push([Bx(0.016, 0.075, 0.018), K.skin, x, -0.4, 0.012, -0.35, 0, 0], [Bx(0.014, 0.02, 0.016), '#3a3024', x, -0.44, 0.03, -0.6, 0, 0]); }
+    fa.push([Bx(0.018, 0.06, 0.018), K.skin, s * -0.045, -0.35, 0.02, -0.4, 0, s * 0.5]);
+    P(el, fa); q.arms.push({ sh, el, s, dead: v === 2 && s < 0 }); }
+  const mound = q.mound = new THREE.Mesh(new THREE.CircleGeometry(0.75, 16), new THREE.MeshBasicMaterial({ color: 0x3a2a1c, transparent: true, opacity: 0, depthWrite: false })); mound.rotation.x = -Math.PI / 2; mound.renderOrder = 1; mound.material.userData.noTod = true;
+  return Object.assign(q, { st: 'off', t: 0, x: 0, z: 0, face: 0, sp: 1, gp: 0, groanT: 2 + Math.random() * 4, twT: 2, tw: 0, atk: 0, chomp: 0 });
+}
+function zPose(q, dt, d) {                                             // every pose: rising out of the grave, the limping shamble, the lunge, the two ways to go down
+  const t = q.t, T = clock, L = (a, b, k) => a + (b - a) * k, cl = x => Math.max(0, Math.min(1, x)), sm = x => { x = cl(x); return x * x * (3 - 2 * x); };
+  const B = q.body, pel = q.pel, tor = q.tor, hd = q.head, legs = q.legs, arms = q.arms;
+  q.eyes.forEach((e, i) => { e.material.opacity = q.st === 'die' ? Math.max(0, 1 - t * 2) : 0.7 + 0.3 * Math.sin(T * 3 + q.ph + i); });
+  q.tat.forEach((r, k) => r.rotation.x = 0.1 + Math.sin(T * 6 + k * 1.7 + q.ph) * 0.25);
+  if (q.st === 'rise') {                                               // a hand claws up first, then the head, then it hauls itself out and lets out a moan
+    const a = cl(t / 0.8), b = sm((t - 0.8) / 1.1), c = sm((t - 1.9) / 0.8);
+    B.position.y = t < 0.8 ? L(-1.8, -1.4, a) : t < 1.9 ? L(-1.4, -0.45, b) : L(-0.45, 0, c);
+    B.rotation.set(0, 0, Math.sin(t * 14) * 0.06 * (1 - c));
+    tor.rotation.set(L(0.9, 0.3, c), 0, 0); pel.position.y = 0.95; pel.rotation.set(0, 0, 0);
+    arms.forEach((A, i) => { const up = t < 0.8 ? (i ? -2.9 : -1.2) : L(-2.9, -0.5, b); A.sh.rotation.set(t < 1.9 ? up + Math.sin(t * 11 + i) * 0.25 : L(-0.5, -1.35, c), 0, A.s * 0.15); A.el.rotation.x = -0.3 - Math.abs(Math.sin(t * 8 + i)) * 0.4 * (1 - c); });
+    legs.forEach(l => { l.hip.rotation.set(L(-1.1, 0, c), 0, 0); l.knee.rotation.x = L(1.6, 0, c); });
+    hd.rotation.set(t > 2.2 ? -0.5 * Math.sin((t - 2.2) / 0.4 * Math.PI) : Math.sin(t * 9) * 0.2, Math.sin(t * 5) * 0.3 * (1 - c), 0);
+    q.jaw.rotation.x = t > 2.1 ? 0.55 : 0.1 + 0.1 * Math.sin(t * 7);
+    return t >= 2.6; }
+  if (q.st === 'walk' || q.st === 'sink') {                            // the shamble: one good leg, one dragging; hunched, head lolling, arms out reaching, jaw working
+    const near = q.st === 'walk' && d < 1.6, gp = q.gp += dt * q.sp * 3.1, sn = Math.sin(gp);
+    if ((q.twT -= dt) <= 0) { q.twT = 2 + Math.random() * 4; q.tw = 0.3; } if (q.tw > 0) q.tw -= dt;
+    q.atk = Math.max(0, q.atk - dt); q.chomp += ((near ? 1 : 0) - q.chomp) * Math.min(1, dt * 4);
+    const good = legs[0], bad = legs[1];
+    good.hip.rotation.set(-sn * 0.45, 0, 0); good.knee.rotation.x = Math.max(0, Math.sin(gp + 1.5)) * 0.85 + 0.05;
+    bad.hip.rotation.set(sn * 0.2 - 0.05, 0.3, -0.06); bad.knee.rotation.x = 0.12 + Math.max(0, -sn) * 0.15;
+    pel.position.y = 0.95 - 0.05 * Math.max(0, -sn) + 0.02 * Math.abs(Math.cos(gp)); pel.rotation.set(0, sn * 0.1, sn * 0.07);
+    const lunge = q.atk > 0 ? Math.sin(q.atk / 0.35 * Math.PI) : 0;
+    tor.rotation.set(0.3 + 0.05 * Math.sin(gp * 2) + q.chomp * 0.12 + lunge * 0.35, -sn * 0.12, 0.1 * q.loll + sn * 0.05);
+    hd.rotation.set(-0.25 - q.chomp * 0.15 + Math.sin(T * 1.7 + q.ph) * 0.1, Math.sin(T * 0.9 + q.ph) * 0.2, 0.3 * q.loll + Math.sin(T * 1.3 + q.ph) * 0.1 + (q.tw > 0 ? Math.sin(T * 70) * 0.25 : 0));
+    q.jaw.rotation.x = 0.12 + 0.18 * Math.max(0, Math.sin(T * 2.3 + q.ph)) + q.chomp * 0.3 * (0.5 + 0.5 * Math.sin(T * 17));
+    arms.forEach((A, i) => { if (A.dead) { A.sh.rotation.set(-sn * 0.35 + 0.1, 0, A.s * 0.1); A.el.rotation.x = -0.05; return; }
+      const reach = q.st === 'sink' ? -2.6 : near ? -1.6 + Math.sin(T * 9 + i * Math.PI) * 0.3 : -1.32 + Math.sin(gp + i * Math.PI) * 0.12;
+      A.sh.rotation.set(reach + lunge * 0.6, A.s * -0.12 * (1 - q.chomp), A.s * 0.14); A.el.rotation.x = -0.2 - 0.18 * (0.5 + 0.5 * Math.sin(T * 2 + i)) - q.chomp * 0.2; });
+    if (q.st === 'walk') { B.position.y = 0; B.rotation.set(0, 0, 0); } else B.position.y -= dt * 1.1;
+    return false; }
+  if (q.st === 'die') {
+    if (q.dir === 0) {                                                 // stomped: the knees buckle, it folds up and pitches forward
+      const a = sm(t / 0.35), b = sm((t - 0.35) / 0.4);
+      B.scale.set(q.sc, q.sc * (1 - 0.25 * Math.max(0, 1 - t * 4)), q.sc);
+      legs.forEach(l => { l.hip.rotation.set(-1.3 * a, 0, 0); l.knee.rotation.x = 2.1 * a; }); pel.position.y = 0.95 - 0.52 * a; pel.rotation.set(0, 0, 0);
+      tor.rotation.set(0.3 + 0.9 * a, 0, 0); hd.rotation.set(0.6 * a, 0, 0.5 * a * q.loll); q.jaw.rotation.x = 0.5;
+      arms.forEach(A => { A.sh.rotation.set(L(-1.3, 0.4, a), 0, A.s * 0.3); A.el.rotation.x = 0; });
+      B.rotation.x = 1.25 * b; }
+    else {                                                             // swiped: knocked flying backwards, arms flailing, flat on its back
+      const a = sm(t / 0.55); B.rotation.set(-1.5 * a, 0, Math.sin(t * 20) * 0.1 * (1 - a)); B.position.y = Math.sin(Math.min(1, t / 0.55) * Math.PI) * 0.25;
+      arms.forEach((A, i) => { A.sh.rotation.set(-2.6 + Math.sin(t * 25 + i) * 0.5 * (1 - a), 0, A.s * 0.5); A.el.rotation.x = -0.4; });
+      legs.forEach((l, i) => { l.hip.rotation.set(-0.6 * a * (i ? 1 : 0.5), 0, 0); l.knee.rotation.x = 0.4 * a; });
+      hd.rotation.set(-0.6 * a, 0, 0); q.jaw.rotation.x = 0.6; }
+    if (t > 1.1) B.position.y = -(t - 1.1) * 1.4;
+    return t > 2.4; }
+  return false;
+}
+function zReset(q) { q.body.rotation.set(0, 0, 0); q.body.position.set(0, -2, 0); q.body.scale.setScalar(q.sc); q.gp = Math.random() * 6; q.atk = 0; q.chomp = 0; }
 function zGroan(vol) { const f = 70 + Math.random() * 40; tone(f, f * 0.7, 0.9, 'sawtooth', vol || 0.03); tone(f * 1.5, f * 1.1, 0.7, 'triangle', (vol || 0.03) * 0.6, 0.1); }
 function zHud() {
   if (!ZN.hud) { const d = ZN.hud = document.createElement('div'); d.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,26,14,.78);color:#d8ff9a;font:700 15px system-ui,sans-serif;padding:7px 16px;border-radius:18px;border:2px solid #7fbf3a;text-shadow:0 1px 2px #000;white-space:nowrap'; document.body.appendChild(d); }
@@ -7277,7 +7386,7 @@ function zSpawnSpot() {                                                // somewh
 }
 function zStart() {
   if (!ZN.pool) { ZN.root = new THREE.Group(); ZN.root.userData.noWalk = true; ZN.root.userData.name = 'Zombies'; scene.add(ZN.root); ZN.pool = true; ZN.z = [];
-    for (let i = 0; i < 8; i++) { const q = makeZombie(); q.g.visible = false; ZN.root.add(q.g, q.mound); ZN.z.push(q); } }
+    for (let i = 0; i < 8; i++) { const q = makeZombie(i); zReset(q); q.g.visible = false; ZN.root.add(q.g, q.mound); ZN.z.push(q); } }
   Object.assign(ZN, { on: true, wave: 0, kills: 0, hearts: 3, left: 0, spawnT: 1.5, breakT: 0, hurtT: 0, waves: 0 });
   zNextWave(); showWalkName('🧟 The ground is moving... ZOMBIES! Pounce on their heads or swipe them!'); zGroan(0.05); setTimeout(() => zGroan(0.04), 500);
 }
@@ -7295,7 +7404,7 @@ function zKill(q, how) {
 }
 function zombieSwipe(paw) {
   if (!ZN || !ZN.on) return false; let best = null, bd = 1.1;
-  for (const q of ZN.z) if (q.st === 'walk' || (q.st === 'rise' && q.t > 0.8)) { const d = Math.hypot(q.x - paw.x, q.z - paw.z); if (d < bd && paw.y < 2.2) { bd = d; best = q; } }
+  for (const q of ZN.z) if (q.st === 'walk' || (q.st === 'rise' && q.t > 1.4)) { const d = Math.hypot(q.x - paw.x, q.z - paw.z); if (d < bd && paw.y < 2.2) { bd = d; best = q; } }
   if (!best) return false; zKill(best, 'swipe'); return true;
 }
 function updateZombies(dt) {
@@ -7316,33 +7425,31 @@ function updateZombies(dt) {
     if (ZN.hurtT > 0) ZN.hurtT -= dt;
     const alive = ZN.z.filter(q => q.st === 'rise' || q.st === 'walk').length;
     if (ZN.left > 0 && inYard && alive < 6 && (ZN.spawnT -= dt) <= 0) { const s = zSpawnSpot(), q = ZN.z.find(q => q.st === 'off');
-      if (s && q) { ZN.left--; ZN.spawnT = Math.max(0.7, 2.6 - ZN.wave * 0.3) + Math.random(); Object.assign(q, { st: 'rise', t: 0, x: s[0], z: s[1], sp: 0.9 + Math.random() * 0.4 + ZN.wave * 0.12 });
+      if (s && q) { ZN.left--; ZN.spawnT = Math.max(0.7, 2.6 - ZN.wave * 0.3) + Math.random(); Object.assign(q, { st: 'rise', t: 0, x: s[0], z: s[1], sp: 0.9 + Math.random() * 0.4 + ZN.wave * 0.12 }); zReset(q);
         q.g.visible = true; q.mound.position.set(s[0], 0.03, s[1]); q.mound.material.opacity = 0.9; noise(0.5, 0.12, 300); zGroan(0.03); } }
     if (ZN.left <= 0 && alive === 0) { if (!ZN.breakT) { ZN.breakT = 3.5; ZN.waves++; showWalkName(`🧟 Wave ${ZN.wave} cleared!`); if (ZN.waves >= 3) { zEnd(true, '🏆 Three waves down!'); } }
       else if ((ZN.breakT -= dt) <= 0) zNextWave(); }
   }
   for (const q of ZN.z) { if (q.st === 'off') continue; q.t += dt;
     const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz);
-    if (q.st === 'rise') { const k = Math.min(1, q.t / 1.6); q.body.position.y = -1.9 * (1 - k) * (1 - k); q.body.rotation.z = Math.sin(q.t * 18) * 0.08 * (1 - k); q.arms.forEach((a, i) => a.rotation.x = -2.6 + k * 1.15 + Math.sin(q.t * 9 + i) * 0.2);
+    if (q.st === 'rise') {
       if (Math.random() < dt * 10) burst(new THREE.Vector3(q.x + (Math.random() - 0.5) * 0.6, 0.1, q.z + (Math.random() - 0.5) * 0.6), 0x4a3524, 2, 1.5, 2, 0.25);
-      q.face = Math.atan2(dx, dz); if (k >= 1) { q.st = ZN.on ? 'walk' : 'sink'; q.t = 0; } }
+      q.face = Math.atan2(dx, dz); if (zPose(q, dt, d)) { q.st = ZN.on ? 'walk' : 'sink'; q.t = 0; } }
     else if (q.st === 'walk') {                                        // shamble toward her (they stay on our lawn)
       const want = Math.atan2(dx, dz); let da = want - q.face; da = Math.atan2(Math.sin(da), Math.cos(da)); q.face += da * Math.min(1, dt * 2.5);
-      if (d > 0.5) { const sp = q.sp * (0.75 + 0.35 * Math.sin(q.t * 4 + q.ph)); let nx = q.x + Math.sin(q.face) * sp * dt, nz = q.z + Math.cos(q.face) * sp * dt;
+      if (d > 0.5) { const sp = q.sp * (0.55 + 0.45 * Math.max(0, Math.sin(q.gp)));   /* (it lurches on the good leg, drags the bad one) */ let nx = q.x + Math.sin(q.face) * sp * dt, nz = q.z + Math.cos(q.face) * sp * dt;
         if (!ZN.z.some(o => o !== q && (o.st === 'walk' || o.st === 'rise') && Math.hypot(o.x - nx, o.z - nz) < 0.8) && inOurYard(nx, nz) && nz > ROOM.visDepth + 1 && !YARD_BLOCKS.some(([x0, x1, z0, z1]) => nx > x0 && nx < x1 && nz > z0 && nz < z1)) { q.x = nx; q.z = nz; } }
-      const sw = Math.sin(q.t * 4 + q.ph); q.legs[0].rotation.x = sw * 0.5; q.legs[1].rotation.x = -sw * 0.5; q.body.position.y = Math.abs(sw) * 0.05; q.body.rotation.z = Math.sin(q.t * 2 + q.ph) * 0.1;
-      q.arms.forEach((a, i) => a.rotation.x = -1.45 + Math.sin(q.t * 3 + i * 1.3) * 0.15); q.head.rotation.x = Math.sin(q.t * 1.7 + q.ph) * 0.2;
+      zPose(q, dt, d);
       if ((q.groanT -= dt) <= 0) { q.groanT = 3 + Math.random() * 5; if (d < 14) zGroan(0.03 * Math.max(0.2, 1 - d / 14)); }
-      const hy = 1.62;                                                 // (the top of its head)
+      const hy = 1.85 * q.sc;                                          // (the top of its head)
       if (walk.vy < -0.5 && d < 0.8 && p.y > hy - 0.7 && p.y < hy + 0.45) zKill(q, 'stomp');
       else if (ZN.on && d < 0.62 && p.y < 1.1 && ZN.hurtT <= 0) {       // it got her: a heart, and she's knocked back
-        ZN.hurtT = 1.6; ZN.hearts--; const ox = dx / (d || 1), oz = dz / (d || 1); walk.vel.set(ox * 7, 0, oz * 7); walk.vy = 5; walk.grounded = false; walk.flingT = clock + 0.6; walk.squash = 1;
+        ZN.hurtT = 1.6; ZN.hearts--; q.atk = 0.35; const ox = dx / (d || 1), oz = dz / (d || 1); walk.vel.set(ox * 7, 0, oz * 7); walk.vy = 5; walk.grounded = false; walk.flingT = clock + 0.6; walk.squash = 1;
         tone(900, 1700, 0.18, 'sawtooth', 0.04); noise(0.1, 0.25, 700); zGroan(0.05);
         if (ZN.hearts <= 0) zEnd(false); else showWalkName(ZN.hearts === 1 ? '🧟 Ouch! Last heart - careful!' : '🧟 A zombie got her! Ouch!'); }
       if (!ZN.on) { q.st = 'sink'; q.t = 0; } }
-    else if (q.st === 'die') { const k = Math.min(1, q.t / 0.5); q.body.rotation.x = (q.dir ? -1 : 1) * k * 1.45; q.body.position.y = 0; if (q.dir === 0) q.body.scale.y = 1 - 0.5 * k;
-      if (q.t > 0.9) q.body.position.y = -(q.t - 0.9) * 1.6; if (q.t > 2.2) { q.st = 'off'; q.g.visible = false; q.body.rotation.set(0, 0, 0); q.body.scale.set(1, 1, 1); } }
-    else if (q.st === 'sink') { q.body.position.y -= dt * 1.2; if (q.body.position.y < -2) { q.st = 'off'; q.g.visible = false; } }
+    else if (q.st === 'die') { if (zPose(q, dt, d)) { q.st = 'off'; q.g.visible = false; zReset(q); } }
+    else if (q.st === 'sink') { zPose(q, dt, d); if (q.body.position.y < -2.2) { q.st = 'off'; q.g.visible = false; zReset(q); } }
     q.g.position.set(q.x, 0, q.z); q.g.rotation.y = q.face;
     if (q.mound.material.opacity > 0 && q.st !== 'rise') q.mound.material.opacity = Math.max(0, q.mound.material.opacity - dt * 0.08); }
   zHud();
@@ -8408,7 +8515,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 19:52';                                              // stamped when the site is published
+const BUILD = '2026-09-29 20:22';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
