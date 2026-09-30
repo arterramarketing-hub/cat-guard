@@ -6194,7 +6194,7 @@ function bikeRoof(d, w, h) {   // hipped roof: four slopes up to a short ridge r
 }
 
 /* ---------- models ---------- */
-function bikeBikeGeoms() { return motoGeoms(); }   // (the same detailed cruiser as the one in the garage)
+function bikeBikeGeoms(paint) { return paint ? motoGeoms({ paint }) : motoGeoms(); }   // (the same detailed cruiser as the one in the garage, in whatever paint she's bought)
 function bikeCatGeom() {   // the stand-in princess: grey with a white bib, pink nose, pointy ears, gold crown
   const G = bikeG, grey = '#9d9aa8', white = '#fbf7fa', pink = '#ff8fbf', gold = '#ffc93c', P = [
     [G.ball(1, 1), grey, 0, 0.3, -0.05, 0, 0, 0, 0.2, 0.17, 0.32], [G.ball(1, 1), white, 0, 0.27, 0.16, 0, 0, 0, 0.14, 0.13, 0.14],
@@ -6278,9 +6278,9 @@ function bikeBuild() {
   const sx = sky.getContext('2d'), gr = sx.createLinearGradient(0, 0, 0, 256);
   gr.addColorStop(0, '#62bdfd'); gr.addColorStop(0.3, '#aee0ff'); gr.addColorStop(0.47, '#ffe4ef'); gr.addColorStop(1, '#ffe4ef');
   sx.fillStyle = gr; sx.fillRect(0, 0, 2, 256);
-  S.background = new THREE.CanvasTexture(sky); S.fog = new THREE.Fog(0xffe4ef, 45, 125);
-  S.add(new THREE.HemisphereLight(0xffffff, 0xb89aac, 0.62));
-  const sun = new THREE.DirectionalLight(0xfff2e6, 0.55); sun.position.set(4, 10, -6); S.add(sun);
+  S.background = B.skyTex = new THREE.CanvasTexture(sky); B.skyCtx = sx; S.fog = new THREE.Fog(0xffe4ef, 45, 125);
+  S.add(B.hemi = new THREE.HemisphereLight(0xffffff, 0xb89aac, 0.62));
+  const sun = new THREE.DirectionalLight(0xfff2e6, 0.55); sun.position.set(4, 10, -6); S.add(sun); B.sun = sun;
   const mat = B.mat = new THREE.MeshLambertMaterial({ vertexColors: true }), add = (geo, m, x, y, z, ry) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.y = ry || 0; S.add(o); return o; };
   // the ground: scrolling textures do the rushing, the planes never move
   B.roadTex = bikeTex(128, 256, (x, w, h) => {
@@ -6299,7 +6299,7 @@ function bikeBuild() {
   B.houses = [['#b5543c', '#f4e6c8', '#5e5061', '#d63a82'], ['#a04a3a', '#efe0d0', '#6c4f47', '#2f7d5b'], ['#c46a4a', '#f6eedd', '#4f5563', '#1f4f8a'], ['#b0503f', '#f3e3cf', '#5a4a5c', '#f2b134']].map((c, i) => { const g = bikeHouseGeom(...c); g.userData.house = i; return g; });
   const trees = [['#5fb04a', '#79c75a', 1], ['#4f9e45', '#6dbb52', 1.15], ['#6cbf55', '#8fd36a', 0.9]].map(([a, b, s]) => bikeMerge([[G.cyl(0.14, 0.2, 2.2, 6), '#7a5140', 0, 1.1, 0],
     [G.ball(1.25 * s, 0), a, 0, 2.9 * s + 0.3, 0], [G.ball(0.95 * s, 0), b, 0.5, 3.6 * s + 0.2, 0.3], [G.ball(0.85 * s, 0), a, -0.4, 3.4 * s, -0.4]]));
-  const lamp = bikeMerge([[G.cyl(0.07, 0.09, 4.4, 6), '#5d5866', 0, 2.2, 0], [G.box(1.3, 0.09, 0.09), '#5d5866', -0.62, 4.35, 0], [G.box(0.45, 0.16, 0.3), '#5d5866', -1.25, 4.3, 0], [G.box(0.36, 0.06, 0.24), '#fff2b8', -1.25, 4.2, 0]]);
+  const lamp = bikeMerge([[G.cyl(0.07, 0.09, 4.4, 6), '#5d5866', 0, 2.2, 0], [G.box(1.3, 0.09, 0.09), '#5d5866', -0.62, 4.35, 0], [G.box(0.45, 0.16, 0.3), '#5d5866', -1.25, 4.3, 0], [G.box(0.36, 0.06, 0.24), '#fff2b8', -1.25, 4.2, 0]]); B.lampGeo = lamp;
   for (const s of [-1, 1]) {
     const ry = s > 0 ? 0 : Math.PI, off = s > 0 ? 0 : 6.5;
     for (let i = 0; i < 12; i++) B.scen.push(add(B.houses[(Math.random() * 4) | 0], mat, s * 16.5, 0, i * 13 + off - 20, ry), add(trees[i % 3], mat, s * 4.5, 0, i * 13 + off - 13.5, i * 1.7));
@@ -6310,12 +6310,14 @@ function bikeBuild() {
   const sk = [[G.cyl(0.9, 2.4, 40, 6), '#d3b1cb', -22, 20, 4], [G.cyl(3.6, 2.6, 3, 10), '#d3b1cb', -22, 30, 4], [G.cyl(4.2, 4.2, 0.8, 10), '#caa6c3', -22, 31.8, 4],
     [G.cyl(1.4, 1.4, 1.4, 8), '#d3b1cb', -22, 38, 4], [G.cyl(0.25, 0.6, 16, 5), '#d3b1cb', -22, 47, 4]];
   for (let i = 0; i < 12; i++) { const h = 9 + Math.random() * 17, w = 5 + Math.random() * 6; sk.push([G.box(w, h, 6), i & 1 ? '#e6cadd' : '#dcbfd5', -62 + i * 9.5 + Math.random() * 3, h / 2, 8 + Math.random() * 10]); }
-  add(bikeMerge(sk), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), 0, 0, 262);
+  B.skyBoxes = sk.slice(5).map(p => [p[0].parameters.width, p[0].parameters.height, p[2], p[4]]);   // (where the towers stand, for their lit windows at night)
+  B.city = add(bikeMerge(sk), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }), 0, 0, 262);
   // the rider's rig: root (lane x, hop y) > roll (lean) > pitch (wheelie about the back tyre) > body > mount (kitty)
   const bg = bikeBikeGeoms(), rv = B.rv = { root: new THREE.Group(), roll: new THREE.Group(), pitch: new THREE.Group(), body: new THREE.Group(), mount: new THREE.Group(), scaleG: new THREE.Group() };
   B.bikeMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 60, specular: 0x555555 });
   S.add(rv.root); rv.root.add(rv.roll); rv.roll.add(rv.pitch); rv.pitch.position.z = -0.56; rv.pitch.add(rv.body); rv.body.position.z = 0.56;
-  rv.body.add(new THREE.Mesh(bg.body, B.bikeMat), new THREE.Mesh(bg.glow, new THREE.MeshBasicMaterial({ vertexColors: true })), rv.mount);
+  rv.paint = 'pink'; B.paintGeo = { pink: bg.body };
+  rv.body.add(rv.bodyMesh = new THREE.Mesh(bg.body, B.bikeMat), new THREE.Mesh(bg.glow, new THREE.MeshBasicMaterial({ vertexColors: true })), rv.mount);
   rv.wf = new THREE.Mesh(bg.wheel, B.bikeMat); rv.wf.position.set(0, 0.3, 0.56); rv.wr = new THREE.Mesh(bg.wheel, B.bikeMat); rv.wr.position.set(0, 0.3, -0.56);
   rv.body.add(rv.wf, rv.wr); rv.mount.add(rv.scaleG);
   rv.cat = new THREE.Mesh(bikeCatGeom(), mat);
@@ -6344,13 +6346,14 @@ function bikeBuild() {
     const g = new THREE.Group(); g.add(new THREE.Mesh(geo, mat), new THREE.Mesh(ring, halo)); g.visible = false; S.add(g);
     B.powers.push({ kind, mesh: g, on: false, x: 0, y: 0, z: 0 });
   }
+  bikeEnvBuild(S);   // the sky's clock, the weather, the headlight and the record banner
   // warm every shader up front so the first cone doesn't hitch
   S.traverse(o => { if (o.isMesh || o.isGroup) o.userData.vis = o.visible, o.visible = true; });
   rv.scaleG.add(rv.cat); renderer.compile(S, bikeCam); rv.scaleG.remove(rv.cat);
   S.traverse(o => { if (o.userData.vis !== undefined) o.visible = o.userData.vis; });
   bikeBuildUI();
   addEventListener('keydown', bikeKey, true);
-  document.addEventListener('visibilitychange', () => bikeEngineSet(BIKE.speed || 0));
+  document.addEventListener('visibilitychange', () => { bikeEngineSet(BIKE.speed || 0); bikeRainSnd(); });
   B.built = true;
 }
 
@@ -6403,6 +6406,52 @@ function bikeBuildUI() {
 @keyframes bkCount{0%{opacity:0;transform:scale(1.8)}20%{opacity:1;transform:scale(1)}70%{opacity:1}100%{opacity:0;transform:scale(.8)}}
 @keyframes bkPulse{to{transform:translateX(-50%) scale(1.07)}}
 @keyframes bkIn{from{transform:scale(.7);opacity:0}}
+#bikeUI .bk-card{position:relative;max-height:calc(100% - 12px);overflow-y:auto;overscroll-behavior:contain}
+#bikeUI .bk-card>:not(.bk-conf){position:relative;z-index:1}
+#bikeUI .bk-rec{display:none;position:relative;z-index:1;margin:8px auto 2px;padding:6px 18px 5px;border-radius:16px;color:#fff;font-size:26px;line-height:1.05;letter-spacing:.03em;text-shadow:0 2px 0 rgba(45,19,40,.45);background:linear-gradient(90deg,#ff6fae,#ffc93c,#8a5cff,#ff6fae);background-size:300% 100%;box-shadow:0 4px 0 #2d1328;width:max-content;max-width:100%;animation:bkStamp .7s cubic-bezier(.2,1.7,.4,1) both,bkShine 2.4s linear infinite}
+#bikeUI .bk-rec small{display:block;font:700 11px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;text-shadow:none;margin-top:3px}
+#bikeUI .bk-conf{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:16px;display:none}
+#bikeUI .bk-card.rec .bk-conf{display:block}
+#bikeUI .bk-conf i{position:absolute;top:-14px;width:7px;height:12px;border-radius:2px;animation:bkConf 2.6s linear infinite}
+#bikeUI .bk-bank{font:700 13px system-ui,sans-serif;color:#9a4f7c;margin-top:6px}
+#bikeUI .bk-btn.paint{display:flex;align-items:center;justify-content:center;gap:10px;background:#8a5cff;box-shadow:0 4px 0 #5a2fc9;font-size:17px}
+#bikeUI .bk-purse-sm{background:rgba(255,244,248,.22);border-radius:12px;padding:2px 9px;font-size:14px;white-space:nowrap}
+#bikeUI .bk-btn:disabled{opacity:.5;cursor:default}
+#bikeUI .bk-over.shop{background:transparent;align-items:flex-end;padding:0}
+#bikeUI .bk-over.shop .bk-card,#bikeUI.shopping .bk-top,#bikeUI.shopping .bk-pads{display:none}
+#bikeUI .bk-shop{display:none;background:#fff4f8;color:#2d1328;border-radius:16px 16px 0 0;width:min(460px,100%);max-height:62%;overflow-y:auto;overscroll-behavior:contain;padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 14px);box-shadow:0 -8px 30px rgba(45,19,40,.35);animation:bkUp .3s cubic-bezier(.2,1.2,.4,1)}
+#bikeUI .bk-over.shop .bk-shop{display:block}
+#bikeUI .bk-shop-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+#bikeUI .bk-shop h2{margin:0;font-size:26px;font-weight:400;color:#d63a82}
+#bikeUI .bk-purse{background:#2d1328;color:#fff4f8;border-radius:16px;padding:5px 12px;font-size:17px;white-space:nowrap}
+#bikeUI .bk-swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 4px}
+#bikeUI .bk-sw{position:relative;background:#fff;color:#2d1328;border-radius:14px;padding:9px 3px 7px;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:0 0 0 2px #f3d7e5;transition:transform .15s,box-shadow .15s}
+#bikeUI .bk-sw i{width:38px;height:38px;border-radius:50%;box-shadow:inset 0 -4px 0 rgba(0,0,0,.18),0 2px 4px rgba(45,19,40,.2)}
+#bikeUI .bk-sw span{font:700 11px/1.15 system-ui,sans-serif;text-align:center;min-height:2.3em;display:flex;align-items:center}
+#bikeUI .bk-sw small{font:700 10px system-ui,sans-serif;opacity:.7;white-space:nowrap}
+#bikeUI .bk-sw.sel{box-shadow:0 0 0 3px #ff6fae;transform:translateY(-3px)}
+#bikeUI .bk-sw.on small{color:#d63a82;opacity:1}
+#bikeUI .bk-sw:not(.own) i{opacity:.78}
+#bikeUI .bk-rp{position:absolute;inset:0;display:none;pointer-events:none}
+#bikeUI.rp .bk-rp{display:block}
+#bikeUI.rp .bk-top,#bikeUI.rp .bk-pads,#bikeUI.rp .bk-power,#bikeUI.rp .bk-warn,#bikeUI.rp .bk-msg,#bikeUI.rp .bk-count{display:none}
+#bikeUI .bk-rp:before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(20,6,18,0) 55%,rgba(20,6,18,.5) 100%)}
+#bikeUI .bk-rp-bar{position:absolute;left:0;right:0;height:9vh;background:#0d0510;animation:bkBar .4s ease-out both}
+#bikeUI .bk-rp-bar.top{top:0;transform-origin:50% 0}
+#bikeUI .bk-rp-bar.bot{bottom:0;transform-origin:50% 100%}
+#bikeUI .bk-rp-tag{position:absolute;top:calc(9vh + 12px);left:calc(env(safe-area-inset-left,0px) + 16px);display:flex;align-items:center;gap:9px;font-size:24px;letter-spacing:.1em;text-shadow:0 2px 0 #2d1328}
+#bikeUI .bk-rp-tag i{width:12px;height:12px;border-radius:50%;background:#ff2d55;box-shadow:0 0 10px #ff2d55;animation:bkBlink 1s steps(1) infinite}
+#bikeUI .bk-rp-tag small{font:700 12px system-ui,sans-serif;letter-spacing:.1em;opacity:.75}
+#bikeUI .bk-rp-skip{position:absolute;bottom:calc(9vh + 12px);left:0;right:0;text-align:center;font:700 12px system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;opacity:.8;text-shadow:0 1px 3px #2d1328}
+@keyframes bkBar{from{transform:scaleY(0)}}
+@keyframes bkBlink{50%{opacity:0}}
+@keyframes bkStamp{0%{transform:scale(2.6) rotate(-14deg);opacity:0}100%{transform:scale(1) rotate(-3deg);opacity:1}}
+@keyframes bkShine{to{background-position:300% 0}}
+@keyframes bkConf{0%{transform:translateY(0) rotate(0)}100%{transform:translateY(620px) rotate(900deg)}}
+@keyframes bkUp{from{transform:translateY(40%);opacity:0}}
+@keyframes bkSide{from{transform:translateX(40%);opacity:0}}
+@media (max-height:520px) and (orientation:landscape){#bikeUI .bk-over.shop{justify-content:flex-end;align-items:stretch}#bikeUI .bk-shop{border-radius:16px 0 0 16px;width:min(420px,58%);max-height:none;animation-name:bkSide}}
+@media (max-height:520px){#bikeUI .bk-card{padding:12px 16px}#bikeUI .bk-card h2{font-size:26px}#bikeUI .bk-final{font-size:34px}#bikeUI .bk-stats{margin:6px 0 2px}#bikeUI .bk-btn{padding:9px;margin-top:7px;font-size:16px}#bikeUI .bk-rec{font-size:19px}}
 @media (max-height:520px){#bikeUI .bk-pads button{width:50px;height:50px}#bikeUI .bk-msg{top:20%}#bikeUI .bk-count{top:22%}}`;
   document.head.appendChild(st);
   const ui = document.createElement('div'), arrow = (a, d) => `<button data-a="${a}" tabindex="-1" aria-label="${{ L: 'Move left', U: 'Jump', D: 'Duck', R: 'Move right' }[a]}"><svg viewBox="0 0 24 24"><path d="${d}"/></svg></button>`;
@@ -6414,15 +6463,22 @@ function bikeBuildUI() {
 <div class="bk-warn" id="bikeWarn">one more bump and it's a wipeout!</div>
 <div class="bk-msg" id="bikeMsg"></div><div class="bk-count" id="bikeCount"></div>
 <div class="bk-pads">${arrow('L', 'M15 5l-7 7 7 7')}${arrow('U', 'M5 15l7-7 7 7')}${arrow('D', 'M5 9l7 7 7-7')}${arrow('R', 'M9 5l7 7-7 7')}</div>
-<div class="bk-over" id="bikeOver"><div class="bk-card"><h2 id="bikeTitle">Wipeout!</h2><div class="bk-final" id="bikeFinal">0</div><div class="bk-cap">score</div>
-<div class="bk-stats"><div><b id="bikeOT">0</b><span>treats</span></div><div><b id="bikeOD">0 m</b><span>distance</span></div><div><b id="bikeOB">0</b><span>best</span></div></div>
-<div class="bk-new" id="bikeNew">New best!</div><button class="bk-btn" id="bikeAgain">Ride again</button><button class="bk-btn alt" id="bikeGarage">Back to the garage</button></div></div>`;
+<div class="bk-rp"><div class="bk-rp-bar top"></div><div class="bk-rp-bar bot"></div><div class="bk-rp-tag"><i></i>REPLAY<small>slow-mo</small></div><div class="bk-rp-skip">tap to skip</div></div>
+<div class="bk-over" id="bikeOver"><div class="bk-card" id="bikeCard"><div class="bk-conf">${Array.from({ length: 18 }, (_, i) => `<i style="left:${(i * 5.7 + 1) % 100}%;background:${['#ff6fae', '#ffc93c', '#8a5cff', '#6fe0bf', '#8fd6ff'][i % 5]};animation-delay:${(-((i * 0.37) % 2.6)).toFixed(2)}s"></i>`).join('')}</div>
+<h2 id="bikeTitle">Wipeout!</h2><div class="bk-rec" id="bikeRec">NEW RECORD!<small id="bikeRecSub"></small></div><div class="bk-final" id="bikeFinal">0</div><div class="bk-cap">score &middot; best <span id="bikeOS">0</span></div>
+<div class="bk-stats"><div><b id="bikeOT">0</b><span>treats</span></div><div><b id="bikeOD">0 m</b><span>distance</span></div><div><b id="bikeOB">0 m</b><span>best distance</span></div></div>
+<div class="bk-new" id="bikeNew">New best score!</div><div class="bk-bank" id="bikeBank">+<b id="bikeGain">0</b> fish into the piggy bank</div>
+<button class="bk-btn" id="bikeAgain">Ride again</button><button class="bk-btn paint" id="bikeShopBtn"><span>&#x1F3A8;</span> Paint shop <span class="bk-purse-sm">&#x1F41F; <b id="bikeWal">0</b></span></button><button class="bk-btn alt" id="bikeGarage">Back to the garage</button></div>
+<div class="bk-shop" id="bikeShop"><div class="bk-shop-head"><h2>Paint shop</h2><span class="bk-purse">&#x1F41F; <b id="bikeShopWal">0</b></span></div>
+<div class="bk-swatches" id="bikeSwatches">${BIKE_PAINTS.map(p => `<button class="bk-sw" data-id="${p.id}" tabindex="-1"><i style="background:radial-gradient(circle at 34% 30%,rgba(255,255,255,.75) 0 9%,rgba(255,255,255,0) 10%),linear-gradient(155deg,${p.main} 0 46%,${p.stripe} 46% 53%,${p.dark} 53%)"></i><span>${p.name}</span><small></small></button>`).join('')}</div>
+<button class="bk-btn" id="bikeShopAct">Ride</button><button class="bk-btn alt" id="bikeShopDone">Done</button></div></div>`;
   document.body.appendChild(ui);
   const $ = id => ui.querySelector('#' + id), u = BIKE.ui = { root: ui };
-  for (const k of ['Area', 'Score', 'Treats', 'Dist', 'Speed', 'SpeedBar', 'Power', 'PowerName', 'PowerBar', 'Warn', 'Msg', 'Count', 'Over', 'Title', 'Final', 'OT', 'OD', 'OB', 'New']) u[k] = $('bike' + k);
+  for (const k of ['Area', 'Score', 'Treats', 'Dist', 'Speed', 'SpeedBar', 'Power', 'PowerName', 'PowerBar', 'Warn', 'Msg', 'Count', 'Over', 'Title', 'Final', 'OT', 'OD', 'OB', 'New',
+    'Card', 'Rec', 'RecSub', 'OS', 'Bank', 'Gain', 'Wal', 'ShopBtn', 'Shop', 'ShopWal', 'Swatches', 'ShopAct', 'ShopDone']) u[k] = $('bike' + k);
   const hush = e => { e.preventDefault(); e.stopPropagation(); }, sw = BIKE.sw, area = u.Area;
   // swipes live on our own full-screen layer; one gesture = one move, fired as soon as it clears 30px
-  area.addEventListener('pointerdown', e => { if (!BIKE.active) return; hush(e); sw.id = e.pointerId; sw.x = e.clientX; sw.y = e.clientY; sw.done = false; try { area.setPointerCapture(e.pointerId); } catch (x) {} });
+  area.addEventListener('pointerdown', e => { if (!BIKE.active) return; hush(e); if (BIKE.phase === 'replay') { bikeReplayEnd(); return; } sw.id = e.pointerId; sw.x = e.clientX; sw.y = e.clientY; sw.done = false; try { area.setPointerCapture(e.pointerId); } catch (x) {} });
   area.addEventListener('pointermove', e => {
     if (!BIKE.active || e.pointerId !== sw.id || sw.done) return;
     const dx = e.clientX - sw.x, dy = e.clientY - sw.y; hush(e);
@@ -6433,7 +6489,9 @@ function bikeBuildUI() {
   area.addEventListener('pointerup', up); area.addEventListener('pointercancel', up);
   for (const b of ui.querySelectorAll('.bk-pads button')) b.addEventListener('pointerdown', e => { if (!BIKE.active) return; hush(e); bikeAct(b.dataset.a); });
   const tap = (el, fn) => el.addEventListener('click', e => { e.stopPropagation(); if (BIKE.active) fn(); });
-  tap($('bikeExit'), exitBike); tap($('bikeGarage'), exitBike); tap($('bikeAgain'), () => startBike(BIKE.opts));
+  tap($('bikeExit'), exitBike); tap($('bikeGarage'), () => { if (BIKE.overT > 0.35) exitBike(); }); tap($('bikeAgain'), () => { if (BIKE.overT > 0.35) startBike(BIKE.opts); });   // (a beat's grace: the tap that skipped the replay mustn't land on a button)
+  tap($('bikeShopBtn'), () => { if (BIKE.overT > 0.35) bikeShopOpen(); }); tap($('bikeShopAct'), bikeShopAct); tap($('bikeShopDone'), bikeShopClose);
+  u.Swatches.addEventListener('click', e => { const b = e.target.closest('.bk-sw'); e.stopPropagation(); if (b && BIKE.active) bikeShopPick(b.dataset.id); });
   ui.addEventListener('pointerdown', e => { if (BIKE.active) e.stopPropagation(); });   // nothing leaks through to the yard
 }
 function bikeSay(text, hot, quiet) {
@@ -6481,6 +6539,10 @@ function bikeSfx(n) {
     else if (n === 'beep') { tone(660, 660, 0.14, 'square', 0.03); BIKE.rev = 0.6; }                            // (a blip of the throttle on each beep)
     else if (n === 'go') { tone(990, 990, 0.1, 'square', 0.035); tone(1320, 1320, 0.3, 'square', 0.035, 0.1); BIKE.rev = 1; }
     else if (n === 'nope') tone(200, 160, 0.08, 'square', 0.03);
+    else if (n === 'record') { const f = [784, 988, 1175, 1568, 1976]; for (let i = 0; i < 5; i++) tone(f[i], f[i] * 1.01, i === 4 ? 0.4 : 0.14, 'triangle', 0.04, i * 0.09); }   // ta-da!
+    else if (n === 'buy') { tone(1318, 1318, 0.07, 'square', 0.025); tone(1760, 1760, 0.3, 'square', 0.025, 0.07); bikeHit(0.02, 0.25, 0.03, 6000); }   // ka-ching
+    else if (n === 'thunder') { bikeHit(0.5 + Math.random() * 0.8, 1.8, 0.05, 150, 'lowpass', 0.7); bikeHit(0.8 + Math.random(), 1.4, 0.03, 90, 'lowpass', 0.7); }   // (far off: a low rumble)
+    else if (n === 'slowboom') { tone(95, 32, 1.1, 'sine', 0.1); bikeHit(0, 1.0, 0.05, 380, 'lowpass', 0.7); }   // the impact, in slow motion
   } catch (e) {}
 }
 function bikeEngineOn() {                                             // a proper motorbike: a V-twin's uneven pulse through a little overdrive, the exhaust burbling on each firing, the wind picking up with speed
@@ -6640,6 +6702,7 @@ function bikeLand() {
   const B = BIKE, wasFly = B.fly;
   B.y = B.ground; B.vy = 0; B.air = B.fly = B.slam = false; bikeSfx('land');
   if (B.ground > 0.5) bikeSay('Roof ride!', false, true); else if (wasFly) bikeSay('Stuck the landing!', false, true);
+  if (B.rain > 0.3 && B.ground < 0.1) bikeSplash(16);
   if (B.jumpBuf > 0) bikeJump();
 }
 function bikeStumble(msg) {   // first bump is a wobble; a second inside six seconds is a wipeout
@@ -6655,7 +6718,7 @@ function bikeKnock(o) {   // bonk: off it goes, tumbling into the sky
 }
 function bikeCrash(o) {
   const B = BIKE, rv = B.rv; if (B.phase !== 'ride') return;
-  B.phase = 'crash'; B.crashT = 0; B.crashO = o && o.solid ? o : null; B.shake = 0.9; B.side = Math.random() < 0.5 ? -1 : 1;
+  B.phase = 'crash'; B.crashT = 0; B.crashAt = B.t; B.crashO = o && o.solid ? o : null; B.shake = 0.9; B.side = Math.random() < 0.5 ? -1 : 1;
   B.rvx = B.side * 1.2; B.rvy = 8.5; B.rvz = 5.5 + B.speed * 0.15; B.rspin = 10; B.bvy = B.air ? B.vy : 4; B.bz = -3;
   B.speed = 0; B.go = 0; B.duck = 0;
   bikeScene.attach(rv.mount);   // kitty parts ways with the bike, in world space
@@ -6675,16 +6738,22 @@ function bikeCrashStep(dt) {   // the bike skids back and flops over; kitty some
     else if (inX && Math.abs(m.z - o.z) < o.hl + 0.2 && m.y > o.top - 0.3) floor = o.top;
   }
   if (m.y < floor) { m.y = floor; B.rvy = B.rvy < -3 ? -B.rvy * 0.35 : 0; B.rvz *= 0.5; B.rvx *= 0.5; B.rspin *= 0.4; }
-  if (B.crashT > 1.7) bikeGameOver();
 }
-function bikeGameOver() {
-  const B = BIKE, u = B.ui, sc = bikeScore(); let best = 0, fresh = false;
+function bikeGameOver() {   // the card: score, treats, distance against her best (a proper fanfare when she beats it), the fish banked
+  const B = BIKE, u = B.ui, sc = bikeScore(), dm = Math.floor(B.dist); let best = 0, fresh = false;
   try { best = parseInt(localStorage.getItem('catguard.bikeBest'), 10) || 0; } catch (e) {}
   if (sc > best) { fresh = true; best = sc; try { localStorage.setItem('catguard.bikeBest', String(sc)); } catch (e) {} }
+  const bd = parseInt(bikeLoad('catguard.bikeBestDist', '0'), 10) || 0, rec = dm > bd && bd > 0;   // (the very first ride just sets the mark)
+  if (dm > bd) bikeSave('catguard.bikeBestDist', dm);
+  const gain = bikeBank();
   B.phase = 'over'; B.overT = 0;
-  u.Title.textContent = BIKE_OOF[(Math.random() * BIKE_OOF.length) | 0]; u.Final.textContent = sc;
-  u.OT.textContent = B.treats; u.OD.textContent = Math.floor(B.dist) + ' m'; u.OB.textContent = best;
-  u.New.style.display = fresh ? '' : 'none'; u.Over.classList.add('on');
+  u.Title.textContent = rec ? 'What a ride!' : BIKE_OOF[(Math.random() * BIKE_OOF.length) | 0]; u.Final.textContent = sc;
+  u.OT.textContent = B.treats; u.OD.textContent = dm + ' m'; u.OB.textContent = Math.max(dm, bd) + ' m'; u.OS.textContent = best;
+  u.New.style.display = fresh && !rec ? '' : 'none';
+  u.Rec.style.display = rec ? 'block' : 'none'; u.RecSub.textContent = rec ? dm + ' m \u00b7 ' + (dm - bd) + ' m past your old best' : '';
+  u.Card.classList.toggle('rec', rec); u.Gain.textContent = gain; u.Bank.style.display = gain > 0 ? '' : 'none'; bikeOverWallet();
+  u.Over.classList.remove('shop'); u.Over.classList.add('on');
+  if (rec) bikeSfx('record');
 }
 function bikeRide(dt) {
   const B = BIKE;
@@ -6700,6 +6769,7 @@ function bikeRide(dt) {
     if (B.y <= B.ground && B.vy <= 0) bikeLand();
   }
   B.dist += B.speed * dt;
+  if (!B.passedBest && B.bestD0 >= 30 && B.dist > B.bestD0) { B.passedBest = true; bikeSay('New record!', true); bikeSfx('record'); }
   while (B.rowAt - B.dist < BIKE_AHEAD) bikeRow();
 }
 function bikeWorld(dt) {   // scroll everything toward the camera, and check what kitty touches
@@ -6761,7 +6831,7 @@ function bikeWorld(dt) {   // scroll everything toward the camera, and check wha
   }
   for (let i = 0; i < B.scen.length; i++) {
     const s = B.scen[i]; s.position.z -= d;
-    if (s.position.z < -24) { s.position.z += BIKE_SPAN; if (s.geometry.userData.house !== undefined) s.geometry = B.houses[(Math.random() * 4) | 0]; }
+    if (s.position.z < -24) { s.position.z += BIKE_SPAN; if (s.geometry.userData.house !== undefined) s.geometry = B.houses[(Math.random() * 4) | 0]; if (s.userData.win) s.userData.win.geometry = B.env.winGeos[(Math.random() * 3) | 0]; }
   }
   B.roadTex.offset.y = (B.roadTex.offset.y - d / 8) % 1; B.walkTex.offset.y = (B.walkTex.offset.y - d / 1.8) % 1; B.lawnTex.offset.y = (B.lawnTex.offset.y - d / 5) % 1;
 }
@@ -6785,9 +6855,11 @@ function bikePose(dt) {   // lean into lane changes, wheelie on hops, tuck on du
   const lift = Math.max(0, B.y - B.ground), s = 1 / (1 + lift * 0.35);
   rv.shadow.position.y = B.ground - B.y + 0.03; rv.shadow.scale.set(s * 0.7, s * 1.4, 1);
   if (B.nip > 0) B.bikeMat.emissive.setHSL((B.t * 1.5) % 1, 0.9, 0.28); else if (B.bikeMat.emissive.r + B.bikeMat.emissive.g > 0) B.bikeMat.emissive.setRGB(0, 0, 0);
+  if (B.shop) { rv.roll.rotation.z = 0; rv.pitch.rotation.x = 0; rv.root.position.y = 0; rv.root.rotation.y += dt * 0.55; rv.shadow.position.y = 0.03; }   // (the paint shop: upright, turning slowly on the spot)
 }
 function bikeCamStep(dt) {   // chase cam, a little higher and wider in portrait, fov stretching with speed
   const B = BIKE, cam = bikeCam, port = cam.aspect < 0.9;
+  if (B.shop) { bikeShopCam(); return; }
   B.camX += (B.x * 0.55 - B.camX) * Math.min(1, dt * 5);
   B.shake = Math.max(0, B.shake - dt * 1.2);
   const sh = B.shake * B.shake * 1.4, lift = Math.min(B.phase === 'ride' ? B.y : 0, 5);
@@ -6803,9 +6875,372 @@ function bikeKey(e) {
     : k === 'Escape' ? 'X' : k === 'Enter' ? 'E' : null;
   if (!a) return;
   e.preventDefault(); e.stopPropagation();
-  if (a === 'X') exitBike();
-  else if (B.phase === 'over') { if ((a === 'E' || k === ' ') && B.overT > 0.6) startBike(B.opts); }   // enter or space: ride again
+  if (a === 'X') { if (B.shop) bikeShopClose(); else exitBike(); }
+  else if (B.phase === 'replay') { if (!e.repeat) bikeReplayEnd(); }   // any key skips the replay
+  else if (B.phase === 'over') { if (!B.shop && (a === 'E' || k === ' ') && B.overT > 0.6) startBike(B.opts); }   // enter or space: ride again
   else if (a !== 'E' && !e.repeat) bikeAct(a);
+}
+
+/* ---------- the long ride: the sky turns from day to golden hour to night to dawn as the distance piles up, some rides it rains,
+   the fish she catches buy paint for the bike, her best distance waits on the road as a banner, and every wipeout gets an instant replay ---------- */
+const BIKE_PAINTS = [   // main paint, the darker inner stripe, the saddle, the pinstripe, the saddle's stitched top; the price is in fish treats
+  { id: 'pink', name: 'Princess pink', price: 0, main: '#ff6fae', dark: '#e2518f', seat: '#3a1434', stripe: '#fff4f8', stitch: '#6a3a62' },
+  { id: 'midnight', name: 'Midnight black', price: 60, main: '#2b2833', dark: '#ff6fae', seat: '#141217', stripe: '#c8c2d6', stitch: '#3a3542' },
+  { id: 'mint', name: 'Mint', price: 90, main: '#6fe0bf', dark: '#35b58f', seat: '#1d4a42', stripe: '#fffaf0', stitch: '#2f6b5f' },
+  { id: 'tangerine', name: 'Tangerine', price: 120, main: '#ff8a3d', dark: '#e0531f', seat: '#3a1a0c', stripe: '#fff4e0', stitch: '#5a2c18' },
+  { id: 'gold', name: 'Sunshine gold', price: 150, main: '#ffc93c', dark: '#f08a1c', seat: '#4a2a14', stripe: '#fff8e0', stitch: '#6b4424' },
+  { id: 'ruby', name: 'Ruby red', price: 220, main: '#e3243f', dark: '#9e0f26', seat: '#2a0c12', stripe: '#ffd6de', stitch: '#4a1a22' },
+  { id: 'ice', name: 'Ice blue', price: 300, main: '#8fd6ff', dark: '#3f97d9', seat: '#18304d', stripe: '#ffffff', stitch: '#2a4a6e' },
+  { id: 'galaxy', name: 'Galaxy purple', price: 400, main: '#8a5cff', dark: '#3d1f9e', seat: '#1c0d3a', stripe: '#7ff0ff', stitch: '#35206a' },
+];
+const BIKE_TOD = (() => {   // the sky along the ride, by distance (the cycle repeats every 2.1 km). hor is the horizon and the fog; hs/hg/hi the hemisphere light; sc/si the sun lamp; city tints the skyline; night runs 0..1
+  const day = { top: 0x62bdfd, mid: 0xaee0ff, hor: 0xffe4ef, hs: 0xffffff, hg: 0xb89aac, hi: 0.62, sc: 0xfff2e6, si: 0.55, city: 0xffffff, night: 0, sun: 0xfff6d0, sunY: 150, sunS: 16, moonY: -60 };
+  const gold = { top: 0x5b6fc4, mid: 0xffa688, hor: 0xffc890, hs: 0xffd8b0, hg: 0x9a6f7a, hi: 0.58, sc: 0xffa860, si: 0.62, city: 0xffc4a4, night: 0.12, sun: 0xffa040, sunY: 20, sunS: 32, moonY: -60 };
+  const night = { top: 0x08082a, mid: 0x18184c, hor: 0x3a2c62, hs: 0x7c82d6, hg: 0x2a2140, hi: 0.42, sc: 0xa0b0ff, si: 0.2, city: 0x3c3468, night: 1, sun: 0xff7030, sunY: -50, sunS: 30, moonY: 72 };
+  const dawn = { top: 0x4b62b8, mid: 0xf2a2c6, hor: 0xffd2c2, hs: 0xffd8e8, hg: 0x8a6a8a, hi: 0.52, sc: 0xffc0d0, si: 0.45, city: 0xe8b8cc, night: 0.25, sun: 0xffb090, sunY: 16, sunS: 26, moonY: -40 };
+  return [[0, day], [420, day], [660, gold], [880, night], [1460, night], [1690, dawn], [1900, day], [2100, day]].map(([d, k]) => Object.assign({ d }, k));
+})();
+
+/* the wallet, the paint she owns and rides, her best distance: all in localStorage (any of which may be missing, full or blocked) */
+function bikeLoad(k, def) { try { const v = localStorage.getItem(k); return v === null ? def : v; } catch (e) { return def; } }
+function bikeSave(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+function bikeWallet() { return Math.max(0, parseInt(bikeLoad('catguard.fish', '0'), 10) || 0); }
+function bikeOwned() { let a = []; try { a = JSON.parse(bikeLoad('catguard.bikePaints', '[]')); } catch (e) {} if (!Array.isArray(a)) a = []; if (a.indexOf('pink') < 0) a.push('pink'); return a; }
+function bikePaintDef(id) { return BIKE_PAINTS.find(p => p.id === id) || BIKE_PAINTS[0]; }
+function bikePaintId() { const id = bikeLoad('catguard.bikePaint', 'pink'); return BIKE_PAINTS.some(p => p.id === id) && bikeOwned().indexOf(id) >= 0 ? id : 'pink'; }
+function bikeBank() { const B = BIKE; if (B.banked) return 0; B.banked = true; const n = B.treats | 0; if (n > 0) bikeSave('catguard.fish', bikeWallet() + n); return n; }   // this ride's fish go in the wallet (once)
+function bikePaintApply(id) {   // swap the bike's painted body for this colour (each paint's geometry is built the first time, then kept)
+  const B = BIKE, rv = B.rv; if (!rv || !rv.bodyMesh || rv.paint === id) return;
+  const C = B.paintGeo || (B.paintGeo = {});
+  if (!C[id]) { const g = bikeBikeGeoms(bikePaintDef(id)); C[id] = g.body; g.glow.dispose(); g.wheel.dispose(); }
+  rv.bodyMesh.geometry = C[id]; rv.paint = id;
+}
+
+/* ---------- the paint shop: a showroom turntable behind a sheet of swatches ---------- */
+function bikeOverWallet() { const u = BIKE.ui; if (u && u.Wal) u.Wal.textContent = bikeWallet(); }
+function bikeShopOpen() {   // kitty dusts herself off and climbs back on, the bike turns on the spot, out come the paint samples
+  const B = BIKE, rv = B.rv; if (B.phase !== 'over' || B.shop) return;
+  B.shop = true; B.shopSel = bikePaintId(); B.lean = B.pitch = B.y = 0; B.shopVO = '';
+  rv.body.add(rv.mount); rv.mount.position.set(0, 0.74, -0.1); rv.mount.rotation.set(0, 0, 0); rv.mount.scale.set(1, 1, 1);
+  for (const o of B.obs) o.mesh.visible = false; for (const t of B.fish) t.mesh.visible = false; for (const p of B.powers) p.mesh.visible = false;
+  B.ui.Over.classList.add('shop'); B.ui.root.classList.add('shopping'); bikeShopDraw(); bikeSfx('swish');
+}
+function bikeShopClose() {
+  const B = BIKE; if (!B.shop) return;
+  B.shop = false; B.rv.root.rotation.y = 0; bikeCam.clearViewOffset(); B.shopVO = ''; bikePaintApply(bikePaintId());   // (a paint she only tried on goes back)
+  const C = B.paintGeo; for (const id in C) if (id !== 'pink' && id !== B.rv.paint) { C[id].dispose(); delete C[id]; }   // (and the samples are put away)
+  for (const o of B.obs) o.mesh.visible = o.on; for (const t of B.fish) t.mesh.visible = t.on; for (const p of B.powers) p.mesh.visible = p.on;
+  B.ui.Over.classList.remove('shop'); B.ui.root.classList.remove('shopping'); bikeOverWallet();
+}
+function bikeShopDraw() {   // wallet, swatch states (riding / owned / price), the action button, and the bike in the swatch she's looking at
+  const B = BIKE, u = B.ui, own = bikeOwned(), cur = bikePaintId(), wal = bikeWallet(), sel = bikePaintDef(B.shopSel), mine = own.indexOf(sel.id) >= 0;
+  u.ShopWal.textContent = wal;
+  for (const b of u.Swatches.children) {
+    const id = b.dataset.id, p = bikePaintDef(id), has = own.indexOf(id) >= 0;
+    b.classList.toggle('sel', id === sel.id); b.classList.toggle('on', id === cur); b.classList.toggle('own', has);
+    b.querySelector('small').textContent = id === cur ? 'riding' : has ? 'owned' : '🐟 ' + p.price;
+  }
+  u.ShopAct.disabled = sel.id === cur || (!mine && wal < sel.price);
+  u.ShopAct.textContent = sel.id === cur ? 'Riding this one ✓' : mine ? 'Ride in ' + sel.name : wal >= sel.price ? 'Buy for 🐟 ' + sel.price : 'Need 🐟 ' + (sel.price - wal) + ' more';
+  bikePaintApply(sel.id);
+}
+function bikeShopPick(id) { const B = BIKE; if (!B.shop || B.shopSel === id) return; B.shopSel = id; bikeSfx('swish'); bikeShopDraw(); }
+function bikeShopAct() {   // buy it (fish out of the wallet), or just ride in one she already owns
+  const B = BIKE; if (!B.shop) return;
+  const p = bikePaintDef(B.shopSel), own = bikeOwned();
+  if (own.indexOf(p.id) < 0) {
+    const w = bikeWallet(); if (w < p.price) { bikeSfx('nope'); return; }
+    bikeSave('catguard.fish', w - p.price); own.push(p.id); bikeSave('catguard.bikePaints', JSON.stringify(own)); bikeSfx('buy'); bikeSay('Ooh, shiny!');
+  } else bikeSfx('power');
+  bikeSave('catguard.bikePaint', p.id); bikeShopDraw();
+}
+function bikeShopCam() {   // the showroom camera: a low three-quarter view, the bike framed clear of the shop sheet (above it, or left of it in a short landscape)
+  const B = BIKE, cam = bikeCam, r = B.rv.root.position, port = cam.aspect < 0.9, side = innerHeight <= 520 && innerWidth > innerHeight;
+  const k = Math.min(2, Math.max(1, 0.7 / cam.aspect)), sx = r.x > 0.5 ? -1 : 1;   // (further back on a narrow screen, so the whole bike fits across it)
+  cam.position.set(r.x + sx * 1.9 * k, 0.72 + 1.15 * k, r.z - 5.0 * k); BIKE_LOOK.set(r.x, 0.72, r.z); cam.lookAt(BIKE_LOOK);
+  const vo = side ? 'x' : 'y'; if (B.shopVO !== vo) { B.shopVO = vo; const a = cam.aspect; cam.setViewOffset(a, 1, side ? 0.21 * a : 0, side ? 0 : 0.2, a, 1); }   // (sized by the aspect: setViewOffset resets it from these)
+  const fov = port ? 46 : 40; if (Math.abs(cam.fov - fov) > 0.05) { cam.fov = fov; cam.updateProjectionMatrix(); }
+  if (B.env) B.env.lamp.position.set(cam.position.x, cam.position.y + 1.2, cam.position.z + 0.5);   // (showroom lighting)
+}
+
+/* ---------- the world's clock and weather ---------- */
+function bikeCanvasTex(w, h, paint) { const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h); return new THREE.CanvasTexture(c); }
+function bikeEnvBuild(S) {   // made once, with the street: sun, moon, stars, lamp glows, lit windows, a wet-road sheen, the headlight, rain, spray, the record banner
+  const B = BIKE, G = bikeG, rv = B.rv, AB = THREE.AdditiveBlending, pr = Math.min(2, renderer.getPixelRatio());
+  const E = B.env = { c: {}, tmp: new THREE.Color(), sky: [-1, -1, -1], flash: 0, boltT: 9, sprayAcc: 0, wetK: -1 };
+  for (const k of ['top', 'mid', 'hor', 'hs', 'hg', 'sc', 'city', 'sun']) E.c[k] = new THREE.Color();
+  const radial = stops => (x, w, h) => { const g = x.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); for (const [o, a] of stops) g.addColorStop(o, 'rgba(255,255,255,' + a + ')'); x.fillStyle = g; x.fillRect(0, 0, w, h); };
+  const glow = E.glowTex = bikeCanvasTex(64, 64, radial([[0, 1], [0.22, 0.6], [0.55, 0.16], [1, 0]]));
+  const dot = bikeCanvasTex(16, 16, radial([[0, 1], [0.45, 0.8], [1, 0]]));
+  const disc = bikeCanvasTex(64, 64, (x, w) => { x.fillStyle = '#fff'; x.beginPath(); x.arc(w / 2, w / 2, w / 2 - 2, 0, 7); x.fill(); });
+  const moonT = bikeCanvasTex(64, 64, x => { x.fillStyle = '#fff'; x.beginPath(); x.arc(32, 32, 30, 0, 7); x.fill(); x.fillStyle = 'rgba(190,185,215,.55)';
+    for (const [cx, cy, r] of [[22, 24, 7], [40, 38, 9], [38, 18, 4], [20, 42, 4]]) { x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill(); } });
+  const spr = (map, col, add) => new THREE.Sprite(new THREE.SpriteMaterial({ map, color: col, transparent: true, depthWrite: false, fog: false, blending: add ? AB : THREE.NormalBlending }));
+  // the sky: a sun that sets behind downtown, a moon, stars, lit windows in the towers and a blinking light on the tower
+  E.sunHalo = spr(glow, 0xffc080, true); E.sun = spr(disc, 0xfff6d0); E.moonHalo = spr(glow, 0x9fb4ff, true); E.moon = spr(moonT, 0xfff4d6);
+  E.sun.position.set(48, 150, 300); E.sunHalo.position.set(48, 150, 301); E.moon.position.set(-70, -60, 300); E.moonHalo.position.set(-70, -60, 301);
+  E.moon.scale.set(11, 11, 1); E.moonHalo.scale.set(46, 46, 1); S.add(E.sunHalo, E.sun, E.moonHalo, E.moon);
+  { const p = []; for (let i = 0; i < 260; i++) p.push((Math.random() - 0.5) * 660, 14 + Math.pow(Math.random(), 0.8) * 150, 302 + Math.random() * 20);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+    E.stars = new THREE.Points(g, new THREE.PointsMaterial({ map: dot, size: 2.6 * pr, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false })); S.add(E.stars); }
+  { const p = [], c = [], col = new THREE.Color(), wc = [0xffd98a, 0xffe9b8, 0xffc27a, 0xcfe4ff];
+    for (const [w, h, x, z] of B.skyBoxes || []) { const n = Math.floor(w / 1.3);
+      for (let r = 0; 2.2 + r * 1.7 < h - 1; r++) for (let k = 0; k < n; k++) if (Math.random() < 0.42) { p.push(x + (k - (n - 1) / 2) * 1.3, 2.2 + r * 1.7, 262 + z - 3.4); col.setHex(wc[(Math.random() * 4) | 0]); c.push(col.r, col.g, col.b); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(c, 3));
+    E.cityWin = new THREE.Points(g, new THREE.PointsMaterial({ size: 2.2 * pr, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false })); S.add(E.cityWin); }
+  E.beacon = spr(glow, 0xff3050, true); E.beacon.position.set(-22, 55.5, 265); E.beacon.scale.set(5, 5, 1); S.add(E.beacon);
+  // street lamps: a warm glow round each head and a pool of light on the road beneath it (drawn out into long reflections when the road's wet)
+  E.lampMat = new THREE.SpriteMaterial({ map: glow, color: 0xffd79a, transparent: true, depthWrite: false, blending: AB, opacity: 0 });
+  E.poolMat = new THREE.MeshBasicMaterial({ map: glow, color: 0xffc47a, transparent: true, depthWrite: false, blending: AB, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const pg = new THREE.PlaneGeometry(5.2, 5.2); pg.rotateX(-Math.PI / 2); E.pools = [];
+  // lit windows for the houses: three different sets of rooms with the lights on
+  const wl = ['#ffd27a', '#ffe6a6', '#ffc2d9', '#a6d4ff', '#ffd27a'];
+  E.winGeos = [0, 1, 2].map(() => { const P = [];
+    for (const s of [-1, 1]) for (const [y, z, h, w] of [[1.5, s * 1.1, 1.15, 1.5], [3.95, s * 1.4, 1.05, 1.0], [3.95, s * 3.6, 1.05, 1.0]]) if (Math.random() < 0.65) P.push([G.box(0.02, h, w), wl[(Math.random() * wl.length) | 0], -3.63, y, z]);
+    if (!P.length) P.push([G.box(0.02, 1.15, 1.5), wl[0], -3.63, 1.5, 1.1]); return bikeMerge(P); });
+  E.winMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, fog: true });
+  for (const s of B.scen) {
+    if (s.geometry === B.lampGeo) { const g = new THREE.Sprite(E.lampMat), p = new THREE.Mesh(pg, E.poolMat); g.position.set(-1.25, 4.12, 0); g.scale.set(2.8, 2.8, 1); p.position.set(-1.25, 0.17, 0); p.userData.fz = Math.abs(s.rotation.y) > 1 ? -1 : 1; s.add(g, p); E.pools.push(p); }
+    else if (s.geometry.userData.house !== undefined) { const w = new THREE.Mesh(E.winGeos[(Math.random() * 3) | 0], E.winMat); s.add(w); s.userData.win = w; }
+  }
+  // the wet road: darker asphalt, with a sheen picking up the sky toward the horizon
+  E.road = S.children.find(o => o.material && o.material.map === B.roadTex);
+  { const g = new THREE.PlaneGeometry(7.2, 150); g.rotateX(-Math.PI / 2);
+    const t = bikeCanvasTex(8, 128, (x, w, h) => { const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(255,255,255,.12)'); gr.addColorStop(0.55, 'rgba(255,255,255,.5)'); gr.addColorStop(1, 'rgba(255,255,255,1)'); x.fillStyle = gr; x.fillRect(0, 0, w, h); });
+    E.sheen = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+    E.sheen.position.set(0, 0.005, 65); E.sheen.visible = false; S.add(E.sheen); }
+  // the headlight: a pool on the road ahead, a faint beam through the air, a glint at the lamp, and the tail light
+  { const t = bikeCanvasTex(128, 256, (x, w, h) => { x.save(); x.scale(1, 2); const g = x.createRadialGradient(64, 56, 2, 64, 56, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.45, 'rgba(255,255,255,.5)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h / 2); x.restore();
+      x.globalCompositeOperation = 'destination-in'; const m = x.createLinearGradient(0, 0, 0, h); m.addColorStop(0, 'rgba(0,0,0,0)'); m.addColorStop(0.12, 'rgba(0,0,0,1)'); m.addColorStop(1, 'rgba(0,0,0,1)'); x.fillStyle = m; x.fillRect(0, 0, w, h); });
+    const g = new THREE.PlaneGeometry(4.8, 13); g.rotateX(-Math.PI / 2); g.translate(0, 0, 7.1);
+    E.head = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: t, color: 0xfff0c8, transparent: true, opacity: 0, depthWrite: false, blending: AB, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+    rv.root.add(E.head); }
+  { const pos = [], col = [], idx = [], R = 10, C = 4;   // the beam: a sheet sloping from the lamp to the road, bright at the lamp and soft at the edges (vertex colours, added on)
+    for (let r = 0; r <= R; r++) { const v = r / R, hw = 0.08 + v * 1.9, I = Math.pow(1 - v, 1.6) * Math.min(1, v * 12 + 0.25);
+      for (let c = 0; c <= C; c++) { const u = c / C - 0.5, e = I * Math.pow(1 - Math.abs(u) * 2, 1.4); pos.push(u * 2 * hw, 0.84 - v * 0.78, 0.6 + v * 10.5); col.push(e, e * 0.95, e * 0.82); } }
+    for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) { const a = r * (C + 1) + c, b = a + C + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx);
+    E.beam = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: AB, side: THREE.DoubleSide, fog: false }));
+    rv.body.add(E.beam); }
+  E.flare = spr(glow, 0xfff4d0, true); E.flare.position.set(0, 0.84, 0.64); E.flare.scale.set(0.9, 0.9, 1);
+  E.tail = spr(glow, 0xff2d55, true); E.tail.position.set(0, 0.63, -0.94); E.tail.scale.set(0.75, 0.75, 1); rv.body.add(E.flare, E.tail);
+  E.lamp = new THREE.PointLight(0xffe6bf, 0, 24, 1.2); E.lamp.position.set(0, 2.4, 5); S.add(E.lamp);   // (the one real light: it picks out what's ahead at night)
+  // rain: streaks round the camera, each bright at its head and fading up its tail (added on, so the black tail vanishes)
+  { const N = E.nDrops = 1400, p = new Float32Array(N * 6), c = new Float32Array(N * 6); E.drops = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) { E.drops[i * 3] = (Math.random() - 0.5) * 24; E.drops[i * 3 + 1] = Math.random() * 13; E.drops[i * 3 + 2] = -4 + Math.random() * 40; c[i * 6] = 0.62; c[i * 6 + 1] = 0.68; c[i * 6 + 2] = 0.8; }
+    const g = E.rainGeo = new THREE.BufferGeometry(), pa = new THREE.BufferAttribute(p, 3); pa.setUsage(THREE.DynamicDrawUsage); g.setAttribute('position', pa); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    E.rainLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false, blending: AB, fog: false }));
+    E.rainLines.frustumCulled = false; E.rainLines.visible = false; S.add(E.rainLines); }
+  { const N = 140, g = new THREE.BufferGeometry(), pa = new THREE.BufferAttribute(new Float32Array(N * 3).fill(-50), 3); pa.setUsage(THREE.DynamicDrawUsage); g.setAttribute('position', pa);   // spray off the back tyre
+    E.spray = { N, pos: pa.array, vel: new Float32Array(N * 3), life: new Float32Array(N), next: 0, attr: pa };
+    E.sprayPts = new THREE.Points(g, new THREE.PointsMaterial({ map: dot, color: 0xe4ebf5, size: 0.3, transparent: true, opacity: 0.38, depthWrite: false }));
+    E.sprayPts.frustumCulled = false; E.sprayPts.visible = false; S.add(E.sprayPts); }
+  // her best distance so far: a banner across the road and a chequered line to beat
+  { const g = E.mark = new THREE.Group(), cv = E.markCv = document.createElement('canvas'); cv.width = 512; cv.height = 64; E.markTex = new THREE.CanvasTexture(cv);
+    const ban = new THREE.Mesh(new THREE.PlaneGeometry(7.6, 0.95), new THREE.MeshBasicMaterial({ map: E.markTex, side: THREE.DoubleSide })); ban.position.set(0, 4.55, 0); ban.rotation.y = Math.PI;
+    const posts = new THREE.Mesh(bikeMerge([[G.box(0.14, 5.0, 0.14), '#e9e4ea', -3.95, 2.5, 0], [G.box(0.14, 5.0, 0.14), '#e9e4ea', 3.95, 2.5, 0], [G.ball(0.16, 0), '#ffc93c', -3.95, 5.08, 0], [G.ball(0.16, 0), '#ffc93c', 3.95, 5.08, 0]]), B.mat);
+    const chk = bikeCanvasTex(64, 8, x => { for (let i = 0; i < 16; i++) for (let j = 0; j < 2; j++) { x.fillStyle = (i + j) & 1 ? '#fff4f8' : '#2d1328'; x.fillRect(i * 4, j * 4, 4, 4); } }); chk.magFilter = THREE.NearestFilter;
+    const lg = new THREE.PlaneGeometry(7.2, 0.9); lg.rotateX(-Math.PI / 2);
+    const line = new THREE.Mesh(lg, new THREE.MeshBasicMaterial({ map: chk, transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    g.add(ban, posts, line); g.visible = false; S.add(g); }
+}
+function bikeMarkSet(best) {   // the banner's text
+  const E = BIKE.env, x = E.markCv.getContext('2d');
+  x.fillStyle = '#ff6fae'; x.fillRect(0, 0, 512, 64); x.fillStyle = '#d63a82'; x.fillRect(0, 54, 512, 10); x.fillStyle = '#ffc93c'; x.fillRect(0, 0, 512, 5);
+  x.font = '38px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#fff4f8'; x.fillText('YOUR BEST  ' + best + ' m', 256, 31);
+  E.markTex.needsUpdate = true;
+}
+function bikeEnv(dt, spd, dist) {   // the sky, the lights and the weather for this moment of the ride
+  const B = BIKE, E = B.env, S = bikeScene; if (!E) return;
+  const want = dist >= B.rainAt && dist < B.rainEnd ? 1 : 0;
+  if (B.phase === 'ride' || B.phase === 'count') B.rain += (want - B.rain) * Math.min(1, dt * 0.4);   // (it drifts in and out over a few seconds)
+  const rain = B.rain < 0.004 ? 0 : B.rain, K = BIKE_TOD, cyc = K[K.length - 1].d, d = ((dist % cyc) + cyc) % cyc;
+  let k = 0; while (k < K.length - 2 && K[k + 1].d <= d) k++;
+  const a = K[k], b = K[k + 1], f0 = Math.min(1, (d - a.d) / Math.max(1, b.d - a.d)), f = f0 * f0 * (3 - 2 * f0), C = E.c, T = E.tmp;
+  const num = key => a[key] + (b[key] - a[key]) * f;
+  for (const key of ['top', 'mid', 'hor', 'hs', 'hg', 'sc', 'city', 'sun']) C[key].setHex(a[key]).lerp(T.setHex(b[key]), f);
+  const night = num('night');
+  if (rain > 0) for (const c of [C.top, C.mid, C.hor, C.hs, C.city]) {   // rain washes it all grey
+    const l = (c.r * 0.3 + c.g * 0.59 + c.b * 0.11) * (1 - 0.12 * rain), w = rain * 0.72; c.r += (l * 0.9 - c.r) * w; c.g += (l * 0.93 - c.g) * w; c.b += (l - c.b) * w; }
+  if (rain > 0.6 && night > 0.5 && B.phase === 'ride') { E.boltT -= dt; if (E.boltT < 0) { E.boltT = 8 + Math.random() * 14; E.flash = 1; bikeSfx('thunder'); } }   // lightning, now and then, on a wet night
+  E.flash = Math.max(0, E.flash - dt * 2.2); const fl = E.flash > 0 ? E.flash * (0.55 + 0.45 * Math.sin(E.flash * 31)) : 0;
+  if (fl > 0) { T.setRGB(0.85, 0.87, 1); for (const c of [C.top, C.mid, C.hor]) c.lerp(T, fl * 0.6); }
+  C.city.lerp(C.hor, rain * 0.5);
+  const st = E.sky, ht = C.top.getHex(), hm = C.mid.getHex(), hh = C.hor.getHex();
+  if (st[0] !== ht || st[1] !== hm || st[2] !== hh) {   // the painted sky, repainted only when it has actually changed
+    st[0] = ht; st[1] = hm; st[2] = hh; const x = B.skyCtx, gr = x.createLinearGradient(0, 0, 0, 256), hs = '#' + C.hor.getHexString();
+    gr.addColorStop(0, '#' + C.top.getHexString()); gr.addColorStop(0.3, '#' + C.mid.getHexString()); gr.addColorStop(0.47, hs); gr.addColorStop(1, hs);
+    x.fillStyle = gr; x.fillRect(0, 0, 2, 256); B.skyTex.needsUpdate = true; }
+  S.fog.color.copy(C.hor); S.fog.near = 45 - 10 * night - 16 * rain; S.fog.far = 125 - 14 * night - 28 * rain;
+  B.hemi.color.copy(C.hs); B.hemi.groundColor.copy(C.hg); B.hemi.intensity = num('hi') * (1 - 0.22 * rain) + fl * 0.9;
+  B.sun.color.copy(C.sc); B.sun.intensity = num('si') * (1 - 0.65 * rain);
+  B.city.material.color.copy(C.city);
+  // sun, moon and stars
+  const sunY = num('sunY'), sunS = num('sunS'), low = Math.min(1, Math.max(0, 1 - (sunY - 10) / 70)), clear = 1 - 0.9 * rain, moonY = num('moonY');
+  E.sun.visible = E.sunHalo.visible = sunY > -30 && clear > 0.05;
+  E.sun.position.y = E.sunHalo.position.y = sunY; E.sun.scale.set(sunS, sunS, 1); E.sun.material.color.copy(C.sun); E.sun.material.opacity = clear;
+  E.sunHalo.scale.set(sunS * 5, sunS * 5, 1); E.sunHalo.material.color.copy(C.sun); E.sunHalo.material.opacity = (0.2 + 0.5 * low) * (1 - night) * clear;
+  E.moon.visible = E.moonHalo.visible = moonY > -20 && clear > 0.05; E.moon.position.y = E.moonHalo.position.y = moonY; E.moon.material.opacity = clear; E.moonHalo.material.opacity = 0.35 * clear;
+  const starA = Math.max(0, night - 0.3) / 0.7 * (1 - rain); E.stars.visible = starA > 0.01; E.stars.material.opacity = starA;
+  E.cityWin.visible = E.beacon.visible = night > 0.05; E.cityWin.material.opacity = Math.min(1, night * 1.3) * (1 - 0.5 * rain);
+  E.beacon.material.opacity = night * (Math.sin(B.t * 3.2) > 0.2 ? 0.9 : 0.12);
+  // street lamps and lit windows come on at dusk (and on a dark rainy day); so does the headlight
+  const lampsOn = Math.min(1, Math.max(Math.max(0, night - 0.08) / 0.5, rain * 0.45));
+  E.lampMat.visible = E.poolMat.visible = lampsOn > 0.02; E.lampMat.opacity = lampsOn; E.poolMat.opacity = lampsOn * (0.75 + 0.2 * rain);
+  if (lampsOn > 0.02 && Math.abs(E.wetK - rain) > 0.01) { E.wetK = rain; for (const p of E.pools) { p.scale.set(1 - 0.45 * rain, 1, 1 + 2.4 * rain); p.position.z = -2.6 * rain * p.userData.fz; } }
+  E.winMat.visible = night > 0.05; E.winMat.opacity = Math.min(1, night * 1.25);
+  const hl = Math.min(1, Math.max(night * 1.1, rain * 0.55)), rv = B.rv, tilt = Math.abs(rv.roll.rotation.z);
+  E.head.visible = E.beam.visible = E.flare.visible = E.tail.visible = hl > 0.02;
+  E.head.material.opacity = hl * 0.62; E.head.position.y = 0.035 - rv.root.position.y;   // (always on the road, even from a car roof)
+  E.beam.material.opacity = hl * (0.16 + 0.22 * rain) * Math.max(0, 1 - Math.max(0, tilt - 0.45) * 2.5);   // (gone once the bike's on its side)
+  E.flare.material.opacity = hl * 0.8; E.tail.material.opacity = hl;
+  if (B.shop) E.lamp.intensity = 0.95; else { E.lamp.intensity = hl * 1.15; E.lamp.position.set(rv.root.position.x, 2.4, rv.root.position.z + 5); }
+  // the wet road
+  E.road.material.color.setScalar(1 - 0.3 * rain);
+  E.sheen.visible = rain > 0.02; E.sheen.material.opacity = rain * 0.4; E.sheen.material.color.copy(C.hor).multiplyScalar(0.85 + 0.15 * (1 - night));
+  bikeRainStep(dt, spd, rain); bikeSprayStep(dt, spd, rain);
+  const mz = B.bestD0 - dist; E.mark.visible = B.bestD0 >= 30 && mz > -18 && mz < 175; if (E.mark.visible) E.mark.position.z = mz;   // the record banner
+}
+function bikeRainStep(dt, spd, rain) {   // the drops fall and rush past with the road; each respawns up top (or out ahead) when it's done
+  const E = BIKE.env, N = E.nDrops, n = Math.floor(N * Math.min(1, rain * 1.1)); E.rainLines.visible = n > 0; if (!n) return;
+  const P = E.drops, A = E.rainGeo.attributes.position, p = A.array, vy = 17, vz = spd * 0.92 + 2, k = 0.034, cx = bikeCam.position.x;
+  for (let i = 0; i < n; i++) {
+    const j = i * 3; let x = P[j], y = P[j + 1] - vy * dt, z = P[j + 2] - vz * dt;
+    if (y < 0) { y += 12 + Math.random() * 2; x = cx + (Math.random() - 0.5) * 24; z = -4 + Math.random() * 40; }
+    if (z < -7) { z += 40; x = cx + (Math.random() - 0.5) * 24; }
+    P[j] = x; P[j + 1] = y; P[j + 2] = z; const q = i * 6; p[q] = x; p[q + 1] = y; p[q + 2] = z; p[q + 3] = x; p[q + 4] = y + vy * k; p[q + 5] = z + vz * k;
+  }
+  A.needsUpdate = true; E.rainGeo.setDrawRange(0, n * 2); E.rainLines.material.opacity = 0.35 + 0.4 * rain;
+}
+function bikeSprayOne(x, y, z, spd, k) {
+  const S = BIKE.env.spray, i = S.next, j = i * 3; S.next = (i + 1) % S.N;
+  S.pos[j] = x + (Math.random() - 0.5) * 0.24; S.pos[j + 1] = y; S.pos[j + 2] = z;
+  S.vel[j] = (Math.random() - 0.5) * 2.6 * k; S.vel[j + 1] = (0.8 + Math.random() * 1.6) * k; S.vel[j + 2] = -1 - Math.random() * 2.5 - spd * 0.1;
+  S.life[i] = 0.22 + Math.random() * 0.24;
+}
+function bikeSplash(n) { const B = BIKE, r = B.rv.root.position; if (!B.env) return; for (let i = 0; i < n; i++) bikeSprayOne(r.x + (Math.random() - 0.5) * 0.6, B.ground + 0.05, r.z + (Math.random() - 0.5) * 1.2, B.speed, 1.5); }
+function bikeSprayStep(dt, spd, rain) {   // a rooster tail of spray off the back tyre while she's rolling on a wet road
+  const B = BIKE, E = B.env, S = E.spray, rp = B.rp, r = B.rv.root.position;
+  const emit = rain > 0.15 && spd > 4 && (B.phase === 'replay' ? !!(rp && rp.emit) : B.phase === 'ride' && !B.air);
+  if (emit) { E.sprayAcc += dt * 130 * rain; while (E.sprayAcc >= 1) { E.sprayAcc--; bikeSprayOne(r.x, (B.phase === 'replay' ? rp.gnd : B.ground) + 0.06, r.z - 0.62, spd, 1); } } else E.sprayAcc = 0;
+  let live = false; const p = S.pos, v = S.vel;
+  for (let i = 0; i < S.N; i++) {
+    if (S.life[i] <= 0) continue; const j = i * 3; S.life[i] -= dt; v[j + 1] -= 9.5 * dt; v[j + 2] += (-spd - v[j + 2]) * Math.min(1, dt * 2.2);
+    p[j] += v[j] * dt; p[j + 1] += v[j + 1] * dt; p[j + 2] += v[j + 2] * dt;
+    if (S.life[i] <= 0 || p[j + 1] < 0) { S.life[i] = 0; p[j + 1] = -50; } else live = true;
+  }
+  E.sprayPts.visible = live; if (live) S.attr.needsUpdate = true;
+}
+function bikeRainSnd() {   // a soft hiss under everything while it rains (quiet: it's weather, not a waterfall); silent while the tab is hidden
+  const B = BIKE; if (!actx) return;
+  try {
+    const t = actx.currentTime, lv = B.active && !document.hidden ? B.rain || 0 : 0; let r = B.rainSnd;
+    if (!r) {
+      if (lv < 0.01) return;
+      r = B.rainSnd = {}; r.n = actx.createBufferSource(); r.n.buffer = bikeNoiseBuf(); r.n.loop = true;
+      r.hp = actx.createBiquadFilter(); r.hp.type = 'highpass'; r.hp.frequency.value = 2400; r.lp = actx.createBiquadFilter(); r.lp.type = 'lowpass'; r.lp.frequency.value = 8000;
+      r.bp = actx.createBiquadFilter(); r.bp.type = 'bandpass'; r.bp.frequency.value = 700; r.bp.Q.value = 0.5;
+      r.g = actx.createGain(); r.g.gain.value = 0; r.g2 = actx.createGain(); r.g2.gain.value = 0;
+      r.n.connect(r.hp); r.hp.connect(r.lp); r.lp.connect(r.g); r.g.connect(actx.destination); r.n.connect(r.bp); r.bp.connect(r.g2); r.g2.connect(actx.destination); r.n.start(t, Math.random());
+    }
+    r.g.gain.setTargetAtTime(0.026 * lv, t, 0.4); r.g2.gain.setTargetAtTime(0.01 * lv, t, 0.4);
+  } catch (e) {}
+}
+function bikeRainOff() {
+  const r = BIKE.rainSnd; BIKE.rainSnd = null; if (!r || !actx) return;
+  try { const t = actx.currentTime; r.g.gain.setTargetAtTime(0, t, 0.08); r.g2.gain.setTargetAtTime(0, t, 0.08); r.n.onended = () => { for (const k in r) try { r[k].disconnect(); } catch (x) {} }; r.n.stop(t + 0.4); } catch (e) {}
+}
+function bikeRunStart() {   // a fresh run: the weather's rolled (about a third of rides get wet, some from the start, some partway), the paint she picked, the record to beat, an empty tape
+  const B = BIKE, E = B.env, u = B.ui, rv = B.rv;
+  B.shop = false; B.shopVO = ''; B.rp = null; B.banked = false; B.passedBest = false;
+  rv.root.rotation.y = 0; bikeCam.clearViewOffset(); u.Over.classList.remove('shop'); u.root.classList.remove('rp', 'shopping'); u.Card.classList.remove('rec');
+  bikePaintApply(bikePaintId());
+  B.bestD0 = parseInt(bikeLoad('catguard.bikeBestDist', '0'), 10) || 0; if (B.bestD0 >= 30) bikeMarkSet(B.bestD0);
+  const at = Math.random() < 0.3 ? (Math.random() < 0.45 ? 0 : 150 + Math.random() * 650) : Infinity;
+  B.rainAt = at; B.rainEnd = at + 700 + Math.random() * 1500; B.rain = at === 0 ? 1 : 0;
+  bikeRainOff(); E.flash = 0; E.boltT = 4 + Math.random() * 8; E.wetK = -1; E.sprayAcc = 0; E.spray.life.fill(0); E.spray.pos.fill(-50); E.spray.attr.needsUpdate = true;
+  bikeRecInit(); bikeEnv(0, 0, 0);
+}
+
+/* ---------- the instant replay: a ring buffer of the last few seconds (rig, camera, every pooled thing on the road), played back slow from a new angle ---------- */
+function bikeRecInit() {
+  const B = BIKE, L = 40 + B.obs.length * 8 + B.fish.length * 6 + B.powers.length * 6 + B.scen.length * 2;
+  let R = B.rec; if (!R || R.L !== L) { R = B.rec = { cap: 420, L, bufs: [] }; for (let i = 0; i < R.cap; i++) R.bufs.push(new Float32Array(L)); }
+  R.n = 0; R.head = 0; R.lastT = -9; R.t0 = B.t;
+}
+function bikeRecord() {   // one frame of tape (at most 100 a second)
+  const B = BIKE, R = B.rec; if (!R || B.t - R.t0 - R.lastT < 0.0099) return;
+  const a = R.bufs[R.head], rv = B.rv, m = rv.mount, c = bikeCam, em = B.bikeMat.emissive; R.head = (R.head + 1) % R.cap; if (R.n < R.cap) R.n++;
+  let i = 0; const v = (x, y, z) => { a[i++] = x; a[i++] = y; a[i++] = z; };
+  R.lastT = B.t - R.t0; a[i++] = R.lastT; a[i++] = B.dist; a[i++] = B.speed; a[i++] = B.phase === 'crash' ? 1 : 0; a[i++] = m.parent === bikeScene ? 1 : 0;   // 0-4
+  const p = rv.root.position; v(p.x, p.y, p.z); a[i++] = rv.roll.rotation.z; a[i++] = rv.pitch.rotation.x;                                               // 5-9: the bike
+  v(m.position.x, m.position.y, m.position.z); v(m.rotation.x, m.rotation.y, m.rotation.z); v(m.scale.x, m.scale.y, m.scale.z);                          // 10-18: kitty
+  a[i++] = rv.wf.rotation.x; a[i++] = rv.wr.rotation.x; v(rv.shadow.position.y, rv.shadow.scale.x, rv.shadow.scale.y); v(em.r, em.g, em.b); a[i++] = B.y; a[i++] = B.ground;   // 19-28
+  v(c.position.x, c.position.y, c.position.z); a[i++] = c.quaternion.x; a[i++] = c.quaternion.y; a[i++] = c.quaternion.z; a[i++] = c.quaternion.w; a[i++] = c.fov;   // 29-36: the chase cam
+  v(B.roadTex.offset.y, B.walkTex.offset.y, B.lawnTex.offset.y);                                                                                         // 37-39
+  for (const o of B.obs) { const q = o.mesh; a[i++] = q.visible ? 1 : 0; v(q.position.x, q.position.y, q.position.z); v(q.rotation.x, q.rotation.y, q.rotation.z); a[i++] = o.geos.indexOf(q.geometry); }
+  for (const t of B.fish) { const q = t.mesh; a[i++] = q.visible ? 1 : 0; v(q.position.x, q.position.y, q.position.z); a[i++] = q.rotation.y; a[i++] = q.scale.x; }
+  for (const P of B.powers) { const q = P.mesh; a[i++] = q.visible ? 1 : 0; v(q.position.x, q.position.y, q.position.z); a[i++] = q.rotation.y; a[i++] = 0; }
+  for (const s of B.scen) { a[i++] = s.position.z; a[i++] = s.geometry.userData.house !== undefined ? s.geometry.userData.house : -1; }
+}
+function bikeSnap(a, b, f) {   // lay a moment of the tape back over the world, blended between two recorded frames (things that popped in or wrapped round just snap)
+  const B = BIKE, rv = B.rv, m = rv.mount, n = f < 0.5 ? a : b, snap = f < 0.5 ? 0 : 1;
+  let i = 5, g = f;
+  const L = () => { const v = a[i] + (b[i] - a[i]) * g; i++; return v; };
+  rv.root.position.set(L(), L(), L()); rv.roll.rotation.z = L(); rv.pitch.rotation.x = L();
+  const w = n[4] > 0.5; if (a[4] !== b[4]) g = snap;
+  if (w ? m.parent !== bikeScene : m.parent !== rv.body) (w ? bikeScene : rv.body).add(m);   // (on the bike, or flying free)
+  m.position.set(L(), L(), L()); m.rotation.set(L(), L(), L()); m.scale.set(L(), L(), L()); g = f;
+  rv.wf.rotation.x = L(); rv.wr.rotation.x = L(); rv.shadow.position.y = L(); rv.shadow.scale.set(L(), L(), 1); B.bikeMat.emissive.setRGB(L(), L(), L());
+  i = 37; for (const t of [B.roadTex, B.walkTex, B.lawnTex]) { g = Math.abs(a[i] - b[i]) > 0.5 ? snap : f; t.offset.y = L(); }
+  i = 40;
+  for (const o of B.obs) { const q = o.mesh, vis = n[i] > 0.5; g = (a[i] > 0.5) !== (b[i] > 0.5) || Math.abs(a[i + 3] - b[i + 3]) > 6 ? snap : f; i++; q.visible = vis;
+    if (vis) { q.position.set(L(), L(), L()); q.rotation.set(L(), L(), L()); const gi = n[i++]; if (gi >= 0 && o.geos[gi]) q.geometry = o.geos[gi]; } else i += 7; }
+  for (const t of B.fish) { const q = t.mesh, vis = n[i] > 0.5; g = (a[i] > 0.5) !== (b[i] > 0.5) || Math.abs(a[i + 3] - b[i + 3]) > 6 ? snap : f; i++; q.visible = vis;
+    if (vis) { q.position.set(L(), L(), L()); q.rotation.y = L(); q.scale.setScalar(Math.max(0.001, L())); } else i += 5; }
+  for (const p of B.powers) { const q = p.mesh, vis = n[i] > 0.5; g = (a[i] > 0.5) !== (b[i] > 0.5) || Math.abs(a[i + 3] - b[i + 3]) > 6 ? snap : f; i++; q.visible = vis;
+    if (vis) { q.position.set(L(), L(), L()); q.rotation.y = L(); i++; } else i += 5; }
+  for (const s of B.scen) { g = Math.abs(a[i] - b[i]) > 6 ? snap : f; const h = n[i + 1]; s.position.z = L(); if (h >= 0) s.geometry = B.houses[h]; i++; }
+}
+function bikeReplayStart() {   // roll the tape: the couple of seconds before the wipeout and the tumble after
+  const B = BIKE, R = B.rec;
+  if (!R || R.n < 30) { bikeGameOver(); return; }
+  const list = []; for (let k = 0; k < R.n; k++) list.push(R.bufs[(R.head - R.n + k + R.cap) % R.cap]);
+  const tc = B.crashAt - R.t0, end = list[list.length - 1][0], t0 = Math.max(list[0][0], tc - 1.4);
+  let i = 0; while (i < list.length - 2 && list[i + 1][0] <= t0) i++;
+  const V = B.rpV || (B.rpV = { cam: new THREE.Vector3(), rec: new THREE.Vector3(), tmp: new THREE.Vector3(), qa: new THREE.Quaternion(), qb: new THREE.Quaternion(), q: new THREE.Quaternion() });
+  const x = B.x, mid = Math.abs(x) < 0.5;
+  B.rp = { list, i, p: t0, t0, tc, end, real: 0, rate: 0.5, spd: 0, dist: B.dist, emit: false, gnd: 0, boom: false, shake: 0, V,
+    side: x > 0.5 ? -1 : x < -0.5 ? 1 : Math.random() < 0.5 ? -1 : 1, reach: mid ? 2.9 : 3.3 };   // (the camera stays over the road, between the lanes' traffic and clear of the trees)
+  B.phase = 'replay'; B.ui.root.classList.add('rp');
+}
+function bikeReplayStep(dt) {   // slow motion (slowest right at the impact), the camera swinging from the chase view out to a high side angle
+  const B = BIKE, P = B.rp, V = P.V, cam = bikeCam, L = P.list, sm = (lo, hi, v) => { const t = Math.min(1, Math.max(0, (v - lo) / (hi - lo))); return t * t * (3 - 2 * t); };
+  const x = P.p - P.tc;
+  P.rate = x < 0 ? 0.3 + 0.35 * sm(0.2, 0.8, -x) : 0.3 + 0.45 * sm(0.35, 1.0, x);
+  P.real += dt; P.p += dt * P.rate;
+  if (!P.boom && P.p >= P.tc) { P.boom = true; P.shake = 0.45; bikeSfx('slowboom'); }
+  if (P.p >= P.end) { bikeReplayEnd(); return; }
+  while (P.i < L.length - 2 && L[P.i + 1][0] <= P.p) P.i++;
+  const a = L[P.i], b = L[P.i + 1], f = Math.min(1, Math.max(0, (P.p - a[0]) / Math.max(1e-5, b[0] - a[0])));
+  bikeSnap(a, b, f);
+  P.spd = a[2] + (b[2] - a[2]) * f; P.dist = a[1] + (b[1] - a[1]) * f; P.gnd = a[28]; P.emit = a[3] < 0.5 && a[27] - a[28] < 0.03;
+  const rv = B.rv, r = rv.root.position, T = BIKE_LOOK.set(r.x, 0.55, r.z + 1.6), port = cam.aspect < 0.9;   // (looking a little ahead of her, at what's coming)
+  if (rv.mount.parent === bikeScene) { const km = rv.mount.position, w = Math.min(0.6, Math.max(0, x) * 0.5); T.x += (km.x - T.x) * w; T.y += (km.y + 0.2 - T.y) * w; T.z += (km.z - T.z) * w; }   // (then keep the flying kitty in shot)
+  const u = (P.p - P.t0) / Math.max(0.1, P.end - P.t0);
+  V.cam.set(r.x + P.side * P.reach, port ? 5.4 : 3.9, r.z - (port ? 3.4 : 1.2) + 2.4 * u);   // a high side angle (further back in portrait, so the road runs up the screen), dollying forward with the action
+  cam.position.copy(V.cam); cam.lookAt(T); V.q.copy(cam.quaternion);
+  const e = sm(0, 1.2, P.real), fov = port ? 70 : 56;
+  if (e < 1) {   // (easing out of the recorded chase cam)
+    V.rec.set(a[29], a[30], a[31]).lerp(V.tmp.set(b[29], b[30], b[31]), f); V.qa.set(a[32], a[33], a[34], a[35]); V.qb.set(b[32], b[33], b[34], b[35]); V.qa.slerp(V.qb, f);
+    cam.position.lerpVectors(V.rec, V.cam, e); cam.quaternion.copy(V.qa).slerp(V.q, e); }
+  P.shake = Math.max(0, P.shake - dt * 0.9); if (P.shake > 0) { const s = P.shake * P.shake * 0.5; cam.position.x += (Math.random() - 0.5) * s; cam.position.y += (Math.random() - 0.5) * s; }
+  const fv = e < 1 ? a[36] + (fov - a[36]) * e : fov; if (Math.abs(cam.fov - fv) > 0.01) { cam.fov = fv; cam.updateProjectionMatrix(); }
+}
+function bikeReplayEnd() {   // back to how things lay after the crash, then the card
+  const B = BIKE, P = B.rp; if (!P || B.phase !== 'replay') return;
+  const z = P.list[P.list.length - 1]; bikeSnap(z, z, 0); B.rp = null;
+  B.ui.root.classList.remove('rp'); bikeCam.fov = z[36]; bikeCam.updateProjectionMatrix(); B.phase = 'crash'; bikeCamStep(0); bikeGameOver();
 }
 
 /* ---------- the interface the game calls ---------- */
@@ -6830,21 +7265,29 @@ function startBike(opts) {
   u.root.classList.add('on'); u.Over.classList.remove('on'); u.Msg.classList.remove('pop'); u.Count.classList.remove('pop');
   u.sc = u.tr = u.dm = u.kmh = u.pw = u.warn = null; bikeHud(1);
   bikeEngineOn(); bikeEngineSet(0);
+  bikeRunStart();
   bikeCamStep(1);
 }
 function bikeActive() { return BIKE.active; }
 function updateBike(dt) {
   const B = BIKE; if (!B.active) return;
   B.t += dt;
-  if (B.phase === 'count') {   // 3, 2, 1, GO!
-    B.count -= dt; const n = Math.ceil(B.count);
-    if (n > 0 && n !== B.countShown) { B.countShown = n; bikeCountPop(String(n)); bikeSfx('beep'); }
-    if (B.count <= 0) { B.phase = 'ride'; bikeCountPop('GO!'); bikeSfx('go'); }
-  } else if (B.phase === 'ride') { bikeRide(dt); bikeBeat(dt); }
-  else if (B.phase === 'crash') bikeCrashStep(dt);
-  else B.overT += dt;
-  bikeWorld(dt); bikePose(dt); bikeCamStep(dt); bikeHud(dt);
-  B.engT = (B.engT || 0) - dt; if (B.engT < 0) { B.engT = 0.1; bikeEngineSet(B.speed); }
+  let edt = dt, spd = B.speed, dist = B.dist;
+  if (B.phase === 'replay') { bikeReplayStep(dt); if (B.rp) { edt = dt * B.rp.rate; spd = B.rp.spd; dist = B.rp.dist; } }   // (the weather plays back in slow motion too)
+  else {
+    if (B.phase === 'count') {   // 3, 2, 1, GO!
+      B.count -= dt; const n = Math.ceil(B.count);
+      if (n > 0 && n !== B.countShown) { B.countShown = n; bikeCountPop(String(n)); bikeSfx('beep'); }
+      if (B.count <= 0) { B.phase = 'ride'; bikeCountPop('GO!'); bikeSfx('go'); }
+    } else if (B.phase === 'ride') { bikeRide(dt); bikeBeat(dt); }
+    else if (B.phase === 'crash') bikeCrashStep(dt);
+    else B.overT += dt;
+    bikeWorld(dt); bikePose(dt); bikeCamStep(dt); bikeHud(dt);
+  }
+  bikeEnv(edt, spd, dist);
+  if (B.phase === 'ride' || B.phase === 'crash') bikeRecord();
+  B.engT = (B.engT || 0) - dt; if (B.engT < 0) { B.engT = 0.1; bikeEngineSet(B.speed); bikeRainSnd(); }
+  if (B.phase === 'crash' && B.crashT > 1.7) bikeReplayStart();   // she's landed: roll the tape (then the card)
 }
 function renderBike() {
   if (!bikeScene) return;
@@ -6857,7 +7300,7 @@ function exitBike() {
   const B = BIKE; if (!B.active) return;
   B.active = false; B.phase = 'off';
   B.ui.root.classList.remove('on'); B.ui.Over.classList.remove('on');
-  bikeEngineOff();
+  bikeEngineOff(); bikeRainOff(); bikeBank(); if (B.shop) bikeShopClose(); B.rp = null; B.ui.root.classList.remove('rp'); bikeCam.clearViewOffset();
   if (B.rider && B.rider !== B.rv.cat && B.rider.parent) B.rider.parent.remove(B.rider);   // hand the clone back
   B.rider = null;
   if (B.opts && B.opts.onExit) B.opts.onExit();
@@ -6926,7 +7369,7 @@ function buildGarage(zF) {                                            // the gar
   bakeYard(b);
   { const sh = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 4.8), softShadowMat(0.35, true)); sh.rotation.x = -Math.PI / 2; sh.position.set(gx - 0.2, 0.03, zF + 6.4); sh.userData.noWalk = true; sh.renderOrder = 1; povEndWall.add(sh); }
 }
-function motoGeoms() {   // the princess's pink V-twin cruiser, in detail: facing +z, wheels on y = 0, axles at z = ±0.56 (radius 0.3). { body, glow, wheel (centred on its axle) }
+function motoGeoms(opts) {   // the princess's pink V-twin cruiser, in detail: facing +z, wheels on y = 0, axles at z = ±0.56 (radius 0.3). { body, glow, wheel (centred on its axle) }
   const E = new THREE.Euler(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3(), M = new THREE.Matrix4(), Y = new THREE.Vector3(0, 1, 0), C = new THREE.Color();
   const bag = () => ({ pos: [], col: [], nrm: [] }), N3 = new THREE.Matrix3(), NV = new THREE.Vector3();
   const put = (o, g, col, m) => { const src = g.index ? g.toNonIndexed() : g, a = src.attributes.position, na = src.attributes.normal; C.set(col); N3.getNormalMatrix(m);   /* (each part keeps its own smooth normals) */
@@ -6936,7 +7379,7 @@ function motoGeoms() {   // the princess's pink V-twin cruiser, in detail: facin
     put(o, new THREE.CylinderGeometry(r2 || r, r, L, n || 7), col, new THREE.Matrix4().compose(new THREE.Vector3((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), new THREE.Quaternion().setFromUnitVectors(Y, d.normalize()), new THREE.Vector3(1, 1, 1))); };
   const path = (o, pts, r, col, n) => { for (let i = 0; i + 1 < pts.length; i++) seg(o, pts[i], pts[i + 1], r, col, n); for (let i = 1; i + 1 < pts.length; i++) at(o, new THREE.SphereGeometry(r, n || 7, 4), col, ...pts[i]); };
   const done = o => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(o.pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(o.col, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(o.nrm, 3)); g.computeBoundingSphere(); return g; };
-  const PINK = '#ff6fae', DPINK = '#e2518f', PLUM = '#3a1434', CHR = '#e4e6ee', STEEL = '#9a9ea8', DARK = '#26222b', RUB = '#1c1a1f', GOLD = '#ffc93c', ALU = '#b7bbc4';
+  const PNT = (opts && opts.paint) || {}, PINK = PNT.main || '#ff6fae', DPINK = PNT.dark || '#e2518f', PLUM = PNT.seat || '#3a1434', CHR = '#e4e6ee', STEEL = '#9a9ea8', DARK = '#26222b', RUB = '#1c1a1f', GOLD = '#ffc93c', ALU = '#b7bbc4';
   const o = bag(), w = bag(), gl = bag();
   // -- the wheel: a fat tyre with a tread band, a chrome rim, 16 laced spokes, a hub, a drilled disc
   at(w, new THREE.TorusGeometry(0.245, 0.06, 8, 26), RUB, 0, 0, 0, 0, Math.PI / 2);
@@ -6981,7 +7424,7 @@ function motoGeoms() {   // the princess's pink V-twin cruiser, in detail: facin
   for (const z of [0.18, -0.04]) at(o, new THREE.BoxGeometry(0.016, 0.1, 0.1), '#2f2b33', 0.225, 0.26, z);
   // -- the tank: a pink teardrop, a white pinstripe, a chrome console and filler cap, a gold crown each side
   at(o, new THREE.SphereGeometry(1, 18, 12), PINK, 0, 0.84, 0.15, 0.08, 0, 0, 0.17, 0.115, 0.29);
-  at(o, new THREE.SphereGeometry(1, 18, 12), '#fff4f8', 0, 0.838, 0.15, 0.08, 0, 0, 0.172, 0.06, 0.24);
+  at(o, new THREE.SphereGeometry(1, 18, 12), PNT.stripe || '#fff4f8', 0, 0.838, 0.15, 0.08, 0, 0, 0.172, 0.06, 0.24);
   at(o, new THREE.SphereGeometry(1, 18, 12), DPINK, 0, 0.836, 0.15, 0.08, 0, 0, 0.174, 0.045, 0.235);
   at(o, new THREE.BoxGeometry(0.06, 0.02, 0.26), CHR, 0, 0.955, 0.13, 0.08);
   at(o, new THREE.CylinderGeometry(0.026, 0.026, 0.02, 12), CHR, 0, 0.96, 0.29);
@@ -6991,7 +7434,7 @@ function motoGeoms() {   // the princess's pink V-twin cruiser, in detail: facin
   at(o, new THREE.BoxGeometry(0.27, 0.06, 0.3), PLUM, 0, 0.715, -0.19);
   at(o, new THREE.SphereGeometry(1, 12, 8), PLUM, 0, 0.72, -0.05, 0, 0, 0, 0.13, 0.04, 0.09);
   at(o, new THREE.BoxGeometry(0.2, 0.07, 0.2), PLUM, 0, 0.76, -0.43);
-  at(o, new THREE.BoxGeometry(0.275, 0.012, 0.3), '#6a3a62', 0, 0.742, -0.19);
+  at(o, new THREE.BoxGeometry(0.275, 0.012, 0.3), PNT.stitch || '#6a3a62', 0, 0.742, -0.19);
   for (const s of [-1, 1]) path(o, [[s * 0.1, 0.72, -0.5], [s * 0.1, 1.02, -0.6]], 0.012, CHR, 6);
   seg(o, [-0.1, 1.02, -0.6], [0.1, 1.02, -0.6], 0.012, CHR, 6); at(o, new THREE.BoxGeometry(0.2, 0.14, 0.05), PLUM, 0, 0.92, -0.575, -0.3);
   // -- side covers, the battery box, fenders, the tail light and plate, indicators
@@ -8793,7 +9236,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-29 21:41';                                              // stamped when the site is published
+const BUILD = '2026-09-29 21:54';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
