@@ -5679,7 +5679,7 @@ function buildUpperFloor() {                                          // behind 
       return g; };
     frontDoor = { g: leaf(dR, -1), g2: leaf(dL, 1), open: 0, want: 0, openAt: 0, said: false, inside: false }; }
 }
-function upstairsView(c) { const U = UPPER; return inUpper(c.x, c.z) && (c.y > CEIL_H + 0.05 || (c.z < U.SW + 0.2 && c.x < -0.2)); }   // (a point up there, or in the foyer: not the living room below)
+function upstairsView(c) { const U = UPPER; return inUpper(c.x, c.z) && c.y < U.CH + 0.25 && (c.y > CEIL_H + 0.05 || (c.z < U.SW + 0.2 && c.x < -0.2)); }   // (a point up there, or in the foyer: not the living room below)
 function updateUpperLights() {                                        // the upstairs is only drawn (and its lamps only lit) when you could see it: you're up there or in the foyer, or out front looking in
   const U = UPPER; if (!U.root) return;
   const c = camera.position, p = walk.pos, see = walk.on && (upstairsView(c) || c.z < U.zF + 1.5 || upstairsView(p));
@@ -5994,7 +5994,7 @@ function updateFanHit() {                                             // the liv
 }
 function updateEscape() {                                             // out of an upstairs back window: the great escape
   if (!walk.on || state !== 'playing') return; const p = walk.pos, U = UPPER;
-  if (p.z < U.zB - 0.5 && p.y > U.UF - 0.6) walk.upstairsAt = clock;                                     // (she was up there)
+  if (p.z < U.zB - 0.5 && p.y > U.UF - 0.6 && p.y < U.CH && inUpper(p.x, p.z)) walk.upstairsAt = clock;                                     // (she was up there)
   if (p.z > U.zB + 0.35 && p.z < U.zB + 3 && p.y > U.UF - 2 && clock - (walk.upstairsAt || -9) < 3 && clock > (walk.escT || 0)) {
     walk.escT = clock + 6; const fresh = !achDone.catscape; unlock('catscape');
     showWalkName(fresh ? '🪟 The Great Catscape! (from inside: "BETA! That is the SECOND FLOOR!")' : '🪟 Out the window again! Aunty-ji has given up');
@@ -7610,7 +7610,7 @@ function bikeRainSnd() {   // a soft hiss under everything while it rains (quiet
       r.g = actx.createGain(); r.g.gain.value = 0; r.g2 = actx.createGain(); r.g2.gain.value = 0;
       r.n.connect(r.hp); r.hp.connect(r.lp); r.lp.connect(r.g); r.g.connect(actx.destination); r.n.connect(r.bp); r.bp.connect(r.g2); r.g2.connect(actx.destination); r.n.start(t, Math.random());
     }
-    r.g.gain.setTargetAtTime(0.026 * lv, t, 0.4); r.g2.gain.setTargetAtTime(0.01 * lv, t, 0.4);
+    r.g.gain.setTargetAtTime(0.014 * lv, t, 0.4); r.g2.gain.setTargetAtTime(0.0055 * lv, t, 0.4);   /* (quieter, like the yard's) */
   } catch (e) {}
 }
 function bikeRainOff() {
@@ -8773,7 +8773,7 @@ function updateTOD(dt) {
   if (T.flash > 0) T.flash = Math.max(0, T.flash - dt);
   const fl = T.flash > 0 && (T.flash > 0.25 || (T.flash > 0.08 && T.flash < 0.14)) ? 2.4 : 1;
   if (T.boltShow > 0) { T.boltShow -= dt; T.bolt.visible = T.boltShow > 0 && (T.boltShow > 0.15 || T.boltShow < 0.08); }
-  if (T.flashEl) { const cp = camera.position, cIn = cp.x > YARD.HL - 0.2 && cp.x < YARD.HR + 0.2 && cp.z > UPPER.zF - 0.2 && cp.z < UPPER.zB + 0.2, on = fl > 1 && !cIn; if (on !== T.flashOn) { T.flashOn = on; T.flashEl.style.opacity = on ? 0.3 : 0; } }
+  if (T.flashEl) { const cp = camera.position, cIn = cp.x > YARD.HL - 0.2 && cp.x < YARD.HR + 0.2 && cp.z > UPPER.zF - 0.2 && cp.z < UPPER.zB + 0.2 && !(cp.y > roofRainY(cp.x, cp.z)), on = fl > 1 && !cIn; if (on !== T.flashOn) { T.flashOn = on; T.flashEl.style.opacity = on ? 0.3 : 0; } }
   T.tint.setRGB(L(cur.tint[0], nxt.tint[0]) * (1 + (wt[0] - 1) * W) * fl, L(cur.tint[1], nxt.tint[1]) * (1 + (wt[1] - 1) * W) * fl, L(cur.tint[2], nxt.tint[2]) * (1 + (wt[2] - 1) * W) * fl);
   if ((T.scanT -= dt) <= 0 || T.nKids !== povEndWall.children.length) { T.scanT = 60; T.nKids = povEndWall.children.length; todScan(); }
   if (Math.abs(T.tint.r - T.last.r) + Math.abs(T.tint.g - T.last.g) + Math.abs(T.tint.b - T.last.b) > 0.004 || Math.abs((T.wet || 0) - (T.lastWet || 0)) > 0.01) { T.last.copy(T.tint); T.lastWet = T.wet || 0;
@@ -8788,8 +8788,8 @@ function updateTOD(dt) {
     if (YARD.hoodWin) { YARD.hoodWin.opacity = n; YARD.hoodWin.visible = n > 0.01; } }
   todPuddles(dt, rain, W);
   // rain and snow round the camera, never indoors
-  const c = camera.position, U = UPPER, inside = (x, z) => x > YARD.HL - 0.2 && x < YARD.HR + 0.2 && z > U.zF - 0.2 && z < U.zB + 0.2;
-  const camIn = inside(c.x, c.z);
+  const c = camera.position, U = UPPER, inside = (x, z, y) => x > YARD.HL - 0.2 && x < YARD.HR + 0.2 && z > U.zF - 0.2 && z < U.zB + 0.2 && !(y > roofRainY(x, z));
+  const camIn = inside(c.x, c.z, c.y);                               /* (up on our roof: out in the rain, not muffled indoors) */
   T.rainM.visible = rain && W > 0; T.snowM.visible = snow && W > 0; T.splashM.visible = rain && W > 0.3 && c.y < 30;
   const dim = Math.max(0.45, (T.tint.r + T.tint.g + T.tint.b) / 3);
   if (T.rainM.visible) { const R = T.rain, A = T.rainM.geometry.attributes.position, a = A.array, sl = 0.12;
@@ -8798,7 +8798,7 @@ function updateTOD(dt) {
       if (run) { y -= R.v[i] * dt; x -= R.v[i] * dt * sl; }
       if (y < c.y - 8 || y < 0) { y = Math.max(0, c.y - 8) + 16 + Math.random() * 4; x = c.x + (Math.random() - 0.5) * 32; z = c.z + (Math.random() - 0.5) * 32; }
       if (x < c.x - 16) x += 32; else if (x > c.x + 16) x -= 32; if (z < c.z - 16) z += 32; else if (z > c.z + 16) z -= 32;
-      R.p[j] = x; R.p[j + 1] = y; R.p[j + 2] = z; const o = i * 6, hide = inside(x, z);
+      R.p[j] = x; R.p[j + 1] = y; R.p[j + 2] = z; const o = i * 6, hide = inside(x, z, y);
       if (hide) { a[o] = a[o + 3] = x; a[o + 1] = a[o + 4] = -100; a[o + 2] = a[o + 5] = z; }
       else { a[o] = x; a[o + 1] = y; a[o + 2] = z; a[o + 3] = x + 0.8 * sl; a[o + 4] = y + 0.8; a[o + 5] = z; } }
     A.needsUpdate = true;
@@ -8812,10 +8812,10 @@ function updateTOD(dt) {
       if (run) { y -= (1.4 + (i % 7) * 0.18) * dt; x += Math.sin(tm * 0.9 + S.ph[i]) * 0.5 * dt; z += Math.cos(tm * 0.7 + S.ph[i]) * 0.35 * dt; }
       if (y < c.y - 8 || y < 0) { y = Math.max(0, c.y - 8) + 14 + Math.random() * 4; x = c.x + (Math.random() - 0.5) * 40; z = c.z + (Math.random() - 0.5) * 40; }
       if (x < c.x - 20) x += 40; else if (x > c.x + 20) x -= 40; if (z < c.z - 20) z += 40; else if (z > c.z + 20) z -= 40;
-      S.p[j] = x; S.p[j + 1] = y; S.p[j + 2] = z; a[j] = x; a[j + 1] = inside(x, z) ? -100 : y; a[j + 2] = z; }
+      S.p[j] = x; S.p[j + 1] = y; S.p[j + 2] = z; a[j] = x; a[j + 1] = inside(x, z, y) ? -100 : y; a[j + 2] = z; }
     A.needsUpdate = true; }
   // the sound of it: a soft hiss outdoors, muffled in the house
-  if (actx) { const want = rain && run ? W * (camIn ? 0.012 : 0.03) : 0;
+  if (actx) { const want = rain && run ? W * (camIn ? 0.006 : 0.015) : 0;   /* (quieter again: half what it was) */
     if (want > 0 && !T.audio) { const n = actx.sampleRate * 2, buf = actx.createBuffer(2, n, actx.sampleRate); for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; }   /* (two different hisses: it's all round you) */
       const src = actx.createBufferSource(), lp = actx.createBiquadFilter(), hp = actx.createBiquadFilter(), g = actx.createGain(); src.buffer = buf; src.loop = true;
       lp.type = 'lowpass'; lp.frequency.value = 2400; hp.type = 'highpass'; hp.frequency.value = 400; g.gain.value = 0; src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(actx.destination); src.start();
@@ -8823,7 +8823,7 @@ function updateTOD(dt) {
     if (T.audio) { T.audio.g.gain.value += (want - T.audio.g.gain.value) * Math.min(1, dt * 2); T.audio.lp.frequency.value = camIn ? 900 : 2400;
       if (want === 0 && T.audio.g.gain.value < 0.001) { T.audio.src.stop(); T.audio = null; } } }
 }
-// ---- Zombie night: on a rainy night, zombies claw up out of the backyard lawn. Pounce on their heads or swipe them to put them back down (one hit each).
+// ---- Zombie night: on a rainy night, zombies claw up out of the backyard lawn. Pounce on their heads or swipe them to put them back down (one hit each; bullets take two, and the Groundskeeper is tougher).
 // Waves get bigger; each zombie that reaches her costs a heart (three a night). Survive till the rain stops or the sun comes up, or clear three waves, for the achievement.
 var ZN = null;
 function zombieOK() { return !!TOD && TOD.nightF > 0.8 && TOD.wx === 'rain' && TOD.W > 0.7; }
@@ -8905,7 +8905,7 @@ function makeZombie(idx) {                                             // a prop
     fa.push([Bx(0.018, 0.06, 0.018), K.skin, s * -0.045, -0.35, 0.02, -0.4, 0, s * 0.5]);
     P(el, fa); if (K.boss) el.scale.setScalar(1.3); q.arms.push({ sh, el, s, dead: v === 2 && s < 0 }); }
   const mound = q.mound = new THREE.Mesh(new THREE.CircleGeometry(0.75, 16), new THREE.MeshBasicMaterial({ color: 0x3a2a1c, transparent: true, opacity: 0, depthWrite: false })); mound.rotation.x = -Math.PI / 2; mound.renderOrder = 1; mound.material.userData.noTod = true;
-  return Object.assign(q, { st: 'off', t: 0, x: 0, z: 0, face: 0, sp: 1, gp: 0, groanT: 2 + Math.random() * 4, twT: 2, tw: 0, atk: 0, chomp: 0 });
+  return Object.assign(q, { st: 'off', t: 0, x: 0, z: 0, face: 0, sp: 1, gp: 0, groanT: 2 + Math.random() * 4, twT: 2, tw: 0, atk: 0, chomp: 0, voice: zVoice(v), hp: 2, hpMax: 2 });
 }
 function zPose(q, dt, d) {                                             // every pose: rising out of the grave, the limping shamble, the lunge, the two ways to go down
   const t = q.t, T = clock, L = (a, b, k) => a + (b - a) * k, cl = x => Math.max(0, Math.min(1, x)), sm = x => { x = cl(x); return x * x * (3 - 2 * x); };
@@ -8966,30 +8966,131 @@ function zPose(q, dt, d) {                                             // every 
     return t > 2.4; }
   return false;
 }
-function zReset(q) { q.sinkPos = false; q.body.rotation.set(0, 0, 0); q.body.position.set(0, -2, 0); q.body.scale.setScalar(q.sc); q.gp = Math.random() * 6; q.atk = 0; q.chomp = 0; }
-function zSfx(kind, d, at, pitch) {                                               // zombie sounds, quieter the further off they are: moans, growls, squelchy steps, digging, crunches, gurgles, teeth
-  if (!actx) return; const t = actx.currentTime, v = Math.max(0.15, 1 - (d || 0) / 16), out = sndOut(v, at), pt = pitch || 1;
-  const osc = (type, f0, f1, t0, dur, vol, dest) => { const o = actx.createOscillator(), g = actx.createGain(); o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
-    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + Math.min(0.08, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); o.connect(g); g.connect(dest || out); o.start(t0); o.stop(t0 + dur + 0.05); return o; };
-  const nz = (t0, dur, vol, type, f, q, shape) => { const n = Math.floor(actx.sampleRate * dur), b = actx.createBuffer(1, n, actx.sampleRate), dd = b.getChannelData(0);
-    for (let i = 0; i < n; i++) dd[i] = (Math.random() * 2 - 1) * (shape ? shape(i / n) : Math.pow(1 - i / n, 2));
-    const s = actx.createBufferSource(), fl = actx.createBiquadFilter(), g = actx.createGain(); s.buffer = b; fl.type = type; fl.frequency.value = f; if (q) fl.Q.value = q; g.gain.value = vol; s.connect(fl); fl.connect(g); g.connect(out); s.start(t0); };
-  if (kind === 'groan') {                                              // "uuuhhhhnnn": a buzzy voice through two moving vowel formants, wavering
-    const f = (70 + Math.random() * 45) * pt, dur = 0.9 + Math.random() * 0.8, bus = actx.createGain(); bus.gain.value = 1;
-    for (const [a, b, q] of [[420, 680, 7], [900, 1250, 9]]) { const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = q; bp.frequency.setValueAtTime(a, t); bp.frequency.linearRampToValueAtTime(b, t + dur * 0.6); bp.frequency.linearRampToValueAtTime(a * 0.9, t + dur); bus.connect(bp); bp.connect(out); }
-    const o = osc('sawtooth', f, f * 0.72, t, dur, 0.16, bus), lfo = actx.createOscillator(), lg = actx.createGain(); lfo.frequency.value = 5 + Math.random() * 3; lg.gain.value = f * 0.06; lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t + dur);
-    nz(t, dur, 0.05, 'bandpass', 700, 1.5, x => Math.sin(x * Math.PI)); }
-  else if (kind === 'growl') { const o = osc('sawtooth', 95 * pt, 60 * pt, t, 0.55 * (2 - pt), 0.14), am = actx.createOscillator(), ag = actx.createGain(); am.type = 'square'; am.frequency.value = 28; ag.gain.value = 40; am.connect(ag); ag.connect(o.frequency); am.start(t); am.stop(t + 0.55);
-    nz(t, 0.5, 0.12, 'lowpass', 500); }
-  else if (kind === 'step') nz(t, 0.09, 0.05 + Math.random() * 0.03, 'lowpass', 260 + Math.random() * 120);   // a squelch in the wet grass
-  else if (kind === 'drag') nz(t, 0.3, 0.035, 'bandpass', 1400, 0.8, x => Math.sin(x * Math.PI));          // the bad foot scraping along
-  else if (kind === 'dig') { nz(t, 1.6, 0.14, 'bandpass', 1600, 0.7, x => (0.6 + 0.4 * Math.sin(x * 40)) * Math.sin(x * Math.PI)); nz(t + 0.2, 1.0, 0.18, 'lowpass', 180, 0, x => Math.sin(x * Math.PI)); }   // clawing through gravelly soil
-  else if (kind === 'crack') { nz(t, 0.05, 0.3, 'highpass', 2500); nz(t + 0.04, 0.05, 0.22, 'highpass', 1800); osc('sine', 140, 45, t, 0.25, 0.3); nz(t, 0.18, 0.15, 'lowpass', 400); }   // a crunch and a squelch underfoot
-  else if (kind === 'thwack') { nz(t, 0.12, 0.3, 'bandpass', 1100, 1.2); osc('triangle', 210, 70, t, 0.2, 0.2); }
-  else if (kind === 'gurgle') { const o = osc('sawtooth', 160 * pt, 55 * pt, t + 0.1, 0.8, 0.08), lf = actx.createOscillator(), lg = actx.createGain(); lf.frequency.value = 17; lg.gain.value = 35; lf.connect(lg); lg.connect(o.frequency); lf.start(t + 0.1); lf.stop(t + 0.95);
-    nz(t + 0.1, 0.8, 0.06, 'bandpass', 500, 3, x => 0.5 + 0.5 * Math.sin(x * 60)); }
-  else if (kind === 'slam') { osc('sine', 75, 26, t, 1.1, 0.5); nz(t, 0.9, 0.35, 'lowpass', 220); nz(t, 0.08, 0.25, 'highpass', 1500); }
-  else if (kind === 'chomp') { osc('square', 2200, 1600, t, 0.03, 0.05); osc('square', 2000, 1500, t + 0.06, 0.03, 0.04); }
+function zReset(q) { q.sinkPos = false; q.body.rotation.set(0, 0, 0); q.body.position.set(0, -2, 0); q.body.scale.setScalar(q.sc); q.gp = Math.random() * 6; q.atk = 0; q.chomp = 0; q.hitT = 0; q.kbx = q.kbz = 0; if (q.fx) zHitTick(q, 0); }
+function zVoice(v) {                                                   // each zombie's own throat: how deep it is, the shape of its mouth, how rough and how breathy
+  const r = Math.random;
+  if (v === 4) return { f: 46 + r() * 6, form: 0.7 + r() * 0.05, rough: 0.9, breath: 0.4, det: 12, vib: 2.8 + r() };   /* the Groundskeeper: a cavernous bass */
+  const [f, fm] = [[88, 0.95], [106, 1], [76, 0.9], [150, 1.16]][v] || [92, 1];
+  return { f: f * (0.9 + r() * 0.2), form: fm * (0.95 + r() * 0.1), rough: 0.25 + r() * 0.45, breath: 0.3 + r() * 0.3, det: 5 + r() * 9, vib: 3.6 + r() * 2.4 };
+}
+function zSfxKit() {                                                   // what every zombie sound shares, made once per audio context: noise loops, a throat buzz, a saturation curve, and their own bus with a soft limiter
+  const A = actx; let C = zSfxKit.c; if (C && C.ctx === A) return C;
+  const sr = A.sampleRate, n = sr * 2, R = () => Math.random() * 2 - 1, norm = d => { let m = 0; for (let i = 0; i < n; i++) m = Math.max(m, Math.abs(d[i])); if (m > 0) for (let i = 0; i < n; i++) d[i] /= m; };
+  const buf = fill => { const b = A.createBuffer(1, n, sr), d = b.getChannelData(0); fill(d); norm(d); return b; };
+  C = { ctx: A, live: {} };
+  C.white = buf(d => { for (let i = 0; i < n; i++) d[i] = R(); });
+  C.brown = buf(d => { let l = 0; for (let i = 0; i < n; i++) { l = l * 0.996 + R() * 0.06; d[i] = l; } const a = d[0], b = d[n - 1]; for (let i = 0; i < n; i++) d[i] -= a + (b - a) * i / (n - 1); });   /* (ends tied together: it loops without a click) */
+  C.grit = buf(d => { for (let k = 0; k < 1100; k++) { const a = (0.25 + Math.random() * 0.75) * (Math.random() < 0.5 ? -1 : 1), L = 16 + (Math.random() * 180 | 0), at = Math.random() * (n - L) | 0; for (let j = 0; j < L; j++) d[at + j] += a * Math.min(1, j / 6) * Math.exp(-4 * j / L) * R(); } });   /* soil and gravel: a crackle of tiny grains */
+  C.wob = buf(d => { const P = 28, S = n / P, p = Array.from({ length: P }, R); for (let i = 0; i < n; i++) { const u = i / S, k = Math.floor(u), f = (1 - Math.cos((u - k) * Math.PI)) / 2; d[i] = p[k % P] * (1 - f) + p[(k + 1) % P] * f; } });   /* a smooth random wander (about 14 a second), for jitter and wobble */
+  const H = 56, re = new Float32Array(H), im = new Float32Array(H); for (let k = 1; k < H; k++) im[k] = Math.pow(k, -1.15) * (k % 2 ? 1 : 0.8);
+  C.glot = A.createPeriodicWave(re, im);                               // a buzzing throat: every harmonic, falling away gently
+  C.sat = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; C.sat[i] = Math.tanh(2.5 * x) / Math.tanh(2.5); }
+  const lim = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1, a = Math.abs(x); lim[i] = Math.sign(x) * (a < 0.55 ? a : 0.55 + 0.37 * Math.tanh((a - 0.55) / 0.37)); }
+  C.bus = A.createGain(); const L = A.createWaveShaper(); L.curve = lim; C.bus.connect(L); L.connect(A.destination);   /* (all of them together can never clip) */
+  return zSfxKit.c = C;
+}
+function zSfx(kind, d, at, pitch) {                                    // zombie sounds: real throats moaning through vowels, growls rattling with vocal fry, wet mud, crumbling earth. Quieter, duller and panned the further off they are
+  if (!actx) return; let C; try { C = zSfxKit(); } catch (e) { return; }
+  const A = actx, r = Math.random, boss = !!(at && at.boss), V = (at && at.voice) || zVoice(r() * 4 | 0), gv = V.f * (at && at.voice ? 1 : pitch || 1), jj = () => 0.93 + r() * 0.14, t = A.currentTime + 0.02;
+  if (boss && kind === 'growl') kind = 'roar'; if (boss && kind === 'step') kind = 'bstep';
+  const cat = { groan: 'v', growl: 'v', roar: 'v', breath: 'v', gurgle: 'v', gasp: 'v', step: 's', drag: 's', bstep: 's', dig: 'e', crack: 'e', chomp: 'c', hit: 'p', splat: 'p', die: 'p', thwack: 'p', slam: 'p' }[kind]; if (!cat) return;
+  const now = A.currentTime, live = C.live[cat] = (C.live[cat] || []).filter(e => e > now); if (live.length >= { v: 3, s: 4, e: 3, c: 2, p: 6 }[cat] && !(cat === 'v' && (d || 0) < 2 && live.length < 5)) return;   /* (only so many at once: three voices (one right on top of her may push in), four feet...) */
+  const N = []; let end = t, last = null;
+  const nd = x => (N.push(x), x), G = v => { const g = nd(A.createGain()); g.gain.value = v; return g; };
+  const F = (type, f, q, gn) => { const b = nd(A.createBiquadFilter()); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; if (gn) b.gain.value = gn; return b; };
+  const chain = (...xs) => { for (let i = 0; i < xs.length - 1; i++) xs[i].connect(xs[i + 1]); return xs[xs.length - 1]; };
+  const fin = (s, t1) => { if (t1 >= end) { end = t1; last = s; } return s; };
+  const O = (type, f, t0, t1) => { const o = nd(A.createOscillator()); if (type === 'glot') o.setPeriodicWave(C.glot); else o.type = type; o.frequency.value = f; o.start(t0); o.stop(t1); return fin(o, t1); };
+  const Nz = (b, t0, t1, rate) => { const s = nd(A.createBufferSource()); s.buffer = C[b]; s.loop = true; if (rate) s.playbackRate.value = rate; s.start(t0, r() * 1.9); s.stop(t1); return fin(s, t1); };
+  const env = (p, t0, pk, a, h, rl, sus) => { const s = pk * (sus === undefined ? 1 : sus); p.setValueAtTime(0, t0); p.linearRampToValueAtTime(pk, t0 + a); if (h > 0) p.linearRampToValueAtTime(s, t0 + a + h); p.exponentialRampToValueAtTime(Math.max(1e-6, s * 0.001), t0 + a + h + rl); p.linearRampToValueAtTime(0, t0 + a + h + rl + 0.01); return t0 + a + h + rl + 0.03; };
+  const dd = d || 0, out = G(Math.max(0.12, 1 - dd / 16)); let tail = out;   // its own output: quieter with distance, muffled further off, panned to where it is
+  if (dd > 3) tail = chain(tail, F('lowpass', 1400 + 15000 * Math.pow(Math.max(0, 1 - dd / 15), 2)));
+  if (at && A.createStereoPanner) { const pn = nd(A.createStereoPanner()); pn.pan.value = sndPan(at.x, at.z) * 0.85; tail = chain(tail, pn); }
+  tail.connect(C.bus);
+  const burst = (b, t0, dur, v, a, fl, h, rate) => { const g = G(0), e = env(g.gain, t0, v, a, h || 0, Math.max(0.005, dur - a - (h || 0))), s = Nz(b, t0, e, rate); chain(s, ...fl, g, out); return g; };   /* a shaped noise burst through filters */
+  const thump = (t0, f0, f1, dur, v) => { const g = G(0), e = env(g.gain, t0, v, 0.004, 0, dur), o = O('sine', f0, t0, e); o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur); chain(o, g, out); };
+  const sweep = (type, f0, f1, q, t0, dur) => { const b = F(type, f0, q); b.frequency.setValueAtTime(f0, t0); b.frequency.exponentialRampToValueAtTime(f1, t0 + dur); return b; };
+  const VOW = { u: [320, 800, 2240], o: [480, 840, 2360], a: [720, 1100, 2450], A: [620, 1180, 2400], e: [560, 1650, 2450], n: [280, 1250, 2200] };
+  const voice = (t0, dur, o) => {                                     // a throat: two detuned buzzes (and one an octave down for the big one) wandering along a pitch contour with jitter and a wobble,
+    const fm = V.form * (o.form || 1), hold = Math.max(0, dur - o.a - o.rl), vg = G(0), e = env(vg.gain, t0, o.v, o.a, hold, o.rl, o.sus), T = e - t0;   // rattled by vocal fry, saturated, then shaped by three vowel formants gliding along a path, with breath mixed in
+    const mix = G(1), am = G(1), pre = G(o.drive || 0.55), sh = nd(A.createWaveShaper()), fo = G(1); sh.curve = C.sat;
+    const det = o.det === undefined ? V.det : o.det, srcs = [[O('glot', gv, t0, e), 1, det], [O('glot', gv, t0, e), 1, -det]];
+    if (o.sub) srcs.push([O('triangle', gv / 2, t0, e), 0.5, 0]);
+    const jit = G(o.f * (o.jit || 0.035)), vib = O('sine', V.vib * jj(), t0, e), vibG = G(o.f * (o.vib === undefined ? 0.016 : o.vib));
+    chain(Nz('wob', t0, e, o.jr || 1), jit); vib.connect(vibG);
+    for (const [s, m, dt] of srcs) { const p = s.frequency; s.detune.value = dt; p.setValueAtTime(o.f * m * o.pc[0][1], t0); for (const [k, x] of o.pc) if (k > 0) p.linearRampToValueAtTime(o.f * m * x, t0 + T * k);
+      jit.connect(p); vibG.connect(p); if (m === 1) s.connect(mix); else chain(s, G(o.sub), mix); }
+    const br = o.breath === undefined ? V.breath : o.breath; if (br > 0) chain(Nz('white', t0, e), F('bandpass', 1500 * fm, 0.7), G(br * 1.4), mix);
+    const fry = o.fry === undefined ? V.rough * 0.35 : o.fry, fr = o.fr || 30;
+    if (fry > 0) { am.gain.value = 1 - fry * 0.5; const lf = O('sawtooth', fr, t0, e); chain(lf, F('lowpass', 220), G(fry * 0.5), am.gain); chain(Nz('wob', t0, e, 2.5), G(fr * 0.3), lf.frequency); }   /* (the rattle itself stutters) */
+    chain(mix, am, pre, sh, fo); chain(Nz('wob', t0, e, 0.7), G(0.18), fo.gain);   /* (a slow shimmer in the loudness) */
+    const lv = o.fl || [1, 0.5, 0.2], Q = [4, 6, 9];
+    for (let j = 0; j < 3; j++) { const bp = F('bandpass', VOW[o.vp[0][1]][j] * fm, Q[j]); bp.frequency.setValueAtTime(VOW[o.vp[0][1]][j] * fm, t0); for (const [k, x] of o.vp) if (k > 0) bp.frequency.linearRampToValueAtTime(VOW[x][j] * fm, t0 + T * k); chain(fo, bp, G(lv[j] * 1.6), vg); }
+    chain(sh, F('lowpass', o.sub ? 180 : 260), G(o.body || 0.18), vg);   /* the chest */
+    chain(vg, o.chest ? F('peaking', 100, 1.1, o.chest) : G(1), out); return e; };
+  if (kind === 'groan') {                                              // "uuuhhhaaaahhh": a long, wavering moan sliding through the vowels, falling away at the end
+    const dur = 1.5 + r() * 1.0, P = [['u', 'A', 'a', 'o'], ['A', 'a', 'u'], ['o', 'a', 'A', 'n'], ['u', 'a', 'o']][r() * 4 | 0];
+    voice(t, dur, { f: gv * jj(), pc: [[0, 0.9], [0.22, 1.06], [0.6, 1.0], [1, 0.72 + r() * 0.1]], vp: P.map((x, i) => [i / (P.length - 1), x]), v: boss ? 0.42 : 0.32, a: 0.3 + r() * 0.15, rl: 0.75, sus: 0.85, sub: boss ? 0.8 : 0, chest: boss ? 8 : 0 }); }
+  else if (kind === 'growl') {                                         // a low, rough snarl: vocal fry rattling at 25-40 Hz, pushed into distortion
+    const dur = 0.7 + r() * 0.35; voice(t, dur, { f: gv * 0.8, pc: [[0, 0.92], [0.3, 1.1], [1, 0.8]], vp: [[0, 'a'], [0.6, 'A'], [1, 'o']], v: 0.34, a: 0.06, rl: 0.3, fry: 0.9, fr: 25 + r() * 15, drive: 2.2, breath: 0.7, jit: 0.06 }); }
+  else if (kind === 'roar') {                                          // the Groundskeeper: a cavernous roar with an octave below it and a chest like a barrel
+    const dur = 1.3 + r() * 0.4; voice(t, dur, { f: gv, sub: 0.9, chest: 9, pc: [[0, 0.85], [0.2, 1.15], [0.7, 1.05], [1, 0.75]], vp: [[0, 'A'], [0.3, 'a'], [1, 'o']], v: 0.42, a: 0.1, rl: 0.5, fry: 0.8, fr: 24 + r() * 8, drive: 2.6, breath: 0.8, jit: 0.05 });
+    burst('brown', t, dur, 0.22, 0.12, [F('lowpass', 150)]); }
+  else if (kind === 'breath') {                                        // wet, ragged breathing: a rattling draw in, a gurgling sigh out
+    const fm = V.form, am = G(0.55); chain(Nz('wob', t + 0.6, t + 1.6, 6), G(0.45), am.gain);
+    burst('white', t, 0.55, 0.22, 0.42, [F('bandpass', 1150 * fm, 1.6), F('highpass', 500)]);
+    burst('white', t + 0.6, 0.85, 0.28, 0.08, [F('bandpass', 650 * fm, 1.3), am]);
+    voice(t + 0.62, 0.8, { f: gv * 0.85, pc: [[0, 1], [1, 0.8]], vp: [[0, 'A'], [1, 'n']], v: 0.05, a: 0.15, rl: 0.45, fry: 0.7, fr: 22, breath: 1.4 }); }
+  else if (kind === 'gurgle') {                                        // a throat full of mud: narrow noise jerked about at random, bubbles popping, a drowned moan under it
+    const dur = 0.8 + r() * 0.4, bp = F('bandpass', 520, 7), am = G(0.5);
+    chain(Nz('wob', t, t + dur + 0.1, 4 + r() * 3), G(280), bp.frequency); chain(Nz('wob', t, t + dur + 0.1, 8), G(0.5), am.gain);
+    burst('white', t, dur, 1.1, 0.06, [bp, am], dur * 0.4);
+    for (let k = 0; k < 7; k++) { const t0 = t + r() * dur * 0.9, f = 160 + r() * 260, o = O('sine', f, t0, t0 + 0.08), g = G(0); o.frequency.setValueAtTime(f, t0); o.frequency.exponentialRampToValueAtTime(f * 2.2, t0 + 0.045); env(g.gain, t0, 0.09, 0.004, 0, 0.045); chain(o, g, out); }   /* (bubbles) */
+    voice(t + 0.05, dur, { f: gv * 0.8, pc: [[0, 1], [1, 0.7]], vp: [[0, 'u'], [1, 'o']], v: 0.08, a: 0.1, rl: 0.4, fry: 0.7, fr: 18 + r() * 8, breath: 0.4 }); }
+  else if (kind === 'step') {                                          // a squelchy footfall: a soft low thump, then the wet click and suck of the mud
+    thump(t, 92 * jj(), 40, 0.13, 0.08); burst('brown', t, 0.09, 0.22, 0.004, [F('bandpass', 380, 1.2)]);
+    burst('white', t + 0.018, 0.025, 0.4, 0.002, [F('bandpass', 2300 * jj(), 3)]);
+    burst('white', t + 0.03, 0.11, 1.2, 0.012, [sweep('bandpass', 420 * jj(), 1500, 5, t + 0.03, 0.1)]); }
+  else if (kind === 'drag') {                                          // the bad foot scraping and dragging through the wet grass
+    const dur = 0.35 + r() * 0.15, k = boss ? 0.6 : 1;
+    burst('grit', t, dur, 0.45 * (boss ? 1.5 : 1), dur * 0.4, [sweep('bandpass', 1900 * k, 1000 * k, 1.4, t, dur)]);
+    burst('white', t, dur, 0.03, dur * 0.35, [F('bandpass', 3000 * k, 1.5)]); burst('brown', t, dur, 0.06 * (boss ? 2 : 1), dur * 0.3, [F('lowpass', 600 * k)]); }
+  else if (kind === 'bstep') {                                         // the Groundskeeper's tread: a heavy thud you feel through the lawn, and the squelch of a big boot
+    thump(t, 64 * jj(), 26, 0.36, 0.28); thump(t, 140, 60, 0.1, 0.14); burst('brown', t, 0.3, 0.2, 0.005, [F('lowpass', 170)]); burst('brown', t, 0.22, 0.8, 0.004, [F('bandpass', 300, 1.1)]);
+    burst('white', t + 0.04, 0.15, 1.4, 0.012, [sweep('bandpass', 300, 900, 4, t + 0.04, 0.14)]); burst('grit', t + 0.02, 0.25, 0.08, 0.01, [F('lowpass', 1400)]); }
+  else if (kind === 'dig') {                                           // clawing up through the soil: gritty scrabbling in fits and starts, a low churning rumble, clods thudding down
+    const dur = 1.7, am = G(0.45); chain(Nz('wob', t, t + dur + 0.1, 2.2), G(0.55), am.gain);
+    burst('grit', t, dur, 0.8, 0.4, [F('bandpass', 1300, 0.7), am], 0.7); burst('brown', t + 0.15, dur - 0.15, 0.16, 0.4, [F('lowpass', 220)], 0.6);
+    for (let k = 0; k < 5; k++) { const t0 = t + 0.2 + r() * 1.3; thump(t0, 160 * jj(), 70, 0.07, 0.06); burst('brown', t0, 0.06, 0.12, 0.002, [F('bandpass', 500, 1.2)]); }   /* (clods) */
+    for (let k = 0; k < 3; k++) burst('white', t + 0.1 + r() * 1.3, 0.09, 0.25, 0.01, [F('bandpass', 2800, 2)]); }
+  else if (kind === 'crack') {                                         // the turf tearing open (or a skull under her paws): a sharp crack, a crunch, crumbling earth, a thump
+    burst('white', t, 0.05, 0.3, 0.001, [F('highpass', 2400)]); burst('grit', t + 0.01, 0.45, 1.1, 0.005, [F('bandpass', 1100, 0.8)]);
+    thump(t, 150, 45, 0.22, 0.18); burst('brown', t, 0.18, 0.35, 0.003, [F('bandpass', 420, 1)]); }
+  else if (kind === 'gasp') {                                          // out into the air: a ragged rising gasp, cut off short, then a hiss through the teeth
+    const fm = V.form, dur = 0.42;
+    for (const [f, q, l] of [[750, 5, 1], [1250, 7, 0.6], [2500, 8, 0.35]]) burst('white', t, dur, 0.7 * l, dur - 0.06, [F('bandpass', f * fm, q)]);
+    burst('white', t + dur, 0.5, 0.05, 0.03, [F('highpass', 3200)]);
+    voice(t + dur - 0.14, 0.26, { f: gv * 1.35, pc: [[0, 1], [1, 1.15]], vp: [[0, 'a'], [1, 'A']], v: 0.08, a: 0.05, rl: 0.1, fry: 0.9, fr: 30, breath: 1 }); }
+  else if (kind === 'hit' || kind === 'splat') {                       // a bullet going in: a wet thud and a squelch (and if it's still standing, a pained grunt: "UHH-nh!")
+    thump(t, 125, 48, 0.16, 0.2); burst('white', t, 0.12, 0.25, 0.002, [F('lowpass', 1300)]); burst('brown', t, 0.1, 0.3, 0.002, [F('bandpass', 350, 1.2)]);
+    burst('white', t + 0.01, 0.12, 1.0, 0.004, [sweep('bandpass', 1800, 500, 4, t + 0.01, 0.1)]);
+    if (kind === 'hit') voice(t + 0.05, boss ? 0.5 : 0.34, { f: gv * (boss ? 1.25 : 1.35), sub: boss ? 0.8 : 0, chest: boss ? 7 : 0, pc: [[0, 1.12], [0.25, 1.28], [1, 0.82]], vp: [[0, 'A'], [0.5, 'e'], [1, 'n']], v: 0.36, a: 0.015, rl: 0.2, fry: 0.55, fr: 32, drive: 1.8, breath: 0.6 }); }
+  else if (kind === 'die') {                                           // going down: a long falling moan, the body hitting the mud, then the earth settling back over it
+    const tc = boss ? 0.8 : 0.66;
+    voice(t, boss ? 1.6 : 1.3, { f: gv * 1.1, sub: boss ? 0.9 : 0, chest: boss ? 8 : 0, pc: [[0, 1.05], [0.12, 1.18], [1, 0.48]], vp: [[0, 'a'], [0.5, 'o'], [1, 'u']], v: boss ? 0.34 : 0.27, a: 0.05, rl: 0.6, sus: 0.8, fry: 0.4, fr: 22, drive: 1.2, breath: 0.8, vib: 0.03 });
+    thump(t + tc, boss ? 70 : 88, boss ? 24 : 32, boss ? 0.5 : 0.38, boss ? 0.28 : 0.26); burst('brown', t + tc, 0.35, boss ? 0.36 : 0.24, 0.004, [F('lowpass', 220)]);
+    burst('grit', t + tc + 0.02, 0.14, 0.14, 0.002, [F('bandpass', 2600, 1.5)]);   /* (bones clattering) */
+    burst('grit', t + 1.15, 1.1, 0.09, 0.3, [F('lowpass', 900)], 0.3); burst('brown', t + 1.15, 1.1, 0.14, 0.3, [F('lowpass', 130)], 0.3); }
+  else if (kind === 'thwack') {                                        // a swipe landing: a meaty slap
+    burst('white', t, 0.1, 0.5, 0.002, [F('bandpass', 1050, 1.2)]); thump(t, 210, 70, 0.2, 0.2); burst('white', t + 0.01, 0.1, 0.8, 0.004, [sweep('bandpass', 1500, 500, 4, t + 0.01, 0.09)]); }
+  else if (kind === 'slam') {                                          // the Groundskeeper's ground-pound: a crack, a huge boom, debris raining back down
+    thump(t, 72, 24, 1.1, 0.24); thump(t, 160, 50, 0.3, 0.2); burst('brown', t, 1.0, 0.22, 0.005, [F('lowpass', 210)]); burst('brown', t, 0.5, 1.0, 0.004, [F('bandpass', 280, 0.9)]);
+    burst('grit', t + 0.05, 0.9, 0.7, 0.02, [F('bandpass', 900, 0.8)]); burst('white', t, 0.06, 0.3, 0.001, [F('highpass', 1500)]); }
+  else if (kind === 'chomp') {                                         // teeth snapping at her: two hard clacks and a wet smack
+    for (const dt of [0, 0.065 + r() * 0.02]) burst('white', t + dt, 0.02, 1.0, 0.0008, [F('bandpass', 2700 * jj(), 5)]);
+    burst('white', t + 0.01, 0.05, 0.15, 0.003, [F('lowpass', 800)]); }
+  C.live[cat].push(end);
+  if (last) last.onended = () => { for (const x of N) try { x.disconnect(); } catch (e) {} };   /* (all done: unhook every node) */
 }
 function zGroan(vol) { zSfx('groan', vol ? Math.max(0, 16 - vol * 400) : 4); }
 function scheduleZombie() {                                            // zombie night's own record: a slow heartbeat, a chugging low bass, a diminished pad, a detuned music box, the odd theremin wail
@@ -9030,7 +9131,7 @@ function todActors(dt) {                                               // the ca
   const T = TOD, r = walk.rig; if (!T || !r) return;
   if (!r.todMats) { r.todMats = []; const seen = new Map(); r.g.traverse(o => { const m0 = o.material; if (!o.isMesh || !m0 || Array.isArray(m0) || !m0.color || m0.isMeshBasicMaterial) return;
       let m = seen.get(m0); if (!m) { m = m0.clone(); m.userData = { c0: m0.color.clone(), e0: m0.emissive ? m0.emissive.clone() : null }; seen.set(m0, m); r.todMats.push(m); } o.material = m; }); r.todF = new THREE.Color(1, 1, 1); }
-  const p = walk.pos, U = UPPER, inside = p.x > YARD.HL - 0.3 && p.x < YARD.HR + 0.3 && p.z > U.zF - 0.3 && p.z < U.zB + 0.3, tn = T.tint;
+  const p = walk.pos, U = UPPER, inside = p.x > YARD.HL - 0.3 && p.x < YARD.HR + 0.3 && p.z > U.zF - 0.3 && p.z < U.zB + 0.3 && !(p.y > U.CH + 0.25), tn = T.tint;
   const k = 0.85, want = inside ? [1, 1, 1] : [1 + (Math.min(1.25, tn.r) - 1) * k, 1 + (Math.min(1.25, tn.g) - 1) * k, 1 + (Math.min(1.25, tn.b) - 1) * k], f = r.todF, a = Math.min(1, dt * 2.5);
   const nr = f.r + (want[0] - f.r) * a, ng = f.g + (want[1] - f.g) * a, nb = f.b + (want[2] - f.b) * a;
   if (Math.abs(nr - f.r) + Math.abs(ng - f.g) + Math.abs(nb - f.b) > 0.002 || T.flash > 0) { f.setRGB(nr, ng, nb); for (const m of r.todMats) { m.color.copy(m.userData.c0).multiply(f); if (m.userData.e0) m.emissive.copy(m.userData.e0).multiply(f); } }
@@ -9073,7 +9174,7 @@ function thunder() {                                                   // a crac
   sndHiss(out, t, 0.25, 0.12, 'highpass', 900); sndHiss(out, t + 0.05, 3.2, 0.2, 'lowpass', 140, x => (x < 0.08 ? x / 0.08 : 1) * (1 - x) ** 1.6 * (0.7 + 0.3 * Math.sin(x * 23)));
 }
 function catShake(dt, W) {                                             // in out of the rain: she stops and shakes herself off
-  const T = TOD, p = walk.pos, U = UPPER, inside = p.x > YARD.HL - 0.3 && p.x < YARD.HR + 0.3 && p.z > U.zF - 0.3 && p.z < U.zB + 0.3;
+  const T = TOD, p = walk.pos, U = UPPER, inside = p.x > YARD.HL - 0.3 && p.x < YARD.HR + 0.3 && p.z > U.zF - 0.3 && p.z < U.zB + 0.3 && !(p.y > U.CH + 0.25);
   if (T && !inside && T.wx === 'rain' && T.W > 0.3) walk.wet = Math.min(1, (walk.wet || 0) + dt * 0.08); else if (!inside) walk.wet = Math.max(0, (walk.wet || 0) - dt * 0.01);
   if ((walk.shakeT || 0) > 0) { walk.shakeT -= dt; const a = Math.sin(Math.max(0, walk.shakeT) / 0.9 * Math.PI), w = Math.sin(clock * 38);
     W.body.rotation.z = w * 0.28 * a; W.head.rotation.z = -w * 0.35 * a; if (Math.random() < dt * 30) burst(p.clone().setY(p.y + 0.45), 0xcfe6ff, 2, 2.6, 1.2, 0.06); }
@@ -9149,7 +9250,7 @@ function zHeave(q) {                                                   // the gr
   return q.heave;
 }
 function zAmmoDrop(q) {                                                // she's got the gun: some of them drop a box of rounds
-  const gr = gunRig; if (!walk.on || gr.state !== 'cat' || Math.random() > (gr.ammo <= 2 ? 0.8 : 0.35)) return;
+  const gr = gunRig; if (!walk.on || gr.state !== 'cat' || Math.random() > (q.boss ? 1 : gr.ammo <= 2 ? 0.9 : gr.ammo <= 4 ? 0.65 : 0.45)) return;
   ZN.ammo = ZN.ammo || []; if (ZN.ammo.filter(a => a.on).length >= 4) return;
   let a = ZN.ammo.find(a => !a.on);
   if (!a) { const g = new THREE.Group(); g.userData.noWalk = true; ZN.root.add(g);
@@ -9165,8 +9266,8 @@ function zUpdateAmmo(dt) {
   for (const a of ZN.ammo) { if (!a.on) continue; a.t += dt; a.g.rotation.y += dt * 2; a.g.position.y = 0.05 + Math.abs(Math.sin(a.t * 3)) * 0.12 + Math.max(0, 1 - a.t * 3) * 0.6;
     if (a.t > 25 || !ZN.on) { a.on = false; a.g.visible = false; continue; }
     if (Math.hypot(p.x - a.g.position.x, p.z - a.g.position.z) < 0.85 && p.y < 1.2 && gunRig.state === 'cat') {
-      a.on = false; a.g.visible = false; gunRig.ammo = Math.min(GUN_ROUNDS, gunRig.ammo + 3); showFireBtn();
-      tone(520, 780, 0.08, 'square', 0.03); tone(780, 1040, 0.08, 'square', 0.03, 0.07); showWalkName(`🔫 +3 rounds! (${gunRig.ammo} loaded)`); } }
+      a.on = false; a.g.visible = false; gunRig.ammo = Math.min(GUN_ROUNDS, gunRig.ammo + 4); showFireBtn();
+      tone(520, 780, 0.08, 'square', 0.03); tone(780, 1040, 0.08, 'square', 0.03, 0.07); showWalkName(`🔫 +4 rounds! (${gunRig.ammo} loaded)`); } }
 }
 function catSplash(dt) {                                               // running through the rain: little splashes kicked up at her feet
   const T = TOD, p = walk.pos, U = UPPER; if (!T || T.wx !== 'rain' || T.W < 0.3 || !walk.grounded) return;
@@ -9184,8 +9285,7 @@ function zAim() {                                                     // zombie 
   if (!R) { const tex = canvasTex(128, 128, (c, w, h) => { c.clearRect(0, 0, w, h); c.strokeStyle = '#ff3b3b'; c.lineWidth = 7; c.beginPath(); c.arc(64, 64, 38, 0, 7); c.stroke();
       c.lineWidth = 6; for (const [a, b, e, f] of [[64, 6, 64, 30], [64, 98, 64, 122], [6, 64, 30, 64], [98, 64, 122, 64]]) { c.beginPath(); c.moveTo(a, b); c.lineTo(e, f); c.stroke(); } c.fillStyle = '#ff3b3b'; c.beginPath(); c.arc(64, 64, 5, 0, 7); c.fill(); }, 1, 1);
     R = ZN.reticle = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true })); R.renderOrder = 12; scene.add(R); }
-  const h = gunHand(), fx = Math.sin(walk.face), fz = Math.cos(walk.face); let best = null, bd = 16;
-  for (const q of ZN.z) if (zAlive(q) && q.st !== 'stagger' && !(q.st === 'rise' && q.t <= 1.4)) { const dx = q.x - h.x, dz = q.z - h.z, al = dx * fx + dz * fz; if (al > 0 && al < bd && Math.abs(dx * fz - dz * fx) < 1.3) { bd = al; best = q; } }
+  const h = gunHand(), fx = Math.sin(walk.face), fz = Math.cos(walk.face), best = zTarget();
   R.visible = true;
   if (best) { R.position.set(best.x, 1.35 * best.sc, best.z); R.scale.setScalar(0.75 + Math.sin(clock * 10) * 0.05); R.material.opacity = 1; }
   else { R.position.set(h.x + fx * 6, 1.1, h.z + fz * 6); R.scale.setScalar(0.5); R.material.opacity = 0.45; }   /* (nothing in her sights: a faint marker straight ahead) */
@@ -9207,10 +9307,15 @@ function rigMerge(root, protect) {                                    // one mes
       const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.BufferAttribute(P, 3)); mg.setAttribute('normal', new THREE.BufferAttribute(N, 3)); if (U) mg.setAttribute('uv', new THREE.BufferAttribute(U, 2)); mg.computeBoundingSphere();
       const mesh = new THREE.Mesh(mg, m); mesh.renderOrder = list[0].renderOrder; for (const o of list) par.remove(o); par.add(mesh); } }
 }
-function zHud() {
-  if (!ZN.hud) { const d = ZN.hud = document.createElement('div'); d.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,26,14,.78);color:#d8ff9a;font:700 15px system-ui,sans-serif;padding:7px 16px;border-radius:18px;border:2px solid #7fbf3a;text-shadow:0 1px 2px #000;white-space:nowrap'; document.body.appendChild(d); }
+function zHud() {                                                      // the strip up top: wave, how many bopped, hearts; and while the Groundskeeper is up, his health bar under it
+  if (!ZN.hud) { const d = ZN.hud = document.createElement('div'); d.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,26,14,.78);color:#d8ff9a;font:700 15px system-ui,sans-serif;padding:7px 16px;border-radius:18px;border:2px solid #7fbf3a;text-shadow:0 1px 2px #000;white-space:nowrap;text-align:center';
+    ZN.hudS = d.appendChild(document.createElement('div')); const b = ZN.hudB = d.appendChild(document.createElement('div')); b.style.cssText = 'display:none;align-items:center;justify-content:center;gap:6px;margin-top:5px';
+    b.innerHTML = '<span style="font-size:16px;line-height:1">👹</span><span style="position:relative;width:150px;height:12px;border-radius:7px;background:#2a0d0a;border:2px solid #120604;overflow:hidden;box-shadow:0 0 8px rgba(255,70,40,.45)"><i style="position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(#ff8a5a,#d0261c);transition:width .3s ease-out"></i><i style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(20% - 2px),#120604 calc(20% - 2px) 20%)"></i></span>';
+    ZN.hudF = b.querySelector('i'); document.body.appendChild(d); }
   ZN.hud.hidden = !ZN.on || state !== 'playing'; if (ZN.hud.hidden) return;
-  const txt = ZN.breakT > 0 && ZN.left <= 0 ? `🧟 Wave ${ZN.wave} cleared! Next wave in ${Math.ceil(ZN.breakT)}... · 💀 ${ZN.kills} · ❤️×${Math.max(0, ZN.hearts)}` : `🧟 Zombie night · Wave ${ZN.wave} · 💀 ${ZN.kills} · ❤️×${Math.max(0, ZN.hearts)}`; const bq = ZN.boss, full = bq && zAlive(bq) ? txt + ` · 👹 ${'🟥'.repeat(Math.max(0, bq.hp || 0))}` : txt; if (full !== ZN.hudTxt) { ZN.hudTxt = full; ZN.hud.textContent = full; }
+  const txt = ZN.breakT > 0 && ZN.left <= 0 ? `🧟 Wave ${ZN.wave} cleared! Next wave in ${Math.ceil(ZN.breakT)}... · 💀 ${ZN.kills} · ❤️×${Math.max(0, ZN.hearts)}` : `🧟 Zombie night · Wave ${ZN.wave} · 💀 ${ZN.kills} · ❤️×${Math.max(0, ZN.hearts)}`; if (txt !== ZN.hudTxt) { ZN.hudTxt = txt; ZN.hudS.textContent = txt; }
+  const bq = ZN.boss, on = !!bq && zAlive(bq), w = on ? Math.max(0, bq.hp || 0) / (bq.hpMax || 5) : 0;   /* (a bar, no numbers) */
+  if (on !== ZN.hudOn) { ZN.hudOn = on; ZN.hudB.style.display = on ? 'flex' : 'none'; } if (w !== ZN.hudW) { ZN.hudW = w; ZN.hudF.style.width = w * 100 + '%'; }
 }
 function zSpawnSpot() {                                                // somewhere on our lawn a few metres from her, clear of the patio, shed and so on
   const p = walk.pos;
@@ -9222,9 +9327,10 @@ function zSpawnSpot() {                                                // somewh
   return null;
 }
 function zPool() {                                                    // the eight zombies, built once (ahead of time, at dusk, so the big moment doesn't stutter)
-  if (ZN.pool) return; ZN.root = new THREE.Group(); ZN.root.userData.noWalk = true; ZN.root.userData.name = 'Zombies'; scene.add(ZN.root); ZN.pool = true; ZN.z = [];
+  if (ZN.pool) return; if (actx) try { zSfxKit(); } catch (e) {}   /* (its sounds' noise made now, not at the first groan) */
+  ZN.root = new THREE.Group(); ZN.root.userData.noWalk = true; ZN.root.userData.name = 'Zombies'; scene.add(ZN.root); ZN.pool = true; ZN.z = [];
   for (let i = 0; i < 8; i++) { const q = makeZombie(i); zReset(q); q.g.visible = false; q.mound.visible = false; ZN.root.add(q.g, q.mound); ZN.z.push(q); }
-  { const b = makeZombie('boss'); b.boss = true; b.sc = 1.55; b.hp = 3; zReset(b); b.g.visible = false; b.mound.visible = false; b.mound.scale.setScalar(1.7); ZN.root.add(b.g, b.mound); ZN.z.push(b); ZN.boss = b; }
+  { const b = makeZombie('boss'); b.boss = true; b.sc = 1.55; b.hp = 5; b.hpMax = 5; zReset(b); b.g.visible = false; b.mound.visible = false; b.mound.scale.setScalar(1.7); ZN.root.add(b.g, b.mound); ZN.z.push(b); ZN.boss = b; }
   { const m = ZN.shockM = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 40), new THREE.MeshBasicMaterial({ color: 0xe0d2b0, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide })); m.material.userData.noTod = true; m.rotation.x = -Math.PI / 2; m.visible = false; m.renderOrder = 3; ZN.root.add(m); }
 }
 function zAbort() {                                                   // leaving Free roam mid-night: everything back underground, no win, no HUD
@@ -9247,18 +9353,57 @@ function zEnd(won, why) {
   else if (won === false) { showWalkName(`🧟 The zombies got her! They sink back into the mud... (${ZN.kills} bopped)`); tone(300, 90, 0.8, 'sawtooth', 0.04); }
   zHud();
 }
-function zKill(q, how) {
-  if (q.boss && clock < (q.inv || 0)) return;
+function zKill(q, how) {                                               // a hit landing. A pounce or a swipe flattens an ordinary zombie; it takes two bullets.
+  const shot = how === 'shot';                                         // the Groundskeeper takes five: a bullet does one, a pounce or a swipe two (so three of those still beat him)
+  if (!zAlive(q) || (q.boss && !shot && clock < (q.inv || 0))) return;   /* (already going down, or still reeling from the last one) */
   if (how === 'stomp') { walk.vy = WALK.jumpV * (q.boss ? 0.8 : 0.7); walk.grounded = false; walk.squash = 1; tone(660, 990, 0.1, 'triangle', 0.04); }
-  const dd = Math.hypot(walk.pos.x - q.x, walk.pos.z - q.z);
-  if (q.boss && (q.hp || 0) > 1) { q.hp--; q.inv = clock + 0.9; q.st = 'stagger'; q.t = 0;          // the Groundskeeper takes three
-    const l = dd || 1, nx = q.x + (q.x - walk.pos.x) / l, nz = q.z + (q.z - walk.pos.z) / l; if (inOurYard(nx, nz)) { q.x = nx; q.z = nz; }
-    burst(new THREE.Vector3(q.x, 2.4, q.z), 0x8fcf4a, 10, 3, 2, 0.35); zSfx(how === 'stomp' ? 'crack' : 'thwack', dd, q); zSfx('growl', dd, q, 0.5);
-    showWalkName('👹 The Groundskeeper staggers!'); return; }
-  q.st = 'die'; q.t = 0; ZN.kills++; q.dir = how === 'stomp' ? 0 : 1;
-  burst(new THREE.Vector3(q.x, 1.2 * q.sc, q.z), 0x8fcf4a, q.boss ? 28 : 14, q.boss ? 4 : 3, 2, 0.35); zSfx(how === 'stomp' ? 'crack' : 'thwack', dd, q); zSfx('gurgle', dd, q, q.boss ? 0.6 : 1);
+  const dd = Math.hypot(walk.pos.x - q.x, walk.pos.z - q.z), dmg = shot ? 1 : q.boss ? 2 : 9;
+  if ((q.hp || 1) > dmg) { q.hp -= dmg; zWound(q, how, dd); return; }
+  q.hp = 0; q.hitT = 0; q.kbx = q.kbz = 0; q.st = 'die'; q.t = 0; ZN.kills++; q.dir = how === 'stomp' ? 0 : 1;
+  burst(new THREE.Vector3(q.x, 1.2 * q.sc, q.z), 0x8fcf4a, q.boss ? 28 : 14, q.boss ? 4 : 3, 2, 0.35); zSfx(how === 'stomp' ? 'crack' : shot ? 'splat' : 'thwack', dd, q); zSfx('die', dd, q);
   zAmmoDrop(q);
-  if (q.boss) { q.hp = 0; ZN.kills += 2; unlock('zombieBoss'); showWalkName('👹 THE GROUNDSKEEPER IS DOWN!'); }
+  if (q.boss) { ZN.kills += 2; unlock('zombieBoss'); showWalkName('👹 THE GROUNDSKEEPER IS DOWN!'); }
+}
+function zWound(q, how, dd) {                                          // hit, but still standing: knocked back a step, a green splat, a flash, a pained grunt, and pips over its head for what it has left
+  const l = dd || 1, ux = (q.x - walk.pos.x) / l, uz = (q.z - walk.pos.z) / l;
+  if (how === 'shot') { const k = q.st === 'rise' ? 0 : q.boss ? 2.4 : 5; q.kbx = ux * k; q.kbz = uz * k; zSfx('hit', dd, q); }
+  else { q.inv = clock + 0.9; q.st = 'stagger'; q.t = 0; const nx = q.x + ux, nz = q.z + uz; if (inOurYard(nx, nz)) { q.x = nx; q.z = nz; }   /* (a pounce or a swipe: the Groundskeeper reels right back) */
+    zSfx(how === 'stomp' ? 'crack' : 'thwack', dd, q); zSfx('hit', dd, q); showWalkName('👹 The Groundskeeper staggers!'); }
+  zHitFx(q); q.hitT = 0.4;
+  burst(new THREE.Vector3(q.x, 1.35 * q.sc, q.z), 0x8fcf4a, q.boss ? 14 : 10, 3, 2.2, 0.3);
+}
+function zHitFx(q) {                                                   // a zombie's hit effects, made the first time it's hurt: its body flashing, a splash of light, the pips over its head
+  if (q.fx) return q.fx; const mats = []; q.body.traverse(o => { if (o.isMesh && o.material === makeZombie.mat) mats.push(o); });
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xd6ff8a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); glow.material.userData.noTod = true;
+  glow.position.set(0, 1.35 * q.sc, 0.25 * q.sc); glow.scale.setScalar(1.1 * q.sc); glow.visible = false; q.g.add(glow);
+  const pip = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: false, depthWrite: false, transparent: true })); pip.material.userData.noTod = true; pip.renderOrder = 11; pip.visible = false; pip.position.y = 2.25 * q.sc; q.g.add(pip);
+  return q.fx = { mats, glow, pip, on: false, key: '' };
+}
+function zFlashMat() { return zFlashMat.m || (zFlashMat.m = Object.assign(new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(2.2, 2.8, 2) }), { userData: { noTod: true } })); }   // (a zombie lit up by a hit)
+function zPipTex(hp, max) {                                            // a row of pips: a bright one for each hit it has left, a dark cracked one for each it has taken
+  const K = zPipTex.k || (zPipTex.k = {}), key = hp + '/' + max, W = max > 3 ? 256 : 128; if (K[key]) return K[key];
+  return K[key] = canvasTex(W, 32, (c, w, h) => { c.clearRect(0, 0, w, h);
+    for (let i = 0; i < max; i++) { const x = w / 2 + (i - (max - 1) / 2) * 30, y = 16, on = i < hp;
+      c.beginPath(); c.arc(x, y, 12, 0, 7); c.fillStyle = on ? (max > 2 ? '#ff5a3a' : '#b6ff3a') : 'rgba(28,24,20,.9)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#0d0b08'; c.stroke();
+      if (on) { c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.arc(x - 4, y - 4, 3.5, 0, 7); c.fill(); }
+      else { c.strokeStyle = '#a4a888'; c.lineWidth = 2; c.beginPath(); c.moveTo(x - 5, y - 9); c.lineTo(x + 1, y - 2); c.lineTo(x - 3, y + 2); c.lineTo(x + 4, y + 9); c.stroke(); } } }, 1, 1);
+}
+function zHitTick(q, dt) {                                             // a hit playing out: the knock-back, the flinch (laid over whatever pose it's in), the flash; and the pips over its head
+  if (q.kbx || q.kbz) { const nx = q.x + q.kbx * dt, nz = q.z + q.kbz * dt, k = Math.exp(-dt * 9);
+    if ((q.st === 'walk' || q.st === 'slam' || q.st === 'stagger') && inOurYard(nx, nz) && nz > ROOM.visDepth + 1) { q.x = nx; q.z = nz; }
+    q.kbx *= k; q.kbz *= k; if (Math.abs(q.kbx) + Math.abs(q.kbz) < 0.05) q.kbx = q.kbz = 0; }
+  const F = q.fx; if (!F) return;
+  if (q.hitT > 0) { q.hitT = Math.max(0, q.hitT - dt); const a = Math.sin((1 - q.hitT / 0.4) * Math.PI);
+    if (q.st !== 'die' && q.st !== 'sink' && q.st !== 'off') { q.body.rotation.x -= 0.22 * a; q.tor.rotation.x -= 0.45 * a; q.head.rotation.x -= 0.5 * a; q.jaw.rotation.x = Math.max(q.jaw.rotation.x, 0.55 * a); q.arms.forEach(A => { if (!A.dead) A.sh.rotation.x -= 0.6 * a; }); } }
+  const fl = q.hitT > 0.3; if (fl !== F.on) { F.on = fl; const m = fl ? zFlashMat() : makeZombie.mat; for (const o of F.mats) o.material = m; }
+  const go = Math.max(0, (q.hitT - 0.2) / 0.2); F.glow.visible = go > 0; F.glow.material.opacity = go;
+  const show = zAlive(q) && q.hp > 0 && q.hp < (q.hpMax || 1), key = show ? q.hp + '/' + q.hpMax : ''; F.pip.visible = show;
+  if (show && key !== F.key) { F.key = key; F.pip.material.map = zPipTex(q.hp, q.hpMax); F.pip.material.needsUpdate = true; F.pip.scale.set(0.22 * q.sc * (q.hpMax > 3 ? 8 : 4), 0.22 * q.sc, 1); }
+}
+function zTarget() {                                                  // whichever zombie the gun would hit: the nearest in front of her, in a narrow lane (a reeling Groundskeeper too: a free shot)
+  const h = gunHand(), fx = Math.sin(walk.face), fz = Math.cos(walk.face); let best = null, bd = 16;
+  for (const q of ZN.z) if (zAlive(q) && !(q.st === 'rise' && q.t <= 1.4)) { const dx = q.x - h.x, dz = q.z - h.z, al = dx * fx + dz * fz; if (al > 0 && al < bd && Math.abs(dx * fz - dz * fx) < (q.boss ? 1.6 : 1.3)) { bd = al; best = q; } }
+  return best;
 }
 function zFlash() {                                                  // a red flash round the screen's edge when one gets her
   if (!ZN.flashEl) { const d = ZN.flashEl = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:59;box-shadow:inset 0 0 90px 30px rgba(200,20,20,.75);opacity:0;transition:opacity .5s ease-out'; document.body.appendChild(d); }
@@ -9288,10 +9433,10 @@ function updateZombies(dt) {
     if (ZN.hurtT > 0) ZN.hurtT -= dt;
     const alive = ZN.z.filter(zAlive).length;
     if (ZN.left > 0 && inYard && alive < 6 && (ZN.spawnT -= dt) <= 0) { const s = zSpawnSpot(), q = ZN.z.find(q => q.st === 'off' && !q.boss);
-      if (s && q) { ZN.left--; ZN.spawnT = Math.max(0.7, 2.6 - ZN.wave * 0.3) + Math.random(); Object.assign(q, { st: 'rise', t: 0, x: s[0], z: s[1], sp: 0.9 + Math.random() * 0.4 + ZN.wave * 0.12 }); zReset(q);
+      if (s && q) { ZN.left--; ZN.spawnT = Math.max(0.7, 2.6 - ZN.wave * 0.3) + Math.random(); Object.assign(q, { st: 'rise', t: 0, x: s[0], z: s[1], sp: 0.9 + Math.random() * 0.4 + ZN.wave * 0.12, hp: 2, hpMax: 2 }); zReset(q);
         q.g.visible = true; q.mound.position.set(s[0], 0.03, s[1]); q.mound.material.opacity = 0.9; zSfx('dig', Math.hypot(p.x - s[0], p.z - s[1]), q); setTimeout(() => zSfx('groan', 6, q), 1900); q.broke = false; } }
     if (ZN.wave === 3 && !ZN.bossUp && ZN.left <= 5 && inYard && ZN.boss.st === 'off') { const s = zSpawnSpot(), q = ZN.boss;   // wave 3: the boss claws his way up
-      if (s) { ZN.bossUp = true; Object.assign(q, { st: 'rise', t: 0, x: s[0], z: s[1], sp: 0.8, hp: 3, inv: 0, slamCD: clock + 3, broke: false }); zReset(q); q.g.visible = true; q.mound.position.set(s[0], 0.03, s[1]); q.mound.material.opacity = 0.95;
+      if (s) { ZN.bossUp = true; Object.assign(q, { st: 'rise', t: 0, x: s[0], z: s[1], sp: 0.8, hp: 5, hpMax: 5, inv: 0, slamCD: clock + 3, broke: false }); zReset(q); q.g.visible = true; q.mound.position.set(s[0], 0.03, s[1]); q.mound.material.opacity = 0.95;
         zSfx('dig', 0, q); zSfx('growl', 0, q, 0.5); setTimeout(() => zSfx('groan', 2, q, 0.5), 1600); showWalkName('👹 The ground shakes... THE GROUNDSKEEPER rises!'); } }
     if (ZN.left <= 0 && alive === 0 && !(ZN.wave === 3 && !ZN.bossUp)) { if (!ZN.breakT) { ZN.breakT = 5.5; ZN.waves++; showWalkName(`🧟 Wave ${ZN.wave} cleared!`); if (ZN.waves >= 3) { zEnd(true, '🏆 Three waves down!'); } }
       else { const b0 = Math.ceil(ZN.breakT); if ((ZN.breakT -= dt) <= 0) { ZN.breakT = 0; zNextWave(); zSfx('groan', 3); } else if (Math.ceil(ZN.breakT) !== b0 && b0 <= 4) tone(b0 === 1 ? 880 : 520, b0 === 1 ? 880 : 520, 0.12, 'square', 0.03); } }
@@ -9302,7 +9447,8 @@ function updateZombies(dt) {
       { const h = zHeave(q), sc = q.sc, k = Math.min(1, q.t / 0.55); h.visible = true; h.position.set(q.x, 0.01, q.z);
         if (q.t < 0.55) h.scale.set((0.35 + 0.5 * k) * sc, (0.04 + 0.34 * k) * (1 + Math.sin(q.t * 45) * 0.08) * sc, (0.35 + 0.5 * k) * sc);
         else { const k2 = Math.min(1, (q.t - 0.55) / 0.7); h.scale.set((0.85 + 0.3 * k2) * sc, (0.38 * (1 - k2) + 0.07) * sc, (0.85 + 0.3 * k2) * sc); }
-        if (q.t >= 0.55 && !q.broke) { q.broke = true; burst(new THREE.Vector3(q.x, 0.25, q.z), 0x4a3524, 16, 3.4, 3.2, 0.3); burst(new THREE.Vector3(q.x, 0.2, q.z), 0x3f7a32, 8, 2.6, 2.4, 0.18); zSfx('crack', Math.hypot(p.x - q.x, p.z - q.z), q); } }
+        if (q.t >= 0.55 && !q.broke) { q.broke = true; burst(new THREE.Vector3(q.x, 0.25, q.z), 0x4a3524, 16, 3.4, 3.2, 0.3); burst(new THREE.Vector3(q.x, 0.2, q.z), 0x3f7a32, 8, 2.6, 2.4, 0.18); zSfx('crack', Math.hypot(p.x - q.x, p.z - q.z), q); }
+        if (q.t >= 1.3 && q.broke === true) { q.broke = 2; zSfx('gasp', Math.hypot(p.x - q.x, p.z - q.z), q); } }
       if (Math.random() < dt * 10) burst(new THREE.Vector3(q.x + (Math.random() - 0.5) * 0.6, 0.1, q.z + (Math.random() - 0.5) * 0.6), 0x4a3524, 2, 1.5, 2, 0.25);
       q.face = Math.atan2(dx, dz); if (zPose(q, dt, d)) { q.st = ZN.on ? 'walk' : 'sink'; q.t = 0; } }
     else if (q.st === 'walk') {                                        // shamble toward her (they stay on our lawn)
@@ -9312,8 +9458,8 @@ function updateZombies(dt) {
         if (free(nx, nz)) { q.x = nx; q.z = nz; } else if (free(nx, q.z)) q.x = nx; else if (free(q.x, nz)) q.z = nz; }   /* (blocked: slide along it) */
       zPose(q, dt, d);
       if (q.boss && d < 2.4 && clock > (q.slamCD || 0) && ZN.on) { q.st = 'slam'; q.t = 0; q.slamHit = false; zSfx('growl', d, q, 0.5); }
-      if ((q.groanT -= dt) <= 0) { q.groanT = 3 + Math.random() * 5; if (d < 14) zSfx(Math.random() < 0.25 ? 'growl' : 'groan', d, q, q.boss ? 0.55 : 1); }
-      { const up = Math.sin(q.gp) > 0; if (up !== q.stepS) { q.stepS = up; if (d < 9) zSfx(up ? 'step' : 'drag', d, q); } }   /* (a squelch on the good foot, a scrape from the bad one) */
+      if ((q.groanT -= dt) <= 0) { q.groanT = 3 + Math.random() * 5; if (d < 14) { const k = Math.random(); zSfx(k < 0.22 ? 'growl' : d < 6 && k < 0.42 ? 'breath' : k < 0.52 ? 'gurgle' : 'groan', d, q); } }
+      { const up = Math.sin(q.gp) > 0; if (up !== q.stepS) { q.stepS = up; if (d < (q.boss ? 15 : 9)) zSfx(up ? 'step' : 'drag', d, q); } }   /* (a squelch on the good foot, a scrape from the bad one) */
       if (q.chomp > 0.5 && (q.chT = (q.chT || 0) - dt) <= 0) { q.chT = 0.3 + Math.random() * 0.2; zSfx('chomp', d, q); }
       const hy = 1.85 * q.sc;                                          // (the top of its head)
       if (walk.vy < -0.5 && d < (q.boss ? 1.25 : 0.8) && p.y > hy - 0.7 && p.y < hy + 0.45) zKill(q, 'stomp');
@@ -9327,7 +9473,7 @@ function updateZombies(dt) {
       if ((q.st === 'slam' || q.st === 'stagger') && zPose(q, dt, d)) { q.st = ZN.on ? 'walk' : 'sink'; q.t = 0; q.slamCD = clock + 2.2; } }
     else if (q.st === 'die') { if (q.t > 1.05) zSinkFx(q, dt); if (zPose(q, dt, d)) { q.st = 'off'; q.g.visible = false; zReset(q); } }
     else if (q.st === 'sink') { zSinkFx(q, dt); zPose(q, dt, d); if (q.body.position.y < -2.2 * q.sc) { q.st = 'off'; q.g.visible = false; zReset(q); } }
-    q.g.position.set(q.x, 0, q.z); q.g.rotation.y = q.face;
+    zHitTick(q, dt); q.g.position.set(q.x, 0, q.z); q.g.rotation.y = q.face;
     if (q.mound.material.opacity > 0 && q.st !== 'rise') q.mound.material.opacity = Math.max(0, q.mound.material.opacity - dt * 0.08); q.mound.visible = q.mound.material.opacity > 0; }
   zUpdateAmmo(dt); zAim();
   for (const q of ZN.z) { if (q.st === 'off' && q.mound.material.opacity > 0) { q.mound.material.opacity = Math.max(0, q.mound.material.opacity - dt * 0.08); q.mound.visible = q.mound.material.opacity > 0; }
@@ -10381,6 +10527,9 @@ const ACHIEVEMENTS = [
     ['notAGlitch', '🚧', 'Notice: out of bounds', 'In Free roam, climb high enough in the backyard to hop the fence... and wander off'],
     ['auntyHelper', '🪔', 'Aunty’s Little Helper', 'In Free roam, finish 3 of Aunty-ji’s little quests (she asks once you’ve met her upstairs)'],
     ['auntyGem', '💎', 'Beta, You Are a Gem', 'In Free roam, finish every one of Aunty-ji’s little quests'],
+    ['roofRaider', '🏠', 'Roof Raider', 'In Free roam, hop from the treetops across the neighbours’ roof and onto our own'],
+    ['banditBusted', '🦝', 'Bandit Busted', 'Tag the rooftop raccoon 3 times and claim his loot'],
+    ['wishStar', '🌠', 'Wish upon a star', 'Up on our roof at night, spot a shooting star'],
     ['treetop', '🌳', 'Queen of the Canopy', 'In Free roam, climb a tree (jump right at its trunk) and stand on top'],
     ['treeTour', '🍃', 'Treetop Tour', 'In Free roam, stand on top of 5 different trees in one visit'],
     ['fashionista', '👗', 'Fashionista', 'Own 6 things from Kitty’s Closet'],
@@ -10422,7 +10571,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-09-30 12:48';                                              // stamped when the site is published
+const BUILD = '2026-10-01 08:09';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -11745,8 +11894,7 @@ function fireGun() {
     showFireBtn(); return;
   }
   if (walk.on && walk.rig && ZN && ZN.on) {                            // zombie night: the nearest zombie in front of her gets it
-    const h = gunHand(), fx = Math.sin(walk.face), fz = Math.cos(walk.face); let best = null, bd = 16;
-    for (const q of ZN.z) if (zAlive(q) && q.st !== 'stagger' && !(q.st === 'rise' && q.t <= 1.4)) { const dx = q.x - h.x, dz = q.z - h.z, al = dx * fx + dz * fz; if (al > 0 && al < bd && Math.abs(dx * fz - dz * fx) < 1.3) { bd = al; best = q; } }
+    const best = zTarget();
     if (best) { const c = new THREE.Vector3(best.x, 1.35 * best.sc, best.z); gr.aim.copy(c); gr.held.lookAt(c); gr.held.updateMatrixWorld(true);
       tracer(gr.held.localToWorld(gr.held.userData.muzzle.clone()), c, 0); setTimeout(() => { if (zAlive(best)) zKill(best, 'shot'); }, 40);
       if (gr.ammo === 0 && !ZN.on) { const g0 = gameId; setTimeout(() => { if (g0 === gameId) tossGun(); }, 900); }
@@ -13060,7 +13208,7 @@ let musicTrk = '';
 const DESI = { CH: [[55, 59, 62], [53, 57, 60], [48, 52, 55], [55, 59, 62]],
   HOOK: [74, 76, 79, 76, 74, -1, 71, 74,  72, 74, 77, 74, 72, -1, 69, 72,  67, 69, 71, 72, 74, 76, 74, 72,  71, -1, 67, -1, 71, 72, 74, -1],
   ANS: [79, -1, 81, 79, 77, 76, 74, -1,  77, -1, 79, 77, 76, 74, 72, -1,  76, 74, 72, 71, 72, 74, 76, -1,  79, -1, 78, -1, 79, -1, -1, -1] };
-function kittyUpstairs() { const p = walk.pos, U = UPPER; return walk.on && inUpper(p.x, p.z) && (p.y > U.UF - 0.6 || (p.x < -0.2 && p.z < U.SW + 0.2 && p.y > U.LH - 0.6)); }   // (up there, or in the foyer on the way)
+function kittyUpstairs() { const p = walk.pos, U = UPPER; return walk.on && inUpper(p.x, p.z) && p.y < U.CH + 0.25 && (p.y > U.UF - 0.6 || (p.x < -0.2 && p.z < U.SW + 0.2 && p.y > U.LH - 0.6)); }   // (up there, or in the foyer on the way)
 function dDrum(t, f0, f1, dur, vol, type) { const o = actx.createOscillator(), g = actx.createGain(); o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + dur + 0.02); }
 function dVoice(midi, t, dur, vol, from, cfg) {                        // one sustained voice (flute, strings, harmonium): oscillators through a warm filter, sliding in from the last note, a vibrato
@@ -13538,9 +13686,9 @@ function makeWalker(dark) {                                          // dark = t
 }
 function walkNear(x, y, z) {                                          // the solid things within a few metres of her: her feelers only test these (not every mesh in the world)
   const N = walkNear.N || (walkNear.N = { list: [], c: new THREE.Vector3(), s: new THREE.Sphere(), r: 4.2, ok: false }), M = walk.meshes; if (!M) return;
-  N.list.length = 0; N.c.set(x, y, z); const UR = UPPER.root, up = !!UR && y > UPPER.UF - 0.6 && inUpper(x, z);   /* (up in the flat, only the flat's own things can touch her) */
+  N.list.length = 0; N.c.set(x, y, z); const UR = UPPER.root, up = !!UR && y > UPPER.UF - 0.6 && y < UPPER.CH + 0.25 && inUpper(x, z), roofUp = !!UR && y >= UPPER.CH + 0.25 && inUpper(x, z);   /* (up in the flat, only the flat's own things can touch her) */
   for (let i = 0; i < M.length; i++) { const o = M[i], g = o.geometry;
-    if (up) { if (o.userData.inUp === undefined) { let f = false; for (let q = o; q; q = q.parent) if (q === UR) { f = true; break; } o.userData.inUp = f; } if (!o.userData.inUp) continue; }
+    if (up || roofUp) { if (o.userData.inUp === undefined) { let f = false; for (let q = o; q; q = q.parent) if (q === UR) { f = true; break; } o.userData.inUp = f; } if (up ? !o.userData.inUp : o.userData.inUp) continue; }
     if (!g.boundingSphere) g.computeBoundingSphere(); N.s.copy(g.boundingSphere).applyMatrix4(o.matrixWorld);
     const rr = N.r + N.s.radius; if (N.s.center.distanceToSquared(N.c) < rr * rr) N.list.push(o); }
   N.ok = true;
@@ -13557,13 +13705,13 @@ function cullBegin() {                                                // left ou
     C.front = povEndWall.children.filter(o => o.userData.name === 'Front door' || o.userData.name === 'Garage' || o.userData.name === 'Motorcycle' || o.userData.name === 'Garage door'); C.garage = C.front.filter(o => o.userData.name !== 'Front door'); }
   const c = camera.position, U = UPPER, hid = C.hid; hid.length = 0;
   const hide = o => { if (o.visible) { o.visible = false; hid.push(o); } };
-  const inHouse = c.x > YARD.HL - 0.3 && c.x < YARD.HR + 0.3 && c.z > U.zF - 0.3 && c.z < U.zB + 0.3;
+  const inHouse = c.x > YARD.HL - 0.3 && c.x < YARD.HR + 0.3 && c.z > U.zF - 0.3 && c.z < U.zB + 0.3 && !(c.y > U.CH + 0.25 && walk.pos.y > U.CH + 0.25);
   const upCam = c.y > CEIL_H + 0.3 && inUpper(c.x, c.z);
   if (upCam) { C.down.forEach(hide); C.downLit.forEach(hide); C.garage.forEach(hide);   // upstairs: the floor hides the whole living room, and the garage is walled in below the flat (the tall front door isn't: it shows down the hall)
     if (U.props) for (const q of U.props) { const o = q.g.position; if ((o.x - c.x) ** 2 + (o.z - c.z) ** 2 > (110 * q.r + 6) ** 2) hide(q.g); } }   /* (little dishes far down the flat: specks) */
   else if (!inHouse && SLIDER && Math.hypot(c.x - SLIDER.DX, c.z - SLIDER.VD) > 6) C.downSmall.forEach(hide);          // out in the yard, well back: the little things through the slider
   if (!inHouse && U.props) for (const q of U.props) hide(q.g);                                                         // outdoors: the upstairs dishes are specks through the windows
-  if (c.z > U.zB + 0.5) C.front.forEach(hide);                                                                           // out back: the front door, the garage and the bike are round the other side
+  if (c.z > U.zB + 0.5) C.front.forEach(hide); roofCull(c, hide);                                                                           // out back: the front door, the garage and the bike are round the other side
   return hid;
 }
 function cullEnd(hid) { if (hid) for (let i = 0; i < hid.length; i++) hid[i].visible = true; }
@@ -13613,9 +13761,8 @@ function treeOn(p) {                                                  // standin
   if (tt > 0 && Math.abs(tt - p.y) < 0.08) id = treeTopAt.id;
   else { const o = walk.hitObj && walk.hitObj.parent; if (o && o.userData.treeId !== undefined && Math.abs(surfaceTop(p.x, p.z, p.y + 0.05) - p.y) < 0.05) id = o.userData.treeId; }
   if (id < 0) return; walk.treeT = clock; const S = walk.treesSeen || (walk.treesSeen = new Set()); if (S.has(id)) return; S.add(id);
-  const fresh = !achDone.treetop; unlock('treetop');
-  if (S.size >= 5) { if (!achDone.treeTour) { unlock('treeTour'); showWalkName('🍃 Treetop Tour: five trees conquered!'); } else showWalkName(`🌳 Treetop ${S.size}`); }
-  else showWalkName(fresh && S.size === 1 ? '🌳 On top of the tree! The whole street at her paws' : `🌳 Treetop ${S.size}/5`);
+  const fresh = !achDone.treetop; unlock('treetop'); if (fresh) showWalkName('🌳 On top of the tree! The whole street at her paws');   /* (no tree counter: just the achievements, quietly) */
+  if (S.size >= 5 && !achDone.treeTour) unlock('treeTour');
 }
 function ladleTip() {                                                 // a bucket's ladle stays put while the bucket's upright: once it tips past ~70°, out it slides
   const U = UPPER; if (!U.props) return; const P = U.ladlePots || (U.ladlePots = U.props.filter(q => q.ladle)), up = ladleTip.v || (ladleTip.v = new THREE.Vector3());
@@ -14677,7 +14824,7 @@ const CK_LINES = ['Ooh la la!', 'Très chic!', 'Purrfect!', 'Meow-velous!', 'So 
 function ckGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function ckPut(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 function ckState() {
-  if (ckState.S) return ckState.S;
+  if (ckState.S) return ckState.S; roofCkReg();
   const S = ckState.S = { owned: new Set(['crown']), outfit: {}, spent: 0, memFish: null };
   try { const a = JSON.parse(ckGet('catguard.closet') || '[]'); if (Array.isArray(a)) for (const id of a) if (typeof id === 'string' && CK_BY_ID[id]) S.owned.add(id); } catch (e) {}
   try { const o = JSON.parse(ckGet('catguard.outfit') || '{}');
@@ -14869,7 +15016,7 @@ function ckToque(B) {
   B.m(new THREE.SphereGeometry(0.17, 28, 18, 0, Math.PI * 2, 0, 1.1), (x, y) => y > 0.126 && y < 0.142 ? 0xfff4f8 : 0xe0283c);
   B.m(CKG.tor(0.151, 0.017, 8, 44), (x, y, z) => Math.sin(Math.atan2(y, x) * 40) > 0 ? 0xfff4f8 : 0xefe2e8, [0, 0.077, 0], [Math.PI / 2, 0, 0]);
   B.m(ckFluff(CKG.sph(0.043, 14, 10), 0.3, 7), 0xfffafc, [0, 0.178, 0]);
-  B.m(ckFlat(ckMaplePts(0.022), 0.006), 0xd4142e, [0, 0.08, 0.163], [-0.08, 0, 0]);
+  B.m(ckFlat(ckMaplePts(0.03), 0.006), 0xd4142e, [0, 0.08, 0.165], [-0.08, 0, 0]);
   B.frame();
 }
 function ckChefHat(B) {
@@ -14884,10 +15031,12 @@ function ckChefHat(B) {
 function ckCowboyHat(B) {
   B.frame([0, 0.136, -0.012], [-0.06, 0, 0], 1.1);
   const pink = 0xff7fb5;
-  B.m(CKG.sph(0.062, 18, 12), (x, y) => y > 0.035 && Math.abs(x) < 0.012 ? 0xe86aa2 : pink, [0, 0.03, 0], null, [0.88, 0.95, 1.08]);
+  { const g = CKG.sph(0.062, 20, 14), a = g.attributes.position;   /* the crown: tall, with the classic dent pressed along its top */
+    for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), z = a.getZ(i), top = Math.max(0, y / 0.062); a.setXYZ(i, x * (1 - 0.12 * top), (y < 0 ? y * 0.4 : y * 1.35) - Math.exp(-(x * x) / 0.00045) * 0.022 * top * top, z * (1 - 0.05 * top)); }
+    g.computeVertexNormals(); B.m(g, (x, y) => y > 0.07 && Math.abs(x) < 0.014 ? 0xe86aa2 : pink, [0, 0.03, 0], null, [0.9, 1, 1.1]); }
   B.m(CKG.cyl(0.056, 0.058, 0.03, 24, true), pink, [0, 0.012, 0], null, [0.9, 1, 1.08]);
-  { const g = new THREE.RingGeometry(0.045, 0.108, 32, 3), a = g.attributes.position;   // the brim: a ring laid flat, its sides curled up
-    for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), k = Math.pow(Math.abs(x) / 0.108, 2.2); a.setXYZ(i, x * 0.8, 0.002 + k * 0.05 - Math.pow(Math.max(0, y) / 0.108, 2) * 0.006, -y * 1.08); }
+  { const g = new THREE.RingGeometry(0.05, 0.142, 40, 3), a = g.attributes.position;   /* the brim: wide, its sides curled right up, dipping a little at the front */
+    for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), k = Math.pow(Math.abs(x) / 0.142, 2.3); a.setXYZ(i, x * 0.86, 0.002 + k * 0.085 - Math.pow(Math.max(0, y) / 0.142, 2) * 0.016, -y * 1.04); }
     g.computeVertexNormals(); B.m(ckTwoSided(g), 0xf06aa6); }
   B.m(CKG.tor(0.052, 0.0075, 6, 28), 0xfff4f8, [0, 0.016, 0], [Math.PI / 2, 0, 0], [0.9, 1.08, 1]);
   B.s(ckFlat(ckStarPts(0.017), 0.004), 0xffd23a, [0, 0.03, 0.066], [-0.1, 0, 0]);
@@ -15017,11 +15166,11 @@ function ckGarland(B) {
   const f = ckFrontOf(N, 0.75); B.m(CKG.sph(0.012, 8, 6), 0xd81b3a, [f.p.x, f.p.y - 0.03, f.p.z + 0.018]);
 }
 function ckPunkCollar(B) {
-  const N = ckNeckBand(B, B.m, 0x231a26, 0.03, 0.014, 0.012), n = 12;
+  const N = ckNeckBand(B, B.m, 0x1c1520, 0.036, 0.016, 0.012), n = 10;
   for (let i = 0; i < n; i++) {
     const u = i / n, f = ckFrontOf(N, u), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), f.out), e = new THREE.Euler().setFromQuaternion(q);
-    const p = f.p.clone().addScaledVector(f.out, 0.012);
-    B.s(CKG.cone(0.0095, 0.03, 8), 0xdfe6ee, [p.x + f.out.x * 0.012, p.y + f.out.y * 0.012, p.z + f.out.z * 0.012], [e.x, e.y, e.z]);
+    const p = f.p.clone().addScaledVector(f.out, 0.016);
+    B.s(CKG.cone(0.02, 0.06, 8), 0xf4f7fb, [p.x + f.out.x * 0.024, p.y + f.out.y * 0.024, p.z + f.out.z * 0.024], [e.x, e.y, e.z]);
   }
   const f = ckFrontOf(N, 0.75, -0.005); B.s(CKG.tor(0.014, 0.0038, 6, 16), 0xdfe6ee, [f.p.x, f.p.y - 0.018, f.p.z + 0.014], [-0.4, 0, 0]);
 }
@@ -15123,8 +15272,10 @@ function ckBasket(B) {
 function ckJetpack(B) {
   const sil = 0xd9dee7, red = 0xe8283c; B.flamePivot = [0, 0.67, -0.165];
   for (const sx of [-1, 1]) {
-    B.s(CKG.cyl(0.036, 0.036, 0.19, 18), sil, [sx * 0.048, 0.67, -0.04], [Math.PI / 2, 0, 0]);
-    B.s(CKG.cone(0.036, 0.055, 18), red, [sx * 0.048, 0.67, 0.083], [Math.PI / 2, 0, 0]);
+    B.s(CKG.cyl(0.04, 0.04, 0.2, 18), sil, [sx * 0.05, 0.67, -0.04], [Math.PI / 2, 0, 0]);
+    B.s(CKG.cone(0.04, 0.075, 18), red, [sx * 0.05, 0.67, 0.097], [Math.PI / 2, 0, 0]);
+    B.s(CKG.tor(0.0405, 0.007, 6, 20), red, [sx * 0.05, 0.67, -0.02]);
+    B.s(CKG.box(0.005, 0.07, 0.075), red, [sx * 0.098, 0.655, -0.115], [0, 0, sx * 0.35]);
     B.s(CKG.cyl(0.024, 0.031, 0.03, 14, false), 0x4a4550, [sx * 0.048, 0.67, -0.15], [Math.PI / 2, 0, 0]);
     B.s(CKG.box(0.004, 0.04, 0.05), red, [sx * 0.085, 0.67, -0.11]);
     B.f(CKG.cone(0.028, 0.14, 12), (x, y) => new THREE.Color(0xffd35a).lerp(new THREE.Color(0xff3a12), Math.min(1, Math.max(0, (y + 0.07) / 0.14))).getHex(), [sx * 0.048, 0, -0.072], [-Math.PI / 2, 0, 0]);   // (flames: round a pivot at the nozzles, so they flicker in length)
@@ -15138,8 +15289,8 @@ function ckJetpack(B) {
 function ckTailBow(B) {
   const pk = 0xff5fa2;
   B.s(CKG.tor(0.044, 0.0065, 6, 24), pk, [0, 0, -0.03]);
-  B.frame([0, 0.052, -0.03], [0, 0, 0], 1.45);
-  for (const sx of [-1, 1]) { B.s(CKG.tor(0.02, 0.0075, 6, 16), pk, [sx * 0.022, 0.004, 0], [0, sx * 0.3, sx * 0.3], [1.1, 0.75, 1]);
+  B.frame([0, 0.06, -0.03], [0, 0, 0], 2.0);
+  for (const sx of [-1, 1]) { B.s(CKG.sph(0.02, 12, 9), pk, [sx * 0.026, 0.006, 0], [0, 0, sx * 0.38], [1.45, 0.85, 0.5]);   /* (the bow's two puffy wings) */
     B.s(CKG.box(0.012, 0.042, 0.004), 0xe23f86, [sx * 0.013, -0.024, 0.004], [0, 0, sx * 0.4]); }
   B.s(CKG.sph(0.011, 10, 8), 0xe23f86);
   B.frame();
@@ -15551,7 +15702,7 @@ function closetOpen(from) {
   CK.on = true; CK.from = from || null;
   if (from && $(from)) $(from).hidden = true;
   document.body.classList.add('closet-open'); u.root.hidden = false;
-  CK.prev = Object.assign({}, S.outfit); closetDress(CK.rig, CK.prev);
+  CK.prev = Object.assign({}, S.outfit); CK.look = false; closetDress(CK.rig, CK.prev);
   CK.sel = null; CK.tab = CK.tab || 'hat'; CK.view = 'full'; CK.spin = 0; CK.spinV = 0; CK.idleT = 9;
   CK.fishTo = CK.fishShown = ckWallet(); u.Fish.textContent = CK.fishShown;
   CK.rectDirty = true; ckMeasure(); ckAim(true);
@@ -15591,7 +15742,8 @@ function ckTab(id) {
   CK.ui.Grid.scrollTop = 0; ckRefresh();
 }
 function ckPick(id) {
-  const it = CK_BY_ID[id]; if (!it) return;
+  const it = CK_BY_ID[id]; if (!it) return; if (roofCkPick(it)) return;
+  if (!CK.look) CK.prev = Object.assign({}, ckState().outfit);         /* (the preview: her saved outfit plus just this one thing; or, after Surprise me, the surprise look with this swapped in) */
   CK.sel = id; ckTryOn(it); ckRefresh();
 }
 function ckTryOn(it, quiet) {                                          // on it goes: a puff of sparkles, a pop, a happy hop and a word from her
@@ -15631,7 +15783,7 @@ function ckRefresh() {
   else { name = 'Try things on!'; blurb = 'Tap anything to see it on Princess Kitty. Trying on is free!'; label = 'Pick something to try on'; }
   u.Name.textContent = name; u.Blurb.textContent = blurb;
   u.Main.textContent = label; u.Main.disabled = !act; u.Main.className = 'btn ck-main' + (cls ? ' ' + cls : ''); CK.act = act;
-  u.Undo.disabled = !ckPrevDiffers(); u.Undo.style.opacity = u.Undo.disabled ? 0.45 : 1;
+  u.Undo.disabled = !ckPrevDiffers(); u.Undo.style.opacity = u.Undo.disabled ? 0.45 : 1; roofCkRefresh();
 }
 function ckMain() {
   const S = ckState(), it = CK.sel && CK_BY_ID[CK.sel], A = CK.anim;
@@ -15648,7 +15800,7 @@ function ckMain() {
     closetDress(CK.rig, CK.prev); ckSave(); ckSfx('off'); A.flick = 1; ckCaption(pickOf(['Maybe later...', 'Off it comes!', 'Back to basics.']));
   } else if (CK.act === 'look') {
     for (const s of CK_SLOTS) { const v = CK.prev[s.id]; if (v) S.outfit[s.id] = v; else delete S.outfit[s.id]; }
-    ckSave(); ckSfx('wear'); A.hop = 1; A.wave = 1; ckPuffAt(CK.rig.g.localToWorld(CK.v.set(0, 0.55, 0)), 36, true); ckCaption('Outfit saved! 💖'); ckCheckAch();
+    CK.look = false; ckSave(); ckSfx('wear'); A.hop = 1; A.wave = 1; ckPuffAt(CK.rig.g.localToWorld(CK.v.set(0, 0.55, 0)), 36, true); ckCaption('Outfit saved! 💖'); ckCheckAch();
   } else { ckSfx('nope'); const m = CK.ui.Main; m.classList.remove('shake'); void m.offsetWidth; m.classList.add('shake'); return; }
   ckRefresh();
 }
@@ -15659,6 +15811,7 @@ function ckWearSaved(it) {                                             // what s
   closetDress(CK.rig, CK.prev);
 }
 function ckUndo() {
+  CK.look = false;
   if (!ckPrevDiffers()) return;
   CK.prev = Object.assign({}, ckState().outfit); closetDress(CK.rig, CK.prev); CK.sel = null; CK.view = 'full'; ckSfx('off'); CK.anim.flick = 1; ckCaption('Back to my usual!'); ckRefresh();
 }
@@ -15672,7 +15825,7 @@ function ckSurprise() {
     if (!Object.keys(next).length) next[mine[0].slot] = mine[0].id;
     if (CK_SLOTS.some(s => (next[s.id] || null) !== (CK.prev[s.id] || null))) break;
   }
-  CK.prev = next; closetDress(CK.rig, CK.prev); CK.sel = null; CK.view = 'full'; CK.idleT = 9;
+  CK.prev = next; CK.look = true; closetDress(CK.rig, CK.prev); CK.sel = null; CK.view = 'full'; CK.idleT = 9;
   const A = CK.anim; A.hop = 1; A.flick = 1; A.tilt = 1; ckPuffAt(CK.rig.g.localToWorld(CK.v.set(0, 0.55, 0.05)), 40, true); ckSfx('try'); ckCaption(pickOf(['Ta-da! ✨', 'Surprise!', 'How about this?', 'Mix and match!']));
   ckRefresh();
 }
@@ -15817,8 +15970,454 @@ function closetGameOverPay(mouse, val) {                               // Classi
     ckDot();
   } catch (e) { console.error(e); }
 })();
+/* =====================================================================
+   THE ROOFTOP. Our own roof, walkable at last: up a tree in 30 & 32's backyard, onto their roof, across into the big red maple that
+   leans out over the side yard between the houses, and one good leap down onto our shingles... where the raccoon (the one who taunts her
+   through the slider) has a secret camp by the chimney: a pallet deck, a tiny lawn chair, a pile of sardine tins, a box of stolen loot,
+   fairy lights and a sign that says NO CATS. Tag him three times and the loot is hers (fish, and three things for Kitty's Closet that
+   money can't buy). Afterwards it's a cozy spot of her own, with shooting stars at night.
+   Our roof is worked out, not ray-cast: a hipped roof is just "the eave height plus the pitch times the distance to the nearest eave",
+   so standing on it, the camera, the rain and the raccoon all share one cheap sum. Saved in localStorage: catguard.rooftop.
+   ===================================================================== */
+var RF;                                                               // (made the first time Free roam needs it: the house is built long before this line runs)
+function roofGeo() {                                                  // our roof's numbers, straight from the house (hipRoof() in 'House details')
+  if (RF) return RF;
+  const Y = YARD, VD = ROOM.visDepth, WZ = VD + IN(5), x0 = Y.HL - 0.6, x1 = Y.HR + 0.6, z0 = WZ - Y.HD - 0.6, z1 = WZ + 1.15, y0 = FT(15.6) + 0.1, k = 0.55, half = (x1 - x0) / 2;
+  const R = RF = { x0, x1, z0, z1, y0, k, half, xm: (x0 + x1) / 2, rz0: z0 + half, rz1: z1 - half, VD, built: false, solids: [], save: roofLoad(), st: 'lounge', t: 0, tags: 0, said: 0, offT: 9, sess: null,
+    v: new THREE.Vector3(), v2: new THREE.Vector3(), n: new THREE.Vector3(), q: new THREE.Quaternion(), q2: new THREE.Quaternion(), Z: new THREE.Vector3(0, 0, 1), m4: new THREE.Matrix4() };
+  const hAt = (x, z) => y0 + k * Math.min(x - x0, x1 - x, z - z0, z1 - z), fz = FIRE.z;   // (the chimney rises from the living room's fireplace, on the north wall)
+  R.ch = { x0: Y.HL + 0.05, x1: Y.HL + 1.35, z0: fz - 0.95, z1: fz + 0.95, top: 16.16 };
+  R.dk = { x0: R.ch.x1, x1: Y.HL + 3.75, z0: fz - 1.6, z1: fz + 1.6 }; R.dk.top = hAt(R.dk.x1, fz) + 0.06;   // the raccoon's deck: an old pallet propped level on bricks, against the chimney's uphill side
+  R.solids.push([R.ch.x0, R.ch.x1, R.ch.z0, R.ch.z1, R.ch.top], [R.dk.x0, R.dk.x1, R.dk.z0, R.dk.z1, R.dk.top]);
+  R.chair = new THREE.Vector3(Y.HL + 2.75, R.dk.top, fz + 0.15);         // (his chair, looking out over the backyard)
+  R.box = new THREE.Vector3(Y.HL + 2.0, R.dk.top, fz + 1.05);
+  R.arena = { x0: x0 + 1.6, x1: R.xm + 2.6, z0: fz - 21, z1: z1 - 1.6 };   // where he runs: our half and a little over the ridge, never near an eave
+  R.maple = { x: -16.3, z: fz - 4.9 };                                 // the big red maple between the houses, its east limb reaching for our roof
+  return R;
+}
+function roofH(x, z) { const R = RF || roofGeo(); if (x <= R.x0 || x >= R.x1 || z <= R.z0 || z >= R.z1) return -1; return R.y0 + R.k * Math.min(x - R.x0, R.x1 - x, z - R.z0, R.z1 - z); }   // the shingles' height (-1: off the roof)
+function roofSurf(x, z) {                                             // the shingles, or the deck or the chimney top on them (where the raccoon's feet go)
+  const R = RF, h = roofH(x, z); if (h < 0) return h; let t = h;
+  for (const s of R.solids) if (x > s[0] && x < s[1] && z > s[2] && z < s[3] && s[4] > t) t = s[4];
+  if (Math.abs(x - R.xm) < 0.14 && z > R.rz0 && z < R.rz1) t += 0.12;   // (the ridge cap)
+  return t;
+}
+function roofTopAt(x, z, fromY) {                                     // (surfaceTop) our roof under (x, z): solid all the way through, so she's never inside it
+  const R = RF; if (!R || !R.built) return 0; const h = roofH(x, z); if (h < 0) return 0;
+  if (!(h <= fromY + 1e-6 || fromY > Math.max(h - 0.9, UPPER.CH + 0.15))) return 0;   // (just under the shingles: popped up onto them. Well under, at the eaves: nothing)
+  return roofSurf(x, z);
+}
+function roofCamY(x, z) {                                             // the follow camera never dips into our roof while she's up there
+  const R = RF; if (!R || !R.built || !walk.on || walk.pos.y < 8) return 0;   /* (and just after she steps off an eave: the camera's still up over the shingles) */
+  const cx = Math.max(R.x0 + 0.01, Math.min(R.x1 - 0.01, x)), cz = Math.max(R.z0 + 0.01, Math.min(R.z1 - 0.01, z)), out = Math.hypot(x - cx, z - cz);
+  if (out > 2) return 0; let t = out > 0 ? R.y0 : roofH(cx, cz);
+  for (const s of R.solids) if (x > s[0] - 0.35 && x < s[1] + 0.35 && z > s[2] - 0.35 && z < s[3] + 0.35 && s[4] > t) t = s[4];
+  return t + 0.45;
+}
+function roofCull(c, hide) {                                         // (cullBegin) the camera's up over our roof: the flat underneath can't be seen, so it isn't drawn
+  if (!RF || !RF.built || !UPPER.root || walk.pos.y < UPPER.CH + 0.25) return; const h = roofH(c.x, c.z); if (h > 0 && c.y > h) hide(UPPER.root);
+}
+function roofAbove(p) { return !!RF && RF.built && p.y > UPPER.CH + 0.25 && roofH(p.x, p.z) >= 0; }   // (up over our roof: outdoors, not in the flat)
+function roofRainY(x, z) { if (!RF || !RF.built) return 1e9; const h = roofH(x, z); return h < 0 ? 1e9 : h; }   // (the rain: over the house it only stops at the roof)
+function roofLoad() { try { const o = JSON.parse(localStorage.getItem('catguard.rooftop') || '{}'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; } }
+function roofSave(patch) { const R = RF; if (!R) return; Object.assign(R.save, patch); try { localStorage.setItem('catguard.rooftop', JSON.stringify(R.save)); } catch (e) {} }
+function roofSay(t) { showWalkName('🦝 ' + t); }
+function roofLimb(par, a, b, r0, r1, hex) {                           // a branch from a to b
+  const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), L = d.length(), m = yCyl(par, r1, r0, L, hex, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, 7);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); return m;
+}
+function roofBuild(R) {                                               // the maple, the chimney, the camp, the raccoon: built once, the first time she's out in Free roam
+  R.built = true; const Y = YARD, M = R.maple, fz = FIRE.z, grp = name => { const g = new THREE.Group(); g.userData.name = name; g.userData.noWalk = true; povEndWall.add(g); return g; };
+  // -- the big red maple: a Crimson King, its trunk bare to well over the cedars (no climbing it from the ground), a crown that rests on 30 & 32's eave
+  { const g = grp('Big red maple'), TH = 10.4, LEAF = [0x9e2b25, 0xb8372a, 0x8a2622, 0xc94a2c, 0xa8322a, 0x7e2420], bl = [];
+    yCyl(g, 0.45, 0.8, TH, 0x4e3b2e, M.x, TH / 2, M.z, 10);
+    // [x, y, z (from the trunk), R, H]: a broad, flat-topped crown she can walk along, from 30 & 32's eave out to the tip of the east limb (then one leap to our roof)
+    const crowns = [[-17.4, 13.2, -0.3, 2.2, 1.1], [-15.6, 13.3, 0, 2.6, 1.0], [-12.9, 13.0, -0.2, 2.4, 1.0], [-10.9, 12.8, -0.4, 1.6, 0.9], [-15.0, 13.8, -1.8, 1.9, 1.4], [-16.2, 13.0, 1.6, 2.0, 1.0]];
+    let k = 0;
+    for (const [x, y, dz, Rr, H] of crowns) { const z = M.z + dz, r = Rr / 0.92; bl.push([x, y, z, Rr, H]); roofLimb(g, [M.x, TH - 1.6, M.z], [x, y - 0.4, z], 0.32, 0.12, 0x4e3b2e);
+      yBlob(g, r, LEAF[k++ % LEAF.length], x, y, z, (H + 0.1) / r);
+      for (let j = 0; j < 2; j++) { const a = j * 2.6 + x * 1.7; yBlob(g, r * 0.6, LEAF[k++ % LEAF.length], x + Math.cos(a) * r * 0.45, y - 0.35, z + Math.sin(a) * r * 0.45, 0.7); } }
+    roofLimb(g, [-11.4, 12.4, M.z - 0.4], [-8.6, 12.7, M.z - 0.7], 0.11, 0.035, 0x4e3b2e);   // (a bare twig reaching right out toward our gutter: the way across)
+    bakeYard(g); treeReg(M.x, M.z, TH, 0.8, 7.8, bl); YARD_POSTS.push([M.x, M.z, 0.55, TH]);
+    const sh = new THREE.Mesh(new THREE.CircleGeometry(1, 24), yardShadowMat()); sh.rotation.x = -Math.PI / 2; sh.scale.set(5.2, 3.6, 1); sh.position.set(M.x + 1.8, 0.007, M.z - 0.2); sh.userData.noWalk = true; povEndWall.add(sh); }
+  // -- the chimney (over the fireplace), brick with a stone cap and two clay pots, and the camp on its uphill side
+  { const g = grp('Raccoon camp'), C = R.ch, D = R.dk, cx = (C.x0 + C.x1) / 2, cz = (C.z0 + C.z1) / 2, BR = 0x8a4636, by = 11.9;
+    yBox(g, C.x1 - C.x0, C.top - 0.16 - by, C.z1 - C.z0, BR, cx, (by + C.top - 0.16) / 2, cz);
+    for (let y = 12.6; y < C.top - 0.3; y += 0.42) yBox(g, C.x1 - C.x0 + 0.02, 0.05, C.z1 - C.z0 + 0.02, 0x6e382c, cx, y, cz);   // (mortar courses)
+    yBox(g, C.x1 - C.x0 + 0.24, 0.16, C.z1 - C.z0 + 0.24, 0x9a958c, cx, C.top - 0.08, cz);
+    for (const s of [-1, 1]) yCyl(g, 0.17, 0.21, 0.5, 0xb0583a, cx, C.top + 0.25, cz + s * 0.45, 10);
+    const DY = D.top, dcx = (D.x0 + D.x1) / 2, dcz = (D.z0 + D.z1) / 2;
+    for (let i = 0; i < 7; i++) yBox(g, D.x1 - D.x0, 0.07, 0.34, i % 2 ? 0xb89a6a : 0xa88a5c, dcx, DY - 0.035, D.z0 + 0.23 + i * (D.z1 - D.z0 - 0.46) / 6);   // pallet slats
+    for (const z of [D.z0 + 0.15, dcz, D.z1 - 0.15]) yBox(g, D.x1 - D.x0, 0.14, 0.14, 0x8a6c48, dcx, DY - 0.14, z);
+    for (const z of [D.z0 + 0.2, D.z1 - 0.2]) for (const x of [D.x0 + 0.15, dcx]) { const base = roofH(x, z), h = DY - 0.2 - base; if (h > 0.05) yBox(g, 0.32, h + 0.25, 0.22, 0x9c4a38, x, base - 0.1 + (h + 0.25) / 2, z); }   // (brick stilts on the downhill side)
+    const CH = R.chair, cy = DY + 0.34;                                                                                           // the lawn chair: aluminium, green and white webbing
+    for (const s of [-1, 1]) { yBox(g, 0.04, 0.04, 0.85, 0xd9dde2, CH.x + s * 0.32, cy, CH.z); const bk = yBox(g, 0.04, 0.8, 0.04, 0xd9dde2, CH.x + s * 0.32, cy + 0.36, CH.z - 0.5); bk.rotation.x = -0.35;
+      for (const zz of [-0.36, 0.36]) yBox(g, 0.04, 0.34, 0.04, 0xd9dde2, CH.x + s * 0.32, DY + 0.17, CH.z + zz); }
+    for (let i = 0; i < 5; i++) yBox(g, 0.62, 0.02, 0.15, i % 2 ? 0xf4f4ee : 0x3f9a5a, CH.x, cy + 0.01, CH.z - 0.32 + i * 0.16);
+    for (let i = 0; i < 4; i++) { const w = yBox(g, 0.62, 0.17, 0.02, i % 2 ? 0xf4f4ee : 0x3f9a5a, CH.x, cy + 0.12 + i * 0.17, CH.z - 0.47 - i * 0.06); w.rotation.x = -0.35; }
+    const tin = (x, y, z, ry) => { yBox(g, 0.34, 0.07, 0.21, 0xc9ced4, x, y + 0.035, z, ry); yBox(g, 0.3, 0.012, 0.17, [0x2f5fa8, 0xd23a3a, 0xe6b422][(x * 37 + z * 11 | 0) & 1 ? 0 : (y * 9 | 0) % 3], x, y + 0.076, z, ry); };   // sardine tins (empty, licked clean)
+    { const tx = D.x1 - 0.45, tz = D.z1 - 0.5; for (let i = 0; i < 5; i++) tin(tx + (i % 3 - 1) * 0.33, DY, tz + (i > 2 ? 0.3 : 0), (i * 0.7) % 1.2); for (let i = 0; i < 3; i++) tin(tx - 0.16 + i * 0.25, DY + 0.08, tz + 0.1, 0.2 + i * 0.5); tin(tx, DY + 0.16, tz + 0.15, 0.9); tin(D.x0 + 0.5, DY, D.z0 + 0.4, 0.4); }
+    { const B = R.box, bw = 0.8, bh = 0.55, bd = 0.6; yBox(g, bw, bh, bd, 0xb98a55, B.x, DY + bh / 2, B.z);                      // the loot box, flaps flung open
+      for (const s of [-1, 1]) { const f = yBox(g, bw, 0.02, 0.32, 0xc69a62, B.x, DY + bh + 0.1, B.z + s * (bd / 2 + 0.12)); f.rotation.x = s * 0.9; const f2 = yBox(g, 0.32, 0.02, bd, 0xc69a62, B.x + s * (bw / 2 + 0.12), DY + bh + 0.1, B.z); f2.rotation.z = -s * 0.9; }
+      for (let i = 0; i < 9; i++) yCyl(g, 0.06, 0.06, 0.018, 0xf2c14a, B.x - 0.3 + (i % 3) * 0.3 + (i * 0.37 % 0.1), DY + bh - 0.02 + (i > 5 ? 0.04 : 0), B.z - 0.18 + (i / 3 | 0) * 0.16, 10); }   // (gold coins brimming over)
+    { const ax = D.x1 - 0.18, az = D.z1 - 0.15, top = DY + 2.4; yCyl(g, 0.03, 0.03, top - DY, 0x9aa0a6, ax, (DY + top) / 2, az, 6);   // an old TV antenna on a pole: the fairy lights' far end
+      for (const [w, y] of [[1.0, top - 0.1], [0.7, top - 0.35], [0.45, top - 0.6]]) yBox(g, w, 0.025, 0.025, 0x9aa0a6, ax, y, az);
+      const ax2 = D.x1 - 0.18, az2 = D.z0 + 0.15; yCyl(g, 0.025, 0.025, 1.9, 0x8a6c48, ax2, DY + 0.95, az2, 6);   // (and a broom handle at the other corner)
+      R.lightPts = []; const str = [[C.x1, C.top - 0.05, C.z1], [ax, top - 0.35, az], [ax2, DY + 1.85, az2], [C.x1, C.top - 0.05, C.z0]];
+      for (let i = 0; i < 3; i++) { const a = new THREE.Vector3(...str[i]), b = new THREE.Vector3(...str[i + 1]), sag = 0.32 + a.distanceTo(b) * 0.08, pts = [];
+        for (let j = 0; j <= 10; j++) { const u = j / 10, p = a.clone().lerp(b, u); p.y -= Math.sin(u * Math.PI) * sag; pts.push(p); if (j > 0 && j < 10) R.lightPts.push(p.clone()); }
+        g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.012, 4, false), yMat(0x2c4a2a))); } }
+    bakeYard(g); }
+  // -- the loot that's still in the box: three things she'll want (taken away once they're hers)
+  { const g = R.loot = grp('Raccoon loot'), B = R.box, y = R.dk.top + 0.6;
+    const cr = yCyl(g, 0.15, 0.16, 0.08, 0xdfe6f2, B.x - 0.12, y + 0.04, B.z + 0.05, 14); cr.rotation.z = 0.3;   // (a silver crown...)
+    for (let i = 0; i < 5; i++) { const a = i / 5 * 6.28; yBox(g, 0.03, 0.08, 0.03, 0xdfe6f2, B.x - 0.12 + Math.sin(a) * 0.14, y + 0.12 + Math.sin(a) * 0.04, B.z + 0.05 + Math.cos(a) * 0.14); }
+    yBox(g, 0.28, 0.08, 0.03, 0x1d1a20, B.x + 0.2, y + 0.02, B.z - 0.12, 0.5);                                          // (a black mask...)
+    for (const s of [-1, 1]) yBox(g, 0.04, 0.12, 0.04, s < 0 ? 0x2b2725 : 0x8d877f, B.x + 0.18 + s * 0.05, y + 0.05, B.z + 0.18);   // (a striped ribbon...)
+    bakeYard(g); if (R.save.won) g.visible = false;
+    const sp = R.glint = new THREE.Sprite(new THREE.SpriteMaterial({ map: ckStarTex(), color: 0xfff2c0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); sp.position.set(B.x, y + 0.35, B.z); sp.scale.setScalar(0.9); sp.userData.noWalk = true; g.add(sp); }
+  // -- the fairy lights: little coloured bulbs, and their glow at night
+  { const P = R.lightPts, cols = [0xff4f6a, 0xffd23a, 0x5fd0ff, 0x7dff8a, 0xff8fd8], geos = [], C = new THREE.Color();
+    P.forEach((p, i) => { const s = new THREE.SphereGeometry(0.055, 6, 4); s.translate(p.x, p.y - 0.05, p.z); const cc = [], n = s.attributes.position.count; C.setHex(cols[i % cols.length]); for (let j = 0; j < n; j++) cc.push(C.r, C.g, C.b); s.setAttribute('color', new THREE.Float32BufferAttribute(cc, 3)); geos.push(s); });
+    let n = 0; for (const s of geos) n += s.attributes.position.count; const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), idx = []; let at = 0;
+    for (const s of geos) { pos.set(s.attributes.position.array, at * 3); col.set(s.attributes.color.array, at * 3); const ix = s.index.array; for (let j = 0; j < ix.length; j++) idx.push(ix[j] + at); at += s.attributes.position.count; s.dispose(); }
+    const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); bg.setAttribute('color', new THREE.BufferAttribute(col, 3)); bg.setIndex(idx); bg.computeBoundingSphere();
+    const bm = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }); bm.userData.noTod = true; R.bulbs = new THREE.Mesh(bg, bm); R.bulbs.userData.name = 'Fairy lights'; R.bulbs.userData.noWalk = true; povEndWall.add(R.bulbs);
+    const pg = new THREE.BufferGeometry(), pp = [], pc = []; P.forEach((p, i) => { pp.push(p.x, p.y - 0.05, p.z); C.setHex(cols[i % cols.length]); pc.push(C.r, C.g, C.b); });
+    pg.setAttribute('position', new THREE.Float32BufferAttribute(pp, 3)); pg.setAttribute('color', new THREE.Float32BufferAttribute(pc, 3)); pg.computeBoundingSphere();
+    R.glow = new THREE.Points(pg, new THREE.PointsMaterial({ size: 0.9, map: candleGlowTex, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    R.glow.userData.noWalk = true; R.glow.visible = false; povEndWall.add(R.glow); }
+  // -- the sign: NO CATS (facing the way she comes in, over the maple)
+  { const tex = R.signTex = canvasTex(128, 64, (c, w, h) => roofSignDraw(c, w, h, !!R.save.won), 1, 1); tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    const g = grp('NO CATS sign'), D = R.dk, x = D.x0 + 0.3, z = D.z0 + 0.12;
+    const bd = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.48), new THREE.MeshBasicMaterial({ map: tex, fog: false, side: THREE.DoubleSide })); bd.position.set(x, D.top + 0.95, z - 0.02); bd.rotation.y = Math.atan2(R.maple.x - x, R.maple.z - z); g.add(bd);
+    const post = yBox(g, 0.05, 1.1, 0.05, 0x7a5a3c, x, D.top + 0.55, z + 0.02); post.userData.noWalk = true; }
+  // -- a shooting star (night, up on the roof)
+  { const tex = canvasTex(128, 16, (c, w, h) => { const gr = c.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.85, 'rgba(220,235,255,.75)'); gr.addColorStop(1, 'rgba(255,255,255,1)'); c.fillStyle = gr; c.beginPath(); c.moveTo(0, h / 2); c.lineTo(w - 6, 2); c.arc(w - 8, h / 2, 6, -Math.PI / 2, Math.PI / 2); c.lineTo(0, h / 2); c.fill(); }, 1, 1);
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    const m = R.star = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }));
+    m.visible = false; m.frustumCulled = false; m.userData.noWalk = true; m.userData.name = 'Shooting star'; m.onBeforeRender = () => { if (!walk.on) { m.visible = false; R.starLife = 0; } }; scene.add(m); R.starV = new THREE.Vector3(); R.starT = 6; R.starLife = 0; }
+  // -- him: the same raccoon (a second rig, merged down to a few draws)
+  { const c = R.coon = makeRaccoon(); try { rigMerge(c.g, new Set([c.tongue, c.snack, ...c.eyes])); } catch (e) {}
+    const hk = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.16), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, fog: false })); hk.position.set(0.06, -0.42, 0.06); hk.visible = false; c.arms[0].add(hk); c.hanky = hk;   // (a white hanky, for surrendering)
+    c.g.userData.name = 'Raccoon (rooftop)'; c.pos = c.g.position; R.coonY = 0; }
+  roofHudMake(); roofCss();
+  R.st = R.save.won ? 'camp' : 'lounge'; R.t = 0; roofHome(R);
+}
+function roofSignDraw(c, w, h, won) {                                 // the sign: NO CATS! (once she's won, the NO's crossed out, with a paw print)
+  c.fillStyle = '#d9b98a'; c.fillRect(0, 0, w, h); c.strokeStyle = '#7a5a3c'; c.lineWidth = 4; c.strokeRect(2, 2, w - 4, h - 4);
+  for (let i = 0; i < 6; i++) { c.fillStyle = 'rgba(120,80,40,.18)'; c.fillRect(0, 10 + i * 9, w, 2); }
+  c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 26px ' + (typeof SANS === 'string' ? SANS : 'sans-serif'); c.fillStyle = '#c0281e'; c.fillText('NO CATS!', w / 2, h / 2 + 2);
+  if (won) { c.strokeStyle = '#2a2a2a'; c.lineWidth = 5; c.beginPath(); c.moveTo(14, h / 2 - 8); c.lineTo(58, h / 2 + 10); c.stroke(); c.fillStyle = '#ff5fa2'; c.font = 'bold 20px sans-serif'; c.fillText('🐾', w - 16, 14); }
+}
+function roofHome(R) {                                                // him, back in his chair
+  const c = R.coon; if (!c) return; c.pos.copy(R.chair); c.pos.y = R.dk.top + 0.22; c.g.rotation.y = 0; R.coonY = c.pos.y; R.perch = R.leap = null; R.tauntOn = 0;
+}
+function roofHudMake() {
+  if (document.getElementById('roofHud')) return; const ui = document.getElementById('walkUI'); if (!ui) return;
+  const d = document.createElement('div'); d.id = 'roofHud'; d.hidden = true; ui.appendChild(d);
+}
+function roofCss() {
+  if (roofCss.done) return; roofCss.done = true; const st = document.createElement('style'); st.textContent = `
+#roofHud{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:7;pointer-events:none;white-space:nowrap;max-width:calc(100vw - 24px);background:rgba(40,22,52,.88);color:#fff;border:2px solid rgba(255,226,122,.5);border-radius:14px;padding:6px 14px;font:800 13px var(--body);display:grid;gap:3px;text-align:center}
+#roofHud[hidden]{display:none}#roofHud b{font-size:17px;color:#ffe27a}#roofHud .pips{letter-spacing:3px;font-size:15px}#roofHud .sub{font-size:12px;white-space:normal;opacity:.9}
+body.roof-on #tagHud{display:none!important}
+body.roof-on #walkCaption{top:calc(env(safe-area-inset-top,0px) + 82px)}
+@media (max-width:560px){#roofHud{top:calc(env(safe-area-inset-top,0px) + 54px)}body.roof-on #walkCaption{top:calc(env(safe-area-inset-top,0px) + 124px)}}
+.ck-card.ck-lock .ck-th canvas{opacity:0!important}.ck-card.ck-lock .ck-th i{visibility:visible!important}
+.ck-card.ck-lock .ck-th{background:radial-gradient(circle at 50% 38%,#f3eeff 0,#ddd2f7 62%,#c4b3ec 100%)}
+.ck-card.ck-lock .ck-nm{color:#6a5a8a;letter-spacing:.1em}
+.ck-tag.lock{background:#e6dcff;color:#4a3a7a}`;
+  document.head.appendChild(st);
+}
+function roofHud(R, html) { const el = document.getElementById('roofHud'); if (!el || html === R.hud) return; R.hud = html; el.innerHTML = html; el.hidden = !html; document.body.classList.toggle('roof-on', !!html); }
+function roofNewVisit(R) {                                            // a fresh Free roam visit: he's back in his chair, the lines can be said again
+  R.st = R.save.won ? 'camp' : 'lounge'; R.t = 0; R.tags = 0; R.said = 0; R.hint = {}; R.offT = 9; R.waved = false; R.starSeen = false; R.hudKey = null; roofHome(R); roofHud(R, '');
+  if (R.save.won) roofGrant(true);
+}
+function roofOnOurs(p) { return walk.grounded && p.y > 11.9 && roofH(p.x, p.z) >= 0 && Math.abs(roofTopAt(p.x, p.z, p.y + 0.05) - p.y) < 0.1; }
+function roofUpdate(dt) {                                             // every frame in Free roam: the camp, the raccoon, the lights, the stars
+  try {
+    if (!walk.on || !povEndWall || mirrorWorld) { if (RF && RF.hud) roofHud(RF, ''); return; }
+    const R = roofGeo(); if (!R.built) roofBuild(R);
+    if (walk.treesSeen !== R.sess) { R.sess = walk.treesSeen; roofNewVisit(R); }
+    const p = walk.pos, onRoof = roofOnOurs(p), over = roofH(p.x, p.z) >= 0 && p.y > 11.9;
+    R.offT = over ? 0 : R.offT + dt; R.on = onRoof;
+    if (onRoof && !R.save.found) { roofSave({ found: 1 }); unlock('roofRaider'); }
+    roofHints(R, p);
+    roofCoon(R, dt, p);
+    roofLights(R, dt);
+    roofStar(R, dt, over);
+    roofShadow(R, p, over);
+  } catch (e) { if (!roofUpdate.err) { roofUpdate.err = 1; console.error(e); } }
+}
+function roofHints(R, p) {                                            // little nudges toward the route (once a visit each)
+  if (R.save.found) return; const H = R.hint || (R.hint = {}), VD = R.VD;
+  if (!H.maple && !walk.grounded && walk.vy > 9 && p.y < 3 && Math.hypot(p.x - R.maple.x, p.z - R.maple.z) < 2.2) { H.maple = 1; showWalkName('🍁 The big maple’s branches start way up high... maybe it can be reached from a rooftop?'); }
+  const theirs = walk.grounded && p.y > 12.5 && p.x > -62 && p.x < -19.3 && p.z > VD - 22.5 && p.z < VD + 14.4;   // up on 30 & 32's roof
+  if (!H.see && walk.grounded && p.y > 11 && (theirs || clock - (walk.treeT || -9) < 0.5) && p.x < -12 && p.z > VD - 25) { H.see = 1; showWalkName('✨ What’s that twinkling on OUR roof, by the chimney?'); }
+  if (!H.across && theirs && p.x > -27 && Math.abs(p.z - R.maple.z) < 9) { H.across = 1; showWalkName('🍁 That big red maple leans right across toward our roof...'); }
+}
+/* ---------- the raccoon on the roof: lounging, startled, chased, tagged, laughing, surrendering, and (once she's won) her roommate ---------- */
+function roofCoon(R, dt, p) {
+  const c = R.coon; if (!c) return; const g = c.g, pos = c.pos;
+  const away = (typeof coon !== 'undefined' && coon.rig && coon.rig.g.visible && coon.state !== 'hidden') || (typeof coon !== 'undefined' && coon.dead);   // (he's down at the slider, taunting her: not up here too)
+  const chasing = R.st === 'startle' || R.st === 'chase' || R.st === 'tumble';
+  g.visible = !away || chasing; c.shadow.visible = g.visible; if (!g.visible) { roofHud(R, ''); if (R.st === 'laugh') roofHome(R); return; }
+  R.t += dt; const t = R.t, b = c.body, dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz), dy = p.y - pos.y;
+  // reset the pose; each state strikes its own
+  b.position.set(0, 0, 0); b.rotation.set(0, 0, 0); b.scale.setScalar(1); c.head.rotation.set(0, 0, 0); c.head.position.set(0, 1.0, 0.04); c.head.scale.set(1, 1, 1);
+  c.tongue.visible = false; c.snack.visible = false; c.hanky.visible = false; c.eyes.forEach(e => e.scale.set(1, 1, 1));
+  c.arms.forEach(a => a.rotation.set(-1.3, 0, 0)); c.legs.forEach(l => l.rotation.set(0, 0, 0)); c.tail.forEach((sg, i) => sg.rotation.set(i ? -0.18 : 0.9, Math.sin(clock * 3 - i * 0.6) * 0.12, 0));
+  const lookYaw = THREE.MathUtils.clamp(Math.atan2(dx, dz) - g.rotation.y, -0.8, 0.8);
+  const sit = () => { pos.copy(R.chair); pos.y = R.coonY = R.dk.top + 0.22; g.rotation.y = 0; b.rotation.x = -0.42; b.position.z = -0.12; c.legs.forEach(l => l.rotation.x = -1.35); c.tail.forEach((sg, i) => sg.rotation.set(i ? 0.25 : -0.2, 0, 0)); };
+  const run = (fast) => { const w = Math.sin(t * (fast ? 24 : 16)); b.rotation.z = w * 0.1; b.position.y = Math.abs(w) * 0.06; c.legs[0].rotation.x = w * 0.7; c.legs[1].rotation.x = -w * 0.7; c.arms.forEach((a, i) => a.rotation.set((i ? -w : w) * 0.5 - 0.9, 0, 0)); b.rotation.x = 0.85; b.position.y -= 0.24; };
+  const st = R.st, near = d < 14 && Math.abs(dy) < 6;
+  if ((st === 'lounge' || st === 'home') && R.on && !away && !R.save.won) {   // she's here! (the first time: a proper fright; after that, game on)
+    const fresh = !R.save.met; roofSet(R, 'startle'); roofSave({ met: 1 }); R.tags = 0; R.inChair = Math.hypot(pos.x - R.chair.x, pos.z - R.chair.z) < 0.3;
+    roofSay(fresh ? 'WHAAA?! How did YOU get up here?!' : pickOf(['YOU again?! Fine. Catch me if you can!', 'Back for more, huh? Nyah nyah!', 'Ugh, the cat’s back. Try and tag me!'])); chitter(fresh ? 9 : 5, 2200);
+  }
+  switch (R.st) {
+    case 'lounge': case 'camp': {                                      // in his chair: munching a (stolen) mushroom, or hands behind his head, or (after she's won) dozing
+      sit(); const k = Math.floor(t / 5) % 3, won = R.st === 'camp';
+      if (won && !R.waved && near && d < 4.5 && R.on) { R.waved = true; roofSet(R, 'wave'); roofSay(pickOf(['Hey, roomie! Sardine?', 'Oh hi, Princess! Make yourself at home.', 'Shh... best view in the neighbourhood, right?'])); chitter(4, 1500); break; }
+      if (won && (!near || d > 6) && t > 6) { c.eyes.forEach(e => e.scale.set(1, 0.12, 1)); c.head.rotation.x = 0.35; b.rotation.x = -0.55; if ((R.zzz = (R.zzz || 0) - dt) <= 0 && d < 22) { R.zzz = 2.2; floatText(pos.clone().setY(pos.y + 1.35), 'Zzz', 'name'); } }   // (a nap in the sun)
+      else if (k === 0) { c.snack.visible = true; c.arms[1].rotation.set(-1.9, 0, 0.35); c.head.rotation.x = 0.15 + Math.abs(Math.sin(clock * 9)) * 0.1; }
+      else { c.arms.forEach((a, i) => a.rotation.set(0.5, 0, (i ? 1 : -1) * (Math.PI - 0.55))); c.head.rotation.y = Math.sin(clock * 0.7) * 0.3; }   // (paws behind his head)
+      if (!won && near && d < 9) c.head.rotation.y = lookYaw;
+      break; }
+    case 'wave':
+      sit(); c.arms[1].rotation.set(0.2, 0, -(Math.PI - 0.6) + Math.sin(clock * 14) * 0.3); c.head.rotation.y = lookYaw;
+      if (t > 2.2) roofSet(R, 'camp');
+      break;
+    case 'startle': {                                                  // out of the chair like a shot: eyes like saucers, then he's off
+      if (R.inChair) sit(); else roofStick(R, pos, dt); const k = Math.min(1, t / 0.3); b.position.y = Math.sin(Math.min(1, t / 0.5) * Math.PI) * 0.5; c.eyes.forEach(e => e.scale.setScalar(1.6));
+      c.arms.forEach((a, i) => a.rotation.set(0.1, 0, (i ? 1 : -1) * (Math.PI - 0.6) * k)); g.rotation.y = Math.atan2(dx, dz) * k;
+      if (t > 1.4) { roofSet(R, 'chase'); R.cool = 0.8; R.tgt = null; R.burst = 1.2; roofPick(R, p); }
+      break; }
+    case 'chase': roofChase(R, dt, p, d, dy, run); break;
+    case 'tumble': {                                                   // tagged! over he goes, then a fist shaken... and off again (or: he gives up)
+      const k = Math.min(1, t / 0.3); b.position.z = -0.3 * k; b.position.y = -0.2 * k; b.rotation.x = -0.7 * k; c.legs.forEach(l => l.rotation.x = -1.2 * k); c.arms.forEach((a, i) => a.rotation.set(-0.3, 0, (i ? -1 : 1) * 1.2 * k)); c.eyes.forEach(e => e.scale.setScalar(1.4));
+      roofStick(R, pos, dt);
+      if (t > 1.0) { if (R.tags >= 3) { roofSet(R, 'surrender'); roofSay('OKAY, OKAY! Uncle! You win! Take the loot!'); chitter(10, 2000); } else { roofSet(R, 'chase'); R.cool = 0.9; R.immune = 0.5; R.burst = 1.4; R.tgt = null; roofPick(R, p); } }
+      break; }
+    case 'laugh': {                                                    // she fell off: he points and laughs over the edge, then strolls home
+      g.rotation.y = Math.atan2(dx, dz); c.arms[1].rotation.set(-1.6, 0, -0.1); c.arms[0].rotation.set(-0.5, 0, 0.6); b.rotation.x = -0.2; b.position.y = Math.abs(Math.sin(t * 18)) * 0.04; c.head.rotation.x = -0.35; c.tongue.visible = true;
+      roofStick(R, pos, dt);
+      if (t > 2.6) { roofSet(R, 'home'); R.from = pos.clone(); }
+      break; }
+    case 'home': {                                                     // waddling back to his chair
+      const to = R.v.copy(R.chair), dd = Math.hypot(to.x - pos.x, to.z - pos.z);
+      if (dd < 0.15) { roofSet(R, R.save.won ? 'camp' : 'lounge'); roofHome(R); break; }
+      const st2 = Math.min(dd, 2.4 * dt); pos.x += (to.x - pos.x) / dd * st2; pos.z += (to.z - pos.z) / dd * st2; roofAvoidChimney(R, pos);
+      g.rotation.y = Math.atan2(to.x - pos.x, to.z - pos.z); run(false); b.rotation.x = 0.2; b.position.y += 0.2; roofStick(R, pos, dt);
+      break; }
+    case 'surrender': {                                                // a white hanky, waved like mad... then the loot
+      g.rotation.y = Math.atan2(dx, dz); c.hanky.visible = true; c.arms[0].rotation.set(0.1, 0, Math.PI - 0.35 + Math.sin(clock * 16) * 0.35); c.arms[1].rotation.set(0.1, 0, -(Math.PI - 0.6)); c.eyes.forEach(e => e.scale.set(1, 0.5, 1));
+      roofStick(R, pos, dt);
+      if (t > 1.6 && !R.paid) roofWin(R);
+      if (t > 4.2) { roofSet(R, 'home'); }
+      break; }
+  }
+  // his shadow, flat on the slope under him
+  { const sh = c.shadow, sy = roofSurf(pos.x, pos.z); sh.visible = g.visible && sy > 0; if (sh.visible) { roofNormal(R, pos.x, pos.z, R.n); sh.position.set(pos.x, sy + 0.03, pos.z).addScaledVector(R.n, 0.02);
+      sh.quaternion.setFromUnitVectors(R.Z, R.n).multiply(R.q2.setFromAxisAngle(R.Z, g.rotation.y)); sh.scale.set(0.95, 1.15, 1); } }
+  roofHudUpdate(R);
+}
+function roofSet(R, st) { R.st = st; R.t = 0; R.said = 0; }
+function roofStick(R, pos, dt) { const s = roofSurf(pos.x, pos.z); if (s > 0) { R.coonY += (s - R.coonY) * Math.min(1, dt * 14); pos.y = R.coonY; } }
+function roofNormal(R, x, z, out) {                                    // which way's up on the roof here (flat on the deck and the chimney top)
+  const s = roofSurf(x, z), h = roofH(x, z); if (h < 0 || s > h + 0.2) return out.set(0, 1, 0);
+  const a = x - R.x0, b = R.x1 - x, c = z - R.z0, d = R.z1 - z, m = Math.min(a, b, c, d), k = R.k;
+  return (m === a ? out.set(-k, 1, 0) : m === b ? out.set(k, 1, 0) : m === c ? out.set(0, 1, -k) : out.set(0, 1, k)).normalize();
+}
+function roofAvoidChimney(R, pos) {                                   // (he goes round the chimney, not through it)
+  const C = R.ch, m = 0.35; if (pos.x < C.x0 - m || pos.x > C.x1 + m || pos.z < C.z0 - m || pos.z > C.z1 + m) return;
+  const e = [pos.x - (C.x0 - m), C.x1 + m - pos.x, pos.z - (C.z0 - m), C.z1 + m - pos.z], i = e.indexOf(Math.min(...e));
+  if (i === 0) pos.x = C.x0 - m; else if (i === 1) pos.x = C.x1 + m; else if (i === 2) pos.z = C.z0 - m; else pos.z = C.z1 + m;
+}
+function roofPick(R, p) {                                             // where to run: far from her, out in the open, not past her
+  const c = R.coon, pos = c.pos, A = R.arena; let best = null, bs = -1e9;
+  for (let i = 0; i < 18; i++) {
+    const a = i / 12 * Math.PI * 2 + Math.random() * 0.4, r = i < 12 ? 4.5 + Math.random() * 3.5 : 0, x = i < 12 ? pos.x + Math.cos(a) * r : i < 15 ? R.xm - 0.4 : A.x0 + Math.random() * (A.x1 - A.x0), z = i < 12 ? pos.z + Math.sin(a) * r : i < 15 ? R.rz0 + (i - 12) / 2 * (R.rz1 - R.rz0) : A.z0 + Math.random() * (A.z1 - A.z0);
+    const cx = THREE.MathUtils.clamp(x, A.x0, A.x1), cz = THREE.MathUtils.clamp(z, A.z0, A.z1), C = R.ch;
+    if (cx > C.x0 - 0.5 && cx < C.x1 + 0.5 && cz > C.z0 - 0.5 && cz < C.z1 + 0.5) continue;
+    const dc = Math.hypot(cx - p.x, cz - p.z), dm = Math.hypot(cx - pos.x, cz - pos.z), room = Math.min(cx - A.x0, A.x1 - cx, cz - A.z0, A.z1 - cz);
+    const ux = cx - pos.x, uz = cz - pos.z, ul = Math.hypot(ux, uz) || 1, tcx = p.x - pos.x, tcz = p.z - pos.z, along = (tcx * ux + tcz * uz) / ul, side = Math.abs(tcx * uz - tcz * ux) / ul;
+    let s = dc - 0.2 * dm + 0.5 * Math.min(room, 3) + Math.random() * 0.8 + (i >= 12 && i < 15 ? 1.2 : 0);   // (he does like a run along the ridge)
+    if (along > 0 && along < ul && side < 1.8) s -= 8;                // (never straight past her)
+    if (s > bs) { bs = s; best = [cx, cz]; }
+  }
+  R.tgt = best || [THREE.MathUtils.clamp(pos.x + (pos.x - p.x), A.x0, A.x1), THREE.MathUtils.clamp(pos.z + (pos.z - p.z), A.z0, A.z1)]; R.pickT = 1.4;
+}
+function roofChase(R, dt, p, d, dy, run) {                            // the rooftop tag game
+  const c = R.coon, g = c.g, pos = c.pos, A = R.arena, C = R.ch;
+  R.cool -= dt; R.immune = (R.immune || 0) - dt; R.burst = (R.burst || 0) - dt; R.pickT -= dt; R.tauntT = (R.tauntT || 0) - dt; R.perchCool = (R.perchCool || 0) - dt;
+  if (R.offT > 0.35 && (p.y < 11 || R.offT > 4)) {                    // she's fallen off (or gone): he laughs, and it all starts again when she's back up
+    roofSet(R, 'laugh'); R.tags = 0; roofSay(R.offT > 4 ? 'Hah! Running away, Princess?' : pickOf(['HAHAHA! Watch that first step!', 'Gravity: 1, Kitty: 0! Hahaha!', 'Ooh, that’s gotta sting! Hehehe!'])); chitter(10, 2200); return;
+  }
+  if (R.perch) {                                                       // up on the chimney top: taunting, till she gets up close, then he's off
+    const P = R.perch; P.t += dt; const k = Math.min(1, P.t / 0.45);
+    if (k < 1) { pos.lerpVectors(P.from, P.to, k); pos.y = P.from.y + (P.to.y - P.from.y) * k + Math.sin(k * Math.PI) * 1.2; b4(c, 0.6); }
+    else { pos.copy(P.to); g.rotation.y = Math.atan2(p.x - pos.x, p.z - pos.z); c.arms.forEach((a, i) => a.rotation.set(0.15, 0, (i ? 1 : -1) * (Math.PI - 0.4 + Math.sin(clock * 18) * 0.08))); c.tongue.visible = true; c.head.rotation.z = Math.sin(clock * 9) * 0.18;
+      if (!P.said) { P.said = 1; roofSay(pickOf(['Can’t reach me up here! Nyah!', 'King of the chimney!', 'Up here, slowpoke!'])); chitter(6); }
+      P.alarm = d < 1.9 && dy > -1.6 ? (P.alarm || 0) + dt : 0;   /* (a moment to react: quick paws can still tag him up there) */
+      if (P.t > 5 || P.alarm > 0.3) { R.perch = null; R.perchCool = 4; R.cool = 0.5; R.burst = 0.8; roofPick(R, p); const T = R.tgt; R.leap = { t: 0, from: pos.clone(), to: new THREE.Vector3(T[0], roofSurf(T[0], T[1]), T[1]) }; } }
+    R.coonY = pos.y; roofTag(R, d, dy); return;
+  }
+  if (R.leap) {                                                        // a flying leap (off the chimney, or a big dodge)
+    const L = R.leap; L.t += dt; const T = L.T || (L.T = Math.max(0.35, Math.min(0.75, L.from.distanceTo(L.to) / 9))), k = Math.min(1, L.t / T);
+    pos.lerpVectors(L.from, L.to, k); pos.y = L.from.y + (L.to.y - L.from.y) * k + Math.sin(k * Math.PI) * 0.9; g.rotation.y = Math.atan2(L.to.x - L.from.x, L.to.z - L.from.z); b4(c, 0.9);
+    if (k >= 1) { R.leap = null; R.coonY = pos.y; } roofTag(R, d, dy); return;
+  }
+  if (!R.tgt || R.pickT <= 0 || Math.hypot(R.tgt[0] - pos.x, R.tgt[1] - pos.z) < 0.5) roofPick(R, p);
+  // close to the chimney with her on his tail: up he goes
+  const dch = Math.hypot((C.x0 + C.x1) / 2 - pos.x, (C.z0 + C.z1) / 2 - pos.z);
+  if (d < 3.6 && dch < 3.6 && R.perchCool <= 0 && p.y < C.top - 0.5) { R.perch = { t: 0, from: pos.clone(), to: new THREE.Vector3((C.x0 + C.x1) / 2, C.top, (C.z0 + C.z1) / 2) }; chitter(4, 2400); return; }
+  // she's right on him: a dodge, a hop sideways (not every time: he gets winded)
+  if (d < 1.8 && R.cool <= 0) {
+    const ax = (pos.x - p.x) / (d || 1), az = (pos.z - p.z) / (d || 1); let best = null, bs = -1e9;
+    for (const sd of [-1, 1]) { const x = THREE.MathUtils.clamp(pos.x - az * sd * 2.9 + ax * 1.3, A.x0, A.x1), z = THREE.MathUtils.clamp(pos.z + ax * sd * 2.9 + az * 1.3, A.z0, A.z1), s = Math.hypot(x - p.x, z - p.z) + Math.random() * 0.5; if (s > bs) { bs = s; best = [x, z]; } }
+    R.leap = { t: 0, from: pos.clone(), to: new THREE.Vector3(best[0], 0, best[1]) }; R.leap.to.y = roofSurf(best[0], best[1]); roofAvoidChimney(R, R.leap.to); R.leap.to.y = roofSurf(R.leap.to.x, R.leap.to.z);
+    R.cool = Math.max(0.9, 1.6 - R.tags * 0.2); R.burst = 0; R.tired = 0.5;   /* (winded after a dodge: the moment to pounce) */ R.tgt = null; tone(1500, 2300, 0.08, 'triangle', 0.025); if (Math.random() < 0.4) roofSay(pickOf(['Whoops! Too slow!', 'Missed me!', 'Hehe! Nope!', 'Ole!'])); return;
+  }
+  // far ahead of her: he stops to taunt
+  if (d > 7.5 && R.tauntT <= 0 && !R.tauntOn) { R.tauntOn = 1.4; R.tauntT = 6; roofSay(pickOf(['Nyah nyah nyah!', 'Can’t catch meee!', '♪ Trash panda on the roof! ♪', 'Is that all you’ve got, Princess?'])); chitter(5); }
+  if (R.tauntOn > 0) { R.tauntOn -= dt; if (d < 3.2) R.tauntOn = 0;
+    g.rotation.y = 0; b4(c, 0); c.body.rotation.z = Math.sin(clock * 14) * 0.22; c.head.rotation.y = Math.PI * 0.7; c.tail.forEach((sg, i) => { sg.rotation.y = Math.sin(clock * 14 - i * 0.5) * 0.45; });
+    g.rotation.y = Math.atan2(pos.x - p.x, pos.z - p.z); roofStick(R, pos, dt); roofTag(R, d, dy); return; }
+  // run
+  R.tired = (R.tired || 0) - dt; const sp = (R.burst > 0 ? 8.0 : R.tired > 0 ? 4.2 : 5.5) * (d > 9 ? 0.8 : 1), tx = R.tgt[0] - pos.x, tz = R.tgt[1] - pos.z, tl = Math.hypot(tx, tz) || 1, step = Math.min(tl, sp * dt);
+  pos.x += tx / tl * step; pos.z += tz / tl * step; pos.x = THREE.MathUtils.clamp(pos.x, A.x0, A.x1); pos.z = THREE.MathUtils.clamp(pos.z, A.z0, A.z1); roofAvoidChimney(R, pos);
+  let want = Math.atan2(tx, tz), dd = want - g.rotation.y; dd = Math.atan2(Math.sin(dd), Math.cos(dd)); g.rotation.y += dd * Math.min(1, dt * 12);
+  run(true); roofStick(R, pos, dt); roofTag(R, d, dy);
+}
+function b4(c, k) { c.body.rotation.x = 0.85 * k; c.body.position.y = -0.24 * k; c.legs[0].rotation.x = c.legs[1].rotation.x = -0.8 * k; c.arms.forEach(a => a.rotation.set(-1.6 * k, 0, 0)); }   // (down on all fours, stretched out)
+function roofTag(R, d, dy) {                                          // she touched him: tag!
+  if (R.immune > 0 || d > 0.85 || Math.abs(dy) > 1.0 || R.st !== 'chase') return;
+  R.tags++; R.perch = null; R.leap = null; R.tauntOn = 0; roofSet(R, 'tumble'); R.immune = 1.2;
+  const c = R.coon; burst(c.pos.clone().setY(c.pos.y + 0.6), 0xffe27a, 10, 2.2, 2.6, 0.45); walk.puff = 0.3;
+  [659, 784, 1047].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.04, i * 0.08)); chitter(4, 900);
+  roofSay(R.tags >= 3 ? 'OOF! Three?! No fair...' : R.tags === 2 ? 'HEY! Two?! Lucky paw...' : pickOf(['Ow! Okay, that one counted.', 'Hey! Watch the fur!', 'Oof! Beginner’s luck!']));
+}
+function roofHudUpdate(R) {
+  const on = R.st === 'chase' || R.st === 'tumble' || R.st === 'startle' || R.st === 'laugh', key = on ? R.st + R.tags : ''; if (key === R.hudKey) return; R.hudKey = key;
+  if (!on) { roofHud(R, ''); return; }
+  const pips = '🐾'.repeat(R.tags) + '<span style="opacity:.4;filter:grayscale(1)">' + '🐾'.repeat(Math.max(0, 3 - R.tags)) + '</span>';
+  roofHud(R, R.st === 'laugh' ? '<div>🦝 He’s laughing at you!</div><div class="sub">Climb back up and try again</div>' : `<div>🦝 Tag the raccoon! <b>${R.tags}</b>/3</div><div class="pips">${pips}</div>`);
+}
+function roofWin(R) {                                                 // the loot: fish, three secret things for the Closet, a trophy
+  R.paid = true; roofSave({ won: 1, met: 1, found: 1 });
+  const at = R.box.clone(); at.y += 0.8;
+  for (let i = 0; i < 4; i++) setTimeout(() => burst(at, [0xffe27a, 0xff6fae, 0x8fd6ff, 0xffffff][i], 12, 3, 3.2, 0.5), i * 160);
+  try { ckSetWallet(ckWallet() + 150); ckDot(); } catch (e) {}
+  floatText(at.clone().setY(at.y + 0.6), '+150 🐟', 'name');
+  roofGrant(false); if (R.loot) R.loot.visible = false;
+  if (R.signTex) { roofSignDraw(R.signTex.image.getContext('2d'), R.signTex.image.width, R.signTex.image.height, true); R.signTex.needsUpdate = true; }
+  [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f * 1.01, 0.16, 'triangle', 0.04, i * 0.09));
+  unlock('banditBusted');
+  setTimeout(() => { if (walk.on) showWalkName('🎁 His loot: +150 🐟, a Bandit mask, a Moonlight crown and a Raccoon-tail bow (in Kitty’s Closet)!'); }, 1800);
+}
+function roofLights(R, dt) {                                          // the fairy lights: a soft twinkle by day, glowing at night; the loot box glints till it's hers
+  const n = TOD ? THREE.MathUtils.clamp((TOD.nightF - 0.3) / 0.5, 0, 1) : 0, k = 0.5 + 0.5 * n;
+  R.bulbs.material.color.setScalar(k * (0.94 + 0.06 * Math.sin(clock * 5.3)));
+  R.glow.visible = n > 0.02; if (R.glow.visible) R.glow.material.opacity = n * (0.78 + 0.12 * Math.sin(clock * 3.1));
+  if (R.glint && R.loot.visible) { const ph = (clock * 0.55) % 1, s = ph < 0.18 ? Math.sin(ph / 0.18 * Math.PI) : 0; R.glint.material.opacity = s * 0.95; R.glint.material.rotation = clock * 0.8; R.glint.visible = s > 0.01; }
+}
+function roofStar(R, dt, over) {                                      // up on our roof on a clear night: now and then, a shooting star
+  const m = R.star, T = TOD, clear = T && T.nightF > 0.75 && !(T.wx && T.W > 0.15);
+  if (R.starLife > 0) {
+    R.starLife -= dt; const k = 1 - R.starLife / 1.3; m.position.addScaledVector(R.starV, dt);
+    const X = R.v.copy(R.starV).normalize(), Zc = R.v2.subVectors(camera.position, m.position).normalize(), Yv = R.n.crossVectors(Zc, X).normalize(); Zc.crossVectors(X, Yv);
+    R.m4.makeBasis(X, Yv, Zc); m.quaternion.setFromRotationMatrix(R.m4); m.scale.set(10, 0.4, 1); m.material.opacity = Math.sin(Math.min(1, k) * Math.PI) * 0.95;
+    if (R.starLife <= 0) m.visible = false; return;
+  }
+  if (!over || !clear || state !== 'playing') return;
+  if ((R.starT -= dt) > 0) return;
+  R.starT = 6 + Math.random() * 9; R.starLife = 1.3; m.visible = true;
+  const cam = camera, dir = R.v.set((Math.random() - 0.5) * 1.3, 0.74 + Math.random() * 0.2, 0.5).unproject(cam).sub(cam.position).normalize();   // (somewhere up in the sky she can see right now)
+  if (dir.y < 0.07) { dir.y = 0.07; dir.normalize(); } m.position.copy(cam.position).addScaledVector(dir, 50);
+  const e = cam.matrixWorld.elements, sd = Math.random() < 0.5 ? 1 : -1; R.starV.set(e[0] * sd * 24 - e[4] * 8, e[1] * sd * 24 - e[5] * 8, e[2] * sd * 24 - e[6] * 8);   // (across the sky and a little down)
+  tone(2600, 3400, 0.5, 'sine', 0.012); tone(3900, 4600, 0.35, 'sine', 0.008, 0.08);
+  if (!R.starSeen) { R.starSeen = true; showWalkName('🌠 A shooting star! Make a wish, Princess...'); unlock('wishStar'); }
+}
+function roofShadow(R, p, over) {                                     // her shadow lies flat on the slope (not half under the shingles)
+  const S = walk.rig && walk.rig.shadow; if (!S) return;
+  const gy = over ? roofTopAt(p.x, p.z, p.y + 0.05) : 0;
+  if (over && gy > 0 && Math.abs(S.position.y - (gy + 0.03)) < 0.02) { roofNormal(R, p.x, p.z, R.n); S.quaternion.setFromUnitVectors(R.Z, R.n).multiply(R.q2.setFromAxisAngle(R.Z, walk.face)); S.position.addScaledVector(R.n, 0.02); R.tilted = true; }
+  else if (R.tilted) { R.tilted = false; S.rotation.set(-Math.PI / 2, 0, walk.face); }
+}
+/* ---------- the raccoon's loot, in Kitty's Closet: three things money can't buy (locked mystery cards till they're won) ---------- */
+var ROOF_CK_IDS = ['banditMask', 'moonCrown', 'coonBow'];
+function roofCkReg() {                                                // (from ckState(): added to the catalogue before anything reads it)
+  try {
+    if (roofCkReg.done) return; roofCkReg.done = true;
+    const add = [
+      { id: 'banditMask', slot: 'specs', name: 'Bandit mask', price: Infinity, ic: '🦝', blurb: 'Won from the rooftop raccoon. Very sneaky. Not for sale!', say: 'Sneaky sneaky...', build: B => roofCkMask(B), secret: 'roof' },
+      { id: 'moonCrown', slot: 'hat', name: 'Moonlight crown', price: Infinity, ic: '🌙', blurb: 'Silver and moonstone, from the raccoon’s loot box. It glows at night.', say: 'Queen of the night!', build: B => roofCkCrown(B), secret: 'roof' },
+      { id: 'coonBow', slot: 'tail', name: 'Raccoon-tail bow', price: Infinity, ic: '🎀', blurb: 'Ringed like a raccoon’s tail, with a stolen gold coin. A trophy!', say: 'Stripy chic!', build: B => roofCkTail(B), seg: 3, secret: 'roof' },
+    ];
+    for (const it of add) if (!CK_BY_ID[it.id]) { CK_ITEMS.push(it); CK_BY_ID[it.id] = it; }
+    roofCss();
+  } catch (e) { console.error(e); }
+}
+function roofGrant(quiet) {                                           // hers now (and kept hers: the Closet's own save)
+  try { roofCkReg(); const S = ckState(); let n = 0; for (const id of ROOF_CK_IDS) if (!S.owned.has(id)) { S.owned.add(id); n++; } if (n) { ckSave(); ckDot(); if (!quiet) ckCheckAch(); } } catch (e) { console.error(e); }
+}
+function roofCkLocked(it) { try { return !!(it && it.secret && !ckState().owned.has(it.id)); } catch (e) { return false; } }
+function roofCkPick(it) {                                             // (ckPick) a locked card: no trying it on, just a hint
+  if (!roofCkLocked(it)) return false;
+  CK.sel = it.id; ckRefresh(); ckSfx('nope'); ckCaption(pickOf(['Ooh, a secret!', 'What could it be?', 'Somewhere high up...']));
+  return true;
+}
+function roofCkRefresh() {                                            // (ckRefresh) the locked cards: ??? and a padlock; the info line keeps the secret
+  try {
+    const S = ckState(), u = CK.ui; if (!u) return;
+    for (const it of CK_ITEMS) { if (!it.secret) continue; const c = CK.cards[it.id]; if (!c) continue;
+      const lock = !S.owned.has(it.id), nm = c.el.querySelector('.ck-nm'), ic = c.el.querySelector('.ck-th i');
+      c.el.classList.toggle('ck-lock', lock); nm.textContent = lock ? '???' : it.name; ic.textContent = lock ? '❓' : it.ic; c.el.setAttribute('aria-label', lock ? 'A secret, found somewhere high up' : it.name);
+      if (lock) { c.tag.className = 'ck-tag lock'; c.tag.textContent = '🔒 Secret'; } }
+    const sel = CK.sel && CK_BY_ID[CK.sel];
+    if (sel && sel.secret && !S.owned.has(sel.id)) { u.Name.textContent = '??? A secret!'; u.Blurb.textContent = 'Found somewhere high up...'; u.Main.textContent = '🔒 Not found yet'; u.Main.disabled = true; u.Main.className = 'btn ck-main'; CK.act = null; }
+  } catch (e) {}
+}
+function roofCkMask(B) {                                              // a bandit's domino mask (head space: her eyes at x ±0.07, y 0.02)
+  const blk = 0x1d1a20;
+  for (const sx of [-1, 1]) {
+    const lobe = [], hole = [];
+    for (let i = 0; i < 32; i++) { const t = i / 32 * Math.PI * 2, c = Math.cos(t), s = Math.sin(t), out = c * sx > 0;
+      lobe.push([c * (out ? 0.09 : 0.066), s * (out ? 0.038 : 0.046) + (out ? 0.014 * c * sx : 0)]); hole.push([c * 0.036, s * 0.021 - 0.002]); }
+    B.m(ckFlat(lobe, 0.008, [hole]), blk, [sx * 0.07, 0.024, 0.179], [0, sx * 0.26, 0]);
+  }
+  B.m(CKG.box(0.05, 0.036, 0.012), blk, [0, 0.032, 0.191]);
+  ckTemples(B, B.m, blk, 0);
+}
+function roofCkCrown(B) {                                             // silver and moonstone, a glowing crescent moon at the front (head space, where her own crown sits)
+  const sil = 0xdfe6f2, gem = 0xa9dcff;
+  B.frame([0, 0.15, -0.015], [-0.14, 0, 0]);
+  B.s(ckTwoSided(CKG.cyl(0.06, 0.064, 0.034, 28, true)), sil);
+  B.s(CKG.tor(0.064, 0.0045, 6, 32), sil, [0, -0.017, 0], [Math.PI / 2, 0, 0]); B.s(CKG.tor(0.06, 0.004, 6, 32), sil, [0, 0.017, 0], [Math.PI / 2, 0, 0]);
+  for (let i = 1; i < 7; i++) { const a = i / 7 * Math.PI * 2, x = Math.sin(a) * 0.061, z = Math.cos(a) * 0.061;
+    B.s(CKG.cone(0.012, 0.04, 8), sil, [x, 0.036, z]); B.g(new THREE.OctahedronGeometry(0.0085, 0), gem, [x, 0.06, z]); }
+  const cres = []; for (let i = 0; i <= 16; i++) { const a = (51.2 + i / 16 * 257.6) * Math.PI / 180; cres.push([Math.cos(a) * 0.045, Math.sin(a) * 0.045]); }
+  for (let i = 0; i <= 16; i++) { const a = (283.2 - i / 16 * 206.4) * Math.PI / 180; cres.push([0.02 + Math.cos(a) * 0.036, Math.sin(a) * 0.036]); }
+  B.g(ckFlat(cres, 0.008), 0xfff1b8, [0, 0.05, 0.066], [-0.15, 0, 0.5]);
+  B.g(ckFlat(ckStarPts(0.014, 0.45), 0.006), 0xffffff, [0.032, 0.074, 0.062], [-0.15, 0, 0]);
+  B.frame(); B.sprite = { pos: [0, 0.2, 0.05], scale: 0.15 };
+}
+function roofCkTail(B) {                                              // a bow ringed like a raccoon's tail, a stolen gold coin dangling from it
+  const gr = 0x8d877f, dk = 0x2b2725, ring = (x, y) => Math.floor((Math.atan2(y, x) + Math.PI) / (Math.PI / 5)) % 2 ? dk : gr;
+  B.m(CKG.tor(0.046, 0.0085, 6, 30), ring, [0, 0, -0.03]);
+  B.frame([0, 0.056, -0.03], [0, 0, 0], 1.9);
+  for (const sx of [-1, 1]) { B.m(CKG.tor(0.02, 0.0078, 8, 18), (x, y) => Math.floor((Math.atan2(y, x) + Math.PI) / (Math.PI / 4)) % 2 ? dk : 0xb3ada4, [sx * 0.022, 0.004, 0], [0, sx * 0.3, sx * 0.3], [1.1, 0.75, 1]);
+    B.m(CKG.box(0.012, 0.042, 0.004), (x, y) => y > 0.004 ? dk : gr, [sx * 0.013, -0.024, 0.004], [0, 0, sx * 0.4]); }
+  B.m(CKG.sph(0.011, 10, 8), 0xe4dfd6);
+  B.frame();
+  B.s(CKG.tor(0.008, 0.0025, 5, 10), 0xf2c14a, [0, -0.06, -0.03]);
+  B.s(CKG.cyl(0.02, 0.02, 0.005, 16), (x, y, z) => Math.hypot(x, z) > 0.016 ? 0xc99a2e : 0xf5c542, [0, -0.083, -0.03], [Math.PI / 2, 0, 0]);
+}
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
-  _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - UPPER.UF + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
+  _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
   for (const h of _wRay.intersectObjects(walkMeshesAt(x, fromY, z), false)) {
     let shown = true; for (let q = h.object; q; q = q.parent) if (!q.visible) { shown = false; break; }
@@ -15828,6 +16427,7 @@ function surfaceTop(x, z, fromY) {                                   // the high
   if (fromY >= _tvTop.max.y - 0.001 && _tvTop.max.y > top && x > _tvTop.min.x && x < _tvTop.max.x && Math.abs(z - (_tvTop.min.z + _tvTop.max.z) / 2) < 0.26) { walk.hitObj = tvPanel; top = _tvTop.max.y; }
   if (z > YARD.FZ + 1) { const hy = hillY(z); if (hy > top && hy <= fromY + 1e-6) top = hy; }
   if (fromY > 4 && YARD.trees && !inUpper(x, z)) { const tt = treeTopAt(x, z, fromY + (clock - (walk.treeT || -9) < 2 ? 0.9 : 0)); if (tt > top) { top = tt; walk.hitObj = null; } }   /* (the leafy tops of the trees: up there she can scramble up a lump of leaves she couldn't step onto) */   // (out past the back fence: the bank up to the off-ramp)
+  if (fromY > UPPER.CH + 0.15) { const rt = roofTopAt(x, z, fromY); if (rt > top) { top = rt; walk.hitObj = null; } }   /* (our roof, and the raccoon's camp on it) */
   return top;
 }
 let _tvTop = null;
@@ -15835,9 +16435,9 @@ let _tvTop = null;
 // can't slide into a sofa or the box, not just her nose)
 const BODY_PTS = [[0.36, 0], [0.18, 0.17], [0.18, -0.17], [-0.14, 0.17], [-0.14, -0.17], [-0.32, 0], [0, 0]];
 function bodyHits(x, z, face, lim, top) {                            // how far her body is pushed into things (0 = clear): the sum of how much each point is overlapped
-  const fx = Math.sin(face), fz = Math.cos(face), g = walk.gScale || 1, hz = hillY(z); let n = 0;
+  const fx = Math.sin(face), fz = Math.cos(face), g = walk.gScale || 1, hz = hillY(z), r0 = lim > UPPER.CH + 0.25 && RF && RF.built ? roofH(x, z) : -1; let n = 0;
   for (const [f, sd] of BODY_PTS) {
-    const px = x + (fx * f + fz * sd) * g, pz = z + (fz * f - fx * sd) * g, rise = Math.max(0, hillY(pz) - hz);   // (out on the bank: the slope of the ground itself isn't a ledge)
+    const px = x + (fx * f + fz * sd) * g, pz = z + (fz * f - fx * sd) * g, rise = Math.max(0, hillY(pz) - hz) + (r0 >= 0 ? Math.max(0, roofH(px, pz) - r0) : 0);   /* (and up on our roof, the pitch of the roof) */   // (out on the bank: the slope of the ground itself isn't a ledge)
     n += Math.min(1, Math.max(0, surfaceTop(px, pz, top + rise) - lim - rise));
   }
   return n;
@@ -15948,7 +16548,7 @@ function updateWalk(dt) {
   if ((kx || ky) && !walk.frozen) { const l = Math.hypot(kx, ky); sx = kx / l; sy = ky / l; }
   if (mirrorWorld) sx = -sx;                                          // the picture is flipped, so left/right are too
   const yaw = fc.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);   // stick up = away from the camera
-  _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * nipK().walk * (!inRoomXZ(p.x, p.z) && !upstairsView(p) ? 1.9 : 1));   // (outdoors, back or front, she tears about; indoors upstairs, she walks)   // catnip: zoomies / a floaty drift / a slow zen amble
+  _wv.set(rx * sx - fx * sy, 0, rz * sx - fz * sy).multiplyScalar(WALK.speed * nipK().walk * ((!inRoomXZ(p.x, p.z) || p.y > UPPER.CH + 0.25) && !upstairsView(p) ? 1.9 : 1));   // (outdoors, back or front, she tears about; indoors upstairs, she walks)   // catnip: zoomies / a floaty drift / a slow zen amble
   if (yardOpen() && inBush(p.x, p.z, p.y)) { _wv.multiplyScalar(0.6); if (_wv.lengthSq() > 1 && clock > (walk.rustleT || 0)) { walk.rustleT = clock + 0.32; noise(0.16, 0.05, 1300 + Math.random() * 600); } }   // (pushing through a bush: slower, and rustling)
   if (tubWet()) _wv.multiplyScalar(0.55);                             // (wading through the bath: slow going)
   if (clock > (walk.flingT || 0)) walk.vel.lerp(_wv, 1 - Math.exp(-dt * (walk.grounded ? 12 : 8)));   // (flung by the fan: no steering out of it for a moment)
@@ -15985,7 +16585,7 @@ function updateWalk(dt) {
   } else {
     walk.vy -= WALK.grav * nipK().grav * dt;                          // (slow-mo catnip: moon gravity)
     const G = garage, inGar = G && p.y < 6 && p.x > G.X0 - 0.3 && p.x < G.X1 + 0.3 && p.z > UPPER.zF - 0.1 && p.z < G.z1 + 0.2;   // (in the garage: its own ceiling)
-    const cap = inGar ? 6 - WALK.height - 0.05 : inRoomXZ(p.x, p.z) && p.y < CEIL_H ? CEIL_H - WALK.height - 0.05 : inUpper(p.x, p.z) && p.y > UPPER.LH - 0.5 ? UPPER.CH - WALK.height - 0.05 : walk.free || clock - (walk.treeT || -9) < 4 ? 60 : 9;   // (no ceiling out in the yard, or anywhere once she's out)
+    const cap = inGar ? 6 - WALK.height - 0.05 : inRoomXZ(p.x, p.z) && p.y < CEIL_H ? CEIL_H - WALK.height - 0.05 : inUpper(p.x, p.z) && p.y > UPPER.LH - 0.5 && p.y < UPPER.CH + 0.25 ? UPPER.CH - WALK.height - 0.05 : walk.free || p.y > UPPER.CH + 0.25 || clock - (walk.treeT || -9) < 4 ? 60 : 9;   // (no ceiling out in the yard, or anywhere once she's out)
     let ny = p.y + walk.vy * dt; if (ny > cap) { ny = cap; walk.vy = Math.min(walk.vy, 0); }
     if (walk.vy > 0 && upstairsView(p)) { const hy = headRoom(p.x, p.z, p.y); if (ny > hy) { ny = Math.max(p.y, Math.min(ny, hy)); walk.vy = 0; } }   // (upstairs: she bumps her head on cupboards and tabletops, never jumps up into them)
     if (walk.vy <= 0 && discoCatch(ny)) walk.vy = 0;
@@ -16017,13 +16617,13 @@ function updateWalk(dt) {
     walk.burnCD = 1.2; burnPaw();
     const ax = p.x - f.center.x, az = p.z - f.center.z, al = Math.hypot(ax, az) || 1; walk.vel.set(ax / al * 5, 0, az / al * 5); walk.vy = 5.5; walk.grounded = false;
   }
-  if (walk.grounded && p.y > FIRE.h && p.x < -ROOM.halfW + 1.3 && Math.abs(p.z - FIRE.z) < FIRE.w / 2 + 0.4) unlock('walkTop');
+  if (walk.grounded && p.y > FIRE.h && p.y < CEIL_H && p.x < -ROOM.halfW + 1.3 && Math.abs(p.z - FIRE.z) < FIRE.w / 2 + 0.4) unlock('walkTop');
   // back in her box?
   const inBox = walk.grounded && p.y < BOX.h * 0.5 && Math.abs(p.x - CAT_POS.x) < BOX.w / 2 - 0.1 && Math.abs(p.z - CAT_POS.z) < BOX.d / 2 - 0.1;
   if (inBox && !walk.inBox) { unlock('boxJump'); showWalkName('Home sweet box!'); tailWag = 2; }
   walk.inBox = inBox;
   const MA = mosaicArt;                                               // leaping into the mosaic mirror art knocks it off the wall
-  if (MA && MA.state === 'wall' && !walk.grounded && Math.abs(p.x - MA.home.x) < 0.85 && p.z > ROOM.visDepth - 0.85 && p.z < ROOM.visDepth && p.y + 0.75 > MA.home.y - MA.half) { MA.state = 'fall'; MA.t = 0; MA.vy = 0; sfx.crack ? sfx.crack() : noise(0.2, 0.2, 900); showWalkName('Uh oh... the mirror art!'); }
+  if (MA && MA.state === 'wall' && !walk.grounded && p.y < CEIL_H && Math.abs(p.x - MA.home.x) < 0.85 && p.z > ROOM.visDepth - 0.85 && p.z < ROOM.visDepth && p.y + 0.75 > MA.home.y - MA.half) { MA.state = 'fall'; MA.t = 0; MA.vy = 0; sfx.crack ? sfx.crack() : noise(0.2, 0.2, 900); showWalkName('Uh oh... the mirror art!'); }
   if (walk.grounded && _tvTop && Math.abs(p.y - _tvTop.max.y) < 0.02 && p.x > _tvTop.min.x && p.x < _tvTop.max.x) unlock('tvTop');   // up on the TV
   // a nap in the cat tree's condo: curl up on the cushion in there and she dozes off (any move wakes her)
   const cc = catCondo, snug = cc && walk.grounded && cc.box.containsPoint(_nap.set(p.x, p.y + 0.1, p.z));
@@ -16116,9 +16716,9 @@ function walkCam(S) {                                                // keep the
   } else {
     const c = camera.position, f = S.focus, VD = ROOM.visDepth, SD = SLIDER;
     const byHouse = x => x > YARD.HL - 0.35 && x < YARD.HR + 0.35;    // (in line with the house: its back wall and the slider matter)
-    if ((walk.free && !inRoomXZ(f.x, f.z) && (f.z < VD - 0.12 || !byHouse(f.x))) || upstairsView(f)) {   // she's got out round the side or the front: an ordinary outdoor camera, just kept out of walls and off the ground
+    if ((walk.free && !inRoomXZ(f.x, f.z) && (f.z < VD - 0.12 || !byHouse(f.x))) || upstairsView(f) || roofAbove(f)) {   // she's got out round the side or the front: an ordinary outdoor camera, just kept out of walls and off the ground
       if (walk.view !== 'chase') { const h = camHit(f, c); if (h) c.copy(f).addScaledVector(_camV, Math.max(0.3, h.distance - 0.25)); }   // (the chase cam does its own, below)
-      c.y = Math.max(c.y, 0.25);
+      c.y = Math.max(c.y, 0.25, roofCamY(c.x, c.z));
     } else if (yardOpen() && SD) {                                            // the slider's open: the camera can follow her out into the yard (and back), but only through the doorway
       const ox0 = SD.DX - SD.DW / 2 + 0.12, ox1 = SD.DX + SD.DW / 2 - 0.12, oh = SD.DH - 0.08;
       if ((c.z - VD) * (f.z - VD) < 0) {                              // on the other side of the back wall from her...
@@ -16528,7 +17128,7 @@ function updateRaccoon(dt) {
     if (atWin && !coon.atWin && clock > (coon.cool || 0) && (!TOD || TOD.nightF > 0.4)) coon.next = Math.random() < 0.45 ? 0.8 + Math.random() * 1.4 : Infinity;   // ...and now and then (not every time) out it pops
     if (!atWin) coon.next = Infinity; coon.atWin = atWin;
     if (!coon.firstDone && walk.pos.z > DOOR2_Z && inRoomXZ(walk.pos.x, walk.pos.z) && walk.pos.y < CEIL_H) { coon.firstDone = true; coon.firstAt = clock + 0.8; }
-    if (coon.firstAt && clock >= coon.firstAt) { if (walk.pos.z > SLIDER.VD - 0.25) coon.firstAt = clock + 3; else { coon.firstAt = 0; coon.next = 0; } }   /* (its first visit: the moment she's past the room's second doorway) */                 // (never off on its own: only ever while she's there at the glass)
+    if (coon.firstAt && clock >= coon.firstAt) { if (walk.pos.z > SLIDER.VD - 0.25 || walk.pos.y > CEIL_H || !inRoomXZ(walk.pos.x, walk.pos.z)) coon.firstAt = clock + 3; else { coon.firstAt = 0; coon.next = 0; } }   /* (its first visit: the moment she's past the room's second doorway) */                 // (never off on its own: only ever while she's there at the glass)
     if (ZN && ZN.on) { coon.next = Infinity; return; }                 /* (zombie night: even the raccoon stays well away) */
     coon.next -= dt; if (coon.next > 0) return;
     if (walk.pos.z > SLIDER.VD - 0.25) { coon.next = Infinity; return; }   /* (she's already outside: no show; its first visit waits till she's back in) */
@@ -16904,7 +17504,7 @@ function roamOff(x, z) {                                              // how far
   const VD = ROOM.visDepth, Y = YARD, FZ = Y.FZ;
   let o = z < VD ? Math.max(0, Math.abs(x) - 94) + Math.max(0, VD - 124 - z) : z < FZ ? Math.max(0, Math.hypot(x, z - VD) - 71) : Math.max(0, Math.abs(x) - 83) + Math.max(0, z - FZ - 70);
   const a = x - (Y.HL - 0.35), b = Y.HR + 0.35 - x, c = z - (VD - Y.HD - 0.4), d = VD + 0.45 - z;
-  if (a > 0 && b > 0 && c > 0 && d > 0 && !indoorsOK(x, z)) o += Math.min(a, b, c, d);
+  if (a > 0 && b > 0 && c > 0 && d > 0 && !indoorsOK(x, z) && !(walk.pos.y > UPPER.CH + 0.25)) o += Math.min(a, b, c, d);
   return o;
 }
 function walkRoamOK(nx, nz) {                                        // the yard (walkZoneOK) and, once she's got out, the whole neighbourhood
@@ -17209,7 +17809,7 @@ function frame(now) {
       if (!karenHolding()) updateSpawner(dt);                       // (Karen holding court: no new mice)
       updateClockHud();
       if (gameMode === 'mouse') updateHeist(dt);
-      if (gameMode === 'walk') updateWalk(dt);
+      if (gameMode === 'walk') { updateWalk(dt); roofUpdate(dt); }
       if (laserMousePending) checkLaserMouse();
       if (karenState.pending) checkKaren();
     }
@@ -17277,7 +17877,7 @@ function frame(now) {
   if (sliderDisco) updateSliderDisco(dt);
   updateRaccoon(dt); updateDog(dt); updateYardLife(dt); updateZombies(dt); ammoChip(); updateYardGate(dt); updateGarage(dt); updateLaundry(dt); updateDucks(dt); updateShards(dt); updateCops(dt); updateMosaic(dt);                              // the slider's little disco ball turns (and runs the disco)
 
-  if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && (camera.position.z >= ROOM.visDepth - 0.05 || !inRoomXZ(camera.position.x, camera.position.z) || upstairsView(camera.position)));   // (or out in the yard, round the front, or upstairs)
+  if (povEndWall) povEndWall.visible = (camera.position.z < ROOM.visDepth - 0.05 && camera.position.y < CEIL_H - 0.02) || (walk.on && (camera.position.z >= ROOM.visDepth - 0.05 || !inRoomXZ(camera.position.x, camera.position.z) || upstairsView(camera.position) || camera.position.y > UPPER.CH + 0.25));   // (or out in the yard, round the front, or upstairs)
   updateQuests(dt);                                                   /* (Aunty-ji's little quests: the lost thing, the tracker) */
   updateUpperLights();   // the end wall + door: only from inside the room
   updateBlanketCover(); updateKarenBubble();
