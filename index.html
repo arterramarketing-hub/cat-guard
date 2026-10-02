@@ -10573,7 +10573,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-01 08:34';                                              // stamped when the site is published
+const BUILD = '2026-10-02 10:43';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -16010,7 +16010,7 @@ function roofTopAt(x, z, fromY) {                                     // (surfac
   return roofSurf(x, z);
 }
 function roofCamY(x, z) {                                             // the follow camera never dips into our roof while she's up there
-  const R = RF; if (!R || !R.built || !walk.on || walk.pos.y < 8) return 0;   /* (and just after she steps off an eave: the camera's still up over the shingles) */
+  const R = RF, p = walk.pos; if (!R || !R.built || !walk.on || p.y < 8 || (inUpper(p.x, p.z) && p.y < UPPER.CH + 0.25)) return 0;   /* (and just after she steps off an eave: the camera's still up over the shingles; but never while she's inside the flat, where a jump onto the furniture used to throw it up onto the roof) */
   const cx = Math.max(R.x0 + 0.01, Math.min(R.x1 - 0.01, x)), cz = Math.max(R.z0 + 0.01, Math.min(R.z1 - 0.01, z)), out = Math.hypot(x - cx, z - cz);
   if (out > 2) return 0; let t = out > 0 ? R.y0 : roofH(cx, cz);
   for (const s of R.solids) if (x > s[0] - 0.35 && x < s[1] + 0.35 && z > s[2] - 0.35 && z < s[3] + 0.35 && s[4] > t) t = s[4];
