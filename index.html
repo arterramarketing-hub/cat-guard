@@ -4865,14 +4865,73 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
       { const top = H + 0.05 + (Math.min(W, D) / 2 + 0.5) * 0.45; yBox(g, 1.4, 3.4, 1.4, C.chim, mx, top + 0.2, zc); yBox(g, 1.6, 0.2, 1.6, 0x6a6a66, mx, top + 1.9, zc); }   // the chimney
       bakeYard(g);
     };
+    const semiM = (x0, x1, z0, z1, face, C) => {                      // straight across from us (from the user's photo, 2026-10-05): three storeys. Garages and doors at street level, a full-width
+      const g = new THREE.Group(); hood.add(g);                          // balcony with white railings along the brick middle floor, and a steep beige mansard top floor with arched windows and Juliet railings
+      const W = x1 - x0, D = z1 - z0, mx = (x0 + x1) / 2, zc = (z0 + z1) / 2, fz = face < 0 ? z0 : z1, bz = face < 0 ? z1 : z0, o = face;
+      const G1 = FT(9), G2 = FT(18), G3 = G2 + 6.4, IN2 = 1.7, T = 0xf6f4ee;   // floor tops, and how far the mansard leans back
+      yBox(g, W, G2, D, C.lo, mx, G2 / 2, zc);                                                                  // brick, two storeys
+      tqRect(HT, 'brick', mx, G2 / 2, fz + o * 0.012, 0, o, W, G2, C.lo); tqRect(HT, 'brick', mx, G2 / 2, bz - o * 0.012, 0, -o, W, G2, C.lo);
+      tqRect(HT, 'brick', x0 - 0.012, G2 / 2, zc, -1, 0, D, G2, C.lo); tqRect(HT, 'brick', x1 + 0.012, G2 / 2, zc, 1, 0, D, G2, C.lo);
+      { const s = new THREE.Shape(); s.moveTo(fz, G2); s.lineTo(fz - o * IN2, G3); s.lineTo(bz + o * IN2, G3); s.lineTo(bz, G2); s.closePath();   // the mansard: steep at the front and back, flat on top
+        const geo = new THREE.ExtrudeGeometry(s, { depth: W, bevelEnabled: false }); geo.applyMatrix4(new THREE.Matrix4().set(0, 0, -1, x1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
+        g.add(new THREE.Mesh(geo, yMat(C.hi))); }
+      for (const sd of [-1, 1]) tqRect(HT, 'siding', sd < 0 ? x0 - 0.012 : x1 + 0.012, (G2 + G3) / 2 - 0.4, zc, sd, 0, D - 2 * IN2 - 0.4, G3 - G2 - 0.8, C.hi);   // (siding on the end walls)
+      yBox(g, W + 0.3, 0.35, D - 2 * IN2 + 0.3, 0x8f8a80, mx, G3 + 0.1, zc);                                       // a cap along the flat top
+      yBox(g, W + 0.2, 0.3, D + 0.2, T, mx, G2 + 0.05, zc);                                                       // white fascia where the mansard meets the brick
+      const F = (x, y, w, h, c, d) => yBox(g, w, h, 0.08, c, x, y, fz + o * (d || 0.04));
+      const glass = (x, y, w, h, zf) => { tqRect(HT, 'window', x, y, zf + o * 0.005, 0, o, w, h, 0xffffff, true); LW.push([x, y, zf + o * 0.02, 0, o, w, h]); };
+      const rail = (xa, xb, zz, y0, hgt, step) => { yBox(g, xb - xa + 0.12, 0.14, 0.14, T, (xa + xb) / 2, y0 + hgt, zz); yBox(g, xb - xa + 0.12, 0.1, 0.1, T, (xa + xb) / 2, y0 + 0.25, zz);   // a white rail: top, bottom, balusters
+        const n = Math.max(2, Math.round((xb - xa) / step)); for (let k = 0; k <= n; k++) yBox(g, 0.08, hgt, 0.08, T, xa + (xb - xa) * k / n, y0 + hgt / 2, zz); };
+      // -- the balcony: a deck right across the front at the top of the ground floor, posts at the ends, white railing
+      const BD = 2.7, bzF = fz + o * BD;
+      yBox(g, W - 0.4, 0.34, BD, 0xd9d6cf, mx, G1 + 0.05, fz + o * BD / 2); yBox(g, W - 0.4, 0.5, 0.12, T, mx, G1 - 0.02, bzF);   // the deck, a white fascia
+      for (const px of [x0 + 0.5, x1 - 0.5]) yBox(g, 0.3, G1, 0.3, T, px, G1 / 2, bzF - o * 0.2);
+      rail(x0 + 0.4, x1 - 0.4, bzF - o * 0.1, G1 + 0.22, 2.4, 0.42);
+      for (const sx of [x0 + 0.4, x1 - 0.4]) { const n = 6; for (let k = 0; k <= n; k++) yBox(g, 0.08, 2.4, 0.08, T, sx, G1 + 1.42, fz + o * BD * k / n); yBox(g, 0.14, 0.14, BD, T, sx, G1 + 2.62, fz + o * BD / 2); }
+      yBox(g, 0.12, G2 - G1, 0.12, T, mx, G1 + (G2 - G1) / 2, fz + o * 0.08);                                    // (the party-wall line)
+      for (const sd of [-1, 1]) {                                                                                 // each half
+        const q = W / 4, h0 = mx + sd * q;
+        // street level: the garage (by the middle) and the front door (at the outer end)
+        const gx = mx + sd * 4.4, ex = mx + sd * (W / 2 - 2.6);
+        F(gx, 2.675, 6.7, 5.35, T); F(gx, 2.55, 6.3, 5.1, C.garage[sd < 0 ? 0 : 1], 0.07); tqRect(HT, 'garage', gx, 2.55, fz + o * 0.115, 0, o, 6.3, 5.1, C.garage[sd < 0 ? 0 : 1], true);
+        F(ex, 1.55, 1.6, 3.1, T); F(ex, 1.5, 1.15, 2.9, C.door[sd < 0 ? 0 : 1], 0.07);
+        F(ex + sd * 1.8, 2.3, 1.2, 1.7, T); F(ex + sd * 1.8, 2.3, 0.95, 1.45, 0x34414f, 0.07); glass(ex + sd * 1.8, 2.3, 0.95, 1.45, fz + o * 0.11);   // (a little window by it)
+        // the middle floor: two sliding doors onto the balcony
+        for (const k of [-1, 1]) { const x = h0 + k * 4.2, y = G1 + 0.35 + 2.55;
+          F(x, y, 5.6, 5.4, T); F(x, y, 5.2, 5.0, 0x34414f, 0.07); F(x, y, 0.12, 5.0, T, 0.1); glass(x, y, 5.2, 5.0, fz + o * 0.11); }
+        // the mansard: two arched windows, each in its own little dormer, with a Juliet railing across the bottom
+        for (const k of [-1, 1]) { const x = h0 + k * 4.0, ww = 3.0, wh = 2.3, yb = G2 + 0.75, df = fz - o * 0.25;
+          yBox(g, ww + 0.9, wh + ww / 2 + 0.75, IN2 + 0.2, C.hi, x, yb + (wh + ww / 2 + 0.75) / 2 - 0.2, df - o * (IN2 + 0.2) / 2);   // the dormer's cheeks
+          const fy = yb + wh / 2; yBox(g, ww + 0.3, wh + 0.15, 0.08, T, x, fy, df + o * 0.04); yBox(g, ww, wh, 0.08, 0x34414f, x, fy, df + o * 0.08); glass(x, fy, ww, wh, df + o * 0.12);
+          for (const [r, c, dz] of [[ww / 2 + 0.15, T, 0.04], [ww / 2, 0x34414f, 0.08]]) { const a = yCyl(g, r, r, 0.08, c, x, yb + wh, df + o * dz, 20); a.rotation.x = Math.PI / 2; }   // the round top
+          yBox(g, 0.08, ww / 2, 0.08, T, x, yb + wh + ww / 4, df + o * 0.12); yBox(g, ww, 0.08, 0.08, T, x, yb + wh, df + o * 0.12);   // (its glazing bars)
+          rail(x - ww / 2 - 0.25, x + ww / 2 + 0.25, df + o * 0.45, yb - 0.25, 1.35, 0.32); }                    // the Juliet railing
+      }
+      if (C.arch) { F(mx, 2.0, 2.2, 4.0, 0x2b2420, 0.03); const a = yCyl(g, 1.1, 1.1, 0.1, 0x2b2420, mx, 4.0, fz + o * 0.03, 16); a.rotation.x = Math.PI / 2; }   // (an arched doorway between the garages)
+      const toWalk = face < 0 ? fz - (zF - 22) : (zF - 46.3) - fz;
+      if (C.twoDrives) for (const sd of [-1, 1]) yBox(g, 7.4, 0.02, toWalk, 0x4b4b4d, mx + sd * 4.4, 0.012, fz + o * toWalk / 2);   // their own driveways...
+      else yBox(g, 15.6, 0.02, toWalk, 0x4b4b4d, mx, 0.012, fz + o * toWalk / 2);                                 // ...or one wide one
+      bakeYard(g);
+    };
     const pal = (lo, hi, roof, garage, door0, door1) => ({ lo, hi, roof, cap: 0x4a4e52, trim: 0xf6f4ee, garage, door: [door0, door1], chim: 0x8a5a44 });
     semi(-61, -19.9, VD - 21.5, VD + 13.4, -1, pal(0x9a6a50, 0xe4e4df, 0x5d6166, 0xe8e4dc, 0x2f4a6a, 0x7a2a2a));        // 30 & 32
     semi(Y.HR + 2.6, Y.HR + 46, VD - 56, VD - 8, -1, pal(0xa8744f, 0xd2c2ab, 0x5d6166, 0x5a3a2a, 0x2d2d2d, 0x3f5f3a));    // 22 & 24 (its back wall a little nearer the street than ours)
     { const lt = new THREE.Group(); hood.add(lt); yBox(lt, 2.8, 2.6, 4.4, 0xf2f2ee, Y.HR + 4.4, 1.3, VD - 5.2); bakeYard(lt); }   // (and the little white lean-to off the back of 24)
-    const z1 = zF - 56;                                                                                           // across the street
+    const z1 = zF - 61;                                                                                           // across the street (set back enough for a car on the driveway, as in the photo)
     semi(-85, -47, z1 - 28, z1, 1, pal(0x8f5a44, 0xefe9dc, 0x5d6166, 0xe8e4dc, 0x3a3a3a, 0x8a2f2f));
-    semi(-41, -3, z1 - 28, z1, 1, pal(0xb08560, 0xd6c1a8, 0x8a3934, 0x6a4a36, 0x2f4a3a, 0x2d3f66));
-    semi(3, 41, z1 - 28, z1, 1, pal(0x7f5646, 0xdfe5e8, 0x4f5358, 0xf0ede6, 0x6a2a4a, 0x2a2a2a));
+    semiM(-41, -3, z1 - 28, z1, 1, { lo: 0xdcd6ca, hi: 0xd3c7aa, garage: [0xeeeae2, 0xeeeae2], door: [0xeceae4, 0x8a5a3a] });   // straight across: pale painted brick, two white garages
+    semiM(3, 41, z1 - 28, z1, 1, { lo: 0x6e4636, hi: 0xd4c9ae, garage: [0xeeeae2, 0x9c7a5a], door: [0x5a3a2a, 0x6a4a36], arch: true, twoDrives: true });   // brown brick, white and wood garages, an arched doorway
+    { const tg = grp('Autumn tree', true), TX = -12, TZ = zF - 48.6; tg.position.set(TX, 0, TZ);              // the big tree on their lawn, turning orange (from the photo)
+      yCyl(tg, 0.32, 0.5, 6, 0x6e6458, 0, 3, 0, 9);
+      for (let k = 0; k < 6; k++) { const a = k * 1.05 + 0.3, br = yBox(tg, 0.24, 5.2, 0.24, 0x6e6458, Math.cos(a) * 1.0, 7.6, Math.sin(a) * 1.0); br.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); }
+      for (let k = 0; k < 18; k++) { const a = k * 2.4, r = 1.8 + (k % 5) * 0.75; yBlob(tg, 1.0 + (k % 3) * 0.3, [0xb9622c, 0xcf7f3a, 0x9a4c28, 0xd49250][k % 4], Math.cos(a) * r, 9.0 + (k % 6) * 0.9, Math.sin(a) * r * 0.85, 0.7); }
+      bakeYard(tg); shadow(TX, TZ, 4.6, 4.0); }
+    { const sh = grp('Shrubs across the street', true);
+      for (const [x, z, r] of [[11.4, zF - 55.6, 1.3], [26.2, zF - 56.2, 1.1], [-3.6, zF - 56, 1.4]]) { yBlob(sh, r, 0x3f6a3a, x, r * 0.7, z, 0.75); yBlob(sh, r * 0.7, 0x4a7a40, x + r * 0.4, r * 0.55, z + 0.3, 0.7); }   // round bushes, sitting on the lawn
+      for (let k = 0; k < 4; k++) { const cn = new THREE.Mesh(new THREE.ConeGeometry(1.9 - k * 0.38, 3.4, 9), yMat(0x2f4f34)); cn.position.set(0, 2.2 + k * 2.1, z1 - 3); sh.add(cn); }   // a tall evergreen between the pairs
+      bakeYard(sh); }
+    parkedCar(-25.4, zF - 54.2, Math.PI, 0x5c5e60, 'suv', 'CHIRP 9', [-1e5, 1e5, zF - 60.6, 1e5]);               // their grey SUV and a silver hatchback in the driveway
+    parkedCar(-18.2, zF - 54.6, Math.PI, 0xa9adb2, 'sedan', 'MRRP 5', [-1e5, 1e5, zF - 60.6, 1e5]);
     semi(47, 85, z1 - 28, z1, 1, pal(0x9c6e52, 0xe9d9c3, 0x6b4a3a, 0xe8e4dc, 0x3a5a6a, 0x5a3a2a));
     tqMerge(HT, hood); hoodLights(hood, LW);                                                                                          // (the street's textures: a handful of draws)
     parkedCar(Y.HR + 24.3 + 3.9, zF - 13, 0, 0xb03a2e, 'suv', 'MEOW 42', [-1e5, 1e5, -1e5, VD - 56.6]);          // 22 & 24's red car
@@ -10649,7 +10708,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-05 12:11';                                              // stamped when the site is published
+const BUILD = '2026-10-05 12:42';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
