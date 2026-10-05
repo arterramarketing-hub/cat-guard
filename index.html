@@ -655,6 +655,12 @@ const CAT_POS = new THREE.Vector3(0, 0, 2.2);   // cat guards from the top of th
    RENDERER / SCENE
    ===================================================================== */
 const stage = document.getElementById('stage');
+(function cleanCanvasUploads() {   /* Safari (Mac and iPhone) garbles see-through canvas gradients on their way into WebGL: every glow and light pool came out full of coloured speckles. The canvas's own pixels (getImageData) are clean, so a canvas goes into a texture as those instead. */
+  const clean = src => { try { if (typeof HTMLCanvasElement === 'undefined' || !(src instanceof HTMLCanvasElement) || !src.width || !src.height) return src; const g = src.getContext('2d'); return g ? g.getImageData(0, 0, src.width, src.height) : src; } catch (e) { return src; } };
+  for (const C of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) { if (!C) continue; const p = C.prototype, ti = p.texImage2D, ts = p.texSubImage2D;
+    p.texImage2D = function (...a) { if (a.length === 6) a[5] = clean(a[5]); else if (a.length === 9) a[8] = clean(a[8]); return ti.apply(this, a); };
+    p.texSubImage2D = function (...a) { if (a.length === 7) a[6] = clean(a[6]); else if (a.length === 9) a[8] = clean(a[8]); return ts.apply(this, a); }; }
+})();
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.setClearColor(0x2b2520);
@@ -10538,9 +10544,9 @@ const ACHIEVEMENTS = [
     ['constellation', '🔭', 'Felis Regina', 'Up on the roof at night, join the stars into a cat with the raccoon’s telescope'],
     ['treetop', '🌳', 'Queen of the Canopy', 'In Free roam, climb a tree (jump right at its trunk) and stand on top'],
     ['treeTour', '🍃', 'Treetop Tour', 'In Free roam, stand on top of 5 different trees in one visit'],
-    ['fashionista', '👗', 'Fashionista', 'Own 6 things from Kitty’s Closet'],
+    ['fashionista', '👗', 'Fashionista', 'Own 6 things from PKR’s Closet'],
     ['dressedNines', '💃', 'Dressed to the nines', 'Wear a hat, collar, cape, backpack, glasses and a tail charm all at once'],
-    ['bigSpender', '💸', 'Big spender', 'Spend 1,000 fish in Kitty’s Closet'],
+    ['bigSpender', '💸', 'Big spender', 'Spend 1,000 fish in PKR’s Closet'],
     ['fanLaunch', '🎈', 'Up, up and away!', 'In Free roam, get flung by the ceiling fan upstairs, right through Aunty-ji’s jaali screen'],
     ['laptopFried', '💻', 'Blue screen of meow', 'In Free roam, knock the noodle cup onto Aunty-ji’s laptop upstairs'],
     ['indestructible', '💥', 'Indestructible', 'In Free roam, touch a car. The car loses'],
@@ -10586,7 +10592,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-03 13:36';                                              // stamped when the site is published
+const BUILD = '2026-10-05 06:48';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -13697,7 +13703,7 @@ function makeWalker(dark) {                                          // dark = t
   }
   rigMerge(g, new Set([...peepers, ...lids]));
   const rig = { g, body, head, legs, tail, shadow, eyes, peepers, lids, crown };
-  if (!dark) try { closetDress(rig); } catch (e) { console.error(e); }   /* (Kitty's Closet: she comes dressed in her saved outfit) */
+  if (!dark) try { closetDress(rig); } catch (e) { console.error(e); }   /* (PKR's Closet: she comes dressed in her saved outfit) */
   return rig;
 }
 function walkNear(x, y, z) {                                          // the solid things within a few metres of her: her feelers only test these (not every mesh in the world)
@@ -14820,7 +14826,7 @@ function updateQuests(dt) {                                           // every f
   else if (c && !c.carry && t > AQ.remT) { AQ.remT = t + 75; auntySay([['a', D.remind[Math.random() * D.remind.length | 0]]], 'questRemind'); }
 }
 /* =====================================================================
-   KITTY'S CLOSET: a little boutique where her fish buy things Princess Kitty wears (hats, collars, capes, backpacks,
+   PKR'S CLOSET: a little boutique where her fish buy things Princess Kitty wears (hats, collars, capes, backpacks,
    glasses, a bow for her tail), with a dressing-room window where she tries each one on. Everything in here is
    prefixed ck/CK/closet so it can't trip over the house. The game calls: closetFrame(dt) while the Closet is open
    (it draws only the dressing room), closetTick(dt) the rest of the time (capes flutter, the jetpack fires, the photo
@@ -15909,7 +15915,7 @@ function ckCardHat(force) {                                            // Classi
 }
 function ckHopLink() {                                                 // Treetop Hop's results card: a way to spend the fish
   const u = HOP.ui; u.ckLink = true; const wal = u.Wal && u.Wal.parentElement; if (!wal) return;
-  const b = document.createElement('button'); b.className = 'ck-hoplink'; b.textContent = '👗 Spend your fish in Kitty’s Closet'; wal.after(b);
+  const b = document.createElement('button'); b.className = 'ck-hoplink'; b.textContent = '👗 Spend your fish in PKR’s Closet'; wal.after(b);
   b.addEventListener('click', e => { e.stopPropagation(); if (HOP.active && HOP.phase === 'over' && HOP.overT > 0.4) closetOpen(null); });
 }
 
@@ -16162,8 +16168,8 @@ body.closet-open .ach-toast{z-index:60}body.closet-open .cam-toast{z-index:60}
 }
 function ckBuildUI() {
   ckCss();
-  const root = document.createElement('section'); root.id = 'closet'; root.hidden = true; root.setAttribute('aria-label', 'Kitty’s Closet');
-  root.innerHTML = `<div class="ck-top"><button class="ck-x" id="ckClose" aria-label="Close the Closet">✕</button><h2 class="ck-title">Kitty’s Closet</h2><div class="ck-wallet" aria-label="Fish"><span>🐟</span><b id="ckFish">0</b></div></div>
+  const root = document.createElement('section'); root.id = 'closet'; root.hidden = true; root.setAttribute('aria-label', 'PKR’s Closet');
+  root.innerHTML = `<div class="ck-top"><button class="ck-x" id="ckClose" aria-label="Close the Closet">✕</button><h2 class="ck-title">PKR’s Closet</h2><div class="ck-wallet" aria-label="Fish"><span>🐟</span><b id="ckFish">0</b></div></div>
 <div id="ckStage" aria-label="PKR on the fitting-room pedestal. Drag to spin her."><div class="ck-cap" id="ckCap"></div><div class="ck-hint" id="ckHint">👆 Drag to spin her round</div></div>
 <div class="ck-panel"><div class="ck-tabs" id="ckTabs" role="tablist"></div><div class="ck-grid" id="ckGrid"></div>
 <div class="ck-act"><div class="ck-info"><b id="ckName"></b><span id="ckBlurb"></span></div><button class="btn ck-main" id="ckMain"></button>
@@ -16465,10 +16471,10 @@ function closetGameOverPay(mouse, val) {                               // Classi
   try {
     ckCss();
     const upd = $('updBtn');
-    if (upd && !$('closetBtn')) { const b = document.createElement('button'); b.className = 'ib'; b.id = 'closetBtn'; b.setAttribute('aria-label', 'Kitty’s Closet');
+    if (upd && !$('closetBtn')) { const b = document.createElement('button'); b.className = 'ib'; b.id = 'closetBtn'; b.setAttribute('aria-label', 'PKR’s Closet');
       b.innerHTML = '<span class="ib-i">👗</span><span class="ib-l">Closet</span><i class="ck-dot" hidden></i>'; upd.after(b); b.addEventListener('click', () => closetOpen('startScreen')); }
     const rb = $('resumeBtn');
-    if (rb && !$('closetPauseBtn')) { const b = document.createElement('button'); b.className = 'btn ck-pbtn'; b.id = 'closetPauseBtn'; b.textContent = '👗 Kitty’s Closet'; rb.after(b); b.addEventListener('click', () => closetOpen('pauseScreen')); }
+    if (rb && !$('closetPauseBtn')) { const b = document.createElement('button'); b.className = 'btn ck-pbtn'; b.id = 'closetPauseBtn'; b.textContent = '👗 PKR’s Closet'; rb.after(b); b.addEventListener('click', () => closetOpen('pauseScreen')); }
     const ag = $('againBtn');
     if (ag && !$('ckOverFish')) { const d = document.createElement('div'); d.className = 'ck-over'; d.id = 'ckOverFish'; d.hidden = true;
       d.innerHTML = '<span>+<b>0</b> 🐟 into the piggy bank</span><button class="link-btn chaos-link">👗 Spend in the Closet</button>'; ag.before(d);
@@ -16482,7 +16488,7 @@ function closetGameOverPay(mouse, val) {                               // Classi
    THE ROOFTOP. Our own roof, walkable at last: up a tree in 30 & 32's backyard, onto their roof, across into the big red maple that
    leans out over the side yard between the houses, and one good leap down onto our shingles... where the raccoon (the one who taunts her
    through the slider) has a secret camp by the chimney: a pallet deck, a tiny lawn chair, a pile of sardine tins, a box of stolen loot,
-   fairy lights and a sign that says NO CATS. Make friends with him and he shares the loot (fish, and three things for Kitty's Closet that
+   fairy lights and a sign that says NO CATS. Make friends with him and he shares the loot (fish, and three things for PKR's Closet that
    money can't buy). Afterwards it's a cozy spot of her own, with shooting stars at night.
    Our roof is worked out, not ray-cast: a hipped roof is just "the eave height plus the pitch times the distance to the nearest eave",
    so standing on it, the camera, the rain and the raccoon all share one cheap sum. Saved in localStorage: catguard.rooftop.
@@ -16835,7 +16841,7 @@ function roofWin(R) {                                                 // the loo
   if (R.signTex) { roofSignDraw(R.signTex.image.getContext('2d'), R.signTex.image.width, R.signTex.image.height, true); R.signTex.needsUpdate = true; }
   [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f * 1.01, 0.16, 'triangle', 0.04, i * 0.09));
   unlock('banditBusted');
-  setTimeout(() => { if (walk.on) showWalkName('🎁 His loot: +150 🐟, a Bandit mask, a Moonlight crown and a Raccoon-tail bow (in Kitty’s Closet)!'); }, 1800);
+  setTimeout(() => { if (walk.on) showWalkName('🎁 His loot: +150 🐟, a Bandit mask, a Moonlight crown and a Raccoon-tail bow (in PKR’s Closet)!'); }, 1800);
 }
 function roofLights(R, dt) {                                          // the fairy lights: a soft twinkle by day, glowing at night; the loot box glints till it's hers
   const n = TOD ? THREE.MathUtils.clamp((TOD.nightF - 0.3) / 0.5, 0, 1) : 0, k = 0.5 + 0.5 * n;
@@ -16866,7 +16872,7 @@ function roofShadow(R, p, over) {                                     // her sha
   if (over && gy > 0 && Math.abs(S.position.y - (gy + 0.03)) < 0.02) { roofNormal(R, p.x, p.z, R.n); S.quaternion.setFromUnitVectors(R.Z, R.n).multiply(R.q2.setFromAxisAngle(R.Z, walk.face)); S.position.addScaledVector(R.n, 0.02); R.tilted = true; }
   else if (R.tilted) { R.tilted = false; S.rotation.set(-Math.PI / 2, 0, walk.face); }
 }
-/* ---------- the raccoon's loot, in Kitty's Closet: three things money can't buy (locked mystery cards till they're won) ---------- */
+/* ---------- the raccoon's loot, in PKR's Closet: three things money can't buy (locked mystery cards till they're won) ---------- */
 var ROOF_CK_IDS = ['banditMask', 'moonCrown', 'coonBow'];
 function roofCkReg() {                                                // (from ckState(): added to the catalogue before anything reads it)
   try {
@@ -22101,7 +22107,7 @@ function frame(now) {
   reflFrame++;
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = Math.max(now, last);   // never a backwards step (rAF stamps can trail performance.now())
   if (state !== 'paused' && state !== 'levelup') clock += dt;   /* (catnip, raves, disco... hold still while paused) */
-  if (CK.on) { closetFrame(dt); return; } closetTick(dt);   /* (Kitty's Closet: while it's open only the dressing room is drawn; otherwise capes flutter, jetpacks fire) */
+  if (CK.on) { closetFrame(dt); return; } closetTick(dt);   /* (PKR's Closet: while it's open only the dressing room is drawn; otherwise capes flutter, jetpacks fire) */
   if (state === 'stargaze') return;   /* (the telescope's eyepiece covers the whole screen: nothing to draw behind it) */
   if (chimFrame(dt)) return;                                         /* (Chimney Drop: down the flue in its own little world; in Free roam, the 🧱 button on the chimney top, and the soot she brings back) */
   if (state === 'jet') { updateJet(dt); renderJet(); return; } jetPill();   /* (Sky Paws: the raccoon's jet, its own little world; in Free roam, the ✈️ button by the jet on our roof) */
