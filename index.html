@@ -10714,10 +10714,17 @@ const ACHIEVEMENTS = [
     ['jetAce', '🏅', 'Flying ace', 'In Sky Paws, win all four medals on one level'],
     ['jetCastle', '👑', 'Long live the Princess', 'In Sky Paws, storm Casa Loma and beat the Rat King himself'],
   ]],
+  ['Sled Rush', [
+    ['sledFirst', '🛷', 'Sled Rush!', 'Take the red sled on the bank behind the back fence for a run (squeeze through the hole by the shed)'],
+    ['sledKm', '📏', 'Kilometre kitty', 'In Sled Rush, slide 1,000 m in one run'],
+    ['sledCombo', '🤸', 'Triple trick', 'In Sled Rush, land 3 tricks in one jump (swipe or tap in the air off a ramp)'],
+    ['sledSpace', '🌍', 'Kitty in orbit', 'In Sled Rush, slide all the way up into space'],
+    ['sledAllZones', '🌌', 'The whole ride', 'In Sled Rush, pass through every zone in one run without a keep-sliding'],
+  ]],
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-05 14:25';                                              // stamped when the site is published
+const BUILD = '2026-10-05 14:50';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -13471,6 +13478,7 @@ function syncSecretModes() {                                          // the mot
   const f = k => { try { return localStorage.getItem('catguard.found.' + k) === '1'; } catch (e) { return false; } }, r = f('ride'), h = f('hop') && typeof startHopGame === 'function';
   $('rideBtn').hidden = !r; $('hopBtn').hidden = !h; $('secretDot').hidden = !(r && h); $('secretModes').hidden = !(r || h);
   { const jb = $('jetBtn'), j = f('jet') && typeof startJetGame === 'function'; if (jb) { jb.hidden = !j; $('jetDot').hidden = !(j && (r || h)); if (j) $('secretModes').hidden = false; } }   /* (Sky Paws: once she's flown the raccoon's jet) */
+  if (typeof sledSync === 'function') sledSync();                     /* (Sled Rush: once she's ridden the red sled) */
 }
 function menuOrbit(dt) {                                              // behind the title card: the living room turning slowly (mice still peeking out)
   const M = menuOrbit; if (!M.on) M.t = 0; M.on = true; M.t += dt; const v = M.v || (M.v = new THREE.Vector3()); v.copy(camBase).sub(camTarget);
@@ -22376,6 +22384,1212 @@ function skyFishGet(f) {
   if (n === L.length) { unlock('skyFish'); showWalkName(`🐟 Every last sky fish! More tomorrow`); }
   else if (!S.fishSaid) { S.fishSaid = true; showWalkName(`✨ Golden sky fish! +5 each (${n}/${L.length} today)`); }
 }
+/* SLEDRUSH_2026_10_05 */
+/* =====================================================================
+   SLED RUSH (2026-10-05): an endless sledding runner. In Free roam a red saucer sled leans on the back fence, just outside,
+   by the hole; next to it, the 🛷 button (and a word about it, the first time she sees it). On it, PKR (a clone of her Free
+   roam rig: her coat, her Closet outfit) rides a winding half-pipe of ice from the top of the snowy bank behind the house,
+   through a frozen forest and an icy cave, up above the clouds and out into space, the Earth glowing far below.
+   Drag (or the arrows) to steer: hard over, she rides up the curved walls; swipe up or tap (space / up) to jump; swipe down
+   (down) to tuck for speed. Ramps throw her high: swipe or tap in the air for flips and spins, land them clean for fish and
+   a burst of speed (land mid-trick and she wipes out). Snowmen, ice boulders, pines, red spiked ice balls, crevasses,
+   waddling penguins and rolling snowballs; fish along the racing lines (streaks, now and then a golden one); a magnet, a
+   shield and a rocket. A wipeout tumbles her off the sled; the card shows how far she got, the fish (banked into the piggy
+   bank, catguard.fish) and her best (catguard.sledBest); "Keep sliding" costs 25, 50, then 100 fish.
+   Its own little world (scene, camera, lights), built the first time she rides, like Treetop Hop. The game calls sledFrame(dt)
+   every frame (true: it drew this one); syncSecretModes calls sledSync() for the title's ❄️ button (catguard.found.sled).
+   Everything here is prefixed sled/SLED; the soot pill yields to the 🛷 one through a body class (body.sled-pill).
+   ===================================================================== */
+const SLED = {
+  built: false, active: false, paused: false, phase: 'off', err: 0, t: 0, pt: 0, scene: null, cam: null, ui: null, K: null, size: null, aspect: 0, drawn: false,
+  pill: null, pillOn: false, spot: null, visit: null, saidVisit: null, fade: 0, fadeShown: -1, post: 0, keysOn: false, wind: null, scrape: null,
+  RP: 3.4, A: 1.32, DS: 1.5, NS: 2048, SEG: 24, NSEG: 11, S0: 30, LQ: 2.3, QMAX: 4.3, G: 22, JUMP: 7.8, RAMPV: 11.8,
+  trk: null, segs: null, obs: [], fish: [], pups: [], gaps: [], dec: null, kx: 0, down: false, ptr: null, seed: 1,
+};
+function sledRnd() { const S = SLED; S.seed = (S.seed * 16807) % 2147483647; return (S.seed - 1) / 2147483646; }
+function sledGet(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+function sledPut(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+function sledWallet() { return typeof ckWallet === 'function' ? ckWallet() : Math.max(0, parseInt(sledGet('catguard.fish', '0'), 10) || 0); }
+function sledSetWallet(n) { if (typeof ckSetWallet === 'function') ckSetWallet(n); else sledPut('catguard.fish', Math.max(0, Math.round(n))); }
+function sledZones() {
+  return sledZones.Z || (sledZones.Z = [
+    { at: 0, ic: '🏡', name: 'The Back Bank', sub: 'Behind the house, at night', top: 0x050824, hor: 0x2a2a62, bot: 0x0c0f2c, fog: 0x1c2250, near: 30, far: 165, trk: 0xf2f6ff, em: 0x26304e, hs: 0xc4d0ff, hg: 0x3a3a5a, hi: 1.2, sun: 0.8, stars: 0.8, snow: 1, moon: 1, cloud: 0, earth: 0, tilt: 0.2 },
+    { at: 700, ic: '🌲', name: 'The Frozen Forest', sub: '700 m', top: 0x0b1c44, hor: 0x5c86b6, bot: 0x22385e, fog: 0x4a6c9a, near: 22, far: 140, trk: 0xdcefff, em: 0x22405e, hs: 0xd8e8ff, hg: 0x3a4a5e, hi: 1.25, sun: 0.75, stars: 0.3, snow: 1.6, moon: 0.6, cloud: 0, earth: 0, tilt: 0.05 },
+    { at: 1500, ic: '🧊', name: 'The Icy Cave', sub: '1,500 m', top: 0x020a12, hor: 0x06202c, bot: 0x02080e, fog: 0x072630, near: 10, far: 82, trk: 0x9cf0ff, em: 0x1a6a80, hs: 0x9ae4ff, hg: 0x1a3440, hi: 1.15, sun: 0.45, stars: 0, snow: 0.5, moon: 0, cloud: 0, earth: 0, tilt: 0 },
+    { at: 2400, ic: '☁️', name: 'Above the Clouds', sub: '2,400 m', top: 0x02031a, hor: 0x2e2a74, bot: 0x8a86c8, fog: 0x2e2c6a, near: 70, far: 360, trk: 0xc4ecff, em: 0x2a4a86, hs: 0xd8d0ff, hg: 0x5a5a90, hi: 1.1, sun: 0.6, stars: 1, snow: 0, moon: 1.6, cloud: 1, earth: 0, tilt: 0 },
+    { at: 3400, ic: '🌍', name: 'Outer Space', sub: '3,400 m', top: 0x000004, hor: 0x02030e, bot: 0x000006, fog: 0x000008, near: 200, far: 900, trk: 0xa8f4ff, em: 0x2a5a78, hs: 0xd8f4ff, hg: 0x203048, hi: 1.05, sun: 0.9, stars: 1.25, snow: 0, moon: 0, cloud: 0, earth: 1, tilt: 0 },
+  ]);
+}
+function sledZoneAt(d) { const Z = sledZones(); let z = 0; for (let i = 1; i < Z.length; i++) if (d >= Z[i].at) z = i; return z; }
+
+/* ---------- the track: a centre line sampled every 1.5 m (heading, slope), and a U-shaped trough of ice round it ---------- */
+function sledTrkReset() {
+  const S = SLED, n = S.NS;
+  const T = S.trk || (S.trk = { px: new Float32Array(n), py: new Float32Array(n), pz: new Float32Array(n), yaw: new Float32Array(n), pit: new Float32Array(n), cur: new Float32Array(n), zn: new Uint8Array(n), n: 0 });
+  T.n = 0; T.c = 0; T.cT = 0; T.cL = 0; T.p = 0.3; T.pT = 0.3; T.pL = 0;
+}
+function sledGenTo(iMax) {
+  const S = SLED, T = S.trk, M = S.NS - 1, DS = S.DS;
+  while (T.n <= iMax) {
+    const i = T.n, k = i & M, s = i * DS, d = s - S.S0;
+    if (i === 0) { T.px[k] = T.py[k] = T.pz[k] = 0; T.yaw[k] = 0; T.pit[k] = 0.04; T.cur[k] = 0; }
+    else {
+      const j = (i - 1) & M;
+      if (d < 14) T.cT = 0;                                              // (off the top, straight down the bank)
+      else if (d < 70) T.cT = 0.026;                                     // (then round to the left, along the bank behind the houses)
+      else if ((T.cL -= DS) <= 0) { T.cL = 24 + sledRnd() * 56; const mx = 0.013 + Math.min(1, d / 3000) * 0.022; T.cT = sledRnd() < 0.18 ? 0 : (sledRnd() * 2 - 1) * mx * (d < 300 ? 0.75 : 1); }
+      T.c += (T.cT - T.c) * Math.min(1, DS / 12);
+      if (d < -5) T.pT = 0.04; else if (d < 40) T.pT = 0.36;            // (the flat top by the sound wall, then the steep bank)
+      else if ((T.pL -= DS) <= 0) { T.pL = 30 + sledRnd() * 70; const r = sledRnd(); T.pT = r < 0.14 ? 0.38 : r < 0.36 ? 0.08 : 0.13 + sledRnd() * 0.11; }
+      T.p += (T.pT - T.p) * Math.min(1, DS / (d < 40 ? 6 : 16));
+      T.yaw[k] = T.yaw[j] + T.c * DS; T.pit[k] = T.p; T.cur[k] = T.c;
+      const yw = (T.yaw[k] + T.yaw[j]) / 2, pt = (T.pit[k] + T.pit[j]) / 2, cp = Math.cos(pt);
+      T.px[k] = T.px[j] - Math.sin(yw) * cp * DS; T.py[k] = T.py[j] - Math.sin(pt) * DS; T.pz[k] = T.pz[j] - Math.cos(yw) * cp * DS;
+    }
+    T.zn[k] = d < 0 ? 0 : sledZoneAt(d);
+    T.n++;
+    if (i > 0) sledDecorAt(i - 1, s - DS, d - DS);                       // (the scenery a sample behind: its frame needs this one)
+  }
+}
+function sledFrameAt(s, P, F, R, U) {                                    // the track's frame at s: P on the centre line (the bottom of the trough), F along, R to her right, U up out of it
+  const S = SLED, T = S.trk, M = S.NS - 1, f = Math.max(0, s) / S.DS, i = Math.floor(f), u = f - i;
+  if (i + 1 >= T.n) sledGenTo(i + 2);
+  const a = i & M, b = (i + 1) & M;
+  P.set(T.px[a] + (T.px[b] - T.px[a]) * u, T.py[a] + (T.py[b] - T.py[a]) * u, T.pz[a] + (T.pz[b] - T.pz[a]) * u);
+  const yw = T.yaw[a] + (T.yaw[b] - T.yaw[a]) * u, pt = T.pit[a] + (T.pit[b] - T.pit[a]) * u, cy = Math.cos(yw), sy = Math.sin(yw), cp = Math.cos(pt), sp = Math.sin(pt);
+  if (F) F.set(-sy * cp, -sp, -cy * cp); if (R) R.set(cy, 0, -sy); if (U) U.set(-sy * sp, cp, -cy * sp);
+  return yw;
+}
+function sledCurv(s) { const S = SLED, T = S.trk; return T.cur[Math.floor(Math.max(0, s) / S.DS) & (S.NS - 1)]; }
+function sledSurf(P, R, U, q, h, out, nrm) {                             // the point on the trough's surface at arc length q from the bottom (h out along its normal)
+  const S = SLED, a = q / S.RP, sa = Math.sin(a), ca = Math.cos(a), x = S.RP * sa, y = S.RP * (1 - ca);
+  const nx = -sa, ny = ca;
+  out.set(P.x + R.x * (x + nx * h) + U.x * (y + ny * h), P.y + R.y * (x + nx * h) + U.y * (y + ny * h), P.z + R.z * (x + nx * h) + U.z * (y + ny * h));
+  if (nrm) nrm.set(R.x * nx + U.x * ny, R.y * nx + U.y * ny, R.z * nx + U.z * ny);
+  return out;
+}
+function sledGroundY(x, tl) { const S = SLED, xr = S.RP * Math.sin(S.A), yr = S.RP * (1 - Math.cos(S.A)); return yr + (x < 0 ? Math.min(0, x + xr) * tl : Math.max(0, x - xr) * tl * 0.8); }
+function sledInGap(s) { for (const g of SLED.gaps) if (g.on && s > g.s0 && s < g.s1) return g; return null; }
+function sledProfile() {                                                 // across the trough (and the snow either side): [x, y, u, kind] (kind 0 ground, 1 ice)
+  const S = SLED; if (S.prof) return S.prof;
+  const P = [], A = S.A, RP = S.RP, xr = RP * Math.sin(A), yr = RP * (1 - Math.cos(A)), G = [110, 50, 24, 12, 6, 3.7];
+  for (const x of G) P.push([-x, yr + (x === 3.7 ? 0.2 : 0), 0.53 + 0.19 * Math.min(1, x / 60), 0]); P.push([-xr, yr, 0.53, 0]);
+  P.push([-(xr + 0.34), yr + 0.02, 0.004, 1], [-(xr + 0.16), yr + 0.17, 0.006, 1]);   // (a rolled lip along each edge, bright white)
+  for (let m = 0; m < 15; m++) { const a = -A + 2 * A * m / 14; P.push([RP * Math.sin(a), RP * (1 - Math.cos(a)), 0.02 + 0.46 * m / 14, 1]); if (m === 7) S.profMid = P.length - 1; }
+  P.push([xr + 0.16, yr + 0.17, 0.494, 1], [xr + 0.34, yr + 0.02, 0.496, 1]);
+  P.push([xr, yr, 0.53, 0]); for (let k = G.length - 1; k >= 0; k--) { const x = G[k]; P.push([x, yr + (x === 3.7 ? 0.2 : 0), 0.53 + 0.19 * Math.min(1, x / 60), 0]); }
+  return (S.prof = P);
+}
+function sledSegBuild(sg, k) {                                           // length k of the track (k*24 m on): its 17 rings, built in place (no new arrays)
+  const S = SLED, T = S.trk, M = S.NS - 1, PR = sledProfile(), NPT = PR.length, V = S.sv, Z = sledZones();
+  const i0 = k * 16; sledGenTo(i0 + 17); sg.k = k;
+  const a0 = i0 & M, ox = T.px[a0], oy = T.py[a0], oz = T.pz[a0];
+  for (let j = 0; j <= 16; j++) {
+    const i = i0 + j, a = i & M, s = i * S.DS, zn = Z[T.zn[a]], tl = zn.tilt, cave = T.zn[a] === 2;
+    sledFrameAt(s, V.P, null, V.R, V.U);
+    for (let m = 0; m < NPT; m++) {
+      const p = PR[m], ice = p[3] === 1, x = p[0], y = ice ? p[1] : sledGroundY(x, tl) + p[1] - S.RP * (1 - Math.cos(S.A)) + (Math.abs(x) > 20 ? Math.sin(s * 0.05 + x * 0.3) * 1.2 : 0), o = (j * NPT + m) * 3, w = (j * NPT + m) * 2;
+      sg.pos[o] = V.P.x - ox + V.R.x * x + V.U.x * y; sg.pos[o + 1] = V.P.y - oy + V.R.y * x + V.U.y * y; sg.pos[o + 2] = V.P.z - oz + V.R.z * x + V.U.z * y;
+      if (ice) { const an = Math.abs(x) > S.RP * Math.sin(S.A) + 0.01 ? Math.sign(x) * 2.2 : Math.asin(Math.max(-1, Math.min(1, x / S.RP))), nx = -Math.sin(an), ny = Math.cos(an); sg.nor[o] = V.R.x * nx + V.U.x * ny; sg.nor[o + 1] = V.R.y * nx + V.U.y * ny; sg.nor[o + 2] = V.R.z * nx + V.U.z * ny; }
+      else { sg.nor[o] = V.U.x; sg.nor[o + 1] = V.U.y; sg.nor[o + 2] = V.U.z; }
+      sg.uv[w] = ice ? p[2] : cave ? p[2] + 0.24 : p[2]; sg.uv[w + 1] = s / (ice ? 6 : 10);
+    }
+  }
+  let n = 0; const ix = sg.idx;
+  for (let j = 0; j < 16; j++) {
+    const sm = (i0 + j + 0.5) * S.DS; if (sledInGap(sm)) continue;
+    const zg = T.zn[(i0 + j) & M] < 3, pipe = sm > S.S0 - 9;            // (snow either side, down on the ground, none up in the sky; the ice starts under the sound wall)
+    for (let m = 0; m < NPT - 1; m++) {
+      const ice = PR[m][3] === 1 && PR[m + 1][3] === 1, gr = PR[m][3] === 0 && PR[m + 1][3] === 0; if (!ice && !gr) continue; if (gr && !zg) continue; if (ice && !pipe) continue;
+      const a = j * NPT + m, b = a + NPT; ix[n++] = a; ix[n++] = b; ix[n++] = a + 1; ix[n++] = a + 1; ix[n++] = b; ix[n++] = b + 1;
+    }
+  }
+  const g = sg.m.geometry; g.setDrawRange(0, n); g.index.needsUpdate = true; g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = g.attributes.uv.needsUpdate = true;
+  const mo = (8 * NPT + S.profMid) * 3; g.boundingSphere.center.set(sg.pos[mo], sg.pos[mo + 1], sg.pos[mo + 2]); g.boundingSphere.radius = T.zn[a0] < 3 ? 130 : 18;
+  sg.m.position.set(ox, oy, oz); sg.m.visible = true;
+}
+function sledSegsStep() {                                                // the lengths she can see: 1 behind, 9 ahead (recycled as she passes)
+  const S = SLED, k0 = Math.max(0, Math.floor((S.s - 30) / S.SEG)), k1 = k0 + S.NSEG - 1;
+  for (const sg of S.segs) if (sg.k >= 0 && (sg.k < k0 || sg.k > k1)) { sg.k = -1; sg.m.visible = false; }
+  let built = 0;
+  for (let k = k0; k <= k1; k++) {
+    let have = false, free = null; for (const sg of S.segs) { if (sg.k === k) { have = true; break; } if (!free && sg.k < 0) free = sg; }
+    if (have) continue; if (!free) break;
+    sledSegBuild(free, k); if (++built >= 3 && S.phase === 'run') break;   // (at most three a frame)
+  }
+}
+function sledSegsDirty(s0, s1) { for (const sg of SLED.segs) if (sg.k >= 0 && (sg.k + 1) * SLED.SEG > s0 && sg.k * SLED.SEG < s1) { sg.k = -1; sg.m.visible = false; } }   // (a gap filled in: rebuilt)
+
+/* ---------- textures ---------- */
+function sledIceTex() {                                                  // the atlas: ice across the trough (left half), snow (third quarter), cave rock (last quarter)
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256; const g = c.getContext('2d');
+  for (let x = 0; x < 128; x++) { const u = x / 127, e = Math.abs(u - 0.5) * 2, rim = e > 0.95, a = rim ? 1 : 0.99 - e * e * 0.16, l = rim ? 255 : 228 + (1 - e) * 22, b = rim ? 255 : 250;
+    g.fillStyle = `rgba(${Math.round(l - 30 * e)},${Math.round(l - 8 * e)},${b},${a.toFixed(3)})`; g.fillRect(x, 0, 1, 256); }
+  let sd = 7; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 70; i++) { const x = 8 + rn() * 112, w = 0.6 + rn() * 1.6; g.fillStyle = rn() < 0.5 ? 'rgba(255,255,255,.55)' : 'rgba(120,170,220,.28)'; g.fillRect(x, 0, w, 256); }   // (the grooves of a hundred sleds)
+  for (let i = 0; i < 60; i++) { g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(8 + rn() * 112, rn() * 256, 1.2, 1.2); }
+  g.fillStyle = 'rgba(90,160,230,.35)'; for (const x of [40, 87]) for (let y = 0; y < 256; y += 32) g.fillRect(x, y, 1.5, 16);
+  for (let x = 128; x < 192; x++) { g.fillStyle = '#f4f8ff'; g.fillRect(x, 0, 1, 256); }
+  for (let i = 0; i < 500; i++) { g.fillStyle = rn() < 0.5 ? 'rgba(200,214,240,.6)' : 'rgba(255,255,255,1)'; g.fillRect(128 + rn() * 64, rn() * 256, 1 + rn() * 2, 1 + rn() * 2); }
+  for (let x = 192; x < 256; x++) { g.fillStyle = '#3a4a58'; g.fillRect(x, 0, 1, 256); }
+  for (let i = 0; i < 500; i++) { const v = 40 + rn() * 50 | 0; g.fillStyle = `rgba(${v},${v + 16},${v + 30},.8)`; g.fillRect(192 + rn() * 64, rn() * 256, 1 + rn() * 3, 1 + rn() * 3); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+}
+function sledIconTex(em, col) {                                          // a power-up: its emoji in a glowing bubble
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 20, 64, 64, 62); gr.addColorStop(0, col + 'ff'); gr.addColorStop(0.62, col + 'cc'); gr.addColorStop(0.8, col + '66'); gr.addColorStop(1, col + '00');
+  g.fillStyle = gr; g.beginPath(); g.arc(64, 64, 62, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 5; g.beginPath(); g.arc(64, 64, 44, 0, Math.PI * 2); g.stroke();
+  g.font = '56px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(em, 64, 68);
+  return new THREE.CanvasTexture(c);
+}
+function sledRingTex() {                                                 // the shield: a glowing bubble, clear in the middle
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 34, 64, 64, 63);
+  gr.addColorStop(0, 'rgba(90,200,255,0)'); gr.addColorStop(0.55, 'rgba(90,200,255,.18)'); gr.addColorStop(0.82, 'rgba(160,230,255,.9)'); gr.addColorStop(1, 'rgba(90,200,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128); g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.ellipse(44, 40, 12, 6, -0.7, 0, Math.PI * 2); g.fill();
+  return new THREE.CanvasTexture(c);
+}
+function sledEarthTex() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d');
+  { const o = g.createLinearGradient(0, 0, 0, 256); o.addColorStop(0, '#1a4a9a'); o.addColorStop(0.5, '#2a72c8'); o.addColorStop(1, '#1a4a9a'); g.fillStyle = o; g.fillRect(0, 0, 512, 256); }
+  let sd = 31; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let k = 0; k < 7; k++) { const cx = rn() * 512, cy = 50 + rn() * 156, n = 14 + (rn() * 14 | 0);   // the continents: clumps of green and brown
+    for (let i = 0; i < n; i++) { const x = cx + (rn() - 0.5) * 120, y = cy + (rn() - 0.5) * 70, r = 10 + rn() * 26; g.fillStyle = rn() < 0.7 ? '#3f9a4a' : '#a88a52'; g.beginPath(); g.ellipse(x, y, r * 1.4, r, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.ellipse(x - 512, y, r * 1.4, r, 0, 0, Math.PI * 2); g.fill(); } }
+  g.fillStyle = '#f2f6ff'; g.fillRect(0, 0, 512, 16); g.fillRect(0, 240, 512, 16);
+  for (let i = 0; i < 90; i++) { g.fillStyle = 'rgba(255,255,255,' + (0.35 + rn() * 0.45).toFixed(2) + ')'; g.beginPath(); g.ellipse(rn() * 512, rn() * 256, 18 + rn() * 50, 3 + rn() * 6, rn() * 0.4 - 0.2, 0, Math.PI * 2); g.fill(); }   // (swirls of cloud)
+  return new THREE.CanvasTexture(c);
+}
+function sledMoonTex() {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 26, 64, 64, 64); gr.addColorStop(0, 'rgba(255,250,225,.55)'); gr.addColorStop(1, 'rgba(255,250,225,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = '#fbf6e2'; g.beginPath(); g.arc(64, 64, 26, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(200,190,160,.5)'; for (const [x, y, r] of [[56, 58, 6], [72, 70, 5], [66, 50, 3.5], [54, 74, 3]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+  return new THREE.CanvasTexture(c);
+}
+function sledCloudTex() {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  let sd = 5; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 160; i++) { const x = rn() * 256, y = rn() * 256, r = 14 + rn() * 34, gr = g.createRadialGradient(x, y, 0, x, y, r), a = 0.22 + rn() * 0.3;
+    gr.addColorStop(0, `rgba(255,255,255,${a})`); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr;
+    for (const ox of [-256, 0, 256]) for (const oy of [-256, 0, 256]) g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(6, 6); return t;
+}
+
+/* ---------- the kit: one draw call each (chimMerge: vertex-coloured, flat shaded) ---------- */
+function sledSaucerGeo() {                                               // the red saucer: a shallow dish, its rolled rim, two rope handles
+  const pts = []; for (const [r, y] of [[0, 0.03], [0.16, 0.035], [0.3, 0.05], [0.4, 0.09], [0.46, 0.15], [0.48, 0.2], [0.44, 0.215], [0.4, 0.15], [0.3, 0.1], [0.16, 0.085], [0, 0.08]]) pts.push(new THREE.Vector2(r, y));
+  const parts = [[new THREE.LatheGeometry(pts, 26), 0xe0263a, 0, 0, 0, 1, 1, 1], [new THREE.TorusGeometry(0.46, 0.03, 6, 28), 0xff4d5e, 0, 0.2, 0, 1, 1, 1, Math.PI / 2, 0, 0],
+    [new THREE.CircleGeometry(0.3, 20), 0xff8a96, 0, 0.087, 0, 1, 1, 1, -Math.PI / 2, 0, 0]];
+  for (const sx of [-1, 1]) parts.push([new THREE.TorusGeometry(0.1, 0.018, 5, 10, Math.PI), 0x2a1a1a, sx * 0.47, 0.22, 0, 1, 1, 1, 0, Math.PI / 2, sx * 0.35]);
+  return chimMerge(parts);
+}
+function sledKitGeo(kind) {
+  if (kind === 'snowman') { const P = [[chimLump(1.1, 0.06, 1), 0xf4f8ff, 0, 0.52, 0, 0.6, 0.55, 0.6], [chimLump(2.3, 0.06, 1), 0xf8fbff, 0, 1.22, 0, 0.44, 0.42, 0.44], [new THREE.SphereGeometry(0.31, 14, 10), 0xffffff, 0, 1.78, 0, 1, 1, 1],
+      [new THREE.CylinderGeometry(0.2, 0.22, 0.32, 12), 0x1b1b24, 0, 2.18, 0, 1, 1, 1], [new THREE.CylinderGeometry(0.34, 0.34, 0.04, 14), 0x1b1b24, 0, 2.03, 0, 1, 1, 1], [new THREE.CylinderGeometry(0.205, 0.225, 0.07, 12), 0xd8203a, 0, 2.08, 0, 1, 1, 1],
+      [new THREE.ConeGeometry(0.06, 0.32, 8), 0xff8a1a, 0, 1.76, 0.42, 1, 1, 1, Math.PI / 2, 0, 0], [new THREE.SphereGeometry(0.045, 6, 5), 0x111111, -0.11, 1.86, 0.26, 1, 1, 1], [new THREE.SphereGeometry(0.045, 6, 5), 0x111111, 0.11, 1.86, 0.26, 1, 1, 1],
+      [new THREE.TorusGeometry(0.33, 0.07, 6, 16), 0xd8203a, 0, 1.55, 0, 1, 1, 1, Math.PI / 2, 0, 0], [new THREE.BoxGeometry(0.16, 0.36, 0.08), 0xd8203a, 0.2, 1.38, 0.3, 1, 1, 1, 0.3, 0, 0.2],
+      [new THREE.BoxGeometry(0.7, 0.05, 0.05), 0x5a3a22, -0.68, 1.36, 0, 1, 1, 1, 0, 0, 0.5], [new THREE.BoxGeometry(0.7, 0.05, 0.05), 0x5a3a22, 0.68, 1.36, 0, 1, 1, 1, 0, 0, -0.5]];
+    for (let i = 0; i < 3; i++) P.push([new THREE.SphereGeometry(0.04, 6, 5), 0x111111, 0, 1.08 + i * 0.16, 0.42 - Math.abs(i - 1) * 0.02, 1, 1, 1]);
+    return chimMerge(P); }
+  if (kind === 'boulder') return chimMerge([[chimLump(4.7, 0.28, 1), 0xa8dcf4, 0, 0.55, 0, 0.95, 0.72, 0.9], [chimLump(2.9, 0.3, 1), 0xd8f2ff, 0.45, 0.32, 0.28, 0.42, 0.36, 0.42], [chimLump(8.1, 0.3, 1), 0x8cc8e8, -0.5, 0.28, -0.2, 0.38, 0.32, 0.38]]);
+  if (kind === 'pine') { const P = [[new THREE.CylinderGeometry(0.16, 0.22, 0.8, 7), 0x5a3e2a, 0, 0.4, 0, 1, 1, 1]];
+    for (let i = 0; i < 4; i++) { const r = 1.25 - i * 0.26, y = 0.75 + i * 0.68; P.push([new THREE.ConeGeometry(r, 1.2, 8), [0x22543a, 0x2a6242, 0x2f6a46, 0x357452][i], 0, y + 0.6, 0, 1, 1, 1], [new THREE.ConeGeometry(r * 0.72, 0.5, 8), 0xf4f8ff, 0, y + 0.95, 0, 1, 1, 1]); }
+    return chimMerge(P); }
+  if (kind === 'spike') { const P = [[new THREE.IcosahedronGeometry(0.52, 1), 0xd81e34, 0, 0.72, 0, 1, 1, 1]], ico = new THREE.IcosahedronGeometry(1, 0), a = ico.attributes.position, seen = {};
+    for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), z = a.getZ(i), key = x.toFixed(2) + y.toFixed(2) + z.toFixed(2); if (seen[key]) continue; seen[key] = 1;
+      const v = new THREE.Vector3(x, y, z).normalize(), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), v), e = new THREE.Euler().setFromQuaternion(q);
+      P.push([new THREE.ConeGeometry(0.13, 0.42, 6), 0xff5a5a, v.x * 0.6, 0.72 + v.y * 0.6, v.z * 0.6, 1, 1, 1, e.x, e.y, e.z], [new THREE.ConeGeometry(0.05, 0.14, 5), 0xfff0f0, v.x * 0.83, 0.72 + v.y * 0.83, v.z * 0.83, 1, 1, 1, e.x, e.y, e.z]); }
+    ico.dispose(); return chimMerge(P); }
+  if (kind === 'penguin') return chimMerge([[new THREE.SphereGeometry(0.34, 12, 10), 0x1c2230, 0, 0.5, 0, 1, 1.35, 0.95], [new THREE.SphereGeometry(0.27, 12, 10), 0xf8f8f2, 0, 0.46, 0.12, 1, 1.25, 0.85],
+    [new THREE.SphereGeometry(0.25, 12, 10), 0x1c2230, 0, 1.0, 0, 1, 1, 1], [new THREE.SphereGeometry(0.17, 10, 8), 0xf8f8f2, 0, 0.98, 0.1, 1, 1, 1], [new THREE.ConeGeometry(0.06, 0.18, 6), 0xffa420, 0, 0.97, 0.3, 1, 1, 1, Math.PI / 2, 0, 0],
+    [new THREE.SphereGeometry(0.04, 6, 5), 0x111111, -0.08, 1.05, 0.22, 1, 1, 1], [new THREE.SphereGeometry(0.04, 6, 5), 0x111111, 0.08, 1.05, 0.22, 1, 1, 1],
+    [new THREE.BoxGeometry(0.06, 0.4, 0.18), 0x1c2230, -0.34, 0.55, 0, 1, 1, 1, 0, 0, 0.35], [new THREE.BoxGeometry(0.06, 0.4, 0.18), 0x1c2230, 0.34, 0.55, 0, 1, 1, 1, 0, 0, -0.35],
+    [new THREE.BoxGeometry(0.14, 0.04, 0.2), 0xffa420, -0.12, 0.03, 0.1, 1, 1, 1], [new THREE.BoxGeometry(0.14, 0.04, 0.2), 0xffa420, 0.12, 0.03, 0.1, 1, 1, 1], [new THREE.TorusGeometry(0.17, 0.035, 5, 12), 0x38b0ff, 0, 0.82, 0, 1, 1, 1, Math.PI / 2, 0, 0]]);
+  if (kind === 'snowball') return chimMerge([[chimLump(6.2, 0.1, 2), 0xf6faff, 0, 0, 0, 0.78, 0.78, 0.78], [chimLump(3.4, 0.2, 1), 0xdbe8f6, 0.3, 0.25, 0.5, 0.25, 0.2, 0.2], [chimLump(5.5, 0.2, 1), 0xdbe8f6, -0.4, -0.3, 0.4, 0.22, 0.18, 0.2]]);
+  if (kind === 'ramp') { const sh = new THREE.Shape(); sh.moveTo(-1.6, 0); sh.lineTo(1.6, 0); sh.lineTo(1.6, 0.85); sh.lineTo(-1.6, 0);
+    const ex = new THREE.ExtrudeGeometry(sh, { depth: 2.0, bevelEnabled: false }); ex.rotateY(Math.PI / 2); ex.translate(-1.0, 0, 0);
+    const P = [[ex, 0x8fd8ff, 0, 0, 0, 1, 1, 1]]; for (const x of [-0.62, 0, 0.62]) P.push([new THREE.BoxGeometry(0.16, 0.03, 3.3), x ? 0xffd23a : 0xff5a8a, x, 0.44, 0, 1, 1, 1, 0.26, 0, 0]);
+    return chimMerge(P); }
+  if (kind === 'flag') { const xr = SLED.RP * Math.sin(SLED.A), yr = SLED.RP * (1 - Math.cos(SLED.A)), P = [];
+    for (const sx of [-1, 1]) { for (let i = 0; i < 4; i++) P.push([new THREE.CylinderGeometry(0.05, 0.05, 0.36, 6), i % 2 ? 0xffffff : 0xe8203a, sx * (xr + 0.15), yr + 0.18 + i * 0.36, 0, 1, 1, 1]);
+      const fl = new THREE.Shape(); fl.moveTo(0, 0); fl.lineTo(sx * -0.7, -0.22); fl.lineTo(0, -0.44); P.push([new THREE.ShapeGeometry(fl), 0xff3a4a, sx * (xr + 0.15), yr + 1.6, 0, 1, 1, 1]); }
+    for (let i = 0; i < 6; i++) P.push([new THREE.PlaneGeometry(0.5, 0.32), i % 2 ? 0xffffff : 0xe8203a, -1.25 + i * 0.5, 0.04, 0.6, 1, 1, 1, -Math.PI / 2, 0, 0]);   // (red and white stripes before the edge)
+    return chimMerge(P); }
+  if (kind === 'fish' || kind === 'gold') { const g = kind === 'gold', a = g ? 0xffcf3a : 0xbcd0de, b = g ? 0xffb52a : 0x8fa9bd;
+    const geo = chimMerge([[new THREE.SphereGeometry(0.25, 12, 10), a, 0, 0, 0, 1, 0.42, 0.28], [new THREE.ConeGeometry(0.15, 0.22, 4), b, 0.3, 0, 0, 1, 1, 0.35, 0, 0, -Math.PI / 2],
+      [new THREE.ConeGeometry(0.06, 0.12, 3), b, 0, 0.12, 0, 1, 1, 0.4], [new THREE.SphereGeometry(0.03, 6, 5), g ? 0x3a2400 : 0x1b2a44, -0.15, 0.03, 0.06, 1, 1, 1], [new THREE.SphereGeometry(0.03, 6, 5), g ? 0x3a2400 : 0x1b2a44, -0.15, 0.03, -0.06, 1, 1, 1]]);
+    geo.scale(1.7, 1.7, 1.7); return geo; }
+  if (kind === 'house') { const P = [[new THREE.BoxGeometry(7, 3.4, 6), 0x3a3a52, 0, 1.7, 0, 1, 1, 1], [new THREE.ConeGeometry(5.3, 2.4, 4), 0x8e2a2a, 0, 4.6, 0, 1, 1, 0.82, 0, Math.PI / 4, 0], [new THREE.ConeGeometry(5.0, 0.6, 4), 0xeef2ff, 0, 5.6, 0, 1, 1, 0.82, 0, Math.PI / 4, 0],
+      [new THREE.BoxGeometry(0.8, 3.6, 0.8), 0x5a4a48, 2.2, 5.0, -0.6, 1, 1, 1]];
+    for (const [x, y] of [[-2.2, 1.2], [2.2, 1.2], [-2.2, 2.6], [0, 2.6], [2.2, 2.6]]) P.push([new THREE.BoxGeometry(1.0, 0.8, 0.1), sledRnd() < 0.7 ? 0xffd27a : 0xffb35a, x, y, 3.02, 1, 1, 1]);
+    P.push([new THREE.BoxGeometry(1.2, 0.12, 6.4), 0xeef2ff, 0, 0.06, 4.2, 6, 1, 0.3]);
+    return chimMerge(P); }
+  if (kind === 'arch') { const P = [[new THREE.TorusGeometry(6.2, 1.1, 6, 16, Math.PI), 0x2c4656, 0, 0, 0, 1, 1, 1]];
+    for (let i = 1; i < 12; i++) { const a = i / 12 * Math.PI, r = 5.1, l = 0.6 + ((i * 7) % 5) * 0.28; P.push([new THREE.ConeGeometry(0.16 + l * 0.05, l, 6), 0xa6ecff, Math.cos(a) * r, Math.sin(a) * r - l / 2, 0, 1, 1, 1, Math.PI, 0, 0]); }
+    return chimMerge(P); }
+  if (kind === 'crystal') { const P = []; for (let i = 0; i < 4; i++) { const a = i * 1.7, h = 0.9 + (i % 3) * 0.45, c = [0x7ff0ff, 0xb0a0ff, 0x8affd8, 0xff9ad8][i];
+      P.push([new THREE.CylinderGeometry(0.12, 0.17, h, 6), c, Math.cos(a) * 0.22, h / 2, Math.sin(a) * 0.22, 1, 1, 1, Math.cos(a) * 0.3, 0, Math.sin(a) * 0.3], [new THREE.ConeGeometry(0.12, 0.3, 6), 0xffffff, Math.cos(a) * 0.22 + Math.cos(a) * h * 0.15, h + 0.12, Math.sin(a) * 0.22 + Math.sin(a) * h * 0.15, 1, 1, 1, Math.cos(a) * 0.3, 0, Math.sin(a) * 0.3]); }
+    return chimMerge(P); }
+  if (kind === 'cloud') { const P = []; for (let i = 0; i < 6; i++) { const a = i * 1.1; P.push([chimLump(i * 2.1, 0.12, 1), 0xffffff, Math.cos(a) * (0.6 + i * 0.25), (i % 2) * 0.35, Math.sin(a) * 0.5, 1.0 + (i % 3) * 0.3, 0.75 + (i % 2) * 0.2, 1.0]); } return chimMerge(P); }
+  if (kind === 'rock') return chimMerge([[chimLump(1.3, 0.3, 1), 0xffffff, 0, 0.3, 0, 1, 0.75, 1]]);
+  return null;
+}
+function sledSlideGeo() {                                                // (out in space) a far-off slide crossing overhead: the same trough, along a long arc
+  const S = SLED, NP = 11, NR = 40, pos = [], idx = [], uv = [];
+  for (let j = 0; j < NR; j++) { const t = j / (NR - 1), x = (t - 0.5) * 220, y = -Math.pow((t - 0.5) * 2, 2) * 26, z = Math.sin(t * Math.PI * 1.3) * 22, dx = 220, dy = -8 * (t - 0.5) * 26 / 2.2;
+    const fl = Math.hypot(dx, dy), fx = dx / fl, fy = dy / fl;   // (along x; right is -z, up is perpendicular in the x-y plane)
+    for (let m = 0; m < NP; m++) { const a = -S.A + 2 * S.A * m / (NP - 1), lx = S.RP * 1.3 * Math.sin(a), ly = S.RP * 1.3 * (1 - Math.cos(a));
+      pos.push(x - fy * ly, y + fx * ly, z - lx); uv.push(0.02 + 0.46 * m / (NP - 1), t * 30); } }
+  for (let j = 0; j < NR - 1; j++) for (let m = 0; m < NP - 1; m++) { const a = j * NP + m, b = a + NP; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere(); return g;
+}
+function sledBakeShade(g) {                                              // (out in the yard everything's unlit: shading baked into the colours)
+  const n = g.attributes.normal, c = g.attributes.color, L = new THREE.Vector3(-0.45, 0.78, -0.43).normalize();
+  for (let i = 0; i < c.count; i++) { const k = 0.62 + 0.45 * Math.max(0, n.getX(i) * L.x + n.getY(i) * L.y + n.getZ(i) * L.z); c.setXYZ(i, c.getX(i) * k, c.getY(i) * k, c.getZ(i) * k); }
+  return g;
+}
+
+/* ---------- built once, the first time she rides ---------- */
+function sledBuild() {
+  const S = SLED, sc = S.scene = new THREE.Scene();
+  S.cam = new THREE.PerspectiveCamera(64, 1, 0.2, 6000); sc.add(S.cam); S.size = new THREE.Vector2();
+  S.vv = { P: new THREE.Vector3(), F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3(), P2: new THREE.Vector3(), F2: new THREE.Vector3(), R2: new THREE.Vector3(), U2: new THREE.Vector3(),
+    N: new THREE.Vector3(), X: new THREE.Vector3(), Y: new THREE.Vector3(), Z: new THREE.Vector3(), a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), up: new THREE.Vector3(),
+    M: new THREE.Matrix4(), Q: new THREE.Quaternion(), Q2: new THREE.Quaternion(), E: new THREE.Euler(), Sc: new THREE.Vector3(1, 1, 1), Y0: new THREE.Vector3(0, 1, 0), col: new THREE.Color(), c2: new THREE.Color(), c3: new THREE.Color() };
+  S.sv = { P: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3() }; S.dv = { P: new THREE.Vector3(), F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3() };
+  S.catP = new THREE.Vector3(); S.dirF = new THREE.Vector3(0, 0, -1); S.sideX = new THREE.Vector3(-1, 0, 0);
+  S.env = { top: new THREE.Color(), hor: new THREE.Color(), bot: new THREE.Color(), fog: new THREE.Color(), trk: new THREE.Color(), em: new THREE.Color(), hs: new THREE.Color(), hg: new THREE.Color(), key: -1 };
+  sc.background = new THREE.Color(0x0c0f2c); sc.fog = new THREE.Fog(0x1c2250, 30, 165);
+  sc.add(S.hemi = new THREE.HemisphereLight(0xb4c2ff, 0x2a2a46, 1.05));
+  S.sun = new THREE.DirectionalLight(0xffffff, 0.45); S.sun.position.set(-30, 60, 20); sc.add(S.sun); sc.add(S.sun.target);
+  // the sky: a dome of colour round the camera, the stars, the moon, the Earth, a sea of cloud
+  { const g = new THREE.SphereGeometry(900, 24, 14), n = g.attributes.position.count; g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    S.sky = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false })); S.sky.renderOrder = -10; sc.add(S.sky); }
+  { const n = 700, p = new Float32Array(n * 3); let sd = 99; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < n; i++) { const u = rn() * 2 - 1, a = rn() * Math.PI * 2, r = Math.sqrt(1 - u * u); p[i * 3] = Math.cos(a) * r * 800; p[i * 3 + 1] = u * 800; p[i * 3 + 2] = Math.sin(a) * r * 800; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+    S.stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0.8, fog: false, depthWrite: false })); S.stars.renderOrder = -9; sc.add(S.stars); }
+  S.moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: sledMoonTex(), fog: false, depthWrite: false, transparent: true })); S.moon.scale.setScalar(150); S.moon.renderOrder = -8; sc.add(S.moon);
+  { S.earth = new THREE.Group(); const e = S.earthM = new THREE.Mesh(new THREE.SphereGeometry(2400, 48, 28), new THREE.MeshBasicMaterial({ map: sledEarthTex(), fog: false, transparent: true, depthWrite: false })); e.renderOrder = -7; e.rotation.x = Math.PI / 2 - 0.3;
+    const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0x6ab8ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.85, fog: false })); gl.scale.setScalar(6400); gl.renderOrder = -8;
+    S.earth.add(gl, e); S.earth.visible = false; sc.add(S.earth);
+    S.planet = new THREE.Sprite(new THREE.SpriteMaterial({ map: sledIconTex('🪐', '#ffcf7a'), fog: false, depthWrite: false, transparent: true })); S.planet.scale.setScalar(120); S.planet.visible = false; sc.add(S.planet); }
+  { const m = new THREE.MeshLambertMaterial({ map: sledCloudTex(), transparent: true, opacity: 0.9, depthWrite: false, emissive: 0x3a3870 });
+    S.sea = new THREE.Mesh(new THREE.CircleGeometry(900, 36), m); S.sea.rotation.x = -Math.PI / 2; S.sea.visible = false; sc.add(S.sea); }
+  // the track: eleven recycled 24 m lengths of ice trough (and the snow either side)
+  { const tex = S.iceTex = sledIceTex(), mat = S.trkMat = new THREE.MeshLambertMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, color: 0xf2f6ff, emissive: 0x26304e });
+    const NPT = sledProfile().length, nv = 17 * NPT; S.segs = [];
+    for (let k = 0; k < S.NSEG; k++) { const g = new THREE.BufferGeometry(), sg = { pos: new Float32Array(nv * 3), nor: new Float32Array(nv * 3), uv: new Float32Array(nv * 2), idx: new Uint16Array(16 * (NPT - 1) * 6), k: -1 };
+      g.setAttribute('position', new THREE.BufferAttribute(sg.pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(sg.nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(sg.uv, 2)); g.setIndex(new THREE.BufferAttribute(sg.idx, 1));
+      g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 130); sg.m = new THREE.Mesh(g, mat); sg.m.visible = false; sc.add(sg.m); S.segs.push(sg); } }
+  // the scenery: one instanced mesh a kind, recycled round as she goes (pines, snowy rocks, the houses, the cave's arches and crystals, clouds, far-off slides)
+  { const lam = new THREE.MeshLambertMaterial({ vertexColors: true }), bas = new THREE.MeshBasicMaterial({ vertexColors: true }), D = S.dec = {};
+    const kind = (k, geo, mat, n) => { const im = new THREE.InstancedMesh(geo, mat, n); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false;
+      for (let i = 0; i < n; i++) { im.setMatrixAt(i, S.vv.M.makeScale(0, 0, 0)); im.setColorAt(i, S.vv.col.setHex(0xffffff)); } im.visible = false; sc.add(im); D[k] = { im, n, at: 0, s: new Float32Array(n).fill(-1e9), dirty: false }; };
+    kind('pine', sledKitGeo('pine'), lam, 210); kind('rock', sledKitGeo('rock'), lam, 110); kind('house', sledKitGeo('house'), bas, 26);
+    kind('arch', sledKitGeo('arch'), lam, 44); kind('crystal', sledKitGeo('crystal'), bas, 70);
+    kind('cloud', sledKitGeo('cloud'), new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x4a4a78 }), 120);
+    S.decK = ['pine', 'rock', 'house', 'arch', 'crystal', 'cloud', 'slide'];
+    kind('slide', sledSlideGeo(), new THREE.MeshLambertMaterial({ map: S.iceTex, transparent: true, side: THREE.DoubleSide, color: 0xb8f0ff, emissive: 0x2a5a78, opacity: 0.85 }), 4); }
+  // the top of the bank: the sound wall behind her (a panel missing, where she came through), the off-ramp's lamps over it
+  { const P = [], wall = 0x8a8a90; for (let x = -30; x <= 30; x += 4) if (x !== 4) P.push([new THREE.BoxGeometry(3.9, 4.2, 0.3), x % 8 ? wall : 0x7e7e86, x, 2.1, 0, 1, 1, 1]);
+    for (let x = -32; x <= 32; x += 4) P.push([new THREE.BoxGeometry(0.35, 4.6, 0.45), 0x6a6a70, x - 2, 2.3, 0, 1, 1, 1]);
+    for (const x of [-20, 6, 26]) P.push([new THREE.CylinderGeometry(0.12, 0.14, 8, 6), 0x55585e, x, 4, 4, 1, 1, 1], [new THREE.BoxGeometry(1.6, 0.18, 0.4), 0x55585e, x + 0.7, 8, 4, 1, 1, 1]);
+    for (let k = 0; k < 5; k++) P.push([new THREE.BoxGeometry(0.6, 0.4, 0.5), wall, 3 + k * 0.5, 0.2, -0.6 - (k % 2) * 0.5, 1, 1, 1, 0, k, 0.3]);
+    S.top = new THREE.Group(); S.top.add(new THREE.Mesh(chimMerge(P), new THREE.MeshLambertMaterial({ vertexColors: true })));
+    for (const x of [-20, 6, 26]) { const l = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xffb25a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 })); l.scale.setScalar(3.2); l.position.set(x + 1.4, 7.8, 4); S.top.add(l); }
+    sc.add(S.top); }
+  // the things in her way (pooled, one mesh each), the fish (instanced), the golden fish, the power-ups
+  { const lam = new THREE.MeshLambertMaterial({ vertexColors: true }), pool = (k, n, mk) => { const P = []; for (let i = 0; i < n; i++) { const o = mk(); o.visible = false; o.userData.busy = false; o.userData.kind = k; sc.add(o); P.push(o); } return P; };
+    S.pools = {};
+    for (const [k, n] of [['snowman', 6], ['boulder', 8], ['pine', 7], ['spike', 10], ['penguin', 5], ['snowball', 4], ['ramp', 5], ['flag', 4]]) { const g = sledKitGeo(k); S.pools[k] = pool(k, n, () => new THREE.Mesh(g, lam)); }
+    const fm = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2a3a48 }), im = S.fishIM = new THREE.InstancedMesh(sledKitGeo('fish'), fm, 96); im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); im.frustumCulled = false;
+    for (let i = 0; i < 96; i++) im.setMatrixAt(i, S.vv.M.makeScale(0, 0, 0)); sc.add(im);
+    S.fp = new Float32Array(96 * 3); S.fish = []; for (let i = 0; i < 96; i++) S.fish.push({ i, on: false, s: 0, q: 0, h: 0, ph: 0, pull: false });
+    const gg = sledKitGeo('gold'), gm = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x6a4800 }), glow = new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xffd86a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 });
+    S.pools.gold = pool('gold', 2, () => { const g = new THREE.Group(), f = new THREE.Mesh(gg, gm), s = new THREE.Sprite(glow); f.scale.setScalar(1.3); s.scale.setScalar(2.4); g.add(s, f); g.userData.fish = f; return g; });
+    S.pupTex = { mag: sledIconTex('🧲', '#ff5a7a'), shield: sledIconTex('🛡️', '#3aa8ff'), rocket: sledIconTex('🚀', '#ffa62a') };
+    S.pools.pup = pool('pup', 2, () => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: S.pupTex.mag, transparent: true, depthWrite: false })); s.scale.setScalar(1.9); return s; });
+    S.obs = []; for (let i = 0; i < 48; i++) S.obs.push({ on: false, kind: '', s: 0, q: 0, q0: 0, w: 0, len: 0, hgt: 0, m: null, mv: 0, t: 0, ph: 0, P: new THREE.Vector3(), F: new THREE.Vector3(), R: new THREE.Vector3(), U: new THREE.Vector3() });
+    S.pups = []; for (let i = 0; i < 4; i++) S.pups.push({ on: false, kind: '', s: 0, q: 0, h: 0, m: null });
+    S.gaps = []; for (let i = 0; i < 8; i++) S.gaps.push({ on: false, s0: 0, s1: 0, flag: null }); }
+  // her: the saucer, and her clone from the yard on it, wrapped for the lean, the tricks and the squash
+  { const K = S.K = { root: new THREE.Group(), lean: new THREE.Group(), flip: new THREE.Group(), body: new THREE.Group(), sled: null, rig: null, legs: [], tail: [], head: null, bodyM: null, joints: [] };
+    K.root.add(K.lean); K.lean.add(K.flip); K.flip.position.y = 0.45; K.flip.add(K.body); K.body.position.y = -0.45;
+    K.sled = new THREE.Mesh(sledSaucerGeo(), new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x3a0a10 })); K.body.add(K.sled);
+    K.seat = new THREE.Group(); K.body.add(K.seat);
+    K.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.55, 18), new THREE.MeshBasicMaterial({ color: 0x0a1020, transparent: true, opacity: 0.35, depthWrite: false })); sc.add(K.shadow);
+    K.shield = new THREE.Sprite(new THREE.SpriteMaterial({ map: sledRingTex(), transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending })); K.shield.scale.setScalar(2.6); K.shield.position.y = 0.55; K.root.add(K.shield);
+    K.flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xff8a2a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.95 })); K.flame.position.set(0, 0.3, -0.7); K.flame.scale.setScalar(1.4); K.body.add(K.flame);
+    sc.add(K.root); }
+  S.fx = chimFxMake(sc, 280, false); S.gx = chimFxMake(sc, 120, true);
+  // the weather round the camera (snow, the cave's glints), and the speed lines
+  { const n = 320, p = new Float32Array(n * 3); for (let i = 0; i < n; i++) { p[i * 3] = (Math.random() - 0.5) * 50; p[i * 3 + 1] = (Math.random() - 0.5) * 30; p[i * 3 + 2] = (Math.random() - 0.5) * 50; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+    S.snow = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, map: candleGlowTex, size: 0.3, transparent: true, opacity: 0.85, depthWrite: false })); S.snow.frustumCulled = false; sc.add(S.snow); S.snowV = new Float32Array(n).map(() => 0.6 + Math.random() * 0.8); }
+  { const n = 40, p = new Float32Array(n * 6), g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+    S.lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); S.lines.frustumCulled = false; S.lines.renderOrder = 20; S.cam.add(S.lines);
+    S.lineD = new Float32Array(n * 3); for (let i = 0; i < n; i++) sledLineNew(i, true); }
+  S.built = true;
+}
+function sledLineNew(i, any) { const D = SLED.lineD, a = Math.random() * Math.PI * 2, r = 1.4 + Math.random() * 2.6; D[i * 3] = Math.cos(a) * r; D[i * 3 + 1] = Math.sin(a) * r * 0.8; D[i * 3 + 2] = any ? -2 - Math.random() * 16 : -18; }
+function sledWarm() {                                                    // every shader the run will use compiled, and every picture uploaded, now (behind the fade), not mid-slide
+  const S = SLED, vis = []; S.scene.traverse(o => { vis.push(o, o.visible, o.frustumCulled); o.visible = true; o.frustumCulled = false; });
+  const rt = new THREE.WebGLRenderTarget(4, 4), keep = renderer.getRenderTarget(), pup = S.pools.pup[0];
+  try { renderer.compile(S.scene, S.cam); renderer.setRenderTarget(rt); for (const k of ['mag', 'shield', 'rocket']) { pup.material.map = S.pupTex[k]; renderer.render(S.scene, S.cam); } }
+  finally { renderer.setRenderTarget(keep); rt.dispose(); for (let i = 0; i < vis.length; i += 3) { vis[i].visible = vis[i + 1]; vis[i].frustumCulled = vis[i + 2]; } }
+}
+
+/* ---------- the scenery, placed as the track's laid down ---------- */
+function sledDec(k, x, y, z, ry, sc, sy, col, s) {
+  const S = SLED, D = S.dec[k], V = S.vv, i = D.at; D.at = (D.at + 1) % D.n; D.s[i] = s;
+  V.Q.setFromAxisAngle(V.Y0, ry); V.Sc.set(sc, sc * (sy || 1), sc); V.M.compose(V.a.set(x, y, z), V.Q, V.Sc); D.im.setMatrixAt(i, V.M);
+  D.im.setColorAt(i, V.col.setHex(col === undefined ? 0xffffff : col)); D.dirty = true;
+}
+function sledDecorAt(i, s, d) {                                          // (sledGenTo, each 1.5 m) what stands either side here
+  const S = SLED; if (!S.dec) return; const zi = d < 0 ? 0 : sledZoneAt(d), Z = sledZones()[zi], r = sledRnd;
+  if (d < -2) return;
+  const put = (k, x, yOff, ry, sc, sy, col, onGround) => {      // x across (metres, + right), up from the ground there
+    const W = S.dv, yw = sledFrameAt(s, W.P, W.F, W.R, W.U), gy = onGround ? sledGroundY(x, Z.tilt) : 0;
+    sledDec(k, W.P.x + W.R.x * x + W.U.x * (gy + yOff), W.P.y + W.R.y * x + W.U.y * (gy + yOff), W.P.z + W.R.z * x + W.U.z * (gy + yOff), yw + ry, sc, sy, col, s);
+  };
+  if (zi === 0) {
+    if (i % 3 === 0) { const sd = r() < 0.5 ? -1 : 1, x = sd * (6.5 + r() * 16); if (r() < 0.75) put('pine', x, -0.2, r() * 6, 0.9 + r() * 0.8, 0, r() < 0.3 ? 0xd8e8ff : 0xffffff, true); else put('rock', x, -0.1, r() * 6, 0.6 + r() * 0.8, 0.5, 0xf2f6ff, true); }
+    if (i % 4 === 1) { const x = -(4.6 + r() * 2.5); put('rock', x, -0.25, r() * 6, 0.5 + r() * 0.6, 0.45, 0xeef4ff, true); }
+    if (i % 4 === 3 && r() < 0.6) put('pine', 24 + r() * 30, -0.3, r() * 6, 1.2 + r(), 0, 0xffffff, true);
+    if (d > 6 && d < 560 && i % 14 === 0) put('house', -30 - r() * 5, -0.3, Math.PI / 2, 1, 1, 0xffffff, true);
+  } else if (zi === 1) {
+    if (i % 2 === 0) for (const sd of [-1, 1]) if (r() < 0.8) put('pine', sd * (5.6 + r() * 22), -0.2, r() * 6, 1.1 + r() * 1.1, 0, r() < 0.4 ? 0xcfe4ff : 0xffffff, true);
+    if (i % 5 === 0) put('rock', (r() < 0.5 ? -1 : 1) * (4.4 + r() * 3), -0.2, r() * 6, 0.5 + r() * 0.7, 0.5, 0xe6f0ff, true);
+  } else if (zi === 2) {
+    if (i % 5 === 0) put('arch', 0, -0.3, 0, 1, 1, i % 10 ? 0xffffff : 0xc8d8e8, true);
+    if (i % 3 === 0) put('crystal', (r() < 0.5 ? -1 : 1) * (4.0 + r() * 3.5), -0.1, r() * 6, 0.8 + r() * 0.9, 0, 0xffffff, true);
+    if (i % 4 === 2) put('rock', (r() < 0.5 ? -1 : 1) * (5 + r() * 8), -0.4, r() * 6, 0.8 + r() * 1.4, 0.8, 0x4a6878, true);
+  } else if (zi === 3) {
+    if (i % 3 === 0) { const sd = r() < 0.5 ? -1 : 1, hi = r() < 0.25, sc = 2.2 + r() * 3.4; put('cloud', sd * (11 + sc * 1.5 + r() * 36), hi ? 14 + r() * 16 : -9 - sc - r() * 24, r() * 6, sc, 0, hi ? 0xe8e4ff : 0xffffff, false); }
+  } else {
+    if (i % 4 === 0) { const sd = r() < 0.5 ? -1 : 1; put('rock', sd * (12 + r() * 50), (r() - 0.5) * 50, r() * 6, 1 + r() * 3.5, 0.9, [0x8a8070, 0x6a6a78, 0x9a8a7a][i % 3], false); }
+    if (i % 70 === 0 && d > S.ZSPACE + 60) put('slide', (r() - 0.5) * 30, 16 + r() * 12, Math.PI / 2 + (r() - 0.5) * 0.9, 1, 1, 0xffffff, false);
+  }
+}
+function sledDecStep() {                                                 // (each frame) upload what moved, show only the kinds about
+  const S = SLED; for (const k of S.decK) { const D = S.dec[k]; let live = false; for (let i = 0; i < D.n; i++) if (D.s[i] > S.s - 60 && D.s[i] < S.s + 400) { live = true; break; }
+    D.im.visible = live; if (D.dirty) { D.dirty = false; D.im.instanceMatrix.needsUpdate = true; if (D.im.instanceColor) D.im.instanceColor.needsUpdate = true; } }
+}
+
+/* ---------- what's on the track: laid out a pattern at a time, well ahead of her ---------- */
+function sledTake(k) { for (const o of SLED.pools[k]) if (!o.userData.busy) { o.userData.busy = true; o.visible = true; return o; } return null; }
+function sledGive(o) { if (!o) return; o.userData.busy = false; o.visible = false; }
+function sledPlace(o, P, F, R, U, q, h, spin) {                         // stand a thing on the trough's surface at (q, h), facing back up the track at her
+  const S = SLED, V = S.vv; sledSurf(P, R, U, q, h, o.position, V.N);
+  V.Z.copy(F).negate(); V.X.crossVectors(V.N, V.Z).normalize(); V.Z.crossVectors(V.X, V.N);
+  V.M.makeBasis(V.X, V.N, V.Z); o.quaternion.setFromRotationMatrix(V.M); if (spin) { V.Q.setFromAxisAngle(V.Y0, spin); o.quaternion.multiply(V.Q); }
+}
+const SLED_OBS = { snowman: { w: 0.62, len: 0.6, hgt: 2.2, name: 'a snowman' }, boulder: { w: 0.85, len: 0.75, hgt: 1.05, name: 'an ice boulder' }, pine: { w: 0.85, len: 0.8, hgt: 3.4, name: 'a pine tree' },
+  spike: { w: 0.7, len: 0.7, hgt: 1.15, name: 'a spiky ice ball' }, penguin: { w: 0.42, len: 0.4, hgt: 0.95, name: 'a penguin' }, snowball: { w: 0.78, len: 0.75, hgt: 1.45, name: 'a giant snowball' }, ramp: { w: 1.1, len: 1.6, hgt: 0, name: 'a ramp' } };
+function sledObsAdd(kind, s, q, mv) {
+  const S = SLED, o = S.obs.find(r => !r.on); if (!o) return null; const m = sledTake(kind); if (!m) return null; const D = SLED_OBS[kind];
+  Object.assign(o, { on: true, kind, s, q, q0: q, w: D.w, len: D.len, hgt: D.hgt, m, mv: mv || 0, t: 0, ph: sledRnd() * 6, trig: false, hit: false });
+  sledFrameAt(s, o.P, o.F, o.R, o.U); sledPlace(m, o.P, o.F, o.R, o.U, q, kind === 'snowball' ? 0.78 : kind === 'ramp' ? 0.01 : 0, kind === 'penguin' || kind === 'ramp' ? 0 : sledRnd() * 0.6 - 0.3);
+  return o;
+}
+function sledFishAdd(s, q, h, gold) {
+  const S = SLED;
+  if (gold) { const g = sledTake('gold'); if (!g) gold = false; else { g.userData.s = s; g.userData.q = q; g.userData.h = h; g.userData.pull = false; sledFrameAt(s, S.vv.P2, S.vv.F2, S.vv.R2, S.vv.U2); sledSurf(S.vv.P2, S.vv.R2, S.vv.U2, q, h + 0.7, g.position); return; } }
+  const f = S.fish.find(r => !r.on); if (!f) return; f.on = true; f.s = s; f.q = q; f.h = h; f.ph = sledRnd() * 6; f.pull = false;
+  sledFrameAt(s, S.vv.P2, null, S.vv.R2, S.vv.U2); sledSurf(S.vv.P2, S.vv.R2, S.vv.U2, q, h + 0.62, S.vv.a); S.fp[f.i * 3] = S.vv.a.x; S.fp[f.i * 3 + 1] = S.vv.a.y; S.fp[f.i * 3 + 2] = S.vv.a.z;
+}
+function sledFishLine(s0, n, gap, qf, hf, goldAt) { for (let k = 0; k < n; k++) { const s = s0 + k * gap; if (sledInGap(s)) continue; sledFishAdd(s, qf(k), hf ? hf(k) : 0, k === goldAt); } }
+function sledGapAdd(s0, len) {
+  const S = SLED, g = S.gaps.find(r => !r.on); if (!g) return false; g.on = true; g.s0 = s0; g.s1 = s0 + len;
+  g.flag = sledTake('flag'); if (g.flag) { sledFrameAt(s0, S.vv.P2, S.vv.F2, S.vv.R2, S.vv.U2); g.flag.position.copy(S.vv.P2); S.vv.Z.copy(S.vv.F2).negate(); S.vv.X.crossVectors(S.vv.U2, S.vv.Z); S.vv.M.makeBasis(S.vv.X, S.vv.U2, S.vv.Z); g.flag.quaternion.setFromRotationMatrix(S.vv.M); }
+  sledSegsDirty(s0 - 1, s0 + len + 1); return true;
+}
+function sledPupAdd(s, q, kind) {
+  const S = SLED, p = S.pups.find(r => !r.on); if (!p) return; const m = sledTake('pup'); if (!m) return;
+  Object.assign(p, { on: true, kind, s, q, h: 0.9, m }); m.material.map = S.pupTex[kind]; m.material.needsUpdate = true;
+  sledFrameAt(s, S.vv.P2, null, S.vv.R2, S.vv.U2); sledSurf(S.vv.P2, S.vv.R2, S.vv.U2, q, 0.95, m.position);
+}
+function sledLane() { return ((sledRnd() * 3) | 0) - 1; }
+function sledContent() {                                                 // patterns, one after another, out to 260 m ahead of her
+  const S = SLED, G = S.gen, LQ = S.LQ, r = sledRnd;
+  while (G.next < S.s + 260) {
+    const s = G.next, d = s - S.S0, zi = sledZoneAt(d), hard = Math.min(1, d / 3200);
+    let len = 0;
+    if (d >= G.pupAt) { G.pupAt = d + 380 + r() * 220; const k = ['mag', 'shield', 'rocket'][(G.pupN++ + (r() * 2 | 0)) % 3]; const l = sledLane(); sledPupAdd(s, l * LQ, k); sledFishLine(s + 8, 6, 3, () => l * LQ); len = 26; }
+    else if (d < 70) { const l = sledLane(); sledFishLine(s, 10, 3.2, () => l * LQ); len = 32; }
+    else {
+      const w = r(), mvOk = d > 450, gapOk = d > 320 && !G.lastGap;
+      let pat = w < 0.16 ? 'fish' : w < 0.34 ? 'single' : w < 0.5 ? 'double' : w < 0.62 ? 'ramp' : w < 0.72 ? (gapOk ? 'gap' : 'single') : w < 0.82 ? (mvOk ? 'mover' : 'double') : w < 0.91 ? (zi >= 2 ? 'spikes' : 'slalom') : 'wall';
+      if (G.n < 3) pat = G.n === 0 ? 'single' : G.n === 1 ? 'ramp' : 'double';
+      G.lastGap = pat === 'gap'; G.n++;
+      const solid = () => { const pool = zi === 0 ? ['snowman', 'boulder', 'pine', 'snowman'] : zi === 1 ? ['pine', 'snowman', 'boulder', 'pine'] : zi === 2 ? ['boulder', 'spike', 'boulder', 'snowman'] : zi === 3 ? ['snowman', 'spike', 'boulder'] : ['spike', 'boulder', 'spike']; return pool[(r() * pool.length) | 0]; };
+      if (pat === 'fish') { const l = sledLane(), wv = r() < 0.4; sledFishLine(s, 12, 3, k => wv ? Math.sin(k * 0.55) * LQ * 1.3 : l * LQ, null, r() < 0.12 ? 11 : -1); len = 36; }
+      else if (pat === 'single') { const l = sledLane(); sledObsAdd(solid(), s, l * LQ); const f = l === 0 ? (r() < 0.5 ? -1 : 1) : -l; sledFishLine(s - 9, 7, 3, () => f * LQ); len = 14; }
+      else if (pat === 'double') { const free = sledLane(); for (const l of [-1, 0, 1]) if (l !== free) sledObsAdd(solid(), s + (r() - 0.5) * 2 * hard, l * LQ); sledFishLine(s - 12, 6, 3, () => free * LQ); len = 14; }
+      else if (pat === 'ramp') { sledObsAdd('ramp', s, 0); const big = d > 260 && r() < 0.45, gold = r() < 0.2;
+        for (let k = 0; k < 7; k++) { const t = k / 6, x = s + 2 + t * 22; sledFishAdd(x, 0, Math.max(0, 2.9 * Math.sin(t * Math.PI) + 0.4), gold && k === 3); }
+        if (big && !G.lastGap) { sledGapAdd(s + 5, 7 + hard * 4); G.lastGap = true; }
+        if (d > 200) for (const l of [-1, 1]) if (r() < 0.55) sledObsAdd(solid(), s + 1, l * LQ);
+        len = 34; }
+      else if (pat === 'gap') { const L = 5.5 + hard * 3.5; sledFishLine(s - 6, 4, 2.2, () => 0); for (let k = 0; k < 4; k++) sledFishAdd(s + 1 + k * L / 3.5, 0, 1.2 + Math.sin(k / 3 * Math.PI) * 0.6); sledGapAdd(s, L); len = L + 12; }
+      else if (pat === 'mover') { const k = zi >= 3 || r() < 0.5 ? 'snowball' : 'penguin'; if (k === 'penguin') { sledObsAdd('penguin', s, (r() - 0.5) * 3, 1); if (r() < 0.5 + hard * 0.3) sledObsAdd('penguin', s + 7, (r() - 0.5) * 3, 1); } else sledObsAdd('snowball', s, (r() < 0.5 ? -1 : 1) * 4.2, 2); sledFishLine(s - 10, 5, 3, () => 0); len = 18; }
+      else if (pat === 'spikes') { const n = 3 + (hard > 0.5 ? 1 : 0); let last = 0; for (let k = 0; k < n; k++) { let l = sledLane(); if (l === last && k) l = l === 0 ? 1 : 0; last = l; sledObsAdd('spike', s + k * 11, l * LQ); sledFishAdd(s + k * 11 + 5, -l * LQ * 0.8, 0); } len = n * 11 + 6; }
+      else if (pat === 'slalom') { for (let k = 0; k < 4; k++) { const l = k % 2 ? 1 : -1; sledObsAdd(zi === 1 ? 'pine' : solid(), s + k * 12, l * LQ * 0.9); sledObsAdd(solid(), s + k * 12, 0); sledFishAdd(s + k * 12, -l * LQ * 1.15, 0); } len = 50; }
+      else { const sd = r() < 0.5 ? -1 : 1; sledObsAdd(solid(), s, 0); sledObsAdd(solid(), s + 2, -sd * LQ); sledFishLine(s - 10, 9, 2.6, k => sd * (3.0 + Math.sin(k / 8 * Math.PI) * 0.9), null, r() < 0.15 ? 4 : -1); len = 20; }
+    }
+    G.next = s + len + Math.max(24, 54 - d / 75) * (0.85 + r() * 0.3);
+  }
+}
+function sledClearAhead(s0, s1) {                                        // (keep sliding) the track ahead cleared for her
+  const S = SLED; for (const o of S.obs) if (o.on && o.s > s0 && o.s < s1) { sledGive(o.m); o.on = false; }
+  for (const g of S.gaps) if (g.on && g.s1 > s0 && g.s0 < s1) { sledGive(g.flag); g.on = false; sledSegsDirty(g.s0 - 1, g.s1 + 1); }
+}
+
+/* ---------- the run ---------- */
+function sledCatSet(rig) {                                               // her clone from the yard, sat on the saucer: legs folded, paws on the rim, tail curled round
+  const S = SLED, K = S.K, W = walk.rig;
+  if (K.rig && K.rig.parent) K.rig.parent.remove(K.rig);
+  const a = [], b = []; W.g.traverse(o => a.push(o)); rig.traverse(o => b.push(o));
+  const map = new Map(); for (let i = 0; i < a.length && i < b.length; i++) map.set(a[i], b[i]);
+  K.rig = rig; K.bodyM = map.get(W.body); K.head = map.get(W.head); K.legs = W.legs.map(l => map.get(l)); K.tail = W.tail.map(s => map.get(s)).filter(Boolean);
+  rig.position.set(0, -0.12, 0.02); rig.rotation.set(0, 0, 0); rig.scale.setScalar(1); rig.visible = true; K.seat.add(rig);
+  K.joints = []; K.legs.forEach((l, i) => { if (l) K.joints.push({ o: l, kind: 'leg', front: i < 2, side: i % 2 ? 1 : -1, a: 0, v: 0, b: 0, bv: 0 }); });
+  if (K.head) K.joints.push({ o: K.head, kind: 'head', a: 0, v: 0, b: 0, bv: 0 });
+  K.tail.slice(0, 7).forEach((t, k) => K.joints.push({ o: t, kind: 'tail', k, a: 0, v: 0, b: 0, bv: 0 }));
+}
+function sledReset() {
+  const S = SLED;
+  S.seed = (Date.now() % 2147483000) + 7; sledTrkReset();
+  for (const k in S.pools) for (const o of S.pools[k]) sledGive(o);
+  for (const o of S.obs) o.on = false; for (const g of S.gaps) { g.on = false; g.flag = null; } for (const p of S.pups) p.on = false; for (const f of S.fish) f.on = false;
+  for (let i = 0; i < 96; i++) S.fishIM.setMatrixAt(i, S.vv.M.makeScale(0, 0, 0)); S.fishIM.instanceMatrix.needsUpdate = true;
+  for (const k in S.dec) { const D = S.dec[k]; D.at = 0; D.s.fill(-1e9); for (let i = 0; i < D.n; i++) D.im.setMatrixAt(i, S.vv.M.makeScale(0, 0, 0)); D.dirty = true; }
+  for (const sg of S.segs) { sg.k = -1; sg.m.visible = false; }
+  for (const F of [S.fx, S.gx]) { for (let i = 0; i < F.n; i++) { F.life[i] = 0; F.p[i * 3 + 1] = -1e5; F.a[i] = 0; } F.live = false; F.pts.visible = false; }
+  S.ZSPACE = sledZones()[4].at;
+  S.gen = { next: S.S0 + 26, n: 0, pupAt: 260, pupN: (Math.random() * 3) | 0, lastGap: false };
+  Object.assign(S, { s: S.S0, v: 12, q: 0, qv: 0, tq: 0, h: 0, vh: 0, air: false, airT: 0, onRamp: null, tuckT: 0, boostV: 0, magT: 0, shield: false, rocketT: 0, inv: 0, jumpQ: -9,
+    trick: null, trickQ: null, airTricks: 0, airNames: [], fishN: 0, goldN: 0, tricksN: 0, bestAir: 0, streak: 0, streakT: 0, zone: 0, zoneMax: 0, revives: 0, bankedN: 0, banked: false,
+    crash: null, overT: 0, time: 0, camA: 0, camS: S.S0 - 7, fov: 64, shake: 0, hudT: 0, bannerT: 0, said: 0, km: false, sprayT: 0, landT: 0, squash: 0, kx: 0, down: false, ptr: null, steered: false, lastLand: 0, bestSaid: false, g0: null, best0: +sledGet('catguard.sledBest', '0') || 0, hint0: !sledGet('catguard.sledHinted', '') });
+  sledGenTo(Math.ceil((S.s + 320) / S.DS)); sledContent(); sledSegsStep(); sledSegsStep(); sledSegsStep(); sledSegsStep();
+  sledFrameAt(S.s - 8, S.vv.P, S.vv.F, S.vv.R, S.vv.U); S.top.position.copy(S.vv.P); S.top.rotation.set(0, sledFrameAt(S.s - 8, S.vv.P, null, null, null), 0);
+  S.top.position.addScaledVector(S.vv.U, S.RP * (1 - Math.cos(S.A)) - 0.3); S.top.visible = true;
+  sledDecStep(); sledEnv(1, true);
+}
+function sledRun(first) {                                                // a fresh run (the first from the yard: the camera swoops round her first)
+  const S = SLED, u = S.ui; sledReset(); const K = S.K;
+  if (K.rig) { K.root.add(K.lean); K.seat.add(K.rig); }
+  if (K.sled.parent !== K.body) K.body.add(K.sled);
+  sledCatPoseReset();
+  S.phase = first ? 'intro' : 'run'; S.pt = 0; S.t = 0; S.paused = false; S.drawn = false;
+  u.root.classList.remove('paused'); u.Over.classList.remove('on'); u.PauseOv.classList.remove('on'); u.Msg.className = 'sr-msg'; u.Banner.className = 'sr-banner';
+  u.fn = u.dd = u.zn = u.pk = u.hn = u.cb = null; S.hudT = 0; u.Load.textContent = '';
+  sledCamAspect(); sledPose(0); sledCamStep(1, true); sledHud(1);
+  if (first) sledBanner('🛷 Sled Rush!', 'From the top of the bank...'); else { sledBanner('🛷 Go go go!', ''); sledSfx('go'); }
+  sledLoops(true);
+}
+function sledCatPoseReset() {
+  const K = SLED.K; if (!K.rig) return;
+  K.rig.position.set(0, -0.12, 0.02); K.rig.rotation.set(0, 0, 0); K.rig.quaternion.identity(); K.rig.scale.setScalar(1); K.rig.visible = true;
+  K.sled.position.set(0, 0, 0); K.sled.rotation.set(0, 0, 0); K.sled.visible = true; K.flip.rotation.set(0, 0, 0); K.lean.rotation.set(0, 0, 0); K.body.scale.set(1, 1, 1);
+  for (const j of K.joints) { j.a = j.v = j.b = j.bv = 0; }
+}
+
+/* ---------- each frame of the run ---------- */
+function sledVBase(d) { return 18 + 22 * (1 - Math.exp(-Math.max(0, d) / 2200)); }
+function sledStep(dt) {
+  const S = SLED, V = S.vv, d = S.s - S.S0;
+  S.time += dt; S.inv = Math.max(0, S.inv - dt); S.tuckT = Math.max(0, S.tuckT - dt); S.magT = Math.max(0, S.magT - dt); S.streakT -= dt; if (S.streakT <= 0) S.streak = 0;
+  if (S.rocketT > 0) { S.rocketT = Math.max(0, S.rocketT - dt); if (S.rocketT === 0) S.inv = Math.max(S.inv, 0.8); }
+  const tuck = !S.air && (S.tuckT > 0 || S.down);
+  const vt = sledVBase(d) + (tuck ? 5 : 0) + (S.rocketT > 0 ? 15 : 0) + S.boostV;
+  S.v += (vt - S.v) * Math.min(1, dt * (S.v < vt ? (S.rocketT > 0 ? 3 : 0.9) : 2.2)); S.boostV = Math.max(0, S.boostV - dt * 1.8);
+  const s0 = S.s; S.s += S.v * dt;
+  sledGenTo(Math.ceil((S.s + 320) / S.DS)); sledContent(); sledSegsStep();
+  // steering: the finger (or the keys) set where she's headed across the trough; she carves to it, and the curves push her up the outside wall
+  if (S.kx) { S.tq += S.kx * 8.5 * dt; S.steered = true; }
+  const hold = S.ptr !== null || S.kx !== 0, Q = S.QMAX;
+  if (!hold && Math.abs(S.tq) > S.LQ * 1.15) S.tq -= Math.sign(S.tq) * dt * 2.2 * (Math.abs(S.tq) - S.LQ * 1.1);   // (let go up a wall: she slides back down it)
+  S.tq = Math.max(-Q, Math.min(Q, S.tq));
+  const qc = Math.max(-1, Math.min(1, sledCurv(S.s) * S.v * S.v * 0.03)), goal = Math.max(-Q, Math.min(Q, S.tq + qc)), k = S.air ? 10 : 70, c = S.air ? 5 : 15;
+  S.qv += ((goal - S.q) * k - S.qv * c) * dt; S.q += S.qv * dt; if (Math.abs(S.q) > Q) { S.q = Math.sign(S.q) * Q; S.qv = 0; }
+  // up and down: jumps, ramps, the crevasses
+  if (S.air) {
+    S.airT += dt; S.vh -= S.G * dt; S.h += S.vh * dt;
+    const gap = sledInGap(S.s);
+    if (S.h <= 0) { if (gap || S.h < -0.75) { if (S.h < -1.6) return sledCrash('fall', null); } else { sledLand(); if (S.phase !== 'run') return; } }
+  } else if (S.onRamp) {
+    const o = S.onRamp, u = (S.s - (o.s - 1.6)) / 3.2;
+    if (u >= 1) { S.onRamp = null; S.air = true; S.airT = 0; S.h = 0.85; S.vh = S.RAMPV + Math.min(4, S.v * 0.06) + (S.time - S.jumpQ < 0.35 ? 2.5 : 0); S.jumpQ = -9; S.airTricks = 0; S.airNames.length = 0; sledSfx('ramp'); S.shake = 0.15; }
+    else S.h = 0.85 * Math.max(0, u);
+  } else {
+    S.h = 0;
+    if (sledInGap(S.s)) { S.air = true; S.airT = 0; S.vh = 0; S.airTricks = 0; S.airNames.length = 0; }
+    else if (S.time - S.jumpQ < 0.14) { S.jumpQ = -9; sledJump(); }
+  }
+  // tricks in the air
+  if (S.trick) { const T = S.trick; T.t += dt; if (T.t >= T.dur) { S.airTricks++; S.tricksN++; S.airNames.push(T.name); S.trick = null; sledSfx('trickDone', S.airTricks); if (S.trickQ && S.air) { S.trick = S.trickQ; S.trickQ = null; S.trick.t = 0; } } }
+  // what she runs into, and what she picks up
+  sledHits(s0); if (S.phase !== 'run') return; sledPickups(dt);
+  // the zones, and a word at the milestones
+  const zi = sledZoneAt(S.s - S.S0); if (zi !== S.zone) { S.zone = zi; if (zi > S.zoneMax) { S.zoneMax = zi; const Z = sledZones()[zi]; sledBanner(Z.ic + ' ' + Z.name, Z.sub); sledSfx('zone'); if (zi === 4) { unlock('sledSpace'); if (!S.revives) unlock('sledAllZones'); } } }
+  if (!S.km && d >= 1000) { S.km = true; unlock('sledKm'); sledPop('1,000 m!', 'gold'); }
+  const best = S.best0; if (best > 50 && !S.bestSaid && d > best) { S.bestSaid = true; sledPop('New best!', 'gold'); sledSfx('best'); }
+  // snow off the sled as she carves (more the harder she leans), a puff now and then
+  if (!S.air && S.fx) { S.sprayT += dt * (6 + S.v * 0.9 + Math.abs(S.qv) * 6 + (tuck ? 10 : 0)); while (S.sprayT > 1) { S.sprayT -= 1; sledSpray(); } }
+}
+function sledJump() {
+  const S = SLED; if (S.air || S.phase !== 'run') return;
+  if (S.onRamp) return; S.air = true; S.airT = 0; S.vh = S.JUMP; S.airTricks = 0; S.airNames.length = 0; S.trick = S.trickQ = null; sledSfx('jump'); S.squash = -0.25;
+}
+function sledTrickGo(kind) {                                             // a flip or a spin, while she's up there (one queued after the one she's doing)
+  const S = SLED; if (!S.air || S.phase !== 'run') return;
+  const T = { kind, t: 0, dur: kind === 'spinL' || kind === 'spinR' ? 0.42 : 0.5, name: kind === 'back' ? 'Backflip' : kind === 'front' ? 'Front flip' : 'Spin' };
+  if (!S.trick) { S.trick = T; sledSfx('trick'); } else if (!S.trickQ) S.trickQ = T;
+}
+function sledLand() {
+  const S = SLED; S.air = false; S.h = 0; const fall = -S.vh; S.vh = 0; S.landT = S.time;
+  let n = S.airTricks;
+  if (S.trick) { const p = S.trick.t / S.trick.dur;
+    if (p < 0.72 && S.inv <= 0 && S.rocketT <= 0) { if (S.shield) { sledShieldPop(); S.trick = S.trickQ = null; S.v *= 0.8; sledPop('Phew! The shield caught her', 'ouch'); return; } return sledCrash('trick', null); }
+    n++; S.tricksN++; S.airNames.push(S.trick.name); }
+  S.trick = S.trickQ = null;
+  S.squash = Math.min(0.5, 0.15 + fall * 0.03); S.shake = Math.max(S.shake, Math.min(0.35, fall * 0.025));
+  sledBurst(10 + Math.min(20, fall * 2), 0xffffff, 3 + fall * 0.2);
+  if (n > 0) {
+    const fish = [0, 3, 8, 15, 24][Math.min(4, n)] + Math.max(0, n - 4) * 10; S.fishN += fish; S.boostV = Math.min(14, S.boostV + 3.5 * n);
+    const A = S.airNames, name = n === 1 ? A[0] + '!' : n === 2 ? (A[0] === A[1] ? 'Double ' + A[0].toLowerCase() + '!' : A[0] + ' + ' + A[1].toLowerCase() + '!') : n === 3 ? 'TRIPLE TRICK!' : n + '× COMBO!!';
+    sledPop(name, n >= 3 ? 'gold' : 'trick', '+' + fish + ' 🐟  ·  speed boost!'); sledSfx('land', n); sledBurst(16 + n * 6, 0xffe27a, 5, true);
+    S.bestAir = Math.max(S.bestAir, n); if (n >= 3) unlock('sledCombo');
+  } else sledSfx('thud', fall);
+  S.airTricks = 0; S.airNames.length = 0;
+}
+function sledHits(s0) {
+  const S = SLED;
+  for (const o of S.obs) {
+    if (!o.on) continue;
+    if (o.s < S.s - 25) { sledGive(o.m); o.on = false; continue; }
+    if (o.kind === 'ramp') { if (!S.air && !S.onRamp && S.s >= o.s - 1.6 && s0 < o.s + 1.0 && Math.abs(S.q - o.q) < o.w + 0.2) S.onRamp = o; continue; }
+    const L = o.len + 0.45; if (o.hit || S.s < o.s - L || s0 > o.s + L) continue;
+    if (Math.abs(S.q - o.q) < o.w + 0.3 && S.h < o.hgt) {
+      if (S.rocketT > 0 || S.inv > 0) { if (S.rocketT > 0) { o.hit = true; sledSmash(o); sledPop('SMASH!', 'trick'); S.fishN += 1; } continue; }
+      if (S.shield) { o.hit = true; sledShieldPop(); sledSmash(o); S.v *= 0.85; S.inv = 1.0; continue; }
+      return sledCrash('hit', o);
+    }
+  }
+}
+function sledSmash(o) { const S = SLED, c = { snowman: 0xffffff, boulder: 0xa8dcf4, pine: 0x2f6a46, spike: 0xd81e34, penguin: 0x1c2230, snowball: 0xffffff }[o.kind] || 0xffffff; sledBurst(28, c, 6, false, o.m.position); sledBurst(12, 0xffffff, 4, false, o.m.position); sledGive(o.m); o.on = false; sledSfx('smash'); S.shake = Math.max(S.shake, 0.25); }
+function sledShieldPop() { const S = SLED; S.shield = false; S.inv = Math.max(S.inv, 1.2); sledSfx('shield'); sledBurst(26, 0x7ad8ff, 6, true); sledPop('Shield!', 'trick', 'Saved!'); }
+function sledPickups(dt) {
+  const S = SLED, V = S.vv, cp = S.catP, mag = S.magT > 0;
+  let moved = false;
+  for (const f of S.fish) {
+    if (!f.on) continue;
+    if (f.s < S.s - 6) { f.on = false; S.fishIM.setMatrixAt(f.i, V.M.makeScale(0, 0, 0)); moved = true; continue; }
+    const o = f.i * 3; let got = false;
+    if (mag && f.s < S.s + 14) { f.pull = true; }
+    if (f.pull) { const k = Math.min(1, dt * 9); S.fp[o] += (cp.x - S.fp[o]) * k; S.fp[o + 1] += (cp.y + 0.5 - S.fp[o + 1]) * k; S.fp[o + 2] += (cp.z - S.fp[o + 2]) * k;
+      if (Math.hypot(cp.x - S.fp[o], cp.y + 0.5 - S.fp[o + 1], cp.z - S.fp[o + 2]) < 0.9) got = true; }
+    else if (Math.abs(f.s - S.s) < 1.15 && Math.abs(f.q - S.q) < 0.95 && Math.abs(f.h - S.h) < 1.25) got = true;
+    if (got) { f.on = false; S.fishIM.setMatrixAt(f.i, V.M.makeScale(0, 0, 0)); moved = true; S.fishN++; S.streak++; S.streakT = 1.1;
+      sledSfx('fish', S.streak); chimFxBurst(S.gx, S.fp[o], S.fp[o + 1], S.fp[o + 2], 5, 0x9fe8ff, 2, 1.5, 0.3, 0.1, 0.4, 0.9, 0, 3);
+      if (S.streak % 10 === 0) { S.fishN += 5; sledPop('🐟 ×' + S.streak + ' streak!', 'trick', '+5 🐟'); sledSfx('streak'); } }
+  }
+  if (moved) S.fishIM.instanceMatrix.needsUpdate = true;
+  for (const g of S.pools.gold) { if (!g.userData.busy) continue; const u = g.userData;
+    if (u.s < S.s - 6) { sledGive(g); continue; }
+    if (mag && u.s < S.s + 14) u.pull = true;
+    if (u.pull) { g.position.lerp(V.a.set(cp.x, cp.y + 0.6, cp.z), Math.min(1, dt * 9)); }
+    if ((u.pull && g.position.distanceTo(V.a.set(cp.x, cp.y + 0.6, cp.z)) < 1) || (!u.pull && Math.abs(u.s - S.s) < 1.3 && Math.abs(u.q - S.q) < 1.1 && Math.abs(u.h - S.h) < 1.4)) {
+      u.pull = false; sledGive(g); S.fishN += 10; S.goldN++; sledPop('Golden fish!', 'gold', '+10 🐟'); sledSfx('gold'); sledBurst(24, 0xffd23a, 5, true, g.position); } }
+  for (const p of S.pups) { if (!p.on) continue;
+    if (p.s < S.s - 6) { sledGive(p.m); p.on = false; continue; }
+    if (Math.abs(p.s - S.s) < 1.4 && Math.abs(p.q - S.q) < 1.15 && S.h < 2.4) { sledGive(p.m); p.on = false; sledPower(p.kind); } }
+}
+function sledPower(k) {
+  const S = SLED; sledSfx('power');
+  if (k === 'mag') { S.magT = 10; sledPop('🧲 Fish magnet!', 'trick', '10 seconds'); }
+  else if (k === 'shield') { S.shield = true; sledPop('🛡️ Shield!', 'trick', 'One free bump'); }
+  else { S.rocketT = 4; sledPop('🚀 ROCKET!', 'gold', 'Smash right through!'); S.shake = 0.3; }
+  sledBurst(20, k === 'mag' ? 0xff7a9a : k === 'shield' ? 0x7ad8ff : 0xffb24a, 5, true);
+}
+function sledSpray() {                                                   // a puff of snow off the sled's edge (the side she's carving to)
+  const S = SLED, X = S.sideX, side = S.qv > 0.4 ? -1 : S.qv < -0.4 ? 1 : (Math.random() < 0.5 ? -1 : 1), p = S.catP, sp = 1.5 + Math.abs(S.qv) * 0.8;
+  chimFxPut(S.fx, p.x + X.x * side * 0.45 - S.dirF.x * 0.4, p.y + 0.1, p.z + X.z * side * 0.45 - S.dirF.z * 0.4, X.x * side * sp - S.dirF.x * 2 + (Math.random() - 0.5), 1 + Math.random() * 1.5, X.z * side * sp - S.dirF.z * 2 + (Math.random() - 0.5),
+    S.zone === 2 ? 0xc8f4ff : 0xffffff, 0.18, 0.5 + Math.random() * 0.3, 0.45 + Math.random() * 0.3, 0.85, 4, 2.5);
+}
+function sledBurst(n, col, sp, add, at) { const S = SLED, p = at || S.catP; chimFxBurst(add ? S.gx : S.fx, p.x, p.y + 0.3, p.z, n | 0, col, sp, sp * 0.6, 0.25, 0.6, 0.8, 0.9, add ? 2 : 6, 2); }
+
+/* ---------- the wipeout: off the sled, tumbling down the ice (or down a crevasse); the saucer spinning away ---------- */
+function sledCrash(kind, o) {
+  const S = SLED, K = S.K; if (S.phase !== 'run') return;
+  S.phase = 'crash'; S.pt = 0; S.ptr = null; S.kx = 0; S.trick = S.trickQ = null;
+  const name = o ? SLED_OBS[o.kind].name : '';
+  S.crash = { kind, name, s: S.s, s0: S.s, q: S.q, h: kind === 'fall' ? S.h : Math.max(0, S.h), vs: S.v * (kind === 'hit' ? 0.55 : 0.8), vq: (Math.random() - 0.5) * 6 + S.qv * 0.3, vh: kind === 'fall' ? Math.min(0, S.vh) : 4.5 + Math.random() * 2,
+    rx: 0, ry: 0, rz: 0, wx: (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 5), wy: (Math.random() - 0.5) * 8, wz: (Math.random() - 0.5) * 10, bounces: 0, stop: 0,
+    ss: S.s, sq: S.q, sh: Math.max(0, S.h) + 0.2, svs: S.v * 0.85, svq: (Math.random() < 0.5 ? -1 : 1) * (3 + Math.random() * 4), svh: kind === 'fall' ? -2 : 6 + Math.random() * 3, srx: 0, sry: 0, swy: 16 + Math.random() * 8, swx: 5 + Math.random() * 4 };
+  if (o) { o.hit = true; sledBurst(30, { snowman: 0xffffff, boulder: 0xa8dcf4, pine: 0x2f6a46, spike: 0xd81e34, penguin: 0x1c2230, snowball: 0xffffff }[o.kind] || 0xffffff, 6, false, o.m.position); if (o.kind === 'snowman' || o.kind === 'snowball') sledGive(o.m), o.on = false; }
+  sledBurst(36, 0xffffff, 7); S.shake = 0.6; sledSfx(kind === 'fall' ? 'fall' : 'crash'); sledLoops(false);
+  // off the sled: both now move on their own (their places along the track worked out each frame)
+  K.flip.rotation.set(0, 0, 0); K.lean.rotation.set(0, 0, 0);
+  for (const j of K.joints) { j.a = j.o.rotation.x; j.b = j.kind === 'tail' ? j.o.rotation.y : j.o.rotation.z; j.v = (Math.random() - 0.5) * 20; j.bv = (Math.random() - 0.5) * 16; }
+}
+function sledCrashStep(dt) {
+  const S = SLED, C = S.crash, V = S.vv, K = S.K; if (!C) return;
+  const ground = (s, h) => !sledInGap(s) && h <= 0;
+  // her: tumbling, bouncing along the ice, slowing; (down a crevasse: falling away)
+  C.vh -= S.G * dt; C.s += C.vs * dt; C.q += C.vq * dt; C.h += C.vh * dt;
+  if (Math.abs(C.q) > S.QMAX) { C.q = Math.sign(C.q) * S.QMAX; C.vq *= -0.5; }
+  if (C.h <= 0 && !sledInGap(C.s) && C.h > -0.8 && C.kind !== 'fall') { C.h = 0; if (C.vh < -2) { C.vh = -C.vh * 0.42; C.bounces++; sledBurst(10, 0xffffff, 3, false, S.catP); sledSfx('bump'); C.wx *= 0.7; C.wz *= 0.7; } else C.vh = 0; C.vs *= Math.exp(-dt * 2.2); C.vq *= Math.exp(-dt * 3); }
+  else if (C.h <= 0 && C.h > -0.8 && !sledInGap(C.s) && C.kind === 'fall') { C.h = 0; C.vh = Math.abs(C.vh) * 0.3; }
+  const onIce = C.h <= 0.01 && !sledInGap(C.s); if (onIce) { C.wx *= Math.exp(-dt * 2.5); C.wz *= Math.exp(-dt * 2.5); C.wy *= Math.exp(-dt * 2); }
+  C.rx += C.wx * dt; C.ry += C.wy * dt; C.rz += C.wz * dt;
+  if (onIce && C.vs < 1.2) { C.rx += (Math.round(C.rx / Math.PI) * Math.PI - C.rx) * Math.min(1, dt * 4); C.rz += (Math.round(C.rz / (Math.PI * 2)) * Math.PI * 2 - C.rz) * Math.min(1, dt * 4); }   // (coming to rest: flat on her back or her tummy)
+  sledFrameAt(C.s, V.P, V.F, V.R, V.U); sledSurf(V.P, V.R, V.U, C.q, C.h - 0.2, K.root.position, V.N);
+  V.Z.copy(V.F); V.X.crossVectors(V.N, V.Z).normalize(); V.Y.crossVectors(V.Z, V.X); V.M.makeBasis(V.X, V.Y, V.Z); K.root.quaternion.setFromRotationMatrix(V.M);
+  K.lean.rotation.set(0, 0, 0); K.flip.rotation.set(C.rx, C.ry, C.rz);
+  // the saucer: off on its own, spinning like a frisbee
+  C.svh -= S.G * dt; C.ss += C.svs * dt; C.sq += C.svq * dt; C.sh += C.svh * dt; if (Math.abs(C.sq) > S.QMAX) { C.sq = Math.sign(C.sq) * S.QMAX; C.svq *= -0.6; }
+  if (C.sh <= 0 && !sledInGap(C.ss) && C.sh > -0.8) { C.sh = 0; if (C.svh < -2) C.svh = -C.svh * 0.5; else C.svh = 0; C.svs *= Math.exp(-dt * 1.2); }
+  C.sry += C.swy * dt; C.srx += C.swx * dt * (C.sh > 0.05 ? 1 : 0.2);
+  if (K.sled.parent !== S.scene) S.scene.add(K.sled);
+  sledFrameAt(C.ss, V.P2, V.F2, V.R2, V.U2); sledSurf(V.P2, V.R2, V.U2, C.sq, C.sh + 0.05, K.sled.position, V.N);
+  K.sled.quaternion.copy(K.root.quaternion); V.E.set(Math.sin(C.srx) * 0.6, C.sry, Math.cos(C.srx * 0.7) * 0.3); V.Q.setFromEuler(V.E); K.sled.quaternion.multiply(V.Q);
+  sledRag(dt, onIce && C.vs < 2);
+  K.shadow.visible = !sledInGap(C.s); if (K.shadow.visible) sledShadowAt(C.s, C.q, Math.max(0, C.h));
+  S.catP.copy(K.root.position);
+}
+function sledRag(dt, rest) {                                             // her ragdoll: each leg, her head and her tail on loose springs (flailing, then flopped)
+  const S = SLED, K = S.K, t = S.pt;
+  for (const j of K.joints) {
+    let ta = 0, tb = 0;
+    if (!rest) { if (j.kind === 'leg') { ta = Math.sin(t * 17 + (j.front ? 0 : 1.7) + j.side) * 0.9 - (j.front ? 0.6 : -0.6); tb = j.side * (0.6 + 0.3 * Math.sin(t * 11 + j.side)); }
+      else if (j.kind === 'head') { ta = -0.4 + Math.sin(t * 9) * 0.3; tb = Math.sin(t * 7) * 0.4; } else { ta = 0.3 + Math.sin(t * 12 - j.k * 0.7) * 0.5; tb = Math.sin(t * 10 - j.k * 0.8) * 0.5; } }
+    else { if (j.kind === 'leg') { ta = j.front ? -0.95 : 0.85; tb = j.side * 0.25; } else if (j.kind === 'head') { ta = 0.25; tb = 0.5 + Math.sin(t * 2.2) * 0.12; } else { ta = 0.05; tb = Math.sin(t * 1.5 - j.k * 0.4) * 0.15; } }
+    j.v += ((ta - j.a) * 90 - j.v * 9) * dt; j.a += j.v * dt; j.bv += ((tb - j.b) * 90 - j.bv * 9) * dt; j.b += j.bv * dt;
+    if (j.kind === 'leg') { j.o.rotation.x = j.a; j.o.rotation.z = j.b; } else if (j.kind === 'head') { j.o.rotation.x = j.a; j.o.rotation.z = j.b; } else { j.o.rotation.x = (j.k ? 0.3 : 0.9) * 0.5 + j.a; j.o.rotation.y = j.b; }
+  }
+}
+
+/* ---------- her, on the sled: leaning into the carve, crouched in a tuck, legs out in the air, the tricks ---------- */
+function sledPose(dt) {
+  const S = SLED, K = S.K, V = S.vv; if (!K.rig) return;
+  // where she is: on the surface (or up off it), facing down the track, upright to the trough's curve there
+  sledFrameAt(S.s, V.P, V.F, V.R, V.U); sledSurf(V.P, V.R, V.U, S.q, S.h, K.root.position, V.N);
+  V.Z.copy(V.F); V.X.crossVectors(V.N, V.Z).normalize(); V.Y.crossVectors(V.Z, V.X); V.M.makeBasis(V.X, V.Y, V.Z); K.root.quaternion.setFromRotationMatrix(V.M);
+  S.catP.copy(K.root.position); S.dirF.copy(V.F); S.sideX.copy(V.X);
+  const t = S.t, air = S.air || S.onRamp, tuck = !S.air && (S.tuckT > 0 || S.down);
+  const lean = Math.max(-0.5, Math.min(0.5, S.qv * 0.07 + (S.kx || 0) * 0.15)); K.lean.rotation.z += (lean - K.lean.rotation.z) * Math.min(1, dt * 10);
+  K.lean.rotation.y += ((-S.qv * 0.04) - K.lean.rotation.y) * Math.min(1, dt * 8);
+  // the trick
+  let fx = 0, fy = 0; if (S.trick) { const T = S.trick, p = Math.min(1, T.t / T.dur), e = p * p * (3 - 2 * p); if (T.kind === 'back') fx = -e * Math.PI * 2; else if (T.kind === 'front') fx = e * Math.PI * 2; else fy = (T.kind === 'spinL' ? 1 : -1) * e * Math.PI * 2; }
+  K.flip.rotation.set(fx, fy, 0);
+  // the squash on landing
+  if (dt) S.squash += (-S.squash) * Math.min(1, dt * 7); const sq = Math.max(-0.3, Math.min(0.5, S.squash)); K.body.scale.set(1 + sq * 0.35, 1 - sq * 0.5, 1 + sq * 0.35);
+  // her pose
+  const L = K.legs, R = K.rig, cr = tuck ? 1 : 0; S.crK = (S.crK || 0) + (cr - (S.crK || 0)) * Math.min(1, dt * 8);
+  R.position.y = -0.12 - 0.08 * S.crK; R.rotation.x = air ? -0.1 : -0.12 + 0.3 * S.crK;
+  const fl = Math.sin(t * 13) * 0.1;
+  if (air) { L[0].rotation.set(-1.0 + fl, 0, -0.35); L[1].rotation.set(-1.0 - fl, 0, 0.35); L[2].rotation.set(1.1, 0, -0.3); L[3].rotation.set(1.1, 0, 0.3); if (K.head) K.head.rotation.set(-0.15, 0, 0); }
+  else { const kk = S.crK; L[0].rotation.set(-0.85 + 0.25 * kk, 0, -0.12); L[1].rotation.set(-0.85 + 0.25 * kk, 0, 0.12); L[2].rotation.set(-1.2 - 0.1 * kk, 0, -0.28); L[3].rotation.set(-1.2 - 0.1 * kk, 0, 0.28); if (K.head) K.head.rotation.set(0.1 + 0.3 * kk, Math.sin(t * 1.3) * 0.05, -lean * 0.4); }
+  for (let i = 0; i < K.tail.length; i++) { const sg = K.tail[i]; sg.rotation.x = (i ? 0.25 : 0.7) + (air ? -0.15 : 0) + Math.sin(t * 9 - i * 0.6) * 0.06 * (1 + S.v / 30); sg.rotation.y = Math.sin(t * 5 - i * 0.5) * 0.1 + lean * 0.15; }
+  K.rig.visible = !(S.inv > 0 && S.rocketT <= 0 && Math.floor(S.inv * 12) % 2 === 1);
+  K.shield.visible = S.shield; if (S.shield) K.shield.material.opacity = 0.45 + Math.sin(t * 6) * 0.12;
+  K.flame.visible = S.rocketT > 0; if (S.rocketT > 0) { K.flame.scale.setScalar(1.2 + Math.random() * 0.6); if (Math.random() < dt * 40) chimFxPut(S.gx, S.catP.x - V.F.x * 0.8, S.catP.y + 0.35, S.catP.z - V.F.z * 0.8, -V.F.x * 3 + (Math.random() - 0.5), Math.random(), -V.F.z * 3 + (Math.random() - 0.5), 0xff9a3a, 0.4, 0.1, 0.35, 0.9, 0, 2); }
+  K.shadow.visible = S.h > 0.05 && !sledInGap(S.s); if (K.shadow.visible) sledShadowAt(S.s, S.q, S.h);
+}
+function sledShadowAt(s, q, h) { const S = SLED, V = S.vv, K = S.K; sledFrameAt(s, V.P2, V.F2, V.R2, V.U2); sledSurf(V.P2, V.R2, V.U2, q, 0.03, K.shadow.position, V.N); K.shadow.lookAt(V.a.copy(K.shadow.position).add(V.N)); K.shadow.material.opacity = 0.35 / (1 + h * 0.5); K.shadow.scale.setScalar(1 / (1 + h * 0.12)); }
+
+/* ---------- the camera: behind her and above, rolling with her up the walls; wider the faster she goes ---------- */
+function sledCamAspect() {
+  const S = SLED, cam = S.cam; renderer.getSize(S.size); const a = S.size.x > 0 && S.size.y > 0 ? S.size.x / S.size.y : 1.6;
+  if (Math.abs(a - S.aspect) > 1e-3) { S.aspect = a; cam.aspect = a; cam.updateProjectionMatrix(); S.drawn = false; }
+}
+function sledCamStep(dt, snap) {
+  const S = SLED, V = S.vv, cam = S.cam, port = S.aspect < 0.9, C = S.crash && S.phase !== 'run' ? S.crash : null;
+  const sNow = C ? C.s : S.s, qNow = C ? C.q : S.q, hNow = C ? Math.max(-3, C.h) : S.h;
+  const back = port ? 6.4 : 5.3, upH = port ? 2.9 : 2.3, ahead = port ? 10 : 9;
+  const want = (C && C.kind === 'fall' ? C.s0 : sNow) - back; S.camS = snap ? want : C ? S.camS + (want - S.camS) * Math.min(1, dt * 1.6) : want;
+  const aT = qNow / S.RP; S.camA = snap ? aT : S.camA + (aT - S.camA) * Math.min(1, dt * 6);
+  sledFrameAt(S.camS, V.P, V.F, V.R, V.U);
+  const ca = S.camA * 0.6, x = S.RP * Math.sin(ca), y = S.RP * (1 - Math.cos(ca)) * 0.6 + upH + Math.max(0, hNow) * 0.55;
+  cam.position.set(V.P.x + V.R.x * x + V.U.x * y, V.P.y + V.R.y * x + V.U.y * y, V.P.z + V.R.z * x + V.U.z * y);
+  const b = -S.camA * 0.55; V.up.set(V.U.x * Math.cos(b) + V.R.x * Math.sin(b), V.U.y * Math.cos(b) + V.R.y * Math.sin(b), V.U.z * Math.cos(b) + V.R.z * Math.sin(b));
+  sledFrameAt(sNow + (C ? 1 : ahead), V.P2, V.F2, V.R2, V.U2); const la = (C ? qNow : qNow * 0.55) / S.RP, lx = S.RP * Math.sin(la), ly = S.RP * (1 - Math.cos(la)) * 0.7 + 0.9 + Math.max(0, hNow) * 0.4;
+  V.c.set(V.P2.x + V.R2.x * lx + V.U2.x * ly, V.P2.y + V.R2.y * lx + V.U2.y * ly, V.P2.z + V.R2.z * lx + V.U2.z * ly);
+  if (C) V.c.lerp(S.catP, 0.6);
+  if (S.phase === 'intro') {                                            // (the swoop: from in front of her, looking back up the bank at her, round to behind)
+    const k = Math.min(1, S.pt / 2.2), e = k * k * (3 - 2 * k);
+    sledFrameAt(S.s + 4.5, V.P2, V.F2, V.R2, V.U2); V.a.set(V.P2.x + V.R2.x * 1.6 + V.U2.x * 1.3, V.P2.y + V.R2.y * 1.6 + V.U2.y * 1.3, V.P2.z + V.R2.z * 1.6 + V.U2.z * 1.3);
+    cam.position.lerpVectors(V.a, cam.position, e); V.b.copy(S.catP); V.b.y += 0.45; V.c.lerpVectors(V.b, V.c, e); V.up.lerpVectors(V.Y0, V.up, e);
+  }
+  if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt * 1.5); const k = S.shake * S.shake * 0.8; cam.position.x += (Math.random() - 0.5) * k; cam.position.y += (Math.random() - 0.5) * k; cam.position.z += (Math.random() - 0.5) * k; }
+  cam.up.copy(V.up); cam.lookAt(V.c);
+  const fv = (port ? 78 : 62) + Math.max(0, Math.min(1, (S.v - 15) / 22)) * 12 + (S.rocketT > 0 ? 8 : 0) + (!S.air && (S.tuckT > 0 || S.down) ? 3 : 0);
+  S.fov = snap ? fv : S.fov + (fv - S.fov) * Math.min(1, dt * 3); if (Math.abs(cam.fov - S.fov) > 0.05) { cam.fov = S.fov; cam.updateProjectionMatrix(); }
+}
+
+/* ---------- the world round her: sky, fog, light and weather, blended zone to zone ---------- */
+function sledEnv(dt, snap) {
+  const S = SLED, V = S.vv, E = S.env, Z = sledZones(), d = (S.crash && S.phase !== 'run' ? S.crash.s : S.s) - S.S0, zi = d < 0 ? 0 : sledZoneAt(d), cur = Z[zi], prev = Z[Math.max(0, zi - 1)];
+  const k = zi === 0 ? 1 : Math.max(0, Math.min(1, (d - cur.at) / 140)), key = zi * 1000 + Math.round(k * 60);
+  const mix = (a, b, out) => out.setHex(a).lerp(V.c3.setHex(b), k), lerp = (a, b) => a + (b - a) * k;
+  if (key !== E.key || snap) { E.key = key;
+    mix(prev.top, cur.top, E.top); mix(prev.hor, cur.hor, E.hor); mix(prev.bot, cur.bot, E.bot); mix(prev.fog, cur.fog, E.fog); mix(prev.trk, cur.trk, E.trk); mix(prev.em, cur.em, E.em); mix(prev.hs, cur.hs, E.hs); mix(prev.hg, cur.hg, E.hg);
+    const g = S.sky.geometry, p = g.attributes.position, c = g.attributes.color;
+    for (let i = 0; i < p.count; i++) { const y = p.getY(i) / 900; if (y >= 0) V.col.copy(E.hor).lerp(E.top, Math.pow(y, 0.55)); else V.col.copy(E.hor).lerp(E.bot, Math.pow(-y, 0.45)); c.setXYZ(i, V.col.r, V.col.g, V.col.b); }
+    c.needsUpdate = true;
+    S.scene.fog.color.copy(E.fog); S.scene.fog.near = lerp(prev.near, cur.near); S.scene.fog.far = lerp(prev.far, cur.far); S.scene.background.copy(E.bot);
+    S.trkMat.color.copy(E.trk); S.trkMat.emissive.copy(E.em); S.hemi.color.copy(E.hs); S.hemi.groundColor.copy(E.hg); S.hemi.intensity = lerp(prev.hi, cur.hi); S.sun.intensity = lerp(prev.sun, cur.sun);
+    S.stars.material.opacity = Math.min(1, lerp(prev.stars, cur.stars)); S.stars.material.size = 1.6 + Math.min(1.25, lerp(prev.stars, cur.stars)) * 1.2;
+    E.snow = lerp(prev.snow, cur.snow); E.moon = lerp(prev.moon, cur.moon); E.cloud = lerp(prev.cloud, cur.cloud); E.earth = lerp(prev.earth, cur.earth);
+    S.snow.material.color.setHex(zi === 2 ? 0x9ff0ff : 0xffffff); S.snow.material.size = zi === 2 ? 0.2 : 0.3; S.trkMat.opacity = [1, 1, 0.95, 0.82, 0.62][zi];
+  }
+  const cp = S.cam.position;
+  S.sky.position.copy(cp); S.stars.position.copy(cp); S.stars.visible = S.stars.material.opacity > 0.02;
+  S.moon.visible = E.moon > 0.02; if (S.moon.visible) { S.moon.position.set(cp.x - 420, cp.y + 300, cp.z - 520); S.moon.material.opacity = Math.min(1, E.moon); S.moon.scale.setScalar(110 + 60 * Math.min(1.6, E.moon)); }
+  S.sea.visible = E.cloud > 0.02; if (S.sea.visible) { S.sea.position.set(cp.x, cp.y - 70, cp.z); S.sea.material.opacity = 0.9 * E.cloud; S.sea.material.map.offset.set(cp.x / 150, -cp.z / 150); }
+  S.earth.visible = E.earth > 0.02; S.planet.visible = S.earth.visible;
+  if (S.earth.visible) { const yw = Math.atan2(-S.dirF.x, -S.dirF.z); S.earthYaw = S.earthYaw === undefined ? yw : S.earthYaw + Math.atan2(Math.sin(yw - S.earthYaw), Math.cos(yw - S.earthYaw)) * Math.min(1, (dt || 1) * 0.6);
+    S.earth.position.set(cp.x - Math.sin(S.earthYaw) * 900, cp.y - 2620 - (1 - E.earth) * 1200, cp.z - Math.cos(S.earthYaw) * 900); S.earthM.rotation.y += (dt || 0) * 0.006;
+    S.planet.position.set(cp.x + Math.cos(S.earthYaw) * 500 - Math.sin(S.earthYaw) * 500, cp.y + 210, cp.z - Math.sin(S.earthYaw) * 500 - Math.cos(S.earthYaw) * 500); }
+  S.sun.position.set(cp.x - 30, cp.y + 60, cp.z + 20); S.sun.target.position.copy(cp);
+  // the snow: flakes in a box round the camera, falling and streaming past
+  const sn = E.snow || 0; S.snow.visible = sn > 0.02;
+  if (S.snow.visible && dt) { const p = S.snow.geometry.attributes.position, a = p.array, n = p.count, fall = S.zone === 2 ? 0.3 : 2.2;
+    S.snow.material.opacity = Math.min(0.9, 0.5 * sn);
+    for (let i = 0; i < n; i++) { const o = i * 3; a[o + 1] -= fall * S.snowV[i] * dt; a[o] += Math.sin(S.t * 0.7 + i) * 0.4 * dt;
+      let dx = a[o] - cp.x, dy = a[o + 1] - cp.y, dz = a[o + 2] - cp.z;
+      if (dx > 25) a[o] -= 50; else if (dx < -25) a[o] += 50; if (dy > 15) a[o + 1] -= 30; else if (dy < -15) a[o + 1] += 30; if (dz > 25) a[o + 2] -= 50; else if (dz < -25) a[o + 2] += 50; }
+    p.needsUpdate = true; }
+  S.top.visible = d < 120;
+  // speed lines, round the edge of the view, the faster the brighter
+  const sp = Math.max(0, Math.min(1, (S.v - 20) / 16)) * (S.phase === 'run' ? 1 : 0) + (S.rocketT > 0 ? 0.6 : 0) + (S.boostV > 4 ? 0.25 : 0);
+  S.lines.material.opacity = Math.min(0.55, sp * 0.45); S.lines.visible = sp > 0.02;
+  if (S.lines.visible && dt) { const D = S.lineD, a = S.lines.geometry.attributes.position.array, L = 0.8 + sp * 2.6;
+    for (let i = 0; i < 40; i++) { const o = i * 3; D[o + 2] += S.v * dt * 0.7; if (D[o + 2] > -1.5) sledLineNew(i, false);
+      a[i * 6] = D[o]; a[i * 6 + 1] = D[o + 1]; a[i * 6 + 2] = D[o + 2]; a[i * 6 + 3] = D[o]; a[i * 6 + 4] = D[o + 1]; a[i * 6 + 5] = D[o + 2] - L; }
+    S.lines.geometry.attributes.position.needsUpdate = true; }
+}
+function sledThings(dt) {                                                // the fish turning, the golden ones bobbing, penguins waddling, snowballs rolling across
+  const S = SLED, V = S.vv, t = S.t;
+  for (const f of S.fish) { if (!f.on) continue; const o = f.i * 3; V.Q.setFromAxisAngle(V.Y0, t * 3 + f.ph); V.Sc.set(1, 1, 1); V.M.compose(V.a.set(S.fp[o], S.fp[o + 1] + Math.sin(t * 4 + f.ph) * 0.08, S.fp[o + 2]), V.Q, V.Sc); S.fishIM.setMatrixAt(f.i, V.M); }
+  S.fishIM.instanceMatrix.needsUpdate = true;
+  for (const g of S.pools.gold) if (g.userData.busy) { g.userData.fish.rotation.y = t * 4; g.userData.fish.position.y = Math.sin(t * 3) * 0.15; }
+  for (const p of S.pups) if (p.on) { p.m.material.rotation = Math.sin(t * 3) * 0.15; const k = 1.8 + Math.sin(t * 5) * 0.15; p.m.scale.setScalar(k); }
+  for (const o of S.obs) {
+    if (!o.on || o.hit) continue;
+    if (o.kind === 'penguin') { o.t += dt; o.q = o.q0 + Math.sin(o.t * 1.3 + o.ph) * 1.9; sledPlace(o.m, o.P, o.F, o.R, o.U, o.q, Math.abs(Math.sin(o.t * 9)) * 0.06, Math.cos(o.t * 1.3 + o.ph) > 0 ? -1.2 : 1.2); o.m.rotateZ(Math.sin(o.t * 9) * 0.12); }
+    else if (o.kind === 'snowball') { if (!o.trig && o.s - S.s < 58) o.trig = true; if (o.trig) { o.t += dt; const dir = o.q0 > 0 ? -1 : 1; o.q = o.q0 + dir * Math.min(8.4, o.t * 2.6); if (Math.abs(o.q) > S.QMAX + 0.2) { sledGive(o.m); o.on = false; continue; } }
+      sledPlace(o.m, o.P, o.F, o.R, o.U, o.q, 0.78, 0); o.m.rotateZ(-o.t * 3.3 * (o.q0 > 0 ? -1 : 1)); }
+    else if (o.kind === 'spike') { o.m.rotateY(dt * 1.5); }
+  }
+  for (const g of S.gaps) if (g.on && g.s1 < S.s - 30) { g.on = false; sledGive(g.flag); g.flag = null; }
+}
+
+/* ---------- the HUD (dom writes ten times a second at most, only what changed) ---------- */
+function sledHud(dt) {
+  const S = SLED, u = S.ui; S.hudT -= dt; if (S.hudT > 0) return; S.hudT = 0.1;
+  const fn = S.fishN; if (u.fn !== fn) { u.fn = fn; u.Fish.textContent = fn; }
+  const dd = Math.max(0, Math.floor((S.crash && S.phase !== 'run' ? S.crash.s : S.s) - S.S0)); if (u.dd !== dd) { u.dd = dd; u.Dist.textContent = dd; }
+  if (u.zn !== S.zone) { u.zn = S.zone; const Z = sledZones()[S.zone]; u.Zone.textContent = Z.ic + ' ' + Z.name; }
+  const pk = (S.magT > 0 ? 'm' + Math.ceil(S.magT * 4) : '') + (S.shield ? 's' : '') + (S.rocketT > 0 ? 'r' + Math.ceil(S.rocketT * 8) : '');
+  if (u.pk !== pk) { u.pk = pk; u.pm.classList.toggle('on', S.magT > 0); u.ps.classList.toggle('on', S.shield); u.pr.classList.toggle('on', S.rocketT > 0);
+    u.pmb.style.width = (S.magT / 10 * 100).toFixed(1) + '%'; u.prb.style.width = (S.rocketT / 4 * 100).toFixed(1) + '%'; }
+  const cb = S.phase === 'run' && S.streak >= 3 ? S.streak : 0; if (u.cb !== cb) { u.cb = cb; u.Combo.classList.toggle('on', !!cb); if (cb) u.Combo.textContent = '🐟 ×' + cb; }
+  const hn = S.phase === 'run' && !S.steered && S.time < 7 && S.hint0; if (u.hn !== hn) { u.hn = hn; u.Hint.classList.toggle('on', hn); }
+  const pb = S.phase === 'run' || S.phase === 'intro'; if (pb !== u.pb) { u.pb = pb; u.PauseBtn.style.visibility = pb ? '' : 'hidden'; }
+}
+function sledPop(text, cls, sub) { const el = SLED.ui.Msg; el.textContent = text; if (sub) { const s = document.createElement('small'); s.textContent = sub; el.appendChild(s); } el.className = 'sr-msg' + (cls ? ' ' + cls : ''); void el.offsetWidth; el.classList.add('pop'); }
+function sledBanner(text, sub) { const el = SLED.ui.Banner; el.textContent = text; if (sub) { const s = document.createElement('small'); s.textContent = sub; el.appendChild(s); } el.className = 'sr-banner'; void el.offsetWidth; el.classList.add('pop'); }
+function sledFadeDom() { const S = SLED, v = Math.round(S.fade * 50) / 50; if (v !== S.fadeShown && S.ui) { S.fadeShown = v; S.ui.Fade.style.opacity = v; } }
+function sledBuildUI() {
+  const st = document.createElement('style'); st.id = 'sledStyle';
+  st.textContent = `
+#sledUI{position:fixed;inset:0;z-index:30;display:none;pointer-events:none;overflow:hidden;color:#fff;font-family:var(--display);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+#sledUI.on{display:block}
+#sledArea{position:absolute;inset:0;pointer-events:auto;touch-action:none;cursor:grab}
+#sledUI button{pointer-events:auto;font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulation}
+#sledUI .sr-top{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) + 10px);left:calc(env(safe-area-inset-left,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:6px}
+#sledUI .sr-fish{justify-self:start;display:flex;align-items:center;gap:6px;background:rgba(14,22,52,.72);border-radius:16px;padding:6px 12px 6px 9px;font-size:24px;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+#sledUI .sr-fish i{font-style:normal;font-size:.8em}
+#sledUI .sr-dist{text-align:center;line-height:1;text-shadow:0 3px 0 #1d3f8a,0 0 14px rgba(10,20,60,.8)}
+#sledUI .sr-dist b{font-size:clamp(40px,11vw,62px);font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:1px}
+#sledUI .sr-dist span{font-size:clamp(20px,5vw,30px);margin-left:2px}
+#sledUI .sr-dist small{display:block;font:800 12px var(--body);opacity:.85;margin-top:3px;text-shadow:0 1px 3px #000;white-space:nowrap}
+#sledUI .sr-x{justify-self:end;width:44px;height:44px;border-radius:50%;background:#3a8cff;padding:0;box-shadow:0 3px 0 #1d58b0}
+#sledUI .sr-x svg{display:block;width:20px;height:20px;margin:auto;fill:#fff}
+#sledUI .sr-pups{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 96px);transform:translateX(-50%);display:flex;gap:8px}
+#sledUI .sr-pup{display:none;align-items:center;gap:6px;background:rgba(14,22,52,.78);border-radius:999px;padding:4px 10px 4px 6px;font-size:18px;line-height:1;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+#sledUI .sr-pup.on{display:flex;animation:srBump .35s cubic-bezier(.2,1.6,.4,1)}
+#sledUI .sr-pup s{position:relative;display:block;width:44px;height:7px;border-radius:4px;background:rgba(255,255,255,.22);overflow:hidden;text-decoration:none}
+#sledUI .sr-pup s u{position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(90deg,#ffd23a,#ff7a4a);border-radius:4px}
+#sledUI .sr-pup.sh s{display:none}
+#sledUI .sr-pup.sh b{font:800 12px var(--body)}
+#sledUI .sr-combo{position:absolute;left:calc(env(safe-area-inset-left,0px) + 12px);top:calc(env(safe-area-inset-top,0px) + 62px);display:none;background:linear-gradient(90deg,#7ad8ff,#3a8cff);color:#0b1a40;border-radius:999px;padding:4px 12px;font-size:16px;white-space:nowrap;box-shadow:0 3px 0 #1d58b0}
+#sledUI .sr-combo.on{display:block;animation:srBump .35s cubic-bezier(.2,1.6,.4,1)}
+#sledUI .sr-msg,#sledUI .sr-banner{position:absolute;left:0;right:0;padding:0 16px;text-align:center;line-height:1.05;opacity:0;pointer-events:none}
+#sledUI .sr-msg{top:30%;font-size:clamp(28px,7.5vw,48px);text-shadow:0 3px 0 #1d58b0,0 0 16px rgba(10,20,60,.7)}
+#sledUI .sr-msg small,#sledUI .sr-banner small{display:block;font:800 clamp(14px,3.6vw,18px) var(--body);margin-top:6px;text-shadow:0 1px 3px #000}
+#sledUI .sr-msg.gold{color:#ffe27a;text-shadow:0 3px 0 #8a4a10,0 0 18px rgba(255,190,60,.8)}
+#sledUI .sr-msg.trick{color:#e8f8ff}
+#sledUI .sr-msg.ouch{color:#ffd0dc;text-shadow:0 3px 0 #b3203a,0 0 16px rgba(30,14,10,.7)}
+#sledUI .sr-msg.pop{animation:srPop 1.3s ease-out forwards}
+#sledUI .sr-banner{top:17%;font-size:clamp(30px,8vw,52px);color:#fff;text-shadow:0 4px 0 #2a3a8a,0 0 22px rgba(120,180,255,.8)}
+#sledUI .sr-banner.pop{animation:srBan 2.6s ease-out forwards}
+#sledUI .sr-hint{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:2px;background:rgba(14,22,52,.84);border-radius:18px;padding:9px 18px;font:800 15px var(--body);white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.3);text-align:center}
+#sledUI .sr-hint.on{display:flex}
+#sledUI .sr-hint b{font:400 19px var(--display)}
+#sledUI .sr-over{position:absolute;z-index:3;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,10,30,.5);pointer-events:auto;padding:env(safe-area-inset-top,0px) 16px env(safe-area-inset-bottom,0px)}
+#sledUI .sr-over.on{display:flex}
+#sledUI .sr-card{position:relative;background:#f4f9ff;color:#14234a;border-radius:16px;padding:18px 20px 14px;width:min(340px,100%);max-height:calc(100% - 12px);overflow-y:auto;overscroll-behavior:contain;text-align:center;box-shadow:0 8px 0 #1d3f8a,0 20px 44px rgba(0,0,0,.5);animation:srIn .35s cubic-bezier(.2,1.4,.4,1)}
+#sledUI .sr-card h2{margin:0;font-size:30px;font-weight:400;color:#2a64d8;line-height:1.1}
+#sledUI .sr-sub{font:700 14px var(--body);opacity:.75;margin-top:4px}
+#sledUI .sr-big{display:flex;align-items:baseline;justify-content:center;gap:4px;margin-top:4px}
+#sledUI .sr-big b{font-size:54px;font-weight:400;line-height:1.1}
+#sledUI .sr-big span{font-size:26px}
+#sledUI .sr-stats{display:flex;justify-content:space-around;margin:8px 0 2px}
+#sledUI .sr-stats b{display:block;font-size:22px;font-weight:400}
+#sledUI .sr-stats span{font:600 12px var(--body);opacity:.65}
+#sledUI .sr-badge{display:none;margin:8px auto 2px;padding:5px 16px 4px;border-radius:14px;color:#fff;font-size:20px;background:linear-gradient(90deg,#3aa8ff,#a36bff);box-shadow:0 4px 0 #14234a;width:max-content;max-width:100%;transform:rotate(-2deg);animation:srStamp .6s cubic-bezier(.2,1.7,.4,1) both}
+#sledUI .sr-bank{font:800 14px var(--body);color:#2a64d8;margin-top:8px;line-height:1.4}
+#sledUI .sr-wal{font:700 12px var(--body);opacity:.6;margin-top:10px}
+#sledUI .sr-btn{display:block;width:100%;margin-top:10px;padding:12px;border-radius:16px;background:#3a8cff;color:#fff;font-size:19px;box-shadow:0 4px 0 #1d58b0}
+#sledUI .sr-btn.alt{background:#14234a;box-shadow:0 4px 0 #000;font-size:16px}
+#sledUI .sr-btn.rev{background:#ff8a2a;box-shadow:0 4px 0 #b8531c}
+#sledUI .sr-btn.rev:disabled{opacity:.45;cursor:default}
+#sledUI .sr-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+#sledUI .sr-pcard{width:min(290px,100%)}
+#sledUI .sr-fade{position:absolute;inset:0;z-index:6;background:#05081c;opacity:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
+#sledUI .sr-fade b{font-weight:400;font-size:26px;color:#cfe4ff;text-shadow:0 0 14px rgba(120,180,255,.6)}
+#sledUI.paused .sr-msg,#sledUI.paused .sr-banner,#sledUI.paused .sr-hint{visibility:hidden}
+#sledUI.ghost,#sledUI.ghost *{pointer-events:none!important}
+#sledUI.ghost .sr-top,#sledUI.ghost .sr-pups,#sledUI.ghost .sr-combo,#sledUI.ghost .sr-msg,#sledUI.ghost .sr-banner,#sledUI.ghost .sr-hint{visibility:hidden}
+@keyframes srPop{0%{opacity:0;transform:scale(.5)}12%{opacity:1;transform:scale(1.12)}22%{transform:scale(1)}75%{opacity:1}100%{opacity:0;transform:translateY(-18px)}}
+@keyframes srBan{0%{opacity:0;transform:translateY(-30px) scale(.8)}10%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+@keyframes srBump{from{transform:scale(1.35)}}
+@keyframes srIn{from{transform:scale(.7);opacity:0}}
+@keyframes srStamp{0%{transform:scale(2.4) rotate(-12deg);opacity:0}100%{transform:scale(1) rotate(-2deg);opacity:1}}
+@media (max-width:420px){#sledUI .sr-fish{font-size:20px;padding:5px 10px 5px 7px}#sledUI .sr-hint{font-size:13px;padding:8px 14px}#sledUI .sr-hint b{font-size:16px}#sledUI .sr-pups{top:calc(env(safe-area-inset-top,0px) + 90px)}}
+@media (max-height:520px){#sledUI .sr-dist b{font-size:40px}#sledUI .sr-dist span{font-size:20px}#sledUI .sr-pups{top:calc(env(safe-area-inset-top,0px) + 72px)}#sledUI .sr-combo{top:calc(env(safe-area-inset-top,0px) + 58px)}#sledUI .sr-msg{top:50%;font-size:30px}#sledUI .sr-banner{top:25%;font-size:32px}
+  #sledUI .sr-card{padding:10px 16px}#sledUI .sr-card h2{font-size:24px}#sledUI .sr-big b{font-size:36px}#sledUI .sr-stats{margin:4px 0 0}#sledUI .sr-btn{padding:8px;margin-top:6px;font-size:16px}#sledUI .sr-bank{margin-top:4px}#sledUI .sr-wal{margin-top:5px}#sledUI .sr-hint{bottom:calc(env(safe-area-inset-bottom,0px) + 10px)}
+  #sledUI .sr-card.wide{width:min(560px,100%);display:grid;grid-template-columns:1fr 1fr;column-gap:16px;align-items:center}#sledUI .sr-card.wide .sr-left{grid-column:1}#sledUI .sr-card.wide .sr-right{grid-column:2}}
+body.sledding .banner,body.sledding #walkCaption,body.sledding #auntySubs,body.sledding #hopPill,body.sledding #chimSootPill,body.sledding #jetPill{display:none!important}
+body.sledding .ach-toast{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);z-index:40}`;
+  document.head.appendChild(st);
+  const ui = document.createElement('div'); ui.id = 'sledUI';
+  ui.innerHTML = `<div id="sledArea"></div>
+<div class="sr-top"><div class="sr-fish"><i>&#x1F41F;</i><b id="sledFish">0</b></div><div class="sr-dist"><b id="sledDist">0</b><span>m</span><small id="sledZone"></small></div>
+<button class="sr-x" id="sledPauseBtn" aria-label="Pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.4"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.4"/></svg></button></div>
+<div class="sr-pups" aria-hidden="true"><div class="sr-pup" id="sledPm"><i>&#x1F9F2;</i><s><u id="sledPmb"></u></s></div><div class="sr-pup sh" id="sledPs"><i>&#x1F6E1;&#xFE0F;</i><b>ON</b></div><div class="sr-pup" id="sledPr"><i>&#x1F680;</i><s><u id="sledPrb"></u></s></div></div>
+<div class="sr-combo" id="sledCombo"></div>
+<div class="sr-banner" id="sledBanner"></div>
+<div class="sr-msg" id="sledMsg"></div>
+<div class="sr-hint" id="sledHint"><b>&#x1F446; Drag to steer</b>Swipe up (or tap) to jump &middot; swipe down to tuck<br>In the air: swipe or tap for tricks!</div>
+<div class="sr-over" id="sledPauseOv"><div class="sr-card sr-pcard"><h2>Paused</h2><div class="sr-sub" id="sledPauseSub"></div><button class="sr-btn" id="sledResume">&#x25B6;&#xFE0E; Keep going</button><button class="sr-btn alt" id="sledQuit">Back to the yard</button></div></div>
+<div class="sr-over" id="sledOver"><div class="sr-card" id="sledCard"><div class="sr-left"><h2 id="sledTitle">Wipeout!</h2><div class="sr-sub" id="sledSub"></div>
+<div class="sr-big"><b id="sledOD">0</b><span>m</span></div>
+<div class="sr-stats"><div><b id="sledOF">0</b><span>fish</span></div><div><b id="sledOT">0</b><span>tricks</span></div><div><b id="sledOB">0</b><span>best (m)</span></div></div>
+<div class="sr-badge" id="sledBadge"></div><div class="sr-bank" id="sledBank"></div></div>
+<div class="sr-right"><button class="sr-btn rev" id="sledRevive">Keep sliding &middot; &#x1F41F; <b id="sledRevCost">25</b></button><button class="sr-btn" id="sledAgain">Slide again</button><button class="sr-btn alt" id="sledHome">Back to the yard</button>
+<div class="sr-wal" id="sledWal"></div></div></div></div>
+<div class="sr-fade" id="sledFade"><b id="sledLoad"></b></div>`;
+  document.body.appendChild(ui);
+  const q = id => ui.querySelector('#' + id), u = SLED.ui = { root: ui }, S = SLED;
+  for (const k of ['Area', 'Fish', 'Dist', 'Zone', 'PauseBtn', 'Combo', 'Banner', 'Msg', 'Hint', 'PauseOv', 'PauseSub', 'Resume', 'Quit', 'Over', 'Card', 'Title', 'Sub', 'OD', 'OF', 'OT', 'OB', 'Badge', 'Bank', 'Revive', 'RevCost', 'Again', 'Home', 'Wal', 'Fade', 'Load']) u[k] = q('sled' + k);
+  u.pm = q('sledPm'); u.ps = q('sledPs'); u.pr = q('sledPr'); u.pmb = q('sledPmb'); u.prb = q('sledPrb');
+  const area = u.Area;
+  area.addEventListener('pointerdown', e => { if (!S.active) return; e.preventDefault(); e.stopPropagation(); if (S.paused || (S.phase !== 'run' && S.phase !== 'intro')) return;
+    S.ptr = e.pointerId; S.px = e.clientX; S.g0 = { x: e.clientX, y: e.clientY, t: performance.now(), used: false, moved: 0 }; try { area.setPointerCapture(e.pointerId); } catch (x) {} if (typeof initAudio === 'function') initAudio(); });
+  area.addEventListener('pointermove', e => { if (e.pointerId !== S.ptr || !S.active || S.paused) return; const dx = e.clientX - S.px; S.px = e.clientX;
+    const w = Math.max(280, S.size && S.size.x ? S.size.x : window.innerWidth); S.tq += dx * (2 * S.QMAX) / (0.72 * w); if (Math.abs(dx) > 0.5) { S.steered = true; }
+    const G = S.g0; if (!G) return; G.moved = Math.max(G.moved, Math.hypot(e.clientX - G.x, e.clientY - G.y));
+    const ox = e.clientX - G.x, oy = e.clientY - G.y, dtm = performance.now() - G.t;
+    if (dtm > 380) { G.x = e.clientX; G.y = e.clientY; G.t = performance.now(); return; }   // (a slow drag is steering, not a swipe: start the count again)
+    if (!G.used && oy < -38 && -oy > Math.abs(ox) * 1.1) { G.used = true; sledUp(); }
+    else if (!G.used && oy > 38 && oy > Math.abs(ox) * 1.1) { G.used = true; sledDown(); }
+    else if (!G.used && S.air && Math.abs(ox) > 62 && Math.abs(ox) > Math.abs(oy) * 1.5 && dtm < 260) { G.used = true; sledTrickGo(ox < 0 ? 'spinL' : 'spinR'); }
+    if (G.used && dtm > 120) { G.x = e.clientX; G.y = e.clientY; G.t = performance.now(); G.used = false; } });
+  const up = e => { if (e.pointerId !== S.ptr) return; const G = S.g0; S.ptr = null; S.g0 = null; if (G && !G.used && G.moved < 14 && performance.now() - G.t < 300 && e.type === 'pointerup') sledUp(); };
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) area.addEventListener(t, up);
+  area.addEventListener('contextmenu', e => e.preventDefault());
+  const tap = (el, fn) => el.addEventListener('click', e => { e.stopPropagation(); if (S.active) fn(); });
+  tap(u.PauseBtn, sledPause); tap(u.Resume, sledResume); tap(u.Quit, () => sledLeave());
+  tap(u.Revive, () => { if (S.overT > 0.45) sledRevive(); }); tap(u.Again, () => { if (S.overT > 0.45) sledRun(false); }); tap(u.Home, () => { if (S.overT > 0.45) sledLeave(); });   // (a beat's grace: the swipe that crashed her mustn't land on a button)
+  ui.addEventListener('pointerdown', e => { if (S.active) e.stopPropagation(); });
+  sledKeysOn();
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { sledLoops(false); if (S.active && !S.paused && S.phase === 'run') sledPause(); } });
+}
+function sledUp() { const S = SLED; if (S.phase !== 'run') return; if (S.air) sledTrickGo('back'); else if (S.onRamp) S.jumpQ = S.time; else { sledJump(); if (!S.air) S.jumpQ = S.time; } sledHintDone(); }
+function sledDown() { const S = SLED; if (S.phase !== 'run') return; if (S.air) sledTrickGo('front'); else { S.tuckT = 1.2; sledSfx('tuck'); } sledHintDone(); }
+function sledHintDone() { if (SLED.steered && !sledGet('catguard.sledHinted', '')) sledPut('catguard.sledHinted', '1'); }
+function sledKeysOn() { if (SLED.keysOn) return; SLED.keysOn = true; addEventListener('keydown', sledKey, true); addEventListener('keyup', sledKey, true); }
+function sledKey(e) {                                                    // arrows (or A / D) to steer, up or space to jump (and flip), down to tuck (front flip in the air); Esc or P to pause
+  const S = SLED, k = e.key; if (!S.active) return;
+  const l = k === 'ArrowLeft' || k === 'a' || k === 'A', r = k === 'ArrowRight' || k === 'd' || k === 'D', u = k === 'ArrowUp' || k === 'w' || k === 'W' || k === ' ' || k === 'Spacebar', dn = k === 'ArrowDown' || k === 's' || k === 'S',
+    pz = k === 'Escape' || k === 'p' || k === 'P', go = k === 'Enter';
+  if (!l && !r && !u && !dn && !pz && !go) return;
+  e.preventDefault(); e.stopPropagation();
+  if (e.type === 'keyup') { if ((l && S.kx < 0) || (r && S.kx > 0)) S.kx = 0; if (dn) S.down = false; return; }
+  if (S.paused) { if (!e.repeat && (pz || go || u)) sledResume(); return; }
+  if (S.phase === 'over') { if (!e.repeat && (go || u) && S.overT > 0.6) sledRun(false); else if (!e.repeat && pz && S.overT > 0.6) sledLeave(); return; }
+  if (pz) { if (!e.repeat) sledPause(); return; }
+  if (S.phase !== 'run') return;
+  if (l || r) { const was = S.kx; S.kx = l ? -1 : 1; if (!e.repeat && S.air && was !== S.kx) sledTrickGo(l ? 'spinL' : 'spinR'); S.steered = true; return; }
+  if (e.repeat) return;
+  if (u) sledUp(); else if (dn) { S.down = !S.air; sledDown(); }
+}
+function sledPause() {
+  const S = SLED, u = S.ui; if (!S.active || S.paused || (S.phase !== 'run' && S.phase !== 'intro')) return;
+  S.paused = true; S.drawn = false; S.ptr = null; S.kx = 0; S.down = false; sledLoops(false);
+  u.PauseSub.textContent = Math.max(0, Math.floor(S.s - S.S0)) + ' m · 🐟 ' + S.fishN + ' fish';
+  u.PauseOv.classList.add('on'); u.root.classList.add('paused');
+}
+function sledResume() { const S = SLED, u = S.ui; if (!S.paused) return; S.paused = false; u.PauseOv.classList.remove('on'); u.root.classList.remove('paused'); if (typeof initAudio === 'function') initAudio(); sledLoops(true); }
+
+/* ---------- the card: how far, the fish (banked), the best; and keep sliding, for fish ---------- */
+function sledReviveCost() { return 25 << (SLED.revives | 0); }   // 25, 50, 100 fish
+function sledBank() {                                                    // the run's fish into the piggy bank (only what's new since the last time)
+  const S = SLED, n = S.fishN - S.bankedN; if (n > 0) { sledSetWallet(sledWallet() + n); S.bankedN = S.fishN; }
+  const d = Math.floor((S.crash ? S.crash.s : S.s) - S.S0), best = +sledGet('catguard.sledBest', '0') || 0; if (d > best) sledPut('catguard.sledBest', d);
+  return { d, best0: best };
+}
+function sledOver() {
+  const S = SLED, u = S.ui, C = S.crash || { kind: 'hit', name: '' }; S.phase = 'over'; S.overT = 0;
+  const gain0 = S.fishN - S.bankedN, r = sledBank(), Z = sledZones(), zi = sledZoneAt(r.d);
+  unlock('sledFirst');
+  const sky = zi >= 3;
+  u.Title.textContent = C.kind === 'fall' ? (zi === 4 ? 'Lost in space!' : sky ? 'Into the clouds!' : 'Down the crevasse!') : C.kind === 'trick' ? 'Landed on her head!' : ['Wipeout!', 'Kaboom!', 'Snow-plowed!', 'Splat!'][(Math.random() * 4) | 0];
+  u.Sub.textContent = C.kind === 'hit' && C.name ? 'Bonk! Straight into ' + C.name + (zi ? ' in ' + Z[zi].name.replace(/^The /, 'the ') : '') : C.kind === 'trick' ? 'Land the trick before the ice does!' : Z[zi].ic + ' ' + Z[zi].name;
+  u.OD.textContent = Math.max(0, r.d); u.OF.textContent = S.fishN; u.OT.textContent = S.tricksN; u.OB.textContent = Math.max(r.best0, r.d);
+  const nb = r.d > r.best0 && r.best0 > 0; u.Badge.style.display = nb || r.best0 === 0 && r.d > 0 ? 'block' : 'none'; u.Badge.textContent = nb ? 'New best!' : 'First run!';
+  u.Bank.textContent = gain0 > 0 ? '+' + gain0 + ' 🐟 into the piggy bank' : S.fishN ? 'Fish all banked' : 'No fish this time... grab some next run!';
+  sledOverWallet(); u.Card.classList.toggle('wide', S.aspect > 1.4);
+  u.Over.classList.add('on'); u.PauseOv.classList.remove('on'); u.root.classList.remove('paused');
+  if (nb) sledSfx('best');
+}
+function sledOverWallet() { const S = SLED, u = S.ui, w = sledWallet(), c = sledReviveCost(); u.Wal.textContent = '🐟 ' + w + ' in the piggy bank'; u.Revive.style.display = S.revives < 3 ? '' : 'none'; u.RevCost.textContent = c; u.Revive.disabled = w < c; }
+function sledRevive() {                                                  // keep sliding: fish out of the piggy bank, the ice ahead cleared, back on the sled, blinking for a moment
+  const S = SLED, u = S.ui, K = S.K, C = S.crash; if (!S.active || S.phase !== 'over' || S.revives >= 3 || !C) return;
+  const cost = sledReviveCost(), w = sledWallet(); if (w < cost) { sledSfx('nope'); return; }
+  sledSetWallet(w - cost); S.revives++;
+  let s = Math.max(C.s, S.s - 2); const g = sledInGap(s) || sledInGap(s + 3); if (g) s = g.s1 + 2;
+  sledClearAhead(s - 5, s + 55); for (const gg of S.gaps) if (gg.on && gg.s0 < s && gg.s1 > s - 2) { gg.on = false; sledGive(gg.flag); gg.flag = null; sledSegsDirty(gg.s0 - 1, gg.s1 + 1); }
+  S.s = s; S.q = 0; S.qv = 0; S.tq = 0; S.h = 0; S.vh = 0; S.air = false; S.onRamp = null; S.trick = S.trickQ = null; S.v = Math.max(sledVBase(s - S.S0) * 0.7, 12); S.boostV = 0; S.inv = 2.4; S.crash = null; S.streak = 0;
+  if (K.sled.parent !== K.body) K.body.add(K.sled); sledCatPoseReset();
+  S.phase = 'run'; S.pt = 0; u.Over.classList.remove('on'); u.cb = u.pb = null; S.hudT = 0;
+  sledSegsStep(); sledPose(0); sledCamStep(1, true); sledBanner('Keep sliding!', ''); sledSfx('revive'); sledLoops(true);
+}
+
+/* ---------- sound: through the game's own little synth (the sound-effects switch covers it); the music past it, like the other games ---------- */
+function sledSfx(n, k) {
+  if (!actx || actx.state !== 'running') return;
+  try {
+    if (n === 'jump') { tone(380, 760, 0.14, 'triangle', 0.03); noise(0.12, 0.03, 2600); }
+    else if (n === 'ramp') { tone(300, 900, 0.3, 'sawtooth', 0.012); tone(450, 1200, 0.28, 'triangle', 0.03); noise(0.3, 0.05, 1800); }
+    else if (n === 'trick') { noise(0.18, 0.025, 5000); tone(900, 1300, 0.12, 'sine', 0.02); }
+    else if (n === 'trickDone') { const f = 660 * Math.pow(2, Math.min(k || 1, 6) * 2 / 12); tone(f, f * 1.01, 0.1, 'triangle', 0.03); }
+    else if (n === 'land') { [523, 659, 784, 1047, 1319].slice(0, 2 + Math.min(3, k || 1)).forEach((f, i) => tone(f, f * 1.01, 0.16, 'triangle', 0.035, i * 0.06)); tone(140, 60, 0.16, 'sine', 0.08); noise(0.25, 0.06, 1400); }
+    else if (n === 'thud') { tone(130, 60, 0.12, 'sine', 0.05 + Math.min(0.05, (k || 0) * 0.004)); noise(0.18, 0.04, 1100); }
+    else if (n === 'fish') { const f = 1046 * Math.pow(2, Math.min(k || 0, 16) / 12); tone(f, f * 1.5, 0.06, 'square', 0.012); tone(f * 2, f * 2.02, 0.12, 'sine', 0.02, 0.03); }
+    else if (n === 'gold') { [988, 1319, 1568, 1976, 2637].forEach((f, i) => tone(f, f * 1.01, 0.2, 'triangle', 0.035, i * 0.07)); noise(0.2, 0.03, 4000); }
+    else if (n === 'streak') { [784, 988, 1175].forEach((f, i) => tone(f, f * 1.01, 0.12, 'triangle', 0.03, i * 0.06)); }
+    else if (n === 'power') { [523, 784, 1047, 1568].forEach((f, i) => tone(f, f * 1.02, 0.14, 'square', 0.014, i * 0.05)); noise(0.3, 0.03, 3000); }
+    else if (n === 'shield') { tone(1400, 300, 0.4, 'triangle', 0.04); noise(0.3, 0.06, 3500); }
+    else if (n === 'smash') { noise(0.35, 0.12, 1200); tone(200, 70, 0.25, 'sine', 0.08); }
+    else if (n === 'crash') { noise(0.6, 0.16, 900); tone(220, 50, 0.5, 'sine', 0.1); tone(700, 200, 0.3, 'square', 0.014, 0.05); }
+    else if (n === 'fall') { tone(700, 120, 1.2, 'triangle', 0.035); noise(0.8, 0.04, 700); }
+    else if (n === 'bump') { tone(160, 80, 0.1, 'sine', 0.05); noise(0.12, 0.05, 900); }
+    else if (n === 'zone') { [523, 659, 784, 1047].forEach((f, i) => tone(f, f * 1.01, 0.22, 'triangle', 0.035, i * 0.09)); }
+    else if (n === 'best') { [784, 988, 1175, 1568].forEach((f, i) => tone(f, f * 1.01, 0.18, 'triangle', 0.035, i * 0.08)); }
+    else if (n === 'go') { tone(523, 784, 0.14, 'triangle', 0.035); tone(784, 1046, 0.18, 'triangle', 0.03, 0.12); noise(0.25, 0.04, 2000); }
+    else if (n === 'tuck') noise(0.2, 0.025, 2200);
+    else if (n === 'revive') for (let i = 0; i < 5; i++) { const f = 523 * Math.pow(2, i / 4); tone(f, f * 1.01, 0.16, 'triangle', 0.035, i * 0.06); }
+    else if (n === 'nope') tone(200, 160, 0.08, 'square', 0.03);
+  } catch (e) {}
+}
+function sledLoops(on) {                                                 // the scrape of the sled on the ice and the rush of the wind (one noise loop, two filters)
+  const S = SLED;
+  if (!on) { for (const k of ['scrape', 'wind']) { const W = S[k]; if (W) { try { W.g.gain.cancelScheduledValues(actx.currentTime); W.g.gain.setTargetAtTime(0, actx.currentTime, 0.05); W.src.stop(actx.currentTime + 0.3); } catch (e) {} S[k] = null; } } return; }
+  if (!actx || actx.state !== 'running') return;
+  try {
+    if (!S.noiseBuf) { const n = Math.floor(actx.sampleRate * 2), b = actx.createBuffer(1, n, actx.sampleRate), dd = b.getChannelData(0); for (let i = 0; i < n; i++) dd[i] = Math.random() * 2 - 1; S.noiseBuf = b; }
+    for (const [k, type, f0] of [['scrape', 'bandpass', 1800], ['wind', 'lowpass', 700]]) if (!S[k]) { const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain(); src.buffer = S.noiseBuf; src.loop = true; f.type = type; f.frequency.value = f0; if (type === 'bandpass') f.Q.value = 0.8; g.gain.value = 0; src.connect(f); f.connect(g); g.connect(actx.destination); src.start(); S[k] = { src, f, g, v: -1 }; }
+  } catch (e) {}
+}
+function sledLoopsSet() {
+  const S = SLED; if (!actx || actx.state !== 'running' || !S.scrape) return;
+  const sp = Math.max(0, Math.min(1, (S.v - 8) / 30)), on = S.phase === 'run' && !S.paused, sc = on && !S.air ? 0.012 + 0.03 * sp + Math.min(0.02, Math.abs(S.qv) * 0.004) : 0, wd = on ? 0.008 + 0.03 * sp + (S.air ? 0.02 : 0) + (S.rocketT > 0 ? 0.03 : 0) : 0;
+  const kk = Math.round(sc * 400) + Math.round(wd * 400) * 1000; if (kk === S.scrape.v) return; S.scrape.v = kk;
+  try { const t = actx.currentTime; S.scrape.g.gain.setTargetAtTime(sc, t, 0.08); S.scrape.f.frequency.setTargetAtTime(1400 + 1600 * sp, t, 0.15); S.wind.g.gain.setTargetAtTime(wd, t, 0.12); S.wind.f.frequency.setTargetAtTime(500 + 1200 * sp + (S.air ? 400 : 0), t, 0.2); } catch (e) {}
+}
+const SLED_MUS = { r: [[48, 45, 41, 43], [48, 45, 41, 43], [45, 41, 48, 43], [41, 43, 40, 45], [41, 43, 40, 45]], c: [[[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]], [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]], [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], [[53, 57, 60, 64], [55, 59, 62, 65], [52, 55, 59, 62], [57, 60, 64, 67]], [[53, 57, 60, 64], [55, 59, 62, 65], [52, 55, 59, 62], [57, 60, 64, 67]]],
+  mel: [72, -1, 76, 79, 76, -1, 74, 72, 74, -1, 77, 76, 74, -1, 72, -1, 79, -1, 81, 79, 76, -1, 74, 76, 77, 76, 74, 72, 71, -1, -1, -1] };
+function sledMusic() {
+  const S = SLED; if (!actx || actx.state !== 'running' || !musicOn || S.paused || document.hidden || (S.phase !== 'run' && S.phase !== 'intro')) { S.mNext = 0; return; }
+  const out = actx.__real || null; tone.out = out; try { sledMusic0(out); } catch (e) {} finally { tone.out = null; }
+}
+function sledMusic0(out) {
+  const S = SLED, now = actx.currentTime, z = S.zone, bpm = 136 + z * 4, six = 60 / bpm / 4, f = m => 440 * Math.pow(2, (m - 69) / 12), hit = typeof jetHit === 'function' ? jetHit : null;
+  if (!S.mNext || S.mNext < now) { S.mNext = now + 0.06; }
+  while (S.mNext < now + 0.2) {
+    const t = S.mNext, d = t - now, n = S.mStep = (S.mStep || 0) + 1, st = n % 16, bar = (n >> 4) % 4, cyc = (n >> 6) % 2, root = SLED_MUS.r[z][bar], ch = SLED_MUS.c[z][bar];
+    const dreamy = z >= 3;
+    if (!dreamy || st % 8 === 0) { if (st === 0 || st === 8 || (!dreamy && st === 11)) tone(150, 45, 0.16, 'sine', 0.05, d); }
+    if (!dreamy && (st === 4 || st === 12) && hit) hit(t, 0.12, 0.04, 1900, 'bandpass', out, 0.8);
+    if (hit && st % 2 === 0) hit(t, 0.03, st % 4 === 2 ? 0.013 : 0.007, 9000, 'highpass', out);
+    if (st % 2 === 0) { const m = root - 12 + (st % 4 === 2 ? 12 : 0); tone(f(m), f(m), six * 1.6, dreamy ? 'triangle' : 'sawtooth', dreamy ? 0.02 : 0.011, d); }
+    { const m = ch[st % ch.length] + (dreamy ? 24 : 12); if (dreamy || st % 2 === 1) tone(f(m), f(m), six * (dreamy ? 2.5 : 0.9), dreamy ? 'sine' : 'square', dreamy ? 0.008 : 0.0045, d); }
+    if (cyc && st % 2 === 0) { const m = SLED_MUS.mel[bar * 8 + (st >> 1)]; if (m > 0) tone(f(m + (z === 2 ? -3 : 0)), f(m + (z === 2 ? -3 : 0)) * 1.002, six * 1.8, 'triangle', 0.02, d); }
+    S.mNext += six;
+  }
+}
+
+/* ---------- in from the yard, and back out ---------- */
+function sledSpotPos() {                                                 // the red sled, leaning on the back fence from the outside, just along from the hole
+  if (YARD.holeX === undefined) return null; const S = SLED;
+  if (!S.spotP) { const x = YARD.holeX + 0.95, z = YARD.FZ + 0.3; S.spotP = { x, z, y: 0, sx: YARD.holeX + 0.55, sz: YARD.FZ + 1.15 };   /* (in the clear patch behind the hole, between the hedge bushes) */ }
+  return S.spotP;
+}
+function sledSpotBuild() {
+  const S = SLED, P = sledSpotPos(); if (!P || !povEndWall) return;
+  const g = S.spot = new THREE.Group(); g.userData.name = 'Red saucer sled'; g.userData.noWalk = true;
+  const m = new THREE.Mesh(sledBakeShade(sledSaucerGeo()), new THREE.MeshBasicMaterial({ vertexColors: true })); m.userData.noWalk = true; m.material.userData.noTod = true; S.spotMat = m.material;
+  m.rotation.set(-Math.PI / 2 - 0.3, 0, 0.06); m.position.set(0, 0.5, -0.06); g.add(m);
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(0.5, 16), new THREE.MeshBasicMaterial({ color: 0x1a1a10, transparent: true, opacity: 0.28, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.scale.set(1, 0.5, 1); sh.position.set(0, 0.02, 0.25); sh.renderOrder = 1; sh.userData.noWalk = true; sh.material.userData.noTod = true; g.add(sh);
+  g.position.set(P.x, (typeof hillY === 'function' ? hillY(P.z) : 0), P.z); povEndWall.add(g);
+}
+function sledNear() {                                                    // standing by the sled, out on the bank
+  const P = sledSpotPos(), p = walk.pos; if (!P) return false;
+  return state === 'playing' && gameMode === 'walk' && walk.on && !!walk.rig && walk.grounded && !walk.climb && !mirrorWorld && !(walk.napT > 0)
+    && p.z > YARD.FZ + 0.15 && Math.hypot(p.x - P.x, p.z - (P.z + 0.6)) < 1.9 && p.y < 1.6;
+}
+function sledPill(dt) {                                                  // Free roam: the sled on the fence (made the first time she's out in the yard), its 🛷 button, and a word about it
+  const S = SLED;
+  if (!walk.on || !povEndWall) { if (S.pillOn) sledPillSet(false); return; }
+  if (!S.spot) { try { sledSpotBuild(); } catch (e) { console.error(e); S.spot = new THREE.Group(); } }
+  if (S.spotMat && TOD && TOD.tint) { const t = TOD.tint; if (!S.tint || Math.abs(S.tint - (t.r + t.g + t.b)) > 0.004) { S.tint = t.r + t.g + t.b; S.spotMat.color.setRGB(Math.min(1.2, t.r), Math.min(1.2, t.g), Math.min(1.2, t.b)); } }
+  const on = sledNear(), P = sledSpotPos(); if (!P) return;
+  if (state === 'playing' && gameMode === 'walk' && !mirrorWorld && S.saidVisit !== walk.treesSeen) {
+    const p = walk.pos, dd = Math.hypot(p.x - P.x, p.z - P.z), first = sledGet('catguard.sledSeen', '') !== '1';
+    if ((first && dd < 8.5 && p.y < 3) || on) { S.saidVisit = walk.treesSeen; if (first) sledPut('catguard.sledSeen', '1');
+      showWalkName(first ? (p.z > YARD.FZ ? '🛷 A red saucer sled, propped on the fence! Tap “Sled Rush” for a ride down the bank!' : '🛷 Ooh, a red saucer sled, just over the back fence... squeeze through the hole and take it for a ride!')
+        : sledGet('catguard.found.sled', '') === '1' ? '🛷 The red sled! Tap “Sled Rush” for another run (best: ' + (+sledGet('catguard.sledBest', '0') || 0) + ' m)' : '🛷 Tap “Sled Rush” for a ride!'); }
+  }
+  if (on !== S.pillOn) sledPillSet(on);
+}
+function sledPillOn() { return !!SLED.pillOn; }
+function sledPillSet(on) { const S = SLED; S.pillOn = on; (S.pill || sledPillMake()).classList.toggle('on', on); document.body.classList.toggle('sled-pill', on); }
+function sledPillMake() {
+  const S = SLED; if (S.pill) return S.pill;
+  const st = document.createElement('style'); st.textContent = `
+#sledPill{position:fixed;right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(236px + env(safe-area-inset-bottom,0px));z-index:6;display:none;align-items:center;gap:6px;padding:9px 16px 9px 12px;border-radius:999px;background:#e0263a;color:#fff;font:800 16px var(--body);border:3px solid #fff4f8;box-shadow:0 5px 0 #8a1020,0 10px 18px rgba(0,0,0,.3);touch-action:none;cursor:pointer;white-space:nowrap}
+#sledPill b{font-size:20px;line-height:1}
+#sledPill.on{display:flex;animation:srPillIn .45s cubic-bezier(.2,1.6,.4,1),srPillBob 1.8s ease-in-out .5s infinite}
+body.heist-ui #sledPill,body.hopping #sledPill,body.biking #sledPill,body.chimneying #sledPill,body.jetting #sledPill,body.jet-intro #sledPill,body.sledding #sledPill{display:none}
+body.sled-pill #chimSootPill{display:none!important}
+@keyframes srPillIn{from{transform:scale(.4);opacity:0}}
+@keyframes srPillBob{50%{transform:translateY(-4px)}}`;
+  document.head.appendChild(st);
+  const b = S.pill = document.createElement('button'); b.id = 'sledPill'; b.innerHTML = '<b>&#x1F6F7;</b>Sled Rush'; b.setAttribute('aria-label', 'Ride the red sled: Sled Rush');
+  ($('walkUI') || document.body).appendChild(b);
+  b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (SLED.pillOn) SLED.goQ = true; });
+  sledKeysOn(); return b;
+}
+function sledStart() {
+  const S = SLED; if (state !== 'playing' || !walk.on || !walk.rig || S.active) return;
+  markFound('sled'); if (typeof todAudioStop === 'function') todAudioStop(); if (typeof todActorsReset === 'function') todActorsReset();   // (no sky tint on her out there)
+  S.back = { x: walk.pos.x, y: walk.pos.y, z: walk.pos.z, face: walk.face };
+  state = 'sled'; S.active = true; S.paused = false; S.phase = 'enter'; S.pt = 0; S.fade = 0;
+  walk.stick.x = walk.stick.y = 0; walk.vel.set(0, 0, 0); walk.vy = 0; walk.jumpQ = -1;
+  document.body.classList.add('sledding'); $('walkUI').hidden = true; ui.hud.hidden = true; sledPillSet(false);
+  if (typeof ammoChip === 'function') ammoChip(); if (UPPER.aunty && typeof hideBubbles === 'function') hideBubbles(UPPER.aunty);
+  if (ZN && ZN.hud) ZN.hud.hidden = true; if (ZN && ZN.flashEl) ZN.flashEl.style.opacity = 0; if (TOD && TOD.flashEl) { TOD.flashEl.style.opacity = 0; TOD.flashOn = false; }
+  try { if (!S.ui) sledBuildUI(); } catch (e) { console.error(e); sledBail('🛷 The sled’s stuck in the snow... try again in a bit!'); return; }
+  const u = S.ui; S.post = 0; u.Load.textContent = S.built ? '' : '🛷 Waxing the sled...'; u.root.classList.add('on', 'ghost'); u.root.classList.remove('paused'); u.Over.classList.remove('on'); u.PauseOv.classList.remove('on');
+  sledSfx('go');
+}
+function sledEnterStep(dt) {                                             // (still in the yard) a beat to fade out; built and dressed behind the dark, then the run
+  const S = SLED; S.pt += dt; S.fade = Math.min(1, S.pt / 0.35); sledFadeDom();
+  if (S.pt < 0.4) return;
+  try {
+    if (!S.built) sledBuild();
+    const W = walk.rig; W.g.rotation.set(0, walk.face, 0); W.g.scale.setScalar(walk.gScale || 1); W.body.scale.set(1, 1, 1); W.body.position.set(0, 0, 0);
+    sledCatSet(W.g.clone(true)); if (!S.warm) { S.warm = true; sledReset(); sledWarm(); }
+    S.ui.root.classList.remove('ghost'); sledRun(true); S.fade = 1;
+  } catch (e) { console.error(e); sledBail('🛷 The sled’s stuck in the snow... try again in a bit!'); }
+}
+function sledLeave() { const S = SLED; if (!S.active) return; if (S.phase === 'run' || S.phase === 'crash' || S.phase === 'intro') sledBank(); S.paused = false; S.ui.root.classList.remove('paused'); S.ui.PauseOv.classList.remove('on'); S.ui.Over.classList.remove('on'); S.phase = 'leave'; S.pt = 0; S.ptr = null; sledLoops(false); }
+function sledHandoff() {                                                 // back to Free roam, by the sled on the fence
+  const S = SLED, W = walk.rig, u = S.ui, P = sledSpotPos();
+  S.active = false; S.paused = false; S.phase = 'off'; S.ptr = null; S.kx = 0; S.down = false; sledLoops(false);
+  S.post = 0.45; S.fade = 1; S.fadeShown = -1;
+  if (u) { u.root.classList.remove('paused'); u.root.classList.add('on', 'ghost'); u.Over.classList.remove('on'); u.PauseOv.classList.remove('on'); sledFadeDom(); }
+  const K = S.K; if (K && K.rig && K.rig.parent) K.rig.parent.remove(K.rig); if (K) K.rig = null;   // (hand the clone back)
+  state = 'playing'; last = performance.now(); document.body.classList.remove('sledding'); $('walkUI').hidden = false; ui.hud.hidden = false;
+  if (W) { W.g.rotation.order = 'XYZ'; W.g.rotation.set(0, 0, 0); W.g.visible = true; W.shadow.visible = true; W.body.scale.set(1, 1, 1); W.body.position.set(0, 0, 0); W.body.rotation.set(0, 0, 0); W.head.rotation.set(0, 0, 0); }
+  walk.vel.set(0, 0, 0); walk.vy = 0; walk.grounded = true; walk.climb = null; walk.jumpQ = -1; walk.stick.x = walk.stick.y = 0; walk.squash = 0.4; walk.free = true;
+  if (typeof heist !== 'undefined' && heist.keys) for (const k in heist.keys) heist.keys[k] = false;
+  if (P) { walk.pos.set(P.sx, typeof hillY === 'function' ? hillY(P.sz) : 0, P.sz); walk.face = Math.PI; } else if (S.back) { walk.pos.set(S.back.x, S.back.y, S.back.z); walk.face = S.back.face; }
+  if (typeof fc !== 'undefined' && fc.focus) { fc.focus.set(walk.pos.x, walk.pos.y + 0.55, walk.pos.z); if (fc.s && fc.s.focus) fc.s.focus.copy(fc.focus); }
+  if (W) { W.g.position.copy(walk.pos); W.g.rotation.y = walk.face; }
+  const best = +sledGet('catguard.sledBest', '0') || 0;
+  showWalkName(best ? '🛷 Back by the fence, sled and all. Sled Rush best: ' + best + ' m' : '🛷 Back by the fence, sled and all!');
+  S.saidVisit = walk.treesSeen;
+}
+function sledBail(msg) {                                                 // (something went wrong: back to Free roam, safe)
+  const S = SLED;
+  try { S.phase = 'leave'; sledHandoff(); } catch (e) { S.active = false; S.phase = 'off'; state = 'playing'; document.body.classList.remove('sledding'); try { $('walkUI').hidden = false; ui.hud.hidden = false; if (S.ui) S.ui.root.classList.remove('on'); } catch (x) {} }
+  if (msg) showWalkName(msg);
+}
+function sledUpdate(dt) {
+  const S = SLED;
+  if (S.phase === 'enter') { sledEnterStep(dt); return; }
+  if (S.phase === 'leave') { S.pt += dt; S.fade = Math.min(1, S.pt / 0.35); if (S.fade >= 1) sledHandoff(); return; }
+  if (S.paused) { sledHud(dt); return; }
+  S.t += dt; S.pt += dt;
+  if (S.phase === 'intro') { if (S.pt > 2.4) { S.phase = 'run'; S.pt = 0; } S.v = 12 + S.pt * 2; }
+  if (S.phase === 'run') sledStep(dt);
+  else if (S.phase === 'crash') { sledCrashStep(dt); if (S.pt > 1.9) sledOver(); }
+  else if (S.phase === 'over') { S.overT += dt; sledCrashStep(dt * 0.5); }
+  if (S.fade > 0 && S.phase !== 'leave') S.fade = Math.max(0, S.fade - dt / 0.45);
+  if (S.phase === 'run' || S.phase === 'intro') sledPose(dt);
+  sledThings(dt); chimFxStep(S.fx, dt); chimFxStep(S.gx, dt); sledDecStep();
+  sledCamStep(dt); sledEnv(dt); sledHud(dt); sledLoopsSet(); sledMusic();
+}
+function sledDraw() {
+  const S = SLED;
+  if (S.phase === 'enter' || !S.built || !S.K.rig && S.phase !== 'leave') { if (povEndWall) povEndWall.visible = true; if (typeof updateUpperLights === 'function') updateUpperLights(); const hid = typeof cullBegin === 'function' ? cullBegin() : null; renderer.render(scene, camera); if (hid) cullEnd(hid); }
+  else { sledCamAspect(); if (!(S.paused && S.drawn)) { S.drawn = S.paused; renderer.render(S.scene, S.cam); } }
+  sledFadeDom();
+}
+function sledFrame(dt) {                                                 // (frame) every frame: Sled Rush when it's on (its own world, drawn here: true); otherwise the sled on the fence and its 🛷 button
+  const S = SLED;
+  if (state === 'sled') { try { sledUpdate(dt); sledDraw(); } catch (e) { if (S.err++ < 3) console.error(e); sledBail('🛷 Whoops, a bump in the snow!'); } return true; }
+  try {
+    if (S.goQ) { S.goQ = false; if (S.pillOn) { sledStart(); if (state === 'sled') return sledFrame(0); } }
+    if (S.post > 0) { S.post -= dt; S.fade = Math.max(0, S.post / 0.45); sledFadeDom(); if (S.post <= 0 && S.ui) S.ui.root.classList.remove('on', 'ghost'); }
+    sledPill(dt);
+  } catch (e) { if (S.err++ < 3) console.error(e); }
+  return false;
+}
+
+/* ---------- the title screen: ❄️ Sled Rush, once she's ridden it (catguard.found.sled) ---------- */
+function sledSync() {                                                    // (syncSecretModes) no SLED here: this runs at load, before this block's consts are set
+  const box = document.getElementById('secretModes'); if (!box) return;
+  let b = document.getElementById('sledBtn');
+  if (!b) { const dot = document.createElement('span'); dot.className = 'dot'; dot.id = 'sledDot'; dot.hidden = true; dot.textContent = '·';
+    b = document.createElement('button'); b.className = 'link-btn chaos-link'; b.id = 'sledBtn'; b.hidden = true; b.textContent = '❄️ Sled Rush'; box.appendChild(dot); box.appendChild(b);
+    b.addEventListener('click', () => { startGame('walk'); setTimeout(() => { if (state !== 'playing' || !walk.on) return;   /* (Free roam, out on the bank by the sled, and off) */
+      sliderGlass.forEach(g => { g.visible = false; }); const P = sledSpotPos(); if (!P) return;
+      walk.free = true; walk.pos.set(P.sx, typeof hillY === 'function' ? hillY(P.sz) : 0, P.sz); walk.face = Math.PI; walk.vy = 0; walk.vel.set(0, 0, 0); walk.grounded = true;
+      if (typeof roamSave === 'function') try { roamSave({ free: 1 }); } catch (e) {}
+      sledStart(); }, 150); }); }
+  let on = false; try { on = localStorage.getItem('catguard.found.sled') === '1'; } catch (e) {}
+  b.hidden = !on; const others = ['rideBtn', 'hopBtn', 'jetBtn'].some(id => { const e = document.getElementById(id); return e && !e.hidden; });
+  document.getElementById('sledDot').hidden = !(on && others); if (on) box.hidden = false;
+}
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
@@ -23762,6 +24976,7 @@ function frame(now) {
   if (CK.on) { closetFrame(dt); return; } closetTick(dt);   /* (PKR's Closet: while it's open only the dressing room is drawn; otherwise capes flutter, jetpacks fire) */
   if (state === 'stargaze') return;   /* (the telescope's eyepiece covers the whole screen: nothing to draw behind it) */
   if (chimFrame(dt)) return;                                         /* (Chimney Drop: down the flue in its own little world; in Free roam, the 🧱 button on the chimney top, and the soot she brings back) */
+  if (sledFrame(dt)) return;                                           /* (Sled Rush: down the ice in its own little world; in Free roam, the red sled on the back fence and its 🛷 button) */
   if (state === 'jet') { updateJet(dt); renderJet(); return; } jetPill();   /* (Sky Paws: the raccoon's jet, its own little world; in Free roam, the ✈️ button by the jet on our roof) */
   if (state === 'hop') { updateHop(dt); renderHop(); return; } hopPill();   /* (Treetop Hop: its own little world; in Free roam, the 🌳 button on a tree top) */
   if (state === 'bike') markFound('ride');                            /* (found the motorcycle: it gets a button on the title screen) */
