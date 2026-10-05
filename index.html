@@ -7173,27 +7173,81 @@ function bikeCrash(o) {
   if (B.shield) { bikeShieldPop(o); return; }   /* (a helmet on: it takes the hit instead) */
   B.cleanBest = Math.max(B.cleanBest || 0, B.dist - (B.cleanFrom || 0)); B.trkK = B.trkQ = ''; B.trkStreak = 0;
   B.phase = 'crash'; B.crashT = 0; B.crashAt = B.t; B.landed = false; B.crashO = o && o.solid ? o : null; B.shake = 0.9; B.side = Math.random() < 0.5 ? -1 : 1;
-  B.rvx = B.side * 1.2; B.rvy = 8.5; B.rvz = 5.5 + B.speed * 0.15; B.rspin = 10; B.bvy = B.air ? B.vy : 4; B.bz = -3;
+  B.rvx = B.side * 1.2; B.rvy = 8.5; B.rvz = 5.5 + B.speed * 0.15; B.rspin = 10; B.rroll = B.side * (2 + Math.random() * 2); B.ryaw = (Math.random() - 0.5) * 2; B.bounces = 0; B.sq = 0; bikeRagStart(); B.bvy = B.air ? B.vy : 4; B.bz = -3;
   B.crashSpd = B.speed; B.speed = 0; B.go = 0; B.duck = 0; B.tramWarn = 0; bikeBuzz(120);
   bikeScene.attach(rv.mount);   // kitty parts ways with the bike, in world space
   bikeEngineOff(); bikeSfx('crash'); bikeSay(BIKE_OOF[(Math.random() * BIKE_OOF.length) | 0], true);
 }
-function bikeCrashStep(dt) {   // the bike skids back and flops over; kitty somersaults on ahead (or splats on the car)
-  const B = BIKE, m = B.rv.mount.position, o = B.crashO;
+function bikeCrashStep(dt) {   // the bike skids back and flops over; kitty tumbles on ahead (or splats on the car): a ragdoll, limbs flailing, a bounce or two, a skid, then flopped on her side, dazed
+  const B = BIKE, mt = B.rv.mount, m = mt.position, o = B.crashO;
   B.crashT += dt;
   B.bvy -= 30 * dt; { const fl = B.ground || 0; B.y = Math.max(fl, B.y + B.bvy * dt); if (B.y === fl) B.bvy = 0; }
   B.rv.root.position.z += B.bz * dt; B.bz *= Math.max(0, 1 - dt * 4);
   B.lean += (B.side * 1.35 - B.lean) * Math.min(1, dt * 7); B.pitch += (0.1 - B.pitch) * Math.min(1, dt * 7);
   const pz = m.z; let floor = 0;
-  B.rvy -= 22 * dt; m.x += B.rvx * dt; m.y += B.rvy * dt; m.z += B.rvz * dt; B.rv.mount.rotation.x += B.rspin * dt;
+  B.rvy -= 22 * dt; m.x += B.rvx * dt; m.y += B.rvy * dt; m.z += B.rvz * dt;
+  mt.rotation.x += B.rspin * dt; mt.rotation.z += (B.rroll || 0) * dt; mt.rotation.y += (B.ryaw || 0) * dt;   /* (tumbling every which way, not just head over heels) */
   if (o) {
     const inX = Math.abs(m.x - o.x) < o.hw + 0.2, front = o.z - o.hl - 0.35;
-    if (inX && pz <= front && m.z > front && m.y < o.top) { m.z = front; B.rvz = -Math.abs(B.rvz) * 0.25; B.rvx *= 0.3; B.rspin *= 0.3; }   // splat
+    if (inX && pz <= front && m.z > front && m.y < o.top) { m.z = front; B.rvz = -Math.abs(B.rvz) * 0.25; B.rvx *= 0.3; B.rspin *= 0.3; B.rroll = (B.rroll || 0) * 0.3; bikeRagKick(0.8); B.sq = 0.8; }   // splat
     else if (inX && Math.abs(m.z - o.z) < o.hl + 0.2 && m.y > o.top - 0.3) floor = o.top;
   }
-  const mt = B.rv.mount; mt.updateMatrixWorld(true); const bb = (B.crashBox || (B.crashBox = new THREE.Box3())).setFromObject(mt), low = bb.isEmpty() ? m.y : bb.min.y;   /* (all of her stays above the road, however she's tumbling: not just the point she spins round) */
-  if (low < floor) { m.y += floor - low; if (B.rvy < 0) { B.rvy = B.rvy < -3 ? -B.rvy * 0.35 : 0; B.rvz *= 0.5; B.rvx *= 0.5; B.rspin *= 0.4; } B.landed = true; }
-  if (B.landed && Math.abs(B.rvy) < 0.5) { B.rspin *= Math.max(0, 1 - dt * 6); const r = mt.rotation, k = Math.min(1, dt * 5), tx = Math.round(r.x / (Math.PI * 2)) * Math.PI * 2; r.x += (tx - r.x) * k; r.z += (B.side * 1.35 - r.z) * k; }   /* (she comes to rest dazed, on her side) */
+  mt.updateMatrixWorld(true); const bb = (B.crashBox || (B.crashBox = new THREE.Box3())).setFromObject(mt), low = bb.isEmpty() ? m.y : bb.min.y;   /* (all of her stays above the road, however she's tumbling: not just the point she spins round) */
+  let hit = 0;
+  if (low < floor) { m.y += floor - low;
+    if (B.rvy < 0) { const imp = -B.rvy;
+      if (imp > 2.2 && (B.bounces || 0) < 3) { B.bounces = (B.bounces || 0) + 1; B.rvy = imp * 0.42; hit = Math.min(1, imp / 9);   /* (a bounce: a jolt through her, and the tumble changes) */
+        B.rspin = B.rspin * 0.5 + (Math.random() - 0.5) * 5; B.rroll = (B.rroll || 0) * 0.4 + B.side * (1.5 + Math.random() * 2.5); B.ryaw = (Math.random() - 0.5) * 3; }
+      else B.rvy = 0;
+      B.rvz *= 0.62; B.rvx *= 0.62; }
+    B.landed = true; }
+  const onGround = low <= floor + 0.04;
+  if (onGround && B.landed) { const f = Math.exp(-dt * 3.2); B.rvz *= f; B.rvx *= f; }   /* (a skid along the road) */
+  if (hit > 0) { B.sq = Math.max(B.sq || 0, hit); B.shake = Math.max(B.shake, 0.3 * hit); bikeRagKick(hit); bikeSfx('land'); }
+  const rest = B.landed && onGround && Math.abs(B.rvy) < 0.5;
+  if (rest) { const d = Math.max(0, 1 - dt * 6); B.rspin *= d; B.rroll = (B.rroll || 0) * d; B.ryaw = (B.ryaw || 0) * d;
+    const r = mt.rotation, k = Math.min(1, dt * 4), T = Math.PI * 2, tx = Math.round(r.x / T) * T, tz = Math.round((r.z - B.side * 1.35) / T) * T + B.side * 1.35; r.x += (tx - r.x) * k; r.z += (tz - r.z) * k; }   /* (she comes to rest flopped on her side) */
+  B.sq = Math.max(0, (B.sq || 0) - dt * 4); { const s = B.sq * B.sq; mt.scale.set(1 + 0.18 * s, 1 - 0.28 * s, 1 + 0.18 * s); }   /* (squashed flat for a moment on each landing) */
+  bikeRagStep(dt, rest);
+}
+/* ---------- her ragdoll: each leg, her head and her tail on a loose spring of its own (the rider is a clone of her Free roam rig) ---------- */
+function bikeRagBind() {   // (startBike) find the rider clone's legs, head and tail
+  const B = BIKE, r = B.rider; B.ragJ = []; B.ragOn = false;
+  try { if (!r || r === B.rv.cat || typeof walk === 'undefined' || !walk.rig) return;
+    const a = [], b = []; walk.rig.g.traverse(o => a.push(o)); r.traverse(o => b.push(o)); if (a.length !== b.length) return;
+    const map = new Map(); for (let i = 0; i < a.length; i++) map.set(a[i], b[i]); const W = walk.rig, J = B.ragJ;
+    W.legs.forEach(h => { const o = map.get(h); if (!o) return; const front = h.position.z > 0, side = h.position.x > 0 ? 1 : -1; J.push({ o, ax: 'x', kind: 'leg', front, side }, { o, ax: 'z', kind: 'legz', front, side }); });
+    { const o = map.get(W.head); if (o) J.push({ o, ax: 'x', kind: 'head' }, { o, ax: 'z', kind: 'headz' }); }
+    W.tail.slice(0, 10).forEach((s, k) => { const o = map.get(s); if (o) J.push({ o, ax: 'x', kind: 'tail', k }, { o, ax: 'y', kind: 'taily', k }); });
+    if (J.length > 32) J.length = 32;
+  } catch (e) { B.ragJ = []; }
+}
+function bikeRagStart() { const B = BIKE; for (const j of B.ragJ || []) { j.rest = j.o.rotation[j.ax]; j.a = j.rest; j.v = 0; } B.ragOn = true; B.twT = 0.9; }
+function bikeRagKick(k) { for (const j of BIKE.ragJ || []) j.v += (Math.random() - 0.5) * 18 * k; }
+function bikeRagReset() { const B = BIKE; if (!B.ragOn) return; B.ragOn = false; for (const j of B.ragJ || []) if (j.rest !== undefined) j.o.rotation[j.ax] = j.rest; }   // (back on the bike: her riding pose)
+function bikeRagStep(dt, rest) {
+  const B = BIKE, J = B.ragJ; if (!J || !J.length || !B.ragOn) return; const t = B.crashT, fa = Math.max(0, 1 - t / 1.6), sd = B.side;
+  if (rest && (B.twT -= dt) <= 0) { B.twT = 0.7 + Math.random() * 0.9; const j = J[(Math.random() * J.length) | 0]; j.v += (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 4); }   // (dazed: a twitch now and then)
+  for (const j of J) {
+    let tg = j.rest;
+    if (!rest) {   // flying: legs flung out and flailing, the tail whipping, her head thrown back
+      if (j.kind === 'leg') tg = j.rest + Math.sin(t * 17 + (j.front ? 0 : 1.7) + j.side) * (0.35 + 0.65 * fa) - (j.front ? 0.5 : -0.5);
+      else if (j.kind === 'legz') tg = j.side * (0.55 + 0.25 * Math.sin(t * 11 + j.side));
+      else if (j.kind === 'head') tg = -0.45 + Math.sin(t * 9) * 0.25;
+      else if (j.kind === 'headz') tg = Math.sin(t * 7) * 0.35;
+      else if (j.kind === 'tail') tg = j.rest * 0.4 + Math.sin(t * 12 - j.k * 0.7) * 0.4;
+      else if (j.kind === 'taily') tg = Math.sin(t * 10 - j.k * 0.8) * 0.45;
+    } else {   // flopped: legs stretched out loose, the tail lying flat, her head lolling
+      if (j.kind === 'leg') tg = j.rest + (j.front ? -0.85 : 0.75);
+      else if (j.kind === 'legz') tg = j.side * 0.22;
+      else if (j.kind === 'head') tg = 0.2;
+      else if (j.kind === 'headz') tg = sd * 0.5 + Math.sin(t * 2.2) * 0.12;   // (a dizzy little wobble)
+      else if (j.kind === 'tail') tg = j.k ? 0.04 : j.rest * 0.3;
+      else if (j.kind === 'taily') tg = sd * 0.12 + Math.sin(t * 1.6 - j.k * 0.5) * 0.06;
+    }
+    const kk = rest ? 55 : 110, c = rest ? 8 : 12;
+    j.v += (kk * (tg - j.a) - c * j.v) * dt; j.a += j.v * dt; j.o.rotation[j.ax] = j.a;
+  }
 }
 function bikeGameOver() {   // the card: score, treats, distance against her best (a proper fanfare when she beats it), the fish banked
   const B = BIKE, u = B.ui, sc = bikeScore(), dm = Math.floor(B.dist); let best = 0;
@@ -7391,7 +7445,7 @@ function bikeOverWallet() { const B = BIKE, u = B.ui; if (!u || !u.Wal) return; 
   u.Revive.style.display = B.revives < 3 ? '' : 'none'; u.RevCost.textContent = c; u.Revive.disabled = w < c; }
 function bikeShopOpen() {   // kitty dusts herself off and climbs back on, the bike turns on the spot, out come the paint samples
   const B = BIKE, rv = B.rv; if (B.phase !== 'over' || B.shop) return;
-  B.shop = true; B.shopSel = bikePaintId(); B.trlSel = bikeTrailId(); B.lean = B.pitch = B.y = 0; B.shopVO = '';
+  B.shop = true; B.shopSel = bikePaintId(); B.trlSel = bikeTrailId(); B.lean = B.pitch = B.y = 0; B.shopVO = ''; bikeRagReset();
   rv.body.add(rv.mount); rv.mount.position.set(0, 0.74, -0.1); rv.mount.rotation.set(0, 0, 0); rv.mount.scale.set(1, 1, 1);
   for (const o of B.obs) o.mesh.visible = false; for (const t of B.fish) t.mesh.visible = false; for (const p of B.powers) p.mesh.visible = false;
   B.ui.Over.classList.add('shop'); B.ui.root.classList.add('shopping'); bikeShopTab('paint', true); bikeShopDraw(); bikeSfx('swish');
@@ -7639,7 +7693,7 @@ function bikeRunStart() {   // a fresh run: the weather's rolled (about a third 
 
 /* ---------- the instant replay: a ring buffer of the last few seconds (rig, camera, every pooled thing on the road), played back slow from a new angle ---------- */
 function bikeRecInit() {
-  const B = BIKE, L = 40 + B.obs.length * 8 + B.fish.length * 6 + B.powers.length * 6 + B.scen.length * 2 + 2;   /* (+2: the trick flip, at the end) */
+  const B = BIKE, L = 40 + B.obs.length * 8 + B.fish.length * 6 + B.powers.length * 6 + B.scen.length * 2 + 2 + 32;   /* (+2: the trick flip; +32: her ragdoll's joints, at the very end) */
   let R = B.rec; if (!R || R.L !== L) { R = B.rec = { cap: 420, L, bufs: [] }; for (let i = 0; i < R.cap; i++) R.bufs.push(new Float32Array(L)); }
   R.n = 0; R.head = 0; R.lastT = -9; R.t0 = B.t;
 }
@@ -7658,6 +7712,7 @@ function bikeRecord() {   // one frame of tape (at most 100 a second)
   for (const P of B.powers) { const q = P.mesh; a[i++] = q.visible ? 1 : 0; v(q.position.x, q.position.y, q.position.z); a[i++] = q.rotation.y; a[i++] = 0; }
   for (const s of B.scen) { a[i++] = s.position.z; a[i++] = s.geometry.userData.house !== undefined ? s.geometry.userData.house : -1; }
   a[i++] = rv.flip.rotation.x; a[i++] = rv.flip.rotation.z;   // the trick in progress
+  { const J = B.ragJ || []; for (let k = 0; k < 32; k++) { const j = J[k]; a[i++] = j ? j.o.rotation[j.ax] : 0; } }   /* (her legs, head and tail) */
 }
 function bikeSnap(a, b, f) {   // lay a moment of the tape back over the world, blended between two recorded frames (things that popped in or wrapped round just snap)
   const B = BIKE, rv = B.rv, m = rv.mount, n = f < 0.5 ? a : b, snap = f < 0.5 ? 0 : 1;
@@ -7678,6 +7733,7 @@ function bikeSnap(a, b, f) {   // lay a moment of the tape back over the world, 
     if (vis) { q.position.set(L(), L(), L()); q.rotation.y = L(); i++; } else i += 5; }
   for (const s of B.scen) { g = Math.abs(a[i] - b[i]) > 6 ? snap : f; const h = n[i + 1]; s.position.z = L(); if (h >= 0) s.geometry = B.houses[h]; i++; }
   g = Math.abs(a[i] - b[i]) > 3 ? snap : f; rv.flip.rotation.x = L(); g = Math.abs(a[i] - b[i]) > 3 ? snap : f; rv.flip.rotation.z = L();   // (a finished flip wraps to 0: no spinning back)
+  g = f; { const J = B.ragJ || []; for (let k = 0; k < 32; k++) { const j = J[k], v = L(); if (j) j.o.rotation[j.ax] = v; } }
 }
 function bikeReplayStart() {   // roll the tape: the couple of seconds before the wipeout and the tumble after
   const B = BIKE, R = B.rec;
@@ -7741,7 +7797,7 @@ function bikeRevive() {   // keep riding: fish out of the wallet, the road round
   const cost = bikeReviveCost(), w = bikeWallet(); if (w < cost) { bikeSfx('nope'); return; }
   bikeSave('catguard.fish', w - cost); B.revives++; B.banked = false;   // (the fish banked at the card stay banked: bikeBank only adds what's new)
   for (const o of B.obs) if (o.on && (o.flyT > 0 || o.hit || Math.abs(o.z) < 70 || o.kind === 'arrow' || o.kind === 'work' || o.kind === 'sign')) bikeOff(o);   // (roadwork goes as a whole)
-  const x = bikeLaneX(B.lane);
+  const x = bikeLaneX(B.lane); bikeRagReset();
   rv.body.add(rv.mount); rv.mount.position.set(0, 0.74, -0.1); rv.mount.rotation.set(0, 0, 0); rv.mount.scale.set(1, 1, 1); rv.root.position.set(x, 0, 0); rv.root.rotation.y = 0;
   Object.assign(B, { phase: 'count', count: 2, countShown: 0, x, prevX: x, fromLane: B.lane, y: 0, prevY: 0, vy: 0, ground: 0, air: false, fly: false, slam: false, lean: 0, pitch: 0,
     duck: 0, tuck: 0, jumpBuf: 0, wob: 0, stumbleT: -99, safeT: 0, inv: 2.2, speed: 0, go: 0, resumeSpd: Math.max(13, B.crashSpd * 0.85), crashT: 0, crashO: null,
@@ -8079,7 +8135,7 @@ function startBike(opts) {
   const B = BIKE, rv = B.rv, u = B.ui;
   if (B.rider && B.rider.parent) B.rider.parent.remove(B.rider);   // swap riders: the game's clone, or our stand-in princess
   B.opts = opts; B.rider = opts.rider || rv.cat;
-  B.rider.position.set(0, 0, 0); B.rider.rotation.set(0, 0, 0); rv.scaleG.scale.setScalar(opts.riderScale || 1); rv.scaleG.add(B.rider);
+  B.rider.position.set(0, 0, 0); B.rider.rotation.set(0, 0, 0); rv.scaleG.scale.setScalar(opts.riderScale || 1); rv.scaleG.add(B.rider); bikeRagBind();
   rv.body.add(rv.mount); rv.mount.position.set(0, 0.74, -0.1); rv.mount.rotation.set(0, 0, 0); rv.mount.scale.set(1, 1, 1);
   Object.assign(B, { resumeSpd: 0, nipGrace: 0, lastCyc: undefined, active: true, phase: 'count', count: 3, countShown: 0, lane: 1, fromLane: 1, x: 0, prevX: 0, y: 0, prevY: 0, vy: 0, ground: 0,
     air: false, fly: false, slam: false, lean: 0, pitch: 0, duck: 0, tuck: 0, jumpBuf: 0, stumbleT: -99, wob: 0, safeT: 0, runT: 0, speed: 0, go: 0,
@@ -8124,7 +8180,7 @@ function updateBike(dt) {
   bikeEnv(edt, spd, dist); bikeFxStep(edt, spd); bikeXStep(dt);
   if (B.phase === 'ride' || B.phase === 'crash') bikeRecord();
   B.engT = (B.engT || 0) - dt; if (B.engT < 0) { B.engT = 0.1; bikeEngineSet(B.speed); bikeRainSnd(); }
-  if (B.phase === 'crash' && B.crashT > 1.7) bikeReplayStart();   // she's landed: roll the tape (then the card)
+  if (B.phase === 'crash' && B.crashT > 2.4) bikeReplayStart();   /* (a beat longer: the bounces, the skid, the flop) */   // she's landed: roll the tape (then the card)
 }
 function renderBike() {
   if (!bikeScene) return;
@@ -10592,7 +10648,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-05 06:48';                                              // stamped when the site is published
+const BUILD = '2026-10-05 07:09';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -19472,7 +19528,7 @@ function jetBuild() {
     const dec = new THREE.Mesh(jetDecalGeo(false), dm); dec.renderOrder = 2; inner.add(dec);
     J.kit = new THREE.Group(); J.kit.position.set(0, -0.72, -0.42); inner.add(J.kit);
     const sg = J.scarf = new THREE.Group(); sg.position.set(0.14, 0.5, 0.06); inner.add(sg); const sgeo = new THREE.BoxGeometry(0.2, 0.03, 1.1); sgeo.translate(0, 0, -0.55);   /* (her pink scarf, streaming out behind) */
-    const sc = new THREE.Mesh(sgeo, new THREE.MeshLambertMaterial({ color: 0xff6fae, emissive: 0x3a1020 })); sc.renderOrder = 2; sg.add(sc); g.scale.setScalar(1.45); }
+    const sc = new THREE.Mesh(sgeo, new THREE.MeshLambertMaterial({ color: 0xff6fae, emissive: 0x3a1020 })); sc.renderOrder = 2; sg.add(sc); g.scale.setScalar(1.05); }   /* (was 1.45: smaller, so there's more room to dodge) */
   jetBuildUI(); jetKeysOn();
   document.addEventListener('visibilitychange', () => { if (document.hidden && JET.active) { jetLaserHum(false); if (!JET.paused && (JET.phase === 'play' || JET.phase === 'dead' || JET.phase === 'win')) jetPause(); } });   /* (away mid-flight: it waits for her, paused) */
   J.built = true;
@@ -19620,7 +19676,7 @@ function jetEnemiesStep(dt) {
     if (inPlay && Pl.alive && J.phase === 'play' && !e.mute) { e.fire -= dt; if (e.fire <= 0) { e.fire = e.K.fi * J.dif.fi * (0.8 + Math.random() * 0.4); jetEnemyFire(e, 0); } }
     if (e.burst > 0) { e.bt -= dt; if (e.bt <= 0) { e.burst--; e.bt = 0.14; jetEnemyFire(e, 1); } }
     // a flyer that runs into her
-    if (e.air && Pl.alive && Pl.enter <= 0 && !(e.ram > 0)) { const dx = e.x - Pl.x, dz = e.z - Pl.z, r = e.K.r * 0.85 + 0.8; if (dx * dx + dz * dz < r * r) { e.ram = 0.6; jetHurtPlayer(18); jetHurt(e, 14); } }   /* (a bump: once per contact) */
+    if (e.air && Pl.alive && Pl.enter <= 0 && !(e.ram > 0)) { const dx = e.x - Pl.x, dz = e.z - Pl.z, r = e.K.r * 0.85 + 0.6; if (dx * dx + dz * dz < r * r) { e.ram = 0.6; jetHurtPlayer(18); jetHurt(e, 14); } }   /* (a bump: once per contact) */
   }
 }
 function jetEscape(e) { e.on = false; if (e.wave) { e.wave.left--; e.wave.escaped = true; } }
@@ -19635,8 +19691,10 @@ function jetEnemyFire(e, again) {                                      // what e
   else if (f === 'cheese2') { for (const o of [-1, 1]) jetFan(x + o * 1.6, z, 1 + D.ex, 0.3, 6.4 * bs, 75, 0xffffff, 0.46, 1.55); }
   if (!again || f === 'aim3') jetSfx('enemyShot');
 }
+const JET_EBC = 0xff2a7a;   /* (every enemy bullet is this one hot pink: easy to pick out on a busy screen, and nothing like her gold shots or the fish) */
 function jetShot(x, z, ang, sp, shape, col, r, size, ax, az) {         // one enemy bullet (ang: 0 is straight down the screen)
   const B = JET.B; if (B.k >= B.n) return -1; const i = B.k++;
+  col = JET_EBC; if (shape === 75 || shape === 80 || shape === 2) shape = 0;   /* (no cheese wedges, bags or stars: they looked like pickups) */
   B.x[i] = x; B.z[i] = z; B.vx[i] = Math.sin(ang) * sp; B.vz[i] = Math.cos(ang) * sp; B.ax[i] = ax || 0; B.az[i] = az || 0; B.r[i] = r; B.sh[i] = shape; B.sz[i] = size; B.t[i] = 0; B.hm[i] = 0;
   JT_C.setHex(col); B.cr[i] = JT_C.r; B.cg[i] = JT_C.g; B.cb[i] = JT_C.b; return i;
 }
@@ -19676,17 +19734,17 @@ function jetPlayerStep(dt) {
   // the paw cannon: 1 to 4 streams
   const m = U.main, rf = P.rapid > 0 ? 0.55 : 1;
   if ((P.fireT -= dt) <= 0) {
-    P.fireT = [0.12, 0.115, 0.11, 0.105, 0.098, 0.09][m - 1] * rf; const d = [1.2, 1.2, 1.4, 1.4, 1.6, 1.75][m - 1], nose = P.z - 2.2;
+    P.fireT = [0.12, 0.115, 0.11, 0.105, 0.098, 0.09][m - 1] * rf; const d = [1.2, 1.2, 1.4, 1.4, 1.6, 1.75][m - 1], nose = P.z - 1.6;
     const L = JET_GUNS[m - 1]; for (let g = 0; g < L.length; g += 2) jetPShot(P.x + L[g], nose, L[g + 1], 44, d, 0);
     jetFx(J.FA, P.x, J.AIR + 0.3, nose + 0.2, 0, 0, 0, 0.06, 1.0, 0.6, 4, 0xbff8ff, 0x7fe8ff, 1); jetSfx('shot');
   }
   if (U.wing > 0 && (P.wingT -= dt) <= 0) {                           // whisker guns: angled shots off the wing tips
     P.wingT = [0, 0.21, 0.19, 0.19, 0.16, 0.14][U.wing] * rf; const d = [0, 0.6, 0.75, 0.75, 0.85, 1.0][U.wing];
-    for (let s = -1; s <= 1; s += 2) { if (U.wing >= 3) { jetPShot(P.x + s * 1.5, P.z - 0.5, s * 0.16, 38, d, 1); jetPShot(P.x + s * 1.5, P.z - 0.5, s * 0.32, 38, d, 1); } else jetPShot(P.x + s * 1.5, P.z - 0.5, s * 0.18, 38, d, 1); }
+    for (let s = -1; s <= 1; s += 2) { if (U.wing >= 3) { jetPShot(P.x + s * 1.1, P.z - 0.4, s * 0.16, 38, d, 1); jetPShot(P.x + s * 1.1, P.z - 0.4, s * 0.32, 38, d, 1); } else jetPShot(P.x + s * 1.1, P.z - 0.4, s * 0.18, 38, d, 1); }
   }
   if (U.missile > 0 && (P.misT -= dt) <= 0) {                         // yarn missiles: a pair, homing on the nearest thing
     P.misT = [0, 1.9, 1.5, 1.4, 1.0, 0.75][U.missile]; const d = [0, 5, 5.5, 7, 7, 8][U.missile];
-    for (let s = -1; s <= 1; s += 2) { const i = jetPShot(P.x + s * 1.0, P.z - 0.2, s * 0.9, 10, d, 2); if (i >= 0) J.PB.tg[i] = -1; }
+    for (let s = -1; s <= 1; s += 2) { const i = jetPShot(P.x + s * 0.75, P.z - 0.15, s * 0.9, 10, d, 2); if (i >= 0) J.PB.tg[i] = -1; }
     jetSfx('missile');
   }
   if (U.laser > 0) {                                                   // the laser pointer: charges, then a long red beam straight ahead
@@ -19731,7 +19789,7 @@ function jetPBulletsStep(dt) {                                         // hers: 
 function jetSegHit(x0, z0, x1, z1, cx, cz, r) { const dx = x1 - x0, dz = z1 - z0, l2 = dx * dx + dz * dz; let t = l2 > 0 ? ((cx - x0) * dx + (cz - z0) * dz) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t; const ex = x0 + dx * t - cx, ez = z0 + dz * t - cz; return ex * ex + ez * ez < r * r; }
 function jetNearest(x, z) { const J = JET; let best = -1, bd = 1e9; for (let k = 0; k < J.E.length; k++) { const e = J.E[k]; if (!e.on || e.t < 0 || e.z < J.zTop || e.z > J.zBot || Math.abs(e.x) > J.HW + 1) continue; const d = (e.x - x) ** 2 + (e.z - z) ** 2 + (e.z > z ? 60 : 0); if (d < bd) { bd = d; best = k; } } return best; }
 function jetLaser(dt, dps, w) {                                         // the beam: everything in its path takes damage (it goes right through)
-  const J = JET, P = J.P, x = P.x, z0 = P.z - 2.1, top = J.zTop - 1;
+  const J = JET, P = J.P, x = P.x, z0 = P.z - 1.55, top = J.zTop - 1;
   P.lasHit = (P.lasHit || 0) - dt;
   for (const e of J.E) { if (!e.on || e.t < 0 || e.z > z0 || e.z < top) continue; const r = e.air ? e.K.r : e.K.r * e.fs; if (Math.abs(e.x - x) < w + r) { jetHurt(e, dps * dt, true); if (P.lasHit <= 0) jetFx(J.FA, e.x, J.AIR + 0.5, e.z, (Math.random() - 0.5) * 4, 2, (Math.random() - 0.5) * 4, 0.25, 0.7, 0.1, 5, 0xffd0d0, 0xff3030, 1, 0, 0, 0, 0, 0, 1); } }
   const bo = J.boss; if (bo && bo.on && !bo.dying && Math.abs(bo.cx - x) < w + bo.rw && bo.cz < z0) { jetBossHurt(dps * dt * 0.85, true); if (P.lasHit <= 0) jetSpark(x, J.AIR, bo.cz + 1, 0xff4040, 3); }
@@ -19920,12 +19978,12 @@ function jetShipDraw(dt) {                                             // her je
   if (J.scarf) J.scarf.rotation.set(0.25 + Math.sin(P.bob * 9) * 0.12, Math.sin(P.bob * 13) * 0.35 - P.roll * 0.6, 0);
   g.visible = P.alive && !(P.inv > 0 && J.phase === 'play' && Math.floor(P.inv * 14) % 2 === 0);
   if (!P.alive) return;
-  const fx = P.x, fz = P.z + 2.35, fl = 0.8 + Math.random() * 0.4;
-  jetQ(J.QF, fx, J.AIR, fz, 1.5 * fl, 1.5 * fl, 0, 4, 1, 0.75, 0.3, 1); jetQ(J.QF, fx, J.AIR, fz + 0.5, 0.8 * fl, 1.7 * fl, 0, 4, 1, 0.5, 0.15, 0.8);
+  const fx = P.x, fz = P.z + 1.7, fl = 0.6 + Math.random() * 0.3;
+  jetQ(J.QF, fx, J.AIR, fz, 1.5 * fl, 1.5 * fl, 0, 4, 1, 0.75, 0.3, 1); jetQ(J.QF, fx, J.AIR, fz + 0.36, 0.8 * fl, 1.7 * fl, 0, 4, 1, 0.5, 0.15, 0.8);
   if (Math.random() < 0.7) jetFx(J.FA, fx + (Math.random() - 0.5) * 0.2, J.AIR, fz, 0, 0, 7, 0.28, 0.8, 0.2, 4, 0xffd27a, 0xff5a1a, 0.9);
-  jetQ(J.QH, P.x + J.shx, 0.4, P.z + J.shz, 3.6, 3.0, P.roll * 0.5, 9, 0, 0, 0, 0.3);
-  if (P.shield > 0) { const a = P.shield < 2 ? (Math.floor(P.shield * 8) % 2 ? 0.3 : 0.75) : 0.75; jetQ(J.QF, P.x, J.AIR + 0.5, P.z - 0.2, 4.4, 4.4, J.t * 2, 6, 0.5, 0.9, 1, a); jetQ(J.QF, P.x, J.AIR + 0.5, P.z - 0.2, 4.2, 4.2, 0, 4, 0.3, 0.6, 1, a * 0.35); }
-  if (P.rapid > 0) jetQ(J.QF, P.x, J.AIR + 0.3, P.z - 2.2, 1.6, 1.6, 0, 4, 1, 0.95, 0.4, 0.6 + Math.random() * 0.3);
+  jetQ(J.QH, P.x + J.shx, 0.4, P.z + J.shz, 2.6, 2.2, P.roll * 0.5, 9, 0, 0, 0, 0.3);
+  if (P.shield > 0) { const a = P.shield < 2 ? (Math.floor(P.shield * 8) % 2 ? 0.3 : 0.75) : 0.75; jetQ(J.QF, P.x, J.AIR + 0.5, P.z - 0.15, 3.4, 3.4, J.t * 2, 6, 0.5, 0.9, 1, a); jetQ(J.QF, P.x, J.AIR + 0.5, P.z - 0.15, 3.2, 3.2, 0, 4, 0.3, 0.6, 1, a * 0.35); }
+  if (P.rapid > 0) jetQ(J.QF, P.x, J.AIR + 0.3, P.z - 1.6, 1.3, 1.3, 0, 4, 1, 0.95, 0.4, 0.6 + Math.random() * 0.3);
 }
 function jetScorchStep(dt) {                                          // where ground targets blew up: a dark scorch on the ground, smoking for a few seconds
   const J = JET, S = J.S;
