@@ -662,7 +662,7 @@ const stage = document.getElementById('stage');
     p.texSubImage2D = function (...a) { if (a.length === 7) a[6] = clean(a[6]); else if (a.length === 9) a[8] = clean(a[8]); return ts.apply(this, a); }; }
 })();
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, devTier() === 'low' ? 0.75 : devTier() === 'mid' ? 1.5 : 1.75));   /* (older phones start soft: no stutter while Auto finds its feet) */
 renderer.setClearColor(0x2b2520);
 stage.appendChild(renderer.domElement);
 
@@ -2632,7 +2632,7 @@ const DOOR2_Z = ROOM.visDepth - 1.5 - FT(4), DOOR2_Z0 = DOOR2_Z - DOOR_W / 2, DO
     box(bw, bh, IN(0.6), frameDark, x, y, IN(0.9), lean);                                        // raised panel moulding
   const GW = MIR_W - IN(5), GH = MIR_H - IN(5), glassMat = basic(0xffffff, { map: mirrorTex });
   const glass = THREE.Reflector                                         // a real reflection of the room, like the mantle mirror
-    ? new THREE.Reflector(new THREE.PlaneGeometry(GW, GH), { clipBias: 0.003, textureWidth: TOUCH_DEV ? 512 : 768, textureHeight: TOUCH_DEV ? 1024 : 1536, color: 0xb9c2c6 }   /* seen at a steep angle: needs a sharp texture or the reflection breaks into jagged 'cracks' */)
+    ? new THREE.Reflector(new THREE.PlaneGeometry(GW, GH), { clipBias: 0.003, textureWidth: devTier() === 'low' ? 320 : TOUCH_DEV ? 512 : 768, textureHeight: devTier() === 'low' ? 640 : TOUCH_DEV ? 1024 : 1536, color: 0xb9c2c6 }   /* seen at a steep angle: needs a sharp texture or the reflection breaks into jagged 'cracks' */)
     : new THREE.Mesh(new THREE.PlaneGeometry(GW, GH), glassMat);
   glass.position.set(0, MIR_H / 2, IN(0.8)); lean.add(glass);
   box(GW, GH, IN(0.2), lam(0x3b3e44), 0, MIR_H / 2, IN(0.6), lean);                            // dark backing board (seen once the glass is gone)
@@ -2990,7 +2990,7 @@ SECT = 'Stone fireplace';
   const mh = new THREE.Group(); mh.position.set(0, MY, 0); fp.add(mh);   // frame + glass move together (it can be blasted off the wall)
   box(MW + IN(3), MH + IN(3), IN(1), lam(0x3b3029), 0, 0, IN(0.5), mh);
   const mg = THREE.Reflector                                             // a real planar reflection of the room (falls back to a silvered look)
-    ? new THREE.Reflector(new THREE.PlaneGeometry(MW, MH), { clipBias: 0.003, textureWidth: 512, textureHeight: 384, color: 0xb9c2c6 })
+    ? new THREE.Reflector(new THREE.PlaneGeometry(MW, MH), { clipBias: 0.003, textureWidth: devTier() === 'low' ? 256 : 512, textureHeight: devTier() === 'low' ? 192 : 384, color: 0xb9c2c6 })
     : new THREE.Mesh(new THREE.PlaneGeometry(MW, MH), basic(0xffffff, { map: mirrorTex }));
   mg.position.set(0, 0, IN(1.05)); mh.add(mg);
   { const shardMat = basic(0xd6e4ea, { side: THREE.DoubleSide }), shardMat2 = basic(0xa9bcc4, { side: THREE.DoubleSide }), shards = [];
@@ -5400,7 +5400,7 @@ function buildUpperFloor() {                                          // behind 
     { const mug = C(0.15, 0.13, 0.3, 0x2a7fd6, 8.88, UF + 0.83, -3.58, 12, 'shiny', dec); mug.rotation.z = 0.25; B(9.05, 9.09, UF + 0.9, UF + 1.07, -3.63, -3.53, 0x2a7fd6, 'shiny', dec); }   // ...and the blue plastic mug
     C(0.16, 0.2, 2.2, WHITE, 8.5, UF, 0.4, 12, 'shiny'); B(8.1, 9.0, UF + 2.2, UF + 2.55, -0.05, 0.85, WHITE, 'shiny');   // the basin...
     B(8.09, 8.105, UF + 3.0, UF + 4.5, -0.1, 0.9, 0xb8c8c8, 'shiny', dec); for (const [y0, y1, z0, z1] of [[UF + 2.95, UF + 3.0, -0.15, 0.95], [UF + 4.5, UF + 4.55, -0.15, 0.95], [UF + 3.0, UF + 4.5, -0.15, -0.1], [UF + 3.0, UF + 4.5, 0.9, 0.95]]) B(8.09, 8.15, y0, y1, z0, z1, STEEL, 'shiny', dec);
-    { const mg = THREE.Reflector ? new THREE.Reflector(new THREE.PlaneGeometry(1.0, 1.5), { clipBias: 0.003, textureWidth: 512, textureHeight: 768, color: 0xb9c2c6 }) : new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.5), new THREE.MeshBasicMaterial({ color: 0xb9c2c6 }));   // a real reflection, like the mirrors downstairs (only while you're in there)
+    { const mg = THREE.Reflector ? new THREE.Reflector(new THREE.PlaneGeometry(1.0, 1.5), { clipBias: 0.003, textureWidth: devTier() === 'low' ? 256 : 512, textureHeight: devTier() === 'low' ? 384 : 768, color: 0xb9c2c6 }) : new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.5), new THREE.MeshBasicMaterial({ color: 0xb9c2c6 }));   // a real reflection, like the mirrors downstairs (only while you're in there)
       mg.position.set(8.12, UF + 3.75, 0.4); mg.rotation.y = Math.PI / 2; mg.userData.noWalk = true; mg.userData.name = 'Bathroom mirror'; mg.visible = false; pics.add(mg); U.mirror = mg; }
     B(8.12, 8.35, UF + 2.75, UF + 2.8, -0.05, 0.85, 0xf4f4f4, 'shiny', dec); C(0.07, 0.06, 0.25, 0x2a9d8f, 8.25, UF + 2.8, 0.1, 8);   // ...its mirror, a shelf, the toothbrush cup
     for (let k = 0; k < 4; k++) decal(2, 8.128, UF + 3.4 + k * 0.25, -0.05 + k * 0.28, 0.25, 0.25, Math.PI / 2, 0, k, 0xf4f4f4);   // (toothpaste on the mirror)
@@ -8813,7 +8813,7 @@ function todInit() {
     yBox(G, 0.1, 0.3, 0.2, 0x1e1c1a, x, UPPER.LH + 3.35, zF - 0.1); yBox(G, 0.34, 0.08, 0.34, 0x1e1c1a, x, UPPER.LH + 3.72, zF - 0.28);
     const p = yBox(G, 0.26, 0.4, 0.26, 0, x, UPPER.LH + 3.46, zF - 0.28); p.material = lit; glow(x, UPPER.LH + 3.46, zF - 0.4, 2.2, 0xffc877); }
   // rain: streaks round the camera; snow: soft flakes; a few splashes on the ground
-  const NR = 1800, NS = 1400, NP = 200;
+  const NR = devTier() === 'low' ? 900 : 1800, NS = devTier() === 'low' ? 700 : 1400, NP = 200;
   T.rain = { n: NR, p: new Float32Array(NR * 3), v: new Float32Array(NR) }; T.snow = { n: NS, p: new Float32Array(NS * 3), ph: new Float32Array(NS) };
   const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NR * 6), 3));
   T.rainM = new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: 0xe2eaf2, transparent: true, opacity: 0, depthWrite: false, fog: false }));
@@ -10724,7 +10724,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-05 14:50';                                              // stamped when the site is published
+const BUILD = '2026-10-05 19:11';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -12994,7 +12994,7 @@ $('overAchBtn').addEventListener('click', () => openAchievements('overScreen'));
 $('achClose').addEventListener('click', () => { $('achScreen').hidden = true; $(achFrom).hidden = false; });
 $('shareBtn').addEventListener('click', shareScore);
 updateAchCount();
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});   // works offline after the first visit
+if ('serviceWorker' in navigator && location.protocol === 'https:') { navigator.serviceWorker.register('sw.js').catch(() => {}); swListen(); }   // works offline after the first visit (and opens from the saved copy)
 $('overTitleBtn').addEventListener('click', () => { ui.over.hidden = true; quitToTitle(); });
 $('pauseBtn').addEventListener('click', pauseGame);
 $('resumeBtn').addEventListener('click', resumeGame);
@@ -13022,7 +13022,7 @@ renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
    AUDIO (tiny WebAudio synth, started from the Start button)
    ===================================================================== */
 let actx = null; const soundOn = true;            // (sound effects go through their own switch in Settings; music has its own too)
-const SET = { sfx: (() => { try { return localStorage.getItem('catguard.sfx') !== 'off'; } catch (e) { return true; } })(), gfx: (() => { try { return localStorage.getItem('catguard.gfx') || 'auto'; } catch (e) { return 'auto'; } })() };
+const SET = { sfx: (() => { try { return localStorage.getItem('catguard.sfx') !== 'off'; } catch (e) { return true; } })(), gfx: (() => { const d = devTier() === 'low' ? 'low' : 'auto'; try { return localStorage.getItem('catguard.gfx') || d; } catch (e) { return d; } })() };
 addEventListener('pointerdown', () => { if (actx && actx.state !== 'running') initAudio(); }, true);   // any tap wakes the sound back up after the phone put it to sleep
 function initAudio() {
   if (actx || !soundOn) { if (actx && actx.state !== 'running') actx.resume().catch(() => {}); return; }   // (iOS can also report 'interrupted')
@@ -13469,7 +13469,7 @@ function syncSettings() {
   $('musicBtn').textContent = musicOn ? 'On' : 'Off'; $('musicBtn').classList.toggle('off', !musicOn);
   $('sfxBtn').textContent = SET.sfx ? 'On' : 'Off'; $('sfxBtn').classList.toggle('off', !SET.sfx);
   for (const b of document.querySelectorAll('#qSeg button')) b.classList.toggle('on', b.dataset.q === SET.gfx);
-  $('qNote').textContent = SET.gfx === 'high' ? 'Always the sharpest picture (uses more battery).' : SET.gfx === 'low' ? 'A softer picture that runs cooler and saves battery.' : 'Sharpens or softens the picture by itself to keep things smooth.';
+  $('qNote').textContent = SET.gfx === 'high' ? 'Always the sharpest picture (uses more battery).' : SET.gfx === 'low' ? 'A softer picture that runs cooler and saves battery.' + (gfxPickedForMe() ? ' (Picked automatically for this phone.)' : '') : 'Sharpens or softens the picture by itself to keep things smooth.';
 }
 function toggleSfx() { SET.sfx = !SET.sfx; try { localStorage.setItem('catguard.sfx', SET.sfx ? 'on' : 'off'); } catch (e) {} if (actx && actx.__sfx) actx.__sfx.gain.value = SET.sfx ? 1 : 0; initAudio(); syncSettings(); if (SET.sfx) tone(660, 990, 0.12, 'triangle', 0.04); }
 function setGfx(q) { SET.gfx = q; try { localStorage.setItem('catguard.gfx', q); } catch (e) {} const P = perfAdapt; if (q === 'auto' && P.last) { P.r = renderer.getPixelRatio(); P.hold = 0; } syncSettings(); }
@@ -13911,8 +13911,46 @@ function cullBegin() {                                                // left ou
   return hid;
 }
 function cullEnd(hid) { if (hid) for (let i = 0; i < hid.length; i++) hid[i].visible = true; }
+function devTier() {                                                  // how much this device can take: 'low' (an older phone), 'mid' or 'high'. Decided once, before anything heavy is built
+  if (devTier.t) return devTier.t;
+  let t = 'high';
+  try {
+    const q = (location.search.match(/[?&]tier=(low|mid|high)\b/) || [])[1]; if (q) return (devTier.t = q);   // (for testing: ?tier=low)
+    const n = navigator, ua = n.userAgent || '', mem = n.deviceMemory || 0, cores = n.hardwareConcurrency || 0, dpr = window.devicePixelRatio || 1;
+    const sw = Math.min(screen.width, screen.height), sh = Math.max(screen.width, screen.height);
+    const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && n.maxTouchPoints > 1), android = /Android/.test(ua);
+    let gpu = ''; try { const gl = renderer.getContext(), x = gl.getExtension('WEBGL_debug_renderer_info'); gpu = (x && gl.getParameter(x.UNMASKED_RENDERER_WEBGL)) || ''; } catch (e) {}
+    if (/SwiftShader|llvmpipe|Software|Microsoft Basic/i.test(gpu)) t = 'low';                                 // no real graphics chip at all
+    else if (ios) {                                                                                              // Safari hides the chip: go by the screen
+      if (sw <= 320) t = 'low';                                                                                  // iPhone 5s / first SE
+      else if (sw === 375 && sh === 667) t = 'mid';                                                              // iPhone 6s / 7 / 8 / SE (2nd and 3rd)
+      else if (sw === 414 && sh === 736) t = 'mid';                                                              // the Plus models of those
+      else if (/iPad/.test(ua) && dpr < 2) t = 'low';                                                            // the very first iPad minis
+    } else if (android || (n.maxTouchPoints > 1 && /Mobile|Tablet/.test(ua))) {
+      const weakGpu = /Mali-(4|T)\d|Adreno \(TM\) ([1-4]\d\d|50\d)|PowerVR|SGX|Vivante|VideoCore|GC\d{3,4}/i.test(gpu);
+      const okGpu = /Adreno \(TM\) (5[1-9]\d|6[0-1]\d)|Mali-G(5\d|7[0-2])\b/i.test(gpu);
+      if (weakGpu || (mem && mem <= 2) || (cores && cores <= 4)) t = 'low';
+      else if (okGpu || (mem && mem <= 4)) t = 'mid';
+    }
+  } catch (e) {}
+  return (devTier.t = t);
+}
+function gfxPickedForMe() {                                             // the battery saver was switched on by itself (an older phone), not chosen in Settings
+  if (devTier() !== 'low') return false; try { return !localStorage.getItem('catguard.gfx'); } catch (e) { return false; }
+}
+function swListen() {                                                  // the game opened from the phone's saved copy; if a newer version came down in the background, offer it on the title screen
+  const sw = navigator.serviceWorker; let shown = false;
+  const offer = b => { if (shown || !b || b === BUILD) return; shown = true;
+    const el = document.createElement('button'); el.id = 'newVerPill'; el.textContent = '✨ New version ready: tap to load';
+    el.style.cssText = 'position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top));transform:translateX(-50%);z-index:9;background:var(--hud);color:var(--paper);border:1.5px solid rgba(255,244,248,.35);border-radius:999px;padding:9px 18px;font:800 14px var(--body);letter-spacing:.03em;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)';
+    el.addEventListener('click', () => location.reload()); document.body.appendChild(el);
+    const vis = () => { el.hidden = !(state === 'menu' || state === 'over'); }; vis(); setInterval(vis, 500); };   /* (never pops up mid-game) */
+  sw.addEventListener('message', e => { if (e.data && e.data.type === 'pkd-update') offer(e.data.build); });
+  const ask = () => { const c = sw.controller; if (c) c.postMessage({ type: 'pkd-ask', build: BUILD }); };
+  ask(); setTimeout(ask, 8000); setTimeout(ask, 30000);
+}
 function perfAdapt(now) {                                             // slow device: draw at a lower resolution (and back up when there's room)
-  const P = perfAdapt; if (!P.last) { P.last = now; P.ema = 16; P.cap = Math.min(window.devicePixelRatio || 1, 1.75); P.r = P.cap; P.hold = now + 4000; return; }
+  const P = perfAdapt; if (!P.last) { P.last = now; P.ema = 16; P.cap = Math.min(window.devicePixelRatio || 1, 1.75); P.r = renderer.getPixelRatio(); P.hold = now + 4000; return; }
   if (SET.gfx !== 'auto') { const want = SET.gfx === 'low' ? 0.75 : P.cap; if (P.r !== want) { P.r = want; renderer.setPixelRatio(want); } P.slow = SET.gfx === 'low'; P.last = now; return; }   /* (Settings: always sharp, or always the battery saver) */
   const d = now - P.last; P.last = now; if (d <= 0 || d > 250 || document.hidden) return;     // (a stall, or a hidden tab: not a real frame)
   P.ema += (d - P.ema) * 0.05; if (now < P.hold) return;
@@ -23590,6 +23628,129 @@ function sledSync() {                                                    // (syn
   b.hidden = !on; const others = ['rideBtn', 'hopBtn', 'jetBtn'].some(id => { const e = document.getElementById(id); return e && !e.hidden; });
   document.getElementById('sledDot').hidden = !(on && others); if (on) box.hidden = false;
 }
+/* =====================================================================
+   WARM-UP (WARM_V1). The first time she rides, hops, flies, sleds, drops down the chimney or opens the Closet, that little world used to be
+   built, and its shaders compiled, right then: a freeze on old phones. Now, once the game's loaded, the title screen (and a calm Free roam)
+   quietly gets them ready ahead of time, one small job per idle moment: each world built by its own build function (so the way in finds it
+   built and skips straight past), its shaders compiled with her model in it, and its pictures uploaded. It never runs while a game is on,
+   never makes a sound, never saves anything, never shows anything; it stops when it's all done. Weak phones (devTier() 'low') skip the two
+   biggest worlds (Sky Paws, Sled Rush) and the house's pictures; middling ones ('mid') take it slower.
+   ===================================================================== */
+function warmSt() { return warmSt.W || (warmSt.W = { q: null, i: 0, timer: 0, done: false, log: [], tier: '', lastKey: '', calmAt: 0, started: false }); }
+function warmTier() { try { const t = typeof devTier === 'function' ? devTier() : 'high'; return t === 'low' || t === 'mid' ? t : 'high'; } catch (e) { return 'high'; } }
+function warmFound(k) { try { return localStorage.getItem('catguard.found.' + k) === '1'; } catch (e) { return false; } }
+function warmRigClone() { return walk.rig && walk.rig.g ? walk.rig.g.clone(true) : null; }   /* (her model, for the worlds she's dropped into: its own materials, in that world's light) */
+function warmCompileStep(J, get, budget) {                              // every shader a world can need, compiled with the world lit the way it's drawn (its lights and fog are part of each
+  if (!J.cc) {                                                           // shader), a few at a time: resumable, so no one slice takes long (true when it's all done)
+    const c = get(); if (!c || !c.S || !c.cam) return true;
+    const l = [], seen = new Set(), put = o => { const m = o.material; if (!m) return; const k = (Array.isArray(m) ? m.map(x => x && x.uuid).join(',') : m.uuid) + (o.isInstancedMesh ? 'i' : '') + (o.isSkinnedMesh ? 's' : '') + (o.isPoints ? 'p' : o.isLine ? 'l' : o.isSprite ? 'r' : '');
+      if (!seen.has(k)) { seen.add(k); l.push(o); } };
+    c.S.traverse(put); for (const x of c.extra || []) if (x) x.traverse(put);   /* (her model isn't put in their world: it's only looked at, never drawn there) */
+    J.cc = { S: c.S, cam: c.cam, l, i: 0 };
+  }
+  const C = J.cc, S = C.S, t0 = performance.now();
+  const root = { isScene: true, fog: S.fog, environment: S.environment || null,   // (stands in for the world: its fog, its visible lights, and just the next few things in it)
+    traverseVisible(f) { S.traverseVisible(o => { if (o.isLight) f(o); }); },
+    traverse(f) { while (C.i < C.l.length) { f(C.l[C.i++]); if (performance.now() - t0 > budget) break; } } };
+  renderer.compile(root, C.cam);
+  if (C.i < C.l.length) return false;
+  J.cc = null; return true;
+}
+function warmDraw(S, cam) {                                              // one tiny frame of the world, drawn off-screen (nothing culled, nothing shown or hidden): its shapes go up to the GPU now
+  if (!S || !cam) return; const fc = [];
+  S.traverse(o => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) { fc.push(o, o.frustumCulled); o.frustumCulled = false; } });
+  const W = warmSt(), rt = W.rt || (W.rt = new THREE.WebGLRenderTarget(1, 1)), keep = renderer.getRenderTarget();
+  try { renderer.setRenderTarget(rt); renderer.render(S, cam); } finally { renderer.setRenderTarget(keep); for (let i = 0; i < fc.length; i += 2) fc[i].frustumCulled = fc[i + 1]; }
+}
+function warmTexAll(root, more) {                                         // the pictures a world uses (canvas paintings, mostly), not yet on the GPU
+  const out = new Set(), slots = ['map', 'alphaMap', 'emissiveMap', 'lightMap', 'aoMap', 'bumpMap', 'normalMap', 'specularMap', 'gradientMap', 'displacementMap', 'roughnessMap', 'metalnessMap'];
+  const add = t => { if (t && t.isTexture && !t.isCubeTexture && !t.isVideoTexture && !t.isDataTexture3D && !t.isDataTexture2DArray && !t.isCompressedTexture && t.image && t.version > 0) out.add(t); };
+  if (root) { if (root.background) add(root.background);
+    root.traverse(o => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : null; if (!ms) return;
+      for (const m of ms) { if (!m) continue; for (const k of slots) add(m[k]); if (m.uniforms) for (const u in m.uniforms) { const v = m.uniforms[u]; if (v && v.value) add(v.value); } } }); }
+  if (more) for (const t of more) add(t);
+  return Array.from(out);
+}
+function warmTexStep(J, list, budget) {                                    // upload a few (until the slice's time is up); true when the list's done
+  if (!J.tex) J.tex = { l: list(), i: 0 }; const T = J.tex, t0 = performance.now();
+  while (T.i < T.l.length) { const t = T.l[T.i++]; try { renderer.initTexture(t); } catch (e) {} if (performance.now() - t0 > budget) break; }
+  return T.i >= T.l.length;
+}
+function warmClosetProxy(k) {                                           // PKR's Closet: its world is made along with its catalogue (other things hang off that), so only its shaders here:
+  const W = warmSt(); if (W.ck) return { S: W.ck[k], cam: W.ck.cam, extra: [warmRigClone()] };   // stand-ins lit like the dressing room (and like the card pictures), no fog
+  const mk = dirs => { const S = new THREE.Scene(); S.add(new THREE.HemisphereLight(0xffffff, 0xcccccc, 0.8)); for (let i = 0; i < dirs; i++) S.add(new THREE.DirectionalLight(0xffffff, 0.5)); return S; };
+  const dot = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1); dot.needsUpdate = true;
+  const geo = new THREE.PlaneGeometry(1, 1), M = typeof ckMat === 'function' ? ckMat() : null, room = mk(2), cards = mk(1);
+  const mats = [new THREE.MeshBasicMaterial({ map: dot, side: THREE.BackSide }), new THREE.MeshBasicMaterial({ map: dot }), new THREE.MeshBasicMaterial({ map: dot, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })];
+  if (M) mats.push(M.m, M.s, M.g); if (typeof softShadowMat === 'function') mats.push(softShadowMat(0.3));
+  for (const m of mats) room.add(new THREE.Mesh(geo, m));
+  room.add(new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3)), new THREE.PointsMaterial({ size: 0.1, map: dot, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+  if (M) for (const m of [M.m, M.s, M.g]) cards.add(new THREE.Mesh(geo, m));
+  W.ck = { room, cards, cam: new THREE.PerspectiveCamera(32, 1, 0.05, 40) };   /* (kept for the second step; never disposed, so their shaders stay compiled) */
+  return { S: W.ck[k], cam: W.ck.cam, extra: [warmRigClone()] };
+}
+function warmJobs(tier) {                                                 // what to get ready, most likely first: Free roam, then the secret modes on the title screen, then the rest
+  const J = [];
+  J.push({ id: 'roam', steps: [
+    () => { if (!walk.rig) { walk.rig = makeWalker(); if (!walk.on) { walk.rig.g.visible = false; walk.rig.shadow.visible = false; } } },   /* (as standMeshes() does: her model, hidden till she's out) */
+    () => { if (povEndWall && typeof roofGeo === 'function' && typeof roofBuild === 'function') { const R = roofGeo(); if (!R.built) roofBuild(R); } },   /* (the roof camp: Free roam builds it on her first step) */
+    () => { if (!JET.roof && typeof RF !== 'undefined' && RF && RF.built && povEndWall && typeof jetRoofBuild === 'function') jetRoofBuild(); },   /* (the raccoon's jet on our roof) */
+    J0 => warmCompileStep(J0, () => ({ S: scene, cam: camera }), warmSt().budget),
+    J0 => tier === 'low' || warmTexStep(J0, () => warmTexAll(scene), warmSt().budget)] });   /* (a weak phone: the house's pictures go up as she meets them, not all at once) */
+  const worlds = {
+    bike: typeof bikeBuild === 'function' && { built: () => BIKE.built, steps: [() => bikeBuild(), J0 => warmCompileStep(J0, () => ({ S: bikeScene, cam: bikeCam, extra: [warmRigClone()] }), warmSt().budget), () => warmDraw(bikeScene, bikeCam), J0 => warmTexStep(J0, () => warmTexAll(bikeScene), warmSt().budget)] },
+    hop: typeof hopBuild === 'function' && { built: () => HOP.built, steps: [() => hopBuild(), J0 => warmCompileStep(J0, () => ({ S: HOP.scene, cam: HOP.cam, extra: [warmRigClone()] }), warmSt().budget), () => warmDraw(HOP.scene, HOP.cam), J0 => warmTexStep(J0, () => warmTexAll(HOP.scene), warmSt().budget)] },
+    jet: typeof jetBuild === 'function' && tier !== 'low' && { built: () => JET.built, steps: [() => jetBuild(), () => { for (const k of ['truck', 'airship', 'ship', 'throne']) jetBossMesh(k); },   /* (the bosses: built at take-off anyway) */
+      J0 => warmCompileStep(J0, () => ({ S: JET.scene, cam: JET.cam, extra: [warmRigClone()] }), warmSt().budget), () => warmDraw(JET.scene, JET.cam), J0 => warmTexStep(J0, () => warmTexAll(JET.scene), warmSt().budget)] },
+    sled: typeof sledBuild === 'function' && tier !== 'low' && { built: () => SLED.built, steps: [() => sledBuild(), J0 => warmCompileStep(J0, () => ({ S: SLED.scene, cam: SLED.cam, extra: [warmRigClone()] }), warmSt().budget), () => warmDraw(SLED.scene, SLED.cam),
+      J0 => warmTexStep(J0, () => warmTexAll(SLED.scene, SLED.pupTex ? Object.values(SLED.pupTex) : null), warmSt().budget)] },
+    chim: typeof chimBuild === 'function' && { built: () => CHIM.built, steps: [() => chimBuild(), J0 => warmCompileStep(J0, () => ({ S: CHIM.scene, cam: CHIM.cam, extra: [warmRigClone()] }), warmSt().budget), () => warmDraw(CHIM.scene, CHIM.cam), J0 => warmTexStep(J0, () => warmTexAll(CHIM.scene), warmSt().budget)] },
+    closet: typeof ckBuildScene === 'function' && { built: () => CK.built, steps: [J0 => warmCompileStep(J0, () => warmClosetProxy('room'), warmSt().budget), J0 => warmCompileStep(J0, () => warmClosetProxy('cards'), warmSt().budget)] },
+    gaze: typeof gazeMake === 'function' && { built: () => !!GAZE, steps: [() => gazeMake()] },
+  };
+  const order = [], put = k => { if (worlds[k] && order.indexOf(k) < 0) order.push(k); };
+  if (warmFound('ride')) put('bike'); if (warmFound('hop')) put('hop'); if (warmFound('jet')) put('jet'); if (warmFound('sled')) put('sled');   // (the buttons on the title screen)
+  ['bike', 'sled', 'jet', 'hop', 'chim', 'closet', 'gaze'].forEach(put);
+  for (const k of order) J.push(Object.assign({ id: k }, worlds[k]));
+  return J;
+}
+function warmCalm() {                                                     // a quiet moment: the title screen, or Free roam with nothing much going on (never in a game, the Closet, a fade)
+  const W = warmSt(), key = state + '/' + gameMode + '/' + walk.on;
+  if (key !== W.lastKey) { W.lastKey = key; if (state === 'playing' && gameMode === 'walk') W.calmAt = performance.now() + 2500; }   /* (just out into Free roam, or back from a game: let her get going first) */
+  if (document.hidden || CK.on) return false;
+  if (state === 'menu') return true;
+  if (state !== 'playing' || gameMode !== 'walk' || !walk.on || walk.frozen || mirrorWorld || MW.trans) return false;
+  const now = performance.now(), still = walk.grounded && Math.hypot(walk.vel.x, walk.vel.z) < 0.3 && !walk.stick.x && !walk.stick.y;
+  if (!still || !W.stillAt) W.stillAt = now + 800;
+  return now > W.calmAt && now > W.stillAt;   /* (in Free roam only while she's standing still: a slice never lands mid-run) */
+}
+function warmKick(ms) {
+  const W = warmSt(); if (W.done || W.timer) return;
+  W.timer = setTimeout(() => { W.timer = 0; warmAsk(); }, ms);
+}
+function warmAsk() {
+  const W = warmSt(); if (W.done) return;
+  if (!warmCalm()) { warmKick(500); return; }
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(warmSlice, { timeout: state === 'menu' ? 800 : 3000 });
+  else requestAnimationFrame(() => setTimeout(warmSlice, 0));   /* (Safari: right after a frame's drawn, the longest gap before the next) */
+}
+function warmSlice(dl) {                                                  // one job per idle slot (the compiling and uploading kinds stop when the idle time's used up)
+  const W = warmSt(); if (W.done) return;
+  W.budget = dl && dl.timeRemaining && !dl.didTimeout ? Math.max(4, Math.min(12, dl.timeRemaining() - 1)) : 8;
+  if (!warmCalm()) { warmKick(500); return; }
+  if (!W.q) { W.tier = warmTier(); W.q = warmJobs(W.tier); W.i = 0; }
+  let J = W.q[W.i]; while (J && J.s >= J.steps.length) J = W.q[++W.i];
+  if (!J) { W.done = true; W.q = null; if (W.rt) { W.rt.dispose(); W.rt = null; } return; }   /* (all done: nothing more to do, ever) */
+  if (J.s === undefined) { J.s = 0; if (J.built && J.built()) { J.s = J.steps.length; W.log.push([J.id, 'game']); warmKick(0); return; } }   /* (she's already been in: it built itself, shaders and all) */
+  const t0 = performance.now(), p0 = renderer.info.programs.length; let fin = true;
+  try { const r = J.steps[J.s](J); fin = r !== false; }
+  catch (e) { console.warn('warm-up: ' + J.id + ' skipped', e); J.s = J.steps.length; fin = false; J.err = true; }
+  if (fin) J.s++;
+  const dt = performance.now() - t0; W.log.push([J.id, J.s, Math.round(dt), renderer.info.programs.length - p0]);
+  if (perfAdapt.last) perfAdapt.last = 1e15;                               /* (perfAdapt: the frame after a warm-up job isn't the device being slow; it skips that one) */
+  warmKick(W.tier === 'high' ? 40 : W.tier === 'mid' ? 350 : 600);
+}
+setTimeout(() => { const W = warmSt(); if (!W.started) { W.started = true; warmCalm(); warmKick(warmTier() === 'high' ? 1500 : 3000); } }, 1000);   /* (once the game's up and drawing) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
