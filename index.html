@@ -10724,10 +10724,16 @@ const ACHIEVEMENTS = [
     ['sledAllZones', '🌌', 'The whole ride', 'In Sled Rush, pass through every zone in one run without a keep-sliding'],
     ['sledEdge', '🎪', 'Living on the edge', 'In Sled Rush, wobble on the very edge of the ice and steer back to safety 5 times in one run'],
   ]],
+  ['Meow Lot', [
+    ['lotFirst', '🅿️', 'Valet kitty', 'Clear your first Meow Lot (at the valet stand on our driveway, out front)'],
+    ['lotAll', '🔑', 'Keys to the city', 'In Meow Lot, clear all 40 lots, all the way to the Big Cat Show'],
+    ['lotStars', '🌟', 'Purr-fect parking', 'In Meow Lot, earn 3 stars on every lot'],
+    ['lotGarage', '🏢', 'Not a scratch', 'In Meow Lot, clear a downtown garage lot in the fewest moves: no bonks, no hisses, no undo, no hints'],
+  ]],
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-05 22:37';                                              // stamped when the site is published
+const BUILD = '2026-10-06 00:30';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -13482,6 +13488,7 @@ function syncSecretModes() {                                          // the mot
   $('rideBtn').hidden = !r; $('hopBtn').hidden = !h; $('secretDot').hidden = !(r && h); $('secretModes').hidden = !(r || h);
   { const jb = $('jetBtn'), j = f('jet') && typeof startJetGame === 'function'; if (jb) { jb.hidden = !j; $('jetDot').hidden = !(j && (r || h)); if (j) $('secretModes').hidden = false; } }   /* (Sky Paws: once she's flown the raccoon's jet) */
   if (typeof sledSync === 'function') sledSync();                     /* (Sled Rush: once she's ridden the red sled) */
+  if (typeof lotSync === 'function') lotSync();                       /* (Meow Lot: once she's played it at the valet stand) */
 }
 function menuOrbit(dt) {                                              // behind the title card: the living room turning slowly (mice still peeking out)
   const M = menuOrbit; if (!M.on) M.t = 0; M.on = true; M.t += dt; const v = M.v || (M.v = new THREE.Vector3()); v.copy(camBase).sub(camTarget);
@@ -24384,10 +24391,12 @@ function warmJobs(tier) {                                                 // wha
     chim: typeof chimBuild === 'function' && { built: () => CHIM.built, steps: [() => chimBuild(), J0 => warmCompileStep(J0, () => ({ S: CHIM.scene, cam: CHIM.cam, extra: [warmRigClone()] }), warmSt().budget), () => warmDraw(CHIM.scene, CHIM.cam), J0 => warmTexStep(J0, () => warmTexAll(CHIM.scene), warmSt().budget)] },
     closet: typeof ckBuildScene === 'function' && { built: () => CK.built, steps: [J0 => warmCompileStep(J0, () => warmClosetProxy('room'), warmSt().budget), J0 => warmCompileStep(J0, () => warmClosetProxy('cards'), warmSt().budget)] },
     gaze: typeof gazeMake === 'function' && { built: () => !!GAZE, steps: [() => gazeMake()] },
+    lot: typeof lotBuild === 'function' && { built: () => LOT.built, steps: [() => lotBuild(), J0 => warmCompileStep(J0, () => ({ S: LOT.scene, cam: LOT.cam, extra: [warmRigClone()] }), warmSt().budget), () => warmDraw(LOT.scene, LOT.cam), J0 => warmTexStep(J0, () => warmTexAll(LOT.scene), warmSt().budget)] },   /* (Meow Lot: a light world, so weak phones get it too) */
   };
   const order = [], put = k => { if (worlds[k] && order.indexOf(k) < 0) order.push(k); };
   if (warmFound('ride')) put('bike'); if (warmFound('hop')) put('hop'); if (warmFound('jet')) put('jet'); if (warmFound('sled')) put('sled');   // (the buttons on the title screen)
-  ['bike', 'sled', 'jet', 'hop', 'chim', 'closet', 'gaze'].forEach(put);
+  if (warmFound('lot')) put('lot');                                       /* (Meow Lot's title button) */
+  ['bike', 'sled', 'jet', 'hop', 'chim', 'closet', 'gaze'].forEach(put); put('lot');
   for (const k of order) J.push(Object.assign({ id: k }, worlds[k]));
   return J;
 }
@@ -24428,6 +24437,1095 @@ function warmSlice(dl) {                                                  // one
   warmKick(W.tier === 'high' ? 40 : W.tier === 'mid' ? 350 : 600);
 }
 setTimeout(() => { const W = warmSt(); if (!W.started) { W.started = true; warmCalm(); warmKick(warmTier() === 'high' ? 1500 : 3000); } }, 1000);   /* (once the game's up and drawing) */
+/* LOT_V1 */
+/* =====================================================================
+   MEOW LOT (2026-10-05): a Parking Jam-style valet puzzle. Out front, on our driveway, PKR's valet stand (a podium, a key board,
+   a 🅿️ sign) with two cars jammed beside it; standing by it shows the 🅿️ button. In its own little world (scene, camera, lights,
+   built the first time, like Sled Rush), PKR in a red valet cap clears jammed lots: swipe a car along its length and it drives
+   till something stops it, or out through a gap in the lot's edge and away down the road. Cars only leave through the gaps (most
+   lots are one-way), so some must scoot over first. Planters and pillars never move; a car with a cat napping on its roof hisses if
+   bumped (a star off); the ice-cream truck waits till everyone else has gone; barrier gates go up and down with every move; a
+   grumpy neighbour takes a step every move. 40 lots in five places (our driveway, Chipwood Crescent, the grocery store lot, the
+   downtown garage, the Big Cat Show), every one checked by a BFS solver for its fewest moves; stars by moves against that, undo,
+   restart, a hint (the solver's next move) for a few fish. Progress in catguard.lot; fish via ckWallet; catguard.found.lot puts
+   🅿️ Meow Lot on the title screen. Everything here is prefixed lot/LOT; the game calls lotFrame(dt) every frame (true: it drew this one).
+   ===================================================================== */
+const LOT = {
+  built: false, active: false, phase: 'off', err: 0, t: 0, pt: 0, fade: 0, fadeShown: -1, post: 0, scene: null, cam: null, size: null, aspect: 0, camKey: '',
+  ui: null, pill: null, pillOn: false, goQ: false, spot: null, saidVisit: null, keysOn: false,
+  L: null, li: -1, S: null, cars: [], hist: [], ptr: null, busy: 0, clearT: 0, hintCar: -1, place: -1, rig: null, emo: [], solCache: null,
+};
+function lotGet(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+function lotPut(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+function lotWallet() { return typeof ckWallet === 'function' ? ckWallet() : Math.max(0, parseInt(lotGet('catguard.fish', '0'), 10) || 0); }
+function lotSetWallet(n) { if (typeof ckSetWallet === 'function') ckSetWallet(n); else lotPut('catguard.fish', Math.max(0, Math.round(n))); }
+function lotProg() {                                                     // what she's done: best stars and moves per lot, the stars already paid for, the tips seen
+  const S = LOT; if (S.prog) return S.prog;
+  let p = null; try { p = JSON.parse(lotGet('catguard.lot', 'null')); } catch (e) { p = null; }
+  if (!p || typeof p !== 'object') p = {};
+  const n = lotLevels().length, arr = (a, v) => { const o = Array.isArray(a) ? a.slice(0, n) : []; while (o.length < n) o.push(v); return o.map(x => typeof x === 'number' && isFinite(x) ? x : v); };
+  S.prog = { v: 1, st: arr(p.st, 0), bm: arr(p.bm, 0), paid: arr(p.paid, 0), tips: p.tips && typeof p.tips === 'object' ? p.tips : {}, last: Math.max(0, Math.min(n - 1, p.last | 0)), hints: p.hints | 0 };
+  return S.prog;
+}
+function lotSave() { const p = lotProg(); lotPut('catguard.lot', JSON.stringify(p)); }
+function lotUnlocked(i) { const p = lotProg(); return i === 0 || p.st[i - 1] > 0 || p.st[i] > 0; }
+function lotPlaces() {
+  return lotPlaces.P || (lotPlaces.P = [
+    { ic: '🏡', name: 'Our Driveway', sub: 'Valet parking, out front', sky: 0xbfe3ff, gr: 0x4a8a34, hemi: [0xffffff, 0x7a8a6a, 0.8], sun: 0.55, tint: '#5a5c62' },
+    { ic: '🏘️', name: 'Chipwood Crescent', sub: 'The whole street parked in', sky: 0xffd9a8, gr: 0x4a8a36, hemi: [0xfff2dc, 0x7a7a60, 0.8], sun: 0.55, tint: '#4c4e54' },
+    { ic: '🛒', name: 'The Grocery Lot', sub: 'Saturday morning rush', sky: 0xcfeaff, gr: 0x6e7076, hemi: [0xffffff, 0x7a7a80, 0.85], sun: 0.55, tint: '#6a6d73' },
+    { ic: '🏢', name: 'The Downtown Garage', sub: 'Level P2, concrete and pillars', sky: 0x3a3e46, gr: 0x4a4c50, hemi: [0xf4f8ff, 0x55585e, 0.85], sun: 0.4, tint: '#8f9090' },
+    { ic: '🏆', name: 'The Big Cat Show', sub: 'The grand finale, under the lights', sky: 0x1c1640, gr: 0x221e34, hemi: [0xd8c8ff, 0x3a2a4a, 0.9], sun: 0.5, tint: '#3a3a46' },
+  ]);
+}
+function lotLevelData() {                                             // [place, w, h, edges, blocks, cars, neighbour, fewest moves, a best line, seed] (made by a seeded search + a BFS solver)
+  return [
+    [0,4,4,"0000,1111,1111,1111",[],"10v2+c 02h2-c 23h2+c",[],3,"b+a+c+",1000],
+    [0,4,5,"0000,11100,1111,00111",[],"03v2+c 30v2+c 13v2+c 12h2+c 10v2+c",[],5,"a+b+c+d+e+",1037],
+    [0,5,5,"00000,11000,11111,00111",[],"42v2+c 22v3+t 12v2+c 20v2+c 00v2+c 30h2+c",[],6,"a+b+c+d+e+f+",1074],
+    [0,5,6,"00000,111110,11111,000111",[],"13h3-v 01h2+c 03v2+c 30v3+t 00h2+c 25h3-t 14h2+c 05h2-c 20v3+v",[],9,"a+g+h-c+f-d+i+b+e+",1111],
+    [0,5,6,"00000,111110,11111,000111",[],"21v2+c 20h2+c 23h2+c 11v2+c 05h2-c 01v2+c 31v2+c 24v2+c 03v2+c",[],9,"b+c+e-d+g+h+a+i+f+",1148],
+    [1,5,6,"11110,111001,00111,001111",[],"34h2-c 00h2+c 02v3-v 05h2-c 40v2+c 42v2+c 14h2-c 21v2+c 25h2+c 01h2+c",[],12,"d-h-b+i+j+c-g-a-f+e+b+j+",1185],
+    [1,6,6,"111000,111010,000111,100111",[],"43h2-c 45h2-c 04v2-c 02h2+c 22v3-t 32v2+c 11h2+c 40v2+c 25h2-c",[],12,"c-g-e-g+i-b-f+d+c-a-h+g+",1222],
+    [1,6,6,"111110,111000,000111,000111",[[2,1],[4,3]],"02h3+v 32h2+c 14v2-c 51v3+t 44h2-c 25h2-c 33v2+c 13h2-c 03v2-c 20h2+c 00h2+c 45h2-c",[],16,"i+h-c-i-f-g+e-j+k+l-d+b+a+c-i-e-",1259],
+    [1,6,7,"111010,1111000,000111,1001111",[],"14v2-c 24h3-v 04v3-t 45h2-c 30v2+c 11h2+c 02h2+c 36h2-c 25v2-c 22v2-c 00h3+t 32v2+c 03h2+c",[],18,"a+f-h+k-j-f+g+m-c-b-l+e+f+g+a-i-d-h-",1296],
+    [1,6,7,"111001,1111000,010111,0001111",[[1,0],[3,0]],"42v2+c 01h2+c 02h3+t 23h2-c 35h2-c 24v2-c 40v2+c 34h2-c 03v2-c 13v2+c 05v2-c 15v2-c 31v2+c",[],20,"b+e+f+h+l+j+d-m+c+i-d-h-f-k-e-a+c+g+b+f-",1333],
+    [1,6,7,"111000,1111001,100111,0001111",[[0,0],[0,2]],"45h2-c 13v2-c 34h2-c 12h2+c 23v2-c 42v2+c 01h2+c 40v2+c 15v2-c 26h2+c 46h2+c 21h2+c 32v2+c",[],19,"c+k+j+e+m+d+b-c-e-a-f+d+h+l+e-g+b-i-a-",1370],
+    [1,6,7,"111000,1111000,000111,0001111",[[4,6]],"03v3-v 32h2+c 44h2-c 02h2+c 50v3+t 35h3-t 14v2-c 33v2+c 30v2+c 10h2+c 13h2+c 01h3+t 25v2-c",[],20,"a+d+k-a-g-m-f-h+c-e+b+c+d+i+j+l+a-g-m-c-",1407],
+    [1,6,7,"111000,1111001,100111,0001111",[[0,0],[2,3]],"24h2-c 02h3+t 44h2-c 50v2+c 15v2-c 25h2-c 32v2+c 45h2-c 52v2+c 21h2+c 13v2-c 10h2+c",[],20,"j-g-b+k-a-c-i+b+d+g+j+l+k-e-f-g+h-i+d+j+",1444],
+    [2,6,7,"111000,1111000,001111,0001111",[],"02h2+c 52v2+c 31v2+c* 40v2+c 11h2+c 35h3-v 03v2-c 05v2-c 26h2-c 46h2-c 22v2+c",[],14,"b+c-k+a+g-h-i-j-k+f-b+c+d+e+",1481],
+    [2,6,7,"111000,1111000,001111,0001111",[[1,3]],"02h2+c 51v2+c 31v2+c* 11h2+c 15h3-v 03v2-c 05v2-c 46h2-c 22v2-c 42v2+c 24h3-v 53v3+t",[],17,"c-h-j-l+b+k+i+a+f-g-e-h-i+k-c+j+d+",1518],
+    [2,6,7,"111000,1111000,100111,0001111",[[0,3],[3,3]],"00h3+t 52v2+c* 24v2-c* 15v2-c 26h2-c 13v2-c 50v2+c 42v2+c 44h2-c 35h2-c 12h2+c 31h2+c 11h2+c 46h2-c",[],20,"k+f-d-e-n-c+d+i-b+g+a+h+k+l+m+c-f-d-j-h+",1555],
+    [2,7,7,"1111000,1111000,0001111,0001111",[[3,2],[0,3],[4,3]],"50v2+c* 44h2-c 14v2-c 60v2+i 42h2+c 65v2+c 36h3-t 10h2+c 06h3-t 11v3-t 23v2-c 33v2+c 35h2-c",[],17,"d+e+f+i-g-m+l+b-m-a+h+j-c-k-b-m-d+",1592],
+    [2,7,7,"1111000,1111000,0001111,0001111",[[3,0],[2,1],[5,1]],"02h2+c* 14v2-c* 45h2-c 46h3-i 42v3+v 52v2+c 25h2-c 54h2-c 23h2+c 24h2-c 06h2-c 60v2+c 10v2-c 31v2-c 26h2-c 40v2+c",[],23,"c+i-k-m-o-d-e+d+b+j-h-f+n+a+b-d-g-c-f+l+n+p+d-",1629],
+    [2,6,7,"111000,1111000,100111,0001111",[[0,3],[0,5]],"14v2-c 22h2+c 25v2-c 46h2-c 44v2+c* 23v2-c 11h2+c* 40v3+t 30v2+c 12v2-c 51v3+t 00h3+v 06h2-c 01v2+c",[],23,"m-a+j+b-i+l+n-b-g-f-c-d-e+h+k+l+f-b+c-g+j-a-d-",1666],
+    [2,7,7,"1111000,1111000,0001111,0001111",[[3,0],[6,2],[2,3]],"12v2-c 26h2-c* 40h2+c 51h2+c 01h2+c 02v2-c 05v2-c 15v2-c 32v2-c 21h2+c",[[1,4],[2,4],[3,4],[4,4],[5,4],[6,4]],10,"c+d+j+e+a-f-g-h-b-i+",1703],
+    [2,7,8,"1111000,11110000,0001111,00001111",[[4,2],[0,3],[6,6]],"30h2+c 16v2-c 26v2-c 13v2-c* 50v2+i 11v2-c 57h2-c 33v2+c 20v2-c 00h2+c",[[1,5],[2,5],[3,5],[4,5],[5,5],[6,5]],11,"e+a+h-i-c-j+f-d-b-g-e+",1740],
+    [2,7,7,"1111000,1111000,0001111,0001111",[[3,0],[3,1],[5,1]],"02h2+c* 14v2-c* 04v2-c 46h3-i 42v3+v 52v2+c 45h2-c 54h2-c 61v3+v 00v2-c 40v2+c 25v2-c 34v3+v 23v2-c 20v3-t 06h2-c",[],27,"g+j-m-o-n-l-p-c+d-e+h-m+g-i+d+b+m+h-f+a+b-c-d-g-f+k+d-",1777],
+    [3,6,8,"111000,11110000,000111,10011111",[[0,0],[0,2],[4,3],[5,4]],"42h2+c 11h2+c 30v2+c 23v3-t 15v2-c 35h3-t 07h2-c 37h2-c 36h3-t 22h2+c 04h2-c 10h2-c 33v2+c 12v2-c 26v2-c",[],19,"a+b-g-e+j+c+k-l+d-f-e-o-h-i-m+c+b+n-e-",1814],
+    [3,6,8,"111000,11110000,000111,00001g11",[],"32v3+v 25h3-t 15v2-c 26h2-c 50v2+c 03h2+c 30v2+c 21v3-t 46h2-c 40v3+t 17h3-v 14h2-c 04v3-v",[],16,"h-f+k-c+m-l-b-c-d-a+f+c-g+i-e+j+",1851],
+    [3,6,8,"111000,11Gg0000,000111,00001111",[[5,4],[4,6],[4,7]],"31v3+t 24h2-c 14v2-c 03h3+v 01h3+t 35h3-t 16v2-c 04v2-c 20h2+c 26h2-c 43h2+c 06v2-c",[],17,"b+i+k+a-d+c-b-a+e+c-h-b-f-g-l-j-a+",1888],
+    [3,6,8,"111000,11110000,000111,10011111",[[2,4],[0,6],[5,6]],"12h2+c 30v2+c 01h3+t 16v2-c 45h2-c 47h2-c 13v3-t 40v3+v 27h2-c 02v2-c 43h2-c 04v2-c 34v2+c 32v2+c",[],21,"k+m+n+a+g-d-i-f-d+m+e-h+a+n+b+c+g-j-l-e-d-",1925],
+    [3,7,8,"1111000,11110000,0001111,00001111",[[1,0],[4,0],[1,3],[3,7]],"12h3+v 62v2+c 44h3-v 41v2+c 23v3-t 01h3+t 33h3+v 34v3+v 02v3-t 45h3-v 51h2+c 17h2-c 06v2-c 05h2-c 30v2-c",[],22,"k+b-g+b+d+n-o-f+b-i-m-a-h-l-e+c-d+a+e-j-b+d+",1962],
+    [3,7,8,"1111000,11110000,0001g11,00001111",[[4,0],[5,0],[4,2],[6,4],[3,7]],"03h3+v 43v2+c 14v3-v 26h2-c 24v2-c 35h2-c 51v3+t 55h2-c 01h3+t 46h2-c",[],19,"g+i+j+d+e+f-b+a+c-f-e-d-b+h-j-g+a+e-h-",1999],
+    [3,7,8,"11g1000,11110000,0001111,0000111G",[[0,0],[3,1],[5,2],[1,4],[6,4]],"24v2-c 03h3+t 56h2-c 42v3+v 30h2+c 45v2+c 53v3+v 26v2-c 37h3-t 41h3+t 34v3+v 20v2-c",[],20,"b+e+i+j+d-b+f-k+c-g+l-b+a-d+h-i-c-f+d+g+",2036],
+    [3,7,9,"1111000,111110000,0001G11,00001111g",[[4,0],[0,3],[1,3],[3,5],[3,6]],"48h2-c* 23v3-v 26v3-t 21h3+v 51v2+c 42v2+c 50h2+c 64v2+c 46v2+c 02h3+t 53v2+c 37v2+c 61v3+t",[],18,"d-f+g+e-h+l+m+j+b-c-a-i+k+e+d+b-c-f+",2073],
+    [3,7,8,"1111000,11110000,0001111,00001111",[[2,0],[0,5],[0,7],[3,7]],"46h3-t 41v2+c 15v3-t 43v3+t 14h3-v 02h2+c 03v2-c 01h3+t 60v2+c 30h2+c 22h2+c 54h2-c 50v3+t 35v2+c",[],24,"h+i+m+j+b-k+f+g-e-c-n-a-c+d+n+l-i+m+k+b+f+h+c-n-",2110],
+    [3,6,8,"111000,11110000,000111,10011111",[[0,0],[0,2],[4,3],[5,4]],"11h2+c 30v2+c 35h3-v 07h2-c 37h3-t 36h3-v 12h2+c 10h2+c 32v2+c 13v2-c 40h2+c 15v2-c 23v3-v",[],18,"d-e-i+g+j-k+l+m-c-l-f-i+b+a+h+j-l-m-",2147],
+    [4,7,9,"1111000,111110000,0001111,0000g11G1",[[1,0],[0,8],[3,8],[6,8]],"26v3-t 46h3-i 43v2+c 14h3-v 12h2+c* 03v3-v 20h3+t 06v2-c 50v3+v 13h3+v 53v2+c 35v2-c 32h2+c 00v2-c",[],20,"c+k+j+i+g+n-f-e-d-a-l-b-c+k+i+m+e+h-l-b-",2184],
+    [4,7,9,"1111000,111110000,000g111,000011111",[[3,3],[2,7]],"07v2-c* 50v3+t 18h3-t 01h2+c 02h3+t 24v3-v 55h2-c 35v3-t 53h2+c 48h3-v 56h2-c",[[4,1],[4,2],[4,3],[4,4],[4,5],[4,6]],15,"d+e+a-c-f-i+h+g-j-k-b+d+e+f-g-",2221],
+    [4,7,8,"1111000,11110000,0001111,000011g1",[[2,4]],"00h2+i 15v2-c* 02h2+c 30h3+v 42v2+c 31h2+c 55h2-c 01h3+t 44v2+c 26h2-c 37h4-b 53v2+c 22h2+c 56h2-c 51v2+c",[],22,"a+d+k-b+i+e+g-l+o+f+h+o-a+m+c+b-j-a-n-l+o+a+",2258],
+    [4,7,9,"1111000,111110000,0001111,00001gG11",[[4,0],[2,5],[4,5],[1,7]],"07v2-c* 04h2-i 48h3-t 24h3-v 50v3+t 31v2-c 64v3+v 35v2-c 62v2+c",[[0,3],[1,3],[2,3],[3,3],[4,3],[5,3]],11,"d+b+a-c-f-g+d+e+h+i+b+",2295],
+    [4,7,9,"11G1000,111110000,0001111,000011g11",[[4,0],[0,2],[3,2],[0,3]],"50v2+c* 47h2-i 25v4-b 56h2-c 23h2+c 12v3-v 01h2+c 24h2+c 15v4-b 31h2+c 38h3-v 53v2+c 43v3+v 35v2+c 42h3+t",[],25,"b+k+l+m+e+h+n+c-h-k-m-b-d-l+o+a+j+g+f-h-i-k-d-m+b-",2332],
+    [4,7,9,"1111000,111110000,0001111,0000g11G1",[[1,0],[0,8],[3,8],[6,8]],"25v4-b 46h3-i 43v2+c 14h3-t 12h2+c* 02v3-v 20h3+t 05v2-c 50v3+v 13h3+t 53v2+c 11h4+b 36v2-c",[],19,"c+f-d-e-k+j+a-m-b-c+k+i+g+l+a-m-e+h-b-",2369],
+    [4,7,8,"1111000,11110000,0001111,000011g1",[[1,3],[6,5]],"50v2+c* 24v4-i 12h2+c 03v3-t 20v2-c 46h3-v 00h2+c 06v2-c 23h2+c 36v2+c 52v2+c 34h4-b 47h2-c 35h3-v 32h2+c",[],27,"c-e-i+b-j+f-l-m-n-k+a+f+i+l+n+b+g+o+c+b-d-h-f-l-m-n-b-",2406],
+    [4,7,9,"11G1000,111110000,0001111,000011g11",[[1,2],[4,4],[0,8],[1,8]],"42h3+i 50v2+c* 00h4+b 22v2-c 24v4-b 06v2-c 04v2-c 47h3-v 02v2-c 35h2-c 32v3-t 53v3+v 46h2-c 31h2+c",[],28,"d-e-i-g-f-h-e+d+m-l+j+m+k+a-j-m-b+a+c+d-i-e-g-f-j-n+m-a+",2443],
+  ];
+}
+function lotLevels() {                                                   // the lots, parsed once: w x h cells, edges [top, right, bottom, left] ('0' wall, '1' gap, 'g'/'G' a gate up on even / odd moves),
+  if (lotLevels.L) return lotLevels.L;                                   // blocks, vehicles [x, y, horizontal, length, face, kind, cat], the neighbour's beat, the fewest moves and a way to do it
+  const out = [];
+  for (const d of lotLevelData()) {
+    const L = { p: d[0], w: d[1], h: d[2], e: d[3].split(','), b: d[4], v: [], n: d[6], min: d[7], sol: [], seed: d[9] };
+    for (const t of d[5].split(' ')) { const m = /^(\d)(\d)([hv])(\d)([+-])([a-z])(\*?)$/.exec(t); if (!m) continue; L.v.push({ x: +m[1], y: +m[2], hz: m[3] === 'h', l: +m[4], f: m[5] === '+' ? 1 : -1, k: m[6], cat: !!m[7] }); }
+    for (let i = 0; i < d[8].length; i += 2) L.sol.push([d[8].charCodeAt(i) - 97, d[8][i + 1] === '+' ? 1 : -1]);
+    L.hasGate = L.e.some(s => /[gG]/.test(s)); L.hasPed = L.n.length > 1; L.hasIce = L.v.some(v => v.k === 'i'); L.hasCat = L.v.some(v => v.cat); L.hasBlock = L.b.length > 0;
+    out.push(L);
+  }
+  return (lotLevels.L = out);
+}
+
+/* ---------- the rules (the same as the solver that checked every lot) ---------- */
+function lotState(L) { const n = L.v.length, pos = new Int8Array(n); L.v.forEach((v, i) => { pos[i] = v.hz ? v.x : v.y; }); return { pos, par: 0, pi: 0, pd: 1 }; }
+function lotCopy(S) { return { pos: Int8Array.from(S.pos), par: S.par, pi: S.pi, pd: S.pd }; }
+function lotOcc(L, pos, occ) {
+  const w = L.w; occ.fill(-1); for (const [x, y] of L.b) occ[y * w + x] = -2;
+  for (let i = 0; i < pos.length; i++) { const p = pos[i]; if (p < 0) continue; const v = L.v[i]; for (let t = 0; t < v.l; t++) occ[v.hz ? v.y * w + p + t : (p + t) * w + v.x] = i; }
+  return occ;
+}
+function lotGateOpen(c, par) { return c === '1' || (c === 'g' && par % 2 === 0) || (c === 'G' && par % 2 === 1); }
+function lotSlide(L, S, i, d, occ, R) {                                 // how far car i slides that way, and what stops it: R.np (-1: gone), R.k cells, R.c ('car' | 'wall' | 'block' | 'gate' | 'wait' | 'ped' | 'out'), R.j
+  const v = L.v[i], p = S.pos[i], lim = v.hz ? L.w : L.h, w = L.w, ped = L.hasPed ? L.n[S.pi] : null; let k = 0;
+  R.j = -1; R.hiss = false;
+  for (;;) {
+    const a = d > 0 ? p + v.l + k : p - 1 - k;
+    if (a < 0 || a >= lim) {
+      const side = v.hz ? (d > 0 ? 1 : 3) : (d > 0 ? 2 : 0), c = L.e[side][v.hz ? v.y : v.x];
+      R.side = side; R.k = k; R.np = p + d * k;
+      if (c === '0') { R.c = 'wall'; return R; }
+      if (!lotGateOpen(c, S.par)) { R.c = 'gate'; return R; }
+      if (v.k === 'i') { let o = 0; for (let j = 0; j < S.pos.length; j++) if (j !== i && S.pos[j] >= 0) o++; if (o) { R.c = 'wait'; return R; } }
+      R.c = 'out'; R.np = -1; return R;
+    }
+    const cx = v.hz ? a : v.x, cy = v.hz ? v.y : a, o = occ[cy * w + cx];
+    if (o === -2) { R.c = 'block'; break; }
+    if (o >= 0 && o !== i) { R.c = 'car'; R.j = o; R.hiss = v.cat || L.v[o].cat; break; }
+    if (ped && ped[0] === cx && ped[1] === cy) { R.c = 'ped'; break; }
+    k++;
+  }
+  R.k = k; R.np = p + d * k; return R;
+}
+function lotStep(L, S, i, d, occ, R) {                                  // one move, into S (true: it was a move: something slid, or drove away)
+  lotOcc(L, S.pos, occ); lotSlide(L, S, i, d, occ, R);
+  if (R.np !== -1 && R.k === 0) return false;
+  S.pos[i] = R.np; if (L.hasGate) S.par = (S.par + 1) & 1;
+  if (L.hasPed) { lotOcc(L, S.pos, occ); const P = L.n; let pd = S.pd, ni = S.pi + pd; if (ni < 0 || ni >= P.length) { pd = -pd; ni = S.pi + pd; }
+    R.pedMoved = occ[P[ni][1] * L.w + P[ni][0]] < 0; if (R.pedMoved) S.pi = ni; S.pd = pd; }
+  return true;
+}
+function lotKey(S) { let s = ''; for (let i = 0; i < S.pos.length; i++) s += String.fromCharCode(S.pos[i] + 66); return s + S.par + S.pi + (S.pd > 0 ? '+' : '-'); }
+function lotDone(S) { for (let i = 0; i < S.pos.length; i++) if (S.pos[i] >= 0) return false; return true; }
+function lotSolveJob(L, S0, cap) {                                      // the fewest moves from S0 (no hisses), breadth first, a slice at a time (a hint mustn't freeze a phone): lotSolveRun
+  const k0 = lotKey(S0); return { L, occ: new Int16Array(L.w * L.h), R: {}, seen: new Map([[k0, null]]), q: [S0], h: 0, goal: lotDone(S0) ? k0 : null, cap: cap || 400000, done: lotDone(S0), res: lotDone(S0) ? [] : null, over: false };
+}
+function lotSolveRun(J, ms) {                                            // work on it for about ms (Infinity: to the end); true when it's finished (J.res: the moves, or null)
+  if (J.done) return true; const L = J.L, occ = J.occ, R = J.R, seen = J.seen, q = J.q, t0 = performance.now(); let n = 0;
+  while (J.h < q.length) {
+    const S = q[J.h++], ks = lotKey(S);
+    for (let i = 0; i < S.pos.length && !J.goal; i++) { if (S.pos[i] < 0) continue;
+      for (let d = 1; d >= -1; d -= 2) { const T = lotCopy(S); if (!lotStep(L, T, i, d, occ, R) || R.hiss) continue; const kt = lotKey(T); if (seen.has(kt)) continue;
+        seen.set(kt, [ks, i, d]); if (lotDone(T)) { J.goal = kt; break; } q.push(T); } }
+    if (J.goal) break;
+    if (seen.size > J.cap) { J.over = true; break; }
+    if ((++n & 63) === 0 && performance.now() - t0 > ms) return false;
+  }
+  J.done = true; J.q = null;
+  if (J.goal) { const out = []; for (let k = J.goal; seen.get(k); k = seen.get(k)[0]) { const e = seen.get(k); out.push([e[1], e[2]]); } J.res = out.reverse(); }
+  return true;
+}
+function lotSolve(L, S0, cap) { const J = lotSolveJob(L, S0, cap); lotSolveRun(J, Infinity); return J.res; }
+function lotSolveAny(L, S0, cap) {                                       // too big to search it all: best first (fewest cars left, then fewest moves), any way out will do
+  const occ = new Int16Array(L.w * L.h), R = {}, heap = [], seen = new Map(), cnt = S => { let n = 0; for (let i = 0; i < S.pos.length; i++) if (S.pos[i] >= 0) n++; return n; };
+  const push = (S, g, key) => { const f = cnt(S) * 3 + g; heap.push([f, S, g, key]); let c = heap.length - 1; while (c > 0) { const p = (c - 1) >> 1; if (heap[p][0] <= heap[c][0]) break; [heap[p], heap[c]] = [heap[c], heap[p]]; c = p; } };
+  const pop = () => { const top = heap[0], e = heap.pop(); if (heap.length) { heap[0] = e; let c = 0; for (;;) { const l = c * 2 + 1, r = l + 1; let m = c; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === c) break; [heap[m], heap[c]] = [heap[c], heap[m]]; c = m; } } return top; };
+  const k0 = lotKey(S0); seen.set(k0, null); push(S0, 0, k0);
+  while (heap.length && seen.size < (cap || 200000)) {
+    const [, S, g, ks] = pop(); if (lotDone(S)) { const out = []; for (let k = ks; seen.get(k); k = seen.get(k)[0]) { const e = seen.get(k); out.push([e[1], e[2]]); } return out.reverse(); }
+    for (let i = 0; i < S.pos.length; i++) { if (S.pos[i] < 0) continue; for (let d = 1; d >= -1; d -= 2) { const T = lotCopy(S); if (!lotStep(L, T, i, d, occ, R) || R.hiss) continue; const kt = lotKey(T); if (seen.has(kt)) continue; seen.set(kt, [ks, i, d]); push(T, g + 1, kt); } }
+  }
+  return null;
+}
+
+/* ---------- the shapes: chunky rounded boxes, merged into one vertex-coloured geometry per thing (one draw each) ---------- */
+function lotRBox(w, h, d, r, seg) {                                      // a box with rounded edges (normals straight out of the rounding: smooth, no seams)
+  const g = new THREE.BoxGeometry(w, h, d, seg || 3, seg || 3, seg || 3), p = g.attributes.position, n = g.attributes.normal, v = new THREE.Vector3(), c = new THREE.Vector3();
+  r = Math.min(r, w / 2 - 1e-3, h / 2 - 1e-3, d / 2 - 1e-3); const hx = w / 2 - r, hy = h / 2 - r, hz = d / 2 - r, cl = (a, m) => Math.max(-m, Math.min(m, a));
+  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); c.set(cl(v.x, hx), cl(v.y, hy), cl(v.z, hz)); v.sub(c); const l = v.length() || 1; v.multiplyScalar(1 / l); n.setXYZ(i, v.x, v.y, v.z); p.setXYZ(i, c.x + v.x * r, c.y + v.y * r, c.z + v.z * r); }
+  return g;
+}
+function lotWhiteUV() { return [8 / 512, 1 - 8 / 512]; }
+function lotMerge(parts) {                                               // parts: [geometry, colour, x, y, z, sx, sy, sz, rx, ry, rz, uvRect?]: position, normal, colour, uv (white, or a rect of the atlas)
+  const P = [], N = [], C = [], U = [], m = new THREE.Matrix4(), nm = new THREE.Matrix3(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(), v = new THREE.Vector3(), c = new THREE.Color(), wu = lotWhiteUV();
+  for (const pt of parts) {
+    const src = pt[0], g = src.index ? src.toNonIndexed() : src, a = g.attributes.position; if (!g.attributes.normal) g.computeVertexNormals(); const na = g.attributes.normal, ua = g.attributes.uv;
+    m.compose(p.set(pt[2], pt[3], pt[4]), q.setFromEuler(e.set(pt[8] || 0, pt[9] || 0, pt[10] || 0)), s.set(pt[5], pt[6], pt[7])); nm.getNormalMatrix(m); c.set(pt[1]);
+    const uv = pt[11];
+    for (let i = 0; i < a.count; i++) { v.fromBufferAttribute(a, i).applyMatrix4(m); P.push(v.x, v.y, v.z); v.fromBufferAttribute(na, i).applyMatrix3(nm).normalize(); N.push(v.x, v.y, v.z); C.push(c.r, c.g, c.b);
+      if (uv && ua) U.push(uv[0] + (uv[2] - uv[0]) * ua.getX(i), uv[1] + (uv[3] - uv[1]) * ua.getY(i)); else U.push(wu[0], wu[1]); }
+    if (g !== src) g.dispose(); src.dispose();
+  }
+  const out = new THREE.BufferGeometry(); out.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); out.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); out.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); out.computeBoundingSphere(); return out;
+}
+function lotPlateTexts() {
+  return lotPlateTexts.T || (lotPlateTexts.T = ['MEOW 42', 'PURR 1', 'HISS 7', 'MRRP 5', 'CHIRP 9', 'NYAA 3', 'TUNA 4U', 'MLEM 8', 'BLEP 2', 'PAWS 10', 'FLUFF 6', 'ZOOMY 1', 'BEANS 3', 'KITTY 7',
+    'NAPS 24', 'CATNIP', 'MIAU 11', 'PURRR 2', 'SCRTCH', 'TREATS', 'WHSKR 5', 'MOUSE 0', 'KNEAD 4', 'MROW 12', 'LOAF 9', 'YARN 3', 'SNOOZE', 'TOE BNS', 'CHONK 1', 'BOOP 8', 'SARDN 2', 'PSPSPS', 'FELIX 4', 'TABBY 6', 'CALICO', 'PKR 1']);
+}
+function lotAtlas() {                                                    // one picture for every car: a white corner (most of each car), the number plates (cat puns), the 🅿️ sign, a paw
+  const S = LOT; if (S.atlas) return S.atlas;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 512; const c = cv.getContext('2d');
+  c.fillStyle = '#ffffff'; c.fillRect(0, 0, 64, 64);
+  c.fillStyle = '#2a6fdb'; c.beginPath(); c.roundRect ? c.roundRect(68, 4, 56, 56, 9) : c.rect(68, 4, 56, 56); c.fill(); c.fillStyle = '#ffffff'; c.font = '900 46px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('P', 96, 34);
+  c.fillStyle = '#ffffff'; c.fillRect(128, 0, 64, 64); c.fillStyle = '#e8424a'; c.beginPath(); c.ellipse(160, 40, 13, 11, 0, 0, 6.283); c.fill(); for (let t = 0; t < 4; t++) { c.beginPath(); c.arc(141 + t * 12.6, 20 - (t === 1 || t === 2 ? 4 : 0), 5.4, 0, 6.283); c.fill(); }
+  const T = lotPlateTexts();
+  T.forEach((tx, i) => { const x = (i % 4) * 128, y = 64 + (i >> 2) * 48;
+    c.fillStyle = '#fbf7e8'; c.fillRect(x + 2, y + 2, 124, 44); c.strokeStyle = '#1f3f8f'; c.lineWidth = 3; c.strokeRect(x + 4, y + 4, 120, 40);
+    c.fillStyle = '#e8424a'; c.font = '700 8px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('ONTARIO · MEOW', x + 64, y + 11);
+    c.fillStyle = '#1f3f8f'; c.font = '900 ' + (tx.length > 7 ? 23 : 26) + 'px Arial, sans-serif'; c.fillText(tx, x + 64, y + 30); });
+  const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return (S.atlas = t);
+}
+function lotPlateUV(i) { const T = lotPlateTexts(); i = ((i % T.length) + T.length) % T.length; const x = (i % 4) * 128, y = 64 + (i >> 2) * 48; return [(x + 4) / 512, 1 - (y + 44) / 512, (x + 124) / 512, 1 - (y + 4) / 512]; }
+function lotVehGeo(kind, col, plate, cells) {                                   // a chunky toy car, along +z (its nose at +z), its wheels on y = 0; one cell is one unit
+  const B = lotRBox, Cy = (rt, rb, h, n) => new THREE.CylinderGeometry(rt, rb, h, n || 12), parts = [], add = (g, c, x, y, z, sx, sy, sz, rx, ry, rz, uv) => parts.push([g, c, x, y, z, sx || 1, sy || 1, sz || 1, rx || 0, ry || 0, rz || 0, uv]);
+  const L = cells || (kind === 's' ? 1 : kind === 'b' ? 4 : kind === 'v' || kind === 't' || kind === 'i' ? 3 : 2), len = L - 0.16, glass = 0x2b3d5e, dark = 0x26262c, chrome = 0xdadde2, lite = new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.28).getHex();
+  const wheel = (x, z, r) => { add(Cy(r, r, 0.13, 14), dark, x, r, z, 1, 1, 1, 0, 0, Math.PI / 2); add(Cy(r * 0.5, r * 0.5, 0.14, 10), chrome, x, r, z, 1, 1, 1, 0, 0, Math.PI / 2); };
+  const plates = (y, zf, zb) => { const pg = () => new THREE.PlaneGeometry(0.34, 0.11); if (zb !== null) add(pg(), 0xffffff, 0, y, zb, 1, 1, 1, 0, Math.PI, 0, lotPlateUV(plate)); if (zf !== null) add(pg(), 0xffffff, 0, y, zf, 1, 1, 1, 0, 0, 0, lotPlateUV(plate + 7)); };
+  const lights = (y, zf, zb, xs) => { for (const sx of [-1, 1]) { add(B(0.15, 0.08, 0.05, 0.02, 1), 0xfff3c0, sx * xs, y, zf, 1, 1, 1); add(B(0.13, 0.08, 0.05, 0.02, 1), 0xe0303a, sx * xs, y, zb); } };
+  if (kind === 's') {                                                    // a scooter: a round little body, a seat, a front shield, a basket
+    add(B(0.34, 0.26, 0.62, 0.12), col, 0, 0.3, -0.06); add(B(0.3, 0.07, 0.34, 0.03), dark, 0, 0.46, -0.12); add(B(0.34, 0.42, 0.12, 0.06), col, 0, 0.42, 0.27, 1, 1, 1, -0.25);
+    add(B(0.5, 0.04, 0.04, 0.02), chrome, 0, 0.68, 0.24); add(B(0.22, 0.12, 0.18, 0.03), 0xc8a26a, 0, 0.58, 0.33); add(B(0.1, 0.07, 0.04, 0.02), 0xfff3c0, 0, 0.52, 0.34);
+    for (const z of [-0.26, 0.26]) { add(Cy(0.12, 0.12, 0.1, 12), dark, 0, 0.12, z, 1, 1, 1, 0, 0, Math.PI / 2); add(Cy(0.06, 0.06, 0.11, 8), chrome, 0, 0.12, z, 1, 1, 1, 0, 0, Math.PI / 2); }
+    add(new THREE.PlaneGeometry(0.2, 0.065), 0xffffff, 0, 0.3, -0.375, 1, 1, 1, 0, Math.PI, 0, lotPlateUV(plate));
+  } else if (kind === 'b') {                                             // a little city bus (a streetcar's cousin): a band of windows all round, a white roof
+    add(B(0.84, 0.5, len, 0.14), col, 0, 0.42, 0); add(B(0.86, 0.2, len - 0.3, 0.06), glass, 0, 0.64, -0.04); add(B(0.82, 0.12, len - 0.1, 0.06), 0xf4f4f0, 0, 0.8, 0);
+    add(B(0.7, 0.2, 0.06, 0.04), glass, 0, 0.6, len / 2 - 0.01); add(B(0.5, 0.08, 0.05, 0.03), 0xffd23a, 0, 0.78, len / 2 - 0.02);
+    lights(0.32, len / 2, -len / 2, 0.3); for (const z of [len * 0.36, -len * 0.3]) for (const sx of [-1, 1]) wheel(sx * 0.37, z, 0.15); plates(0.24, len / 2 + 0.006, -len / 2 - 0.006);
+  } else if (kind === 'v' || kind === 'i') {                             // a van (the ice-cream truck: pink and cream, a giant cone on top, a serving hatch)
+    const ice = kind === 'i', c1 = ice ? 0xffa8cf : col, c2 = ice ? 0xfff4e0 : lite;
+    add(B(0.8, 0.36, len, 0.12), c1, 0, 0.3, 0); add(B(0.78, 0.4, len * 0.74, 0.12), c2, 0, 0.64, -len * 0.11); add(B(0.8, 0.16, len * 0.2, 0.06), glass, 0, 0.6, len * 0.3, 1, 1, 1, -0.2);
+    add(B(0.82, 0.16, len * 0.4, 0.05), glass, 0, 0.66, -len * 0.05);
+    if (ice) { add(new THREE.ConeGeometry(0.16, 0.42, 12), 0xd99a4e, 0, 1.04, -len * 0.18, 1, 1, 1, Math.PI); add(new THREE.SphereGeometry(0.17, 14, 10), 0xfff0f6, 0, 1.28, -len * 0.18); add(new THREE.SphereGeometry(0.06, 8, 6), 0xe0303a, 0, 1.45, -len * 0.18);
+      add(B(0.83, 0.06, len * 0.5, 0.03), 0xe0587a, 0, 0.48, -len * 0.1); }
+    lights(0.32, len / 2, -len / 2, 0.27); for (const z of [len * 0.33, -len * 0.33]) for (const sx of [-1, 1]) wheel(sx * 0.37, z, 0.14); plates(0.22, len / 2 + 0.006, -len / 2 - 0.006);
+  } else if (kind === 't') {                                             // a pickup: the cab up front, an open bed with a crate or two
+    add(B(0.8, 0.32, len, 0.12), col, 0, 0.28, 0); add(B(0.76, 0.32, len * 0.34, 0.12), lite, 0, 0.58, len * 0.2); add(B(0.78, 0.15, len * 0.3, 0.05), glass, 0, 0.6, len * 0.21);
+    for (const sx of [-1, 1]) add(B(0.08, 0.2, len * 0.5, 0.03), col, sx * 0.36, 0.52, -len * 0.22); add(B(0.78, 0.2, 0.08, 0.03), col, 0, 0.52, -len / 2 + 0.06);
+    add(B(0.3, 0.24, 0.3, 0.03), 0xc8945a, -0.12, 0.56, -len * 0.18); add(B(0.26, 0.2, 0.26, 0.03), 0x7ac0e8, 0.14, 0.54, -len * 0.36);
+    lights(0.3, len / 2, -len / 2, 0.27); for (const z of [len * 0.33, -len * 0.33]) for (const sx of [-1, 1]) wheel(sx * 0.37, z, 0.14); plates(0.2, len / 2 + 0.006, -len / 2 - 0.006);
+  } else {                                                               // a car: a rounded body, a bubble of glass, a roof in a lighter shade
+    add(B(0.78, 0.3, len, 0.13), col, 0, 0.26, 0); add(B(0.68, 0.24, len * 0.5, 0.1), glass, 0, 0.46, -len * 0.06); add(B(0.66, 0.07, len * 0.42, 0.035), lite, 0, 0.6, -len * 0.07);
+    lights(0.29, len / 2, -len / 2, 0.25); for (const z of [len * 0.3, -len * 0.3]) for (const sx of [-1, 1]) wheel(sx * 0.36, z, 0.135); plates(0.22, len / 2 + 0.006, -len / 2 - 0.006);
+  }
+  return lotMerge(parts);
+}
+function lotRoofY(kind) { return kind === 's' ? 0.5 : kind === 'b' ? 0.87 : kind === 'v' ? 0.85 : kind === 'i' ? 0.85 : kind === 't' ? 0.75 : 0.64; }
+function lotCatGeo(k) {                                                  // a cat curled up asleep (on a car roof): a loaf, her head on her paws, ears, a tail wrapped round
+  const fur = [0xf0a048, 0x9c9ca4, 0xf6f0e6, 0xf4ede2, 0x3a3a40][k % 5], fur2 = [0xc87a2a, 0x6e6e78, 0x8a8a92, 0xd88a3a, 0x222228][k % 5], parts = [], add = (g, c, x, y, z, sx, sy, sz, rx, ry, rz) => parts.push([g, c, x, y, z, sx || 1, sy || 1, sz || 1, rx || 0, ry || 0, rz || 0]);
+  add(new THREE.SphereGeometry(0.2, 14, 10), fur, 0, 0.1, 0, 1, 0.55, 1.15); add(new THREE.SphereGeometry(0.11, 12, 9), fur, 0.02, 0.15, 0.2, 1, 0.85, 0.9);
+  for (const sx of [-1, 1]) add(new THREE.ConeGeometry(0.045, 0.09, 6), fur2, sx * 0.06 + 0.02, 0.26, 0.2, 1, 1, 1, 0, 0, -sx * 0.35);
+  add(new THREE.TorusGeometry(0.17, 0.04, 6, 12, Math.PI * 1.1), fur2, 0, 0.05, 0, 1, 1, 1.2, Math.PI / 2, 0, 0.2);
+  if (k % 4 === 3) add(new THREE.SphereGeometry(0.1, 10, 8), 0xd88a3a, -0.08, 0.15, -0.08, 1, 0.5, 1.2);
+  for (const sx of [-1, 1]) add(lotRBox(0.035, 0.012, 0.02, 0.005, 1), 0x2a1a14, sx * 0.04 + 0.02, 0.16, 0.3);
+  return lotMerge(parts);
+}
+function lotPedGeo() {                                                   // the grumpy neighbour: cardigan, flat cap, a newspaper under his arm, a scowl
+  const parts = [], add = (g, c, x, y, z, sx, sy, sz, rx, ry, rz) => parts.push([g, c, x, y, z, sx || 1, sy || 1, sz || 1, rx || 0, ry || 0, rz || 0]), B = lotRBox;
+  for (const sx of [-1, 1]) { add(B(0.13, 0.36, 0.14, 0.05), 0x3e4048, sx * 0.08, 0.2, 0); add(B(0.14, 0.07, 0.22, 0.03), 0x4a2e22, sx * 0.08, 0.04, 0.04); }
+  add(B(0.36, 0.4, 0.24, 0.1), 0x7a8a4a, 0, 0.56, 0); add(B(0.04, 0.36, 0.02, 0.01), 0xd8c08a, 0, 0.56, 0.12);
+  for (const sx of [-1, 1]) add(B(0.1, 0.34, 0.11, 0.04), 0x6e7c42, sx * 0.22, 0.54, 0, 1, 1, 1, 0, 0, sx * 0.08);
+  add(B(0.06, 0.24, 0.18, 0.01), 0xeeeeea, 0.27, 0.5, 0.02);
+  add(new THREE.SphereGeometry(0.15, 14, 10), 0xf0c8a4, 0, 0.9, 0); add(new THREE.SphereGeometry(0.16, 12, 8), 0xdedede, 0, 0.9, -0.03, 1, 0.8, 1);
+  add(new THREE.CylinderGeometry(0.15, 0.16, 0.08, 14), 0x5a4a3a, 0, 1.02, 0); add(B(0.26, 0.03, 0.14, 0.015), 0x5a4a3a, 0, 0.99, 0.12);
+  for (const sx of [-1, 1]) { add(new THREE.SphereGeometry(0.022, 6, 5), 0x1a1a1a, sx * 0.05, 0.92, 0.135); add(B(0.07, 0.016, 0.02, 0.006), 0x8a8a8a, sx * 0.05, 0.96, 0.14, 1, 1, 1, 0, 0, sx * 0.4); }
+  add(new THREE.SphereGeometry(0.03, 6, 5), 0xe0a080, 0, 0.88, 0.15); add(B(0.08, 0.018, 0.02, 0.008), 0x9a5a4a, 0, 0.83, 0.14);
+  return lotMerge(parts);
+}
+function lotCapGeo() {                                                   // PKR's valet cap: red, a black peak, a gold band and a little 🅿️ badge
+  const parts = [], add = (g, c, x, y, z, sx, sy, sz, rx, ry, rz) => parts.push([g, c, x, y, z, sx || 1, sy || 1, sz || 1, rx || 0, ry || 0, rz || 0]);
+  add(new THREE.CylinderGeometry(0.075, 0.068, 0.07, 18), 0xd62a34, 0, 0.035, 0); add(new THREE.CylinderGeometry(0.09, 0.08, 0.02, 18), 0xd62a34, 0, 0.075, -0.005);
+  add(new THREE.CylinderGeometry(0.0695, 0.0695, 0.016, 18), 0xf2c23a, 0, 0.012, 0); add(lotRBox(0.11, 0.012, 0.06, 0.005, 1), 0x1a1a1e, 0, 0.0, 0.08, 1, 1, 1, 0.2);
+  add(lotRBox(0.03, 0.03, 0.01, 0.004, 1), 0x2a6fdb, 0, 0.045, 0.072); add(new THREE.SphereGeometry(0.012, 8, 6), 0xf2c23a, 0, 0.09, 0);
+  return lotMerge(parts);
+}
+function lotStandGeo(big) {                                              // the valet stand: a red podium, a key board with keys on hooks, the 🅿️ sign on its post (in the yard: big)
+  const parts = [], add = (g, c, x, y, z, sx, sy, sz, rx, ry, rz, uv) => parts.push([g, c, x, y, z, sx || 1, sy || 1, sz || 1, rx || 0, ry || 0, rz || 0, uv]), B = lotRBox;
+  add(B(0.62, 0.72, 0.4, 0.06), 0xc8303a, 0, 0.36, 0); add(B(0.7, 0.06, 0.48, 0.03), 0x8a5a36, 0, 0.75, 0); add(B(0.64, 0.06, 0.42, 0.03), 0xf2c23a, 0, 0.12, 0);
+  add(B(0.44, 0.34, 0.03, 0.02), 0x8a5a36, 0, 0.42, 0.21); for (let k = 0; k < 6; k++) { const x = -0.15 + (k % 3) * 0.15, y = k >= 3 ? 0.35 : 0.5; add(B(0.05, 0.08, 0.02, 0.01), [0xf2c23a, 0xc0c0c8, 0x3a8cff, 0xe8424a, 0x5cc46a, 0xffa8cf][k], x, y, 0.235); }
+  add(new THREE.CylinderGeometry(0.025, 0.025, 1.3, 8), 0xb8bcc2, 0.42, 0.65, -0.05); add(new THREE.PlaneGeometry(0.34, 0.34), 0xffffff, 0.42, 1.36, -0.02, 1, 1, 1, 0, 0, 0, [68 / 512, 1 - 60 / 512, 124 / 512, 1 - 4 / 512]);
+  add(B(0.36, 0.36, 0.02, 0.02), 0x1f4fa8, 0.42, 1.36, -0.035);
+  if (big) { add(new THREE.ConeGeometry(0.11, 0.3, 12), 0xff7a2a, -0.5, 0.15, 0.25); add(B(0.26, 0.03, 0.26, 0.02), 0xff7a2a, -0.5, 0.015, 0.25); add(new THREE.CylinderGeometry(0.075, 0.09, 0.05, 12), 0xffffff, -0.5, 0.18, 0.25); }
+  return lotMerge(parts);
+}
+
+/* ---------- built once, the first time she plays (or in the warm-up) ---------- */
+function lotBuild() {
+  const S = LOT; if (S.built) return;
+  const sc = S.scene = new THREE.Scene(); sc.background = new THREE.Color(0xbfe3ff);
+  S.cam = new THREE.PerspectiveCamera(36, 1, 0.3, 400); sc.add(S.cam); S.size = new THREE.Vector2();
+  sc.add(S.hemi = new THREE.HemisphereLight(0xffffff, 0x8a9a7a, 1.0));
+  S.sun = new THREE.DirectionalLight(0xffffff, 0.75); S.sun.position.set(-6, 14, 8); sc.add(S.sun); sc.add(S.sun.target);
+  S.M = { veh: new THREE.MeshLambertMaterial({ vertexColors: true, map: lotAtlas() }), ground: new THREE.MeshLambertMaterial({ color: 0xbfe0a8 }), lot: new THREE.MeshLambertMaterial({ color: 0xffffff }),
+    sign: new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.1 }) };
+  S.ground = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), S.M.ground); S.ground.rotation.x = -Math.PI / 2; S.ground.position.y = -0.02; sc.add(S.ground);
+  S.lotM = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), S.M.lot); S.lotM.rotation.x = -Math.PI / 2; S.lotM.position.y = 0.002; sc.add(S.lotM);
+  S.decor = new THREE.Mesh(new THREE.BufferGeometry(), S.M.veh); sc.add(S.decor);                       // (everything that stands still: walls, planters, the houses, the store: one mesh, rebuilt per lot)
+  S.signM = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), S.M.sign); S.signM.visible = false; sc.add(S.signM);
+  { const sm = softShadowMat(0.34, true), g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
+    S.shad = new THREE.InstancedMesh(g, sm, 48); S.shad.renderOrder = 1; S.shad.frustumCulled = false; S.shad.count = 0; sc.add(S.shad); }
+  S.fx = chimFxMake(sc, 360, false); S.gx = chimFxMake(sc, 160, true);
+  S.stand = new THREE.Mesh(lotStandGeo(false), S.M.veh); S.stand.scale.setScalar(0.85); sc.add(S.stand);
+  S.capGeo = lotCapGeo();
+  S.pedM = new THREE.Mesh(lotPedGeo(), S.M.veh); S.pedM.scale.setScalar(1.15); S.pedM.visible = false; sc.add(S.pedM);
+  S.gates = []; S.vv = { a: new THREE.Vector3(), b: new THREE.Vector3(), m: new THREE.Matrix4(), q: new THREE.Quaternion(), s: new THREE.Vector3(), e: new THREE.Euler(), Y: new THREE.Vector3(0, 1, 0), r: new THREE.Raycaster() };
+  S.occ = new Int16Array(100); S.R = {};
+  S.built = true;
+  lotLoad(lotProg().last, true);                                         // (a lot laid out, so the warm-up compiles everything a lot uses)
+}
+function lotSignTex(kind) {                                              // the store's sign, the cat show's banner, the garage's level sign (a fresh canvas each)
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128; const c = cv.getContext('2d'); c.textAlign = 'center'; c.textBaseline = 'middle';
+  if (kind === 2) { c.fillStyle = '#e8424a'; c.fillRect(0, 0, 512, 128); c.fillStyle = '#fff'; c.font = '900 64px Arial Black, Arial, sans-serif'; c.fillText('MEOWMART', 256, 58); c.font = '700 20px Arial, sans-serif'; c.fillText('FRESH FISH · TREATS · TOYS', 256, 104); }
+  else if (kind === 4) { const g = c.createLinearGradient(0, 0, 512, 0); g.addColorStop(0, '#7a3fb8'); g.addColorStop(1, '#e0458a'); c.fillStyle = g; c.fillRect(0, 0, 512, 128); c.fillStyle = '#ffd84a'; c.font = '900 60px Arial Black, Arial, sans-serif'; c.fillText('★ CAT SHOW ★', 256, 60); c.fillStyle = '#fff'; c.font = '700 20px Arial, sans-serif'; c.fillText('BEST IN SHOW TONIGHT', 256, 106); }
+  else if (kind === 3) { c.fillStyle = '#20242c'; c.fillRect(0, 0, 512, 128); c.fillStyle = '#ffd23a'; c.fillRect(0, 0, 512, 12); c.fillRect(0, 116, 512, 12); c.fillStyle = '#fff'; c.font = '900 56px Arial Black, Arial, sans-serif'; c.fillText('LEVEL P2', 256, 66); }
+  else { c.fillStyle = '#2f6a3a'; c.fillRect(0, 0, 512, 128); c.fillStyle = '#fff'; c.font = '900 52px Arial, sans-serif'; c.fillText('CHIPWOOD CRES', 256, 66); }
+  const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
+}
+
+/* ---------- a lot: its ground (painted fresh), the walls round it, what stands in it, its cars ---------- */
+function lotRW() { return 1.3; }                                         // (the road round the lot)
+function lotCell(L, x, y) { return [x - (L.w - 1) / 2, y - (L.h - 1) / 2]; }
+function lotCenter(L, v, p) { const c = (v.l - 1) / 2; return v.hz ? lotCell(L, p + c, v.y) : lotCell(L, v.x, p + c); }
+function lotGroundTex(L) {                                               // the asphalt (or concrete), a tile per space, the road round it, the arrows out of each gap, the paint
+  const RW = lotRW(), TW = L.w + RW * 2, TH = L.h + RW * 2, cv = document.createElement('canvas'); cv.width = cv.height = 1024; const c = cv.getContext('2d'), kx = 1024 / TW, ky = 1024 / TH, P = L.p;
+  const X = x => (x + RW) * kx, Y = y => (y + RW) * ky;                  // (lot cells: x 0..w, y 0..h)
+  const road = ['#55575d', '#46484e', '#5d6066', '#6c6d6e', '#2c2b38'][P], lot = ['#686a70', '#5a5c62', '#74777d', '#7f8180', '#3a3948'][P], tile = ['rgba(255,255,255,.07)', 'rgba(255,255,255,.07)', 'rgba(255,255,255,.08)', 'rgba(255,255,255,.1)', 'rgba(255,220,255,.07)'][P];
+  const line = ['rgba(255,255,255,.55)', 'rgba(255,255,255,.6)', 'rgba(255,255,255,.75)', 'rgba(255,214,58,.85)', 'rgba(255,200,90,.75)'][P];
+  c.fillStyle = road; c.fillRect(0, 0, 1024, 1024);
+  let sd = 7 + P; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 2600; i++) { c.fillStyle = rn() < 0.5 ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.07)'; c.fillRect(rn() * 1024, rn() * 1024, 2, 2); }
+  if (P === 1) { c.strokeStyle = 'rgba(255,214,58,.7)'; c.lineWidth = 4; c.setLineDash([22, 18]); c.strokeRect(X(-RW / 2), Y(-RW / 2), (L.w + RW) * kx, (L.h + RW) * ky); c.setLineDash([]); }
+  c.fillStyle = lot; c.fillRect(X(0), Y(0), L.w * kx, L.h * ky);
+  for (let i = 0; i < 1600; i++) { c.fillStyle = rn() < 0.5 ? 'rgba(0,0,0,.1)' : 'rgba(255,255,255,.06)'; c.fillRect(X(rn() * L.w), Y(rn() * L.h), 2, 2); }
+  for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) { c.fillStyle = tile; const m = 0.06; c.beginPath(); const x0 = X(x + m), y0 = Y(y + m), w = (1 - 2 * m) * kx, h = (1 - 2 * m) * ky, r = 10;
+    c.moveTo(x0 + r, y0); c.arcTo(x0 + w, y0, x0 + w, y0 + h, r); c.arcTo(x0 + w, y0 + h, x0, y0 + h, r); c.arcTo(x0, y0 + h, x0, y0, r); c.arcTo(x0, y0, x0 + w, y0, r); c.fill(); }
+  c.strokeStyle = line; c.lineWidth = 3; c.setLineDash(P === 0 ? [10, 10] : []);
+  for (let x = 1; x < L.w; x++) { c.beginPath(); c.moveTo(X(x), Y(0) + 6); c.lineTo(X(x), Y(L.h) - 6); c.globalAlpha = 0.45; c.stroke(); c.globalAlpha = 1; }
+  c.setLineDash([]); c.lineWidth = 5; c.strokeStyle = line; c.strokeRect(X(0), Y(0), L.w * kx, L.h * ky);
+  if (P === 3) { c.fillStyle = 'rgba(255,214,58,.18)'; c.font = '900 ' + (1.4 * ky | 0) + 'px Arial Black, Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('P2', X(L.w / 2), Y(L.h / 2)); }
+  if (P === 4) for (let i = 0; i < 40; i++) { c.fillStyle = 'rgba(255,220,120,' + (0.1 + rn() * 0.25) + ')'; c.font = (10 + rn() * 14 | 0) + 'px Arial'; c.fillText('✦', rn() * 1024, rn() * 1024); }
+  for (let s = 0; s < 4; s++) { const E = L.e[s], n = E.length;                       // the gaps: an arrow out on the road, a stop bar under a gate
+    for (let i = 0; i < n; i++) { if (E[i] === '0') continue; const hz = s === 1 || s === 3, cx = hz ? (s === 1 ? L.w + RW * 0.5 : -RW * 0.5) : i + 0.5, cy = hz ? i + 0.5 : (s === 2 ? L.h + RW * 0.5 : -RW * 0.5);
+      const dx = s === 1 ? 1 : s === 3 ? -1 : 0, dy = s === 2 ? 1 : s === 0 ? -1 : 0, gate = E[i] !== '1';
+      c.save(); c.translate(X(cx), Y(cy)); c.scale(kx / 64, ky / 64); c.rotate(Math.atan2(dy, dx));
+      c.fillStyle = gate ? 'rgba(255,214,58,.95)' : 'rgba(255,255,255,.92)'; c.beginPath(); c.moveTo(26, 0); c.lineTo(2, -20); c.lineTo(2, -8); c.lineTo(-24, -8); c.lineTo(-24, 8); c.lineTo(2, 8); c.lineTo(2, 20); c.closePath(); c.fill(); c.restore();
+      c.fillStyle = lot; const ox = hz ? (s === 1 ? X(L.w) - 3 : X(0) - 3) : X(i) + 4, oy = hz ? Y(i) + 4 : (s === 2 ? Y(L.h) - 3 : Y(0) - 3); c.fillRect(ox, oy, hz ? 6 : kx - 8, hz ? ky - 8 : 6);   /* (the edge line broken at a gap) */
+      if (gate) { c.fillStyle = '#ffd23a'; for (let k = 0; k < 5; k++) { if (k % 2) continue; c.fillRect(hz ? ox : ox + k * (kx - 8) / 5, hz ? oy + k * (ky - 8) / 5 : oy, hz ? 6 : (kx - 8) / 5, hz ? (ky - 8) / 5 : 6); } } } }
+  const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
+}
+function lotDecorGeo(L) {                                                // the place round the lot: walls on the closed sides, the planters (or pillars) in it, and the scenery
+  const P = L.p, RW = lotRW(), hw = L.w / 2, hh = L.h / 2, parts = [], B = lotRBox, add = (g, c, x, y, z, sx, sy, sz, rx, ry, rz) => parts.push([g, c, x, y, z, sx || 1, sy || 1, sz || 1, rx || 0, ry || 0, rz || 0]);
+  let sd = 11 + L.seed; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const blob = (r, c, x, y, z, sy) => add(new THREE.IcosahedronGeometry(r, 1), c, x, y, z, 1, sy || 0.85, 1);
+  // the closed edges: a hedge (driveway), a white picket fence (the street), a curb with shrubs (the store), a concrete wall (the garage), velvet ropes (the show)
+  for (let s = 0; s < 4; s++) { const E = L.e[s];
+    for (let i = 0; i < E.length; i++) { const hz = s === 1 || s === 3, x = hz ? (s === 1 ? hw + 0.08 : -hw - 0.08) : i - hw + 0.5, z = hz ? i - hh + 0.5 : (s === 2 ? hh + 0.08 : -hh - 0.08), sx = hz ? 0.16 : 1, sz = hz ? 1 : 0.16;
+      if (E[i] === '0') {
+        if (P === 0) { add(B(hz ? 0.3 : 1.02, 0.42, hz ? 1.02 : 0.3, 0.13), [0x4f8a3a, 0x5a9642][i % 2], x, 0.21, z); }
+        else if (P === 1) { add(B(hz ? 0.06 : 1, 0.06, hz ? 1 : 0.06, 0.02), 0xf4f2ea, x, 0.3, z); add(B(hz ? 0.06 : 1, 0.06, hz ? 1 : 0.06, 0.02), 0xf4f2ea, x, 0.14, z);
+          for (let k = 0; k < 4; k++) { const o = -0.375 + k * 0.25; add(B(0.08, 0.42, 0.04, 0.02), 0xfbfaf4, x + (hz ? 0 : o), 0.21, z + (hz ? o : 0), 1, 1, 1, 0, hz ? Math.PI / 2 : 0); } }
+        else if (P === 2) { add(B(hz ? 0.26 : 1.0, 0.16, hz ? 1.0 : 0.26, 0.05), 0xc8c4bc, x, 0.08, z); if (i % 2 === 0) blob(0.2, 0x4f8a3a, x, 0.28, z); }
+        else if (P === 3) { add(B(hz ? 0.24 : 1.02, 0.5, hz ? 1.02 : 0.24, 0.04), 0xb4b4b0, x, 0.25, z); add(B(hz ? 0.25 : 1.03, 0.08, hz ? 1.03 : 0.25, 0.02), (i % 2 ? 0xffd23a : 0x2a2a2e), x, 0.46, z); }
+        else { add(new THREE.CylinderGeometry(0.04, 0.05, 0.5, 8), 0xe8c048, x + (hz ? 0 : -0.5), 0.25, z + (hz ? -0.5 : 0)); add(new THREE.SphereGeometry(0.06, 8, 6), 0xffd84a, x + (hz ? 0 : -0.5), 0.52, z + (hz ? -0.5 : 0));
+          add(B(hz ? 0.05 : 1, 0.05, hz ? 1 : 0.05, 0.025), 0xb8203a, x, 0.4, z); }
+      } else if (E[i] !== '1') {                                         // a gate's post (its arm moves: a mesh of its own)
+        const pxo = hz ? 0 : -0.55, pzo = hz ? -0.55 : 0; add(B(0.16, 0.5, 0.16, 0.04), 0xffd23a, x + pxo, 0.25, z + pzo); add(B(0.2, 0.12, 0.2, 0.04), 0x2a2a2e, x + pxo, 0.52, z + pzo);
+      } } }
+  // what stands in the lot: a flower pot, a fire hydrant, a planter, a pillar, a trophy
+  for (const [bx, by] of L.b) { const [x, z] = lotCell(L, bx, by);
+    if (P === 0) { add(new THREE.CylinderGeometry(0.28, 0.2, 0.36, 12), 0xc4683a, x, 0.18, z); blob(0.22, 0x5cae4a, x, 0.45, z); for (let k = 0; k < 4; k++) blob(0.07, [0xff7ab8, 0xffd23a, 0xffffff, 0xff9a3a][k], x + Math.cos(k * 1.6) * 0.16, 0.58, z + Math.sin(k * 1.6) * 0.16); }
+    else if (P === 1) { if ((bx + by) % 2) { add(new THREE.CylinderGeometry(0.15, 0.17, 0.42, 10), 0xd8282e, x, 0.21, z); add(new THREE.SphereGeometry(0.15, 10, 8), 0xd8282e, x, 0.42, z); add(B(0.42, 0.08, 0.1, 0.03), 0xd8282e, x, 0.3, z); add(new THREE.CylinderGeometry(0.06, 0.06, 0.06, 8), 0xf2c23a, x, 0.58, z); }
+      else { add(B(0.7, 0.14, 0.7, 0.05), 0x8a6a4a, x, 0.07, z); add(new THREE.CylinderGeometry(0.06, 0.09, 0.9, 8), 0x6a4a32, x, 0.5, z); blob(0.36, 0x3f8a3a, x, 1.0, z, 0.9); blob(0.24, 0x4f9a42, x + 0.18, 1.15, z + 0.1); } }
+    else if (P === 2) { add(B(0.82, 0.3, 0.82, 0.06), 0xb8b2a8, x, 0.15, z); blob(0.3, 0x4f8a3a, x - 0.12, 0.42, z); blob(0.26, 0x5a9a44, x + 0.14, 0.4, z + 0.1); blob(0.08, 0xff7ab8, x + 0.05, 0.62, z - 0.05); }
+    else if (P === 3) { add(B(0.6, 1.1, 0.6, 0.05), 0xb8b8b4, x, 0.55, z); for (let k = 0; k < 4; k++) add(B(0.62, 0.07, 0.62, 0.02), k % 2 ? 0x2a2a2e : 0xffd23a, x, 0.06 + k * 0.08, z); }
+    else { add(B(0.5, 0.36, 0.5, 0.05), 0x5a2a7a, x, 0.18, z); add(new THREE.CylinderGeometry(0.06, 0.12, 0.16, 10), 0xf2c23a, x, 0.44, z); add(new THREE.CylinderGeometry(0.2, 0.08, 0.28, 12), 0xf2c23a, x, 0.66, z);
+      for (const sx of [-1, 1]) add(new THREE.TorusGeometry(0.08, 0.025, 6, 10), 0xf2c23a, x + sx * 0.22, 0.68, z, 1, 1, 1, 0, 0, 0); } }
+  // the scenery past the road
+  const top = -hh - RW, bot = hh + RW, left = -hw - RW, right = hw + RW;
+  if (P === 2 || P === 4) { for (const sx of [-1, 1]) add(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 8), 0x3a3a40, sx * 1.1, 0.25, top - 0.34); add(B(2.7, 0.75, 0.05, 0.02), P === 2 ? 0xb8202a : 0x4a2a7a, 0, 0.78, top - 0.35); }
+  if (P === 1) { add(new THREE.CylinderGeometry(0.04, 0.05, 1.7, 8), 0x8a8e94, -hw - 0.55, 0.85, top + 0.22); }
+  if (P === 0) {                                                         // our house front: brick below, white stucco and dark timbers above, the black garage door, the green French doors, the stoop; the magnolia
+    const z0 = top - 0.5, W2 = Math.max(9, L.w + 5);
+    add(B(W2, 1.6, 1, 0.04), 0x9a5a44, 0.4, 0.8, z0 - 0.5); add(B(W2, 1.5, 1, 0.04), 0xf2efe6, 0.4, 2.35, z0 - 0.5);
+    for (let k = 0; k < 9; k++) add(B(0.1, 1.5, 0.06, 0.02), 0x4a3424, 0.4 - W2 / 2 + 0.4 + k * (W2 - 0.8) / 8, 2.35, z0 + 0.01);
+    add(B(W2, 0.1, 0.06, 0.02), 0x4a3424, 0.4, 1.62, z0 + 0.01); add(B(W2 + 0.6, 0.3, 1.6, 0.05), 0xb03a2e, 0.4, 3.2, z0 - 0.4, 1, 1, 1, -0.3);
+    add(B(2.6, 1.3, 0.06, 0.03), 0x1e1e22, 1.6, 0.65, z0 + 0.02); for (let k = 1; k < 4; k++) add(B(2.5, 0.03, 0.04, 0.01), 0x3a3a40, 1.6, k * 0.32, z0 + 0.06);
+    add(B(1.0, 1.25, 0.06, 0.03), 0x2f5a3a, -2.2, 0.85, z0 + 0.02); add(B(1.5, 0.22, 0.8, 0.04), 0xc8c4bc, -2.2, 0.11, z0 + 0.4); add(B(1.2, 0.2, 0.5, 0.04), 0xc8c4bc, -2.2, 0.28, z0 + 0.2);
+    for (const k of [-1, 1]) add(B(1.0, 0.7, 0.06, 0.02), 0xbad4e4, 1.6 + k * 0.7, 2.3, z0 + 0.03);
+    { const tx = right + 1.6, tz = top + 1.0; add(new THREE.CylinderGeometry(0.12, 0.18, 1.6, 8), 0x6a5040, tx, 0.8, tz); for (let k = 0; k < 9; k++) blob(0.5 + rn() * 0.3, [0xffb8d8, 0xff9ac4, 0xffd0e4][k % 3], tx + (rn() - 0.5) * 1.6, 1.8 + rn() * 0.9, tz + (rn() - 0.5) * 1.2); }
+    add(B(L.w + 30, 0.04, 1.4, 0.02), 0xa9a69e, 0, 0.0, bot + 0.9); add(B(L.w + 30, 0.12, 0.2, 0.03), 0xb9b6ae, 0, 0.06, bot + 1.7);
+    for (const x of [left - 1.2, right + 1.0]) for (let k = 0; k < 3; k++) blob(0.4, 0x4f8a3a, x + (rn() - 0.5) * 0.6, 0.3, -hh + k * hh);
+  } else if (P === 1) {                                                  // the semis across the way, lawns and trees, street lamps
+    for (let k = -2; k <= 2; k++) { const x = k * 4.2, z0 = top - 2.4, c = [0xa8744f, 0x8f5a44, 0xdcd6ca, 0x6e4636, 0x9c6e52][k + 2];
+      add(B(3.8, 2.0, 2.4, 0.06), c, x, 1.0, z0); add(B(4.1, 0.5, 2.7, 0.08), [0x5d6166, 0x7a2a2a, 0x3a3a3a][(k + 3) % 3], x, 2.2, z0); add(B(1.2, 0.95, 0.06, 0.02), 0xeeeae2, x - 0.9, 0.48, z0 + 1.22); add(B(0.55, 0.95, 0.06, 0.02), 0x5a3a2a, x + 1.1, 0.48, z0 + 1.22);
+      for (const sx of [-1, 1]) add(B(0.6, 0.45, 0.06, 0.02), 0xbad4e4, x + sx * 0.8, 1.45, z0 + 1.22); }
+    for (const [x, z] of [[left - 1.4, top + 0.5], [right + 1.4, 0], [left - 1.6, bot - 0.6], [right + 1.5, top + 0.4]]) { add(new THREE.CylinderGeometry(0.1, 0.15, 1.2, 8), 0x6a5040, x, 0.6, z); blob(0.7, 0x3f7a32, x, 1.6, z); blob(0.5, 0x4f8a3a, x + 0.3, 2.0, z + 0.2); }
+    for (const x of [left - 0.4, right + 0.4]) { add(new THREE.CylinderGeometry(0.05, 0.07, 2.2, 8), 0x3a3a40, x, 1.1, bot + 0.4); add(B(0.3, 0.12, 0.2, 0.04), 0xffe9a0, x, 2.2, bot + 0.4); }
+    add(B(L.w + 30, 0.04, 1.3, 0.02), 0xa9a69e, 0, 0.0, bot + 0.95);
+  } else if (P === 2) {                                                  // MEOWMART: its front, a striped awning, the doors, cart corrals and lamp posts
+    const z0 = top - 1.0, W2 = L.w + 6;
+    add(B(W2, 2.4, 1.2, 0.06), 0xf4e6c8, 0, 1.2, z0 - 0.6); for (let k = 0; k < 12; k++) add(B(W2 / 12 + 0.01, 0.12, 0.7, 0.03), k % 2 ? 0xffffff : 0xe8424a, -W2 / 2 + (k + 0.5) * W2 / 12, 1.55, z0 + 0.25, 1, 1, 1, 0.35);
+    add(B(1.6, 1.2, 0.06, 0.03), 0x9ad0e8, 0, 0.6, z0 + 0.02); add(B(0.04, 1.2, 0.07, 0.01), 0x6a6a70, 0, 0.6, z0 + 0.04);
+    for (const sx of [-1, 1]) add(B(1.6, 0.8, 0.06, 0.03), 0xbad4e4, sx * 2.6, 0.8, z0 + 0.02);
+    for (const sx of [-1, 1]) { const x = sx > 0 ? right + 0.9 : left - 0.9; add(B(0.9, 0.1, 1.8, 0.03), 0x8a8a90, x, 0.45, 0); for (let k = 0; k < 3; k++) { add(B(0.5, 0.3, 0.7, 0.05), 0xc0c4ca, x, 0.3, -0.5 + k * 0.5); add(B(0.46, 0.04, 0.66, 0.02), 0xe8424a, x, 0.47, -0.5 + k * 0.5); } }
+    for (const [x, z] of [[left - 0.5, bot + 0.5], [right + 0.5, bot + 0.5], [left - 0.5, top + 0.2], [right + 0.5, top + 0.2]]) { add(new THREE.CylinderGeometry(0.05, 0.07, 2.4, 8), 0x3a3a40, x, 1.2, z); add(B(0.4, 0.1, 0.24, 0.04), 0xfff4c0, x, 2.4, z); }
+  } else if (P === 3) {                                                  // the garage: concrete walls all round, beams overhead (low enough not to hide the cars), striped kerbs
+    const W2 = L.w + RW * 2 + 1.2, H2 = L.h + RW * 2 + 1.2;
+    add(B(W2, 1.4, 0.4, 0.04), 0x8e8e8a, 0, 0.7, top - 0.5); add(B(0.4, 1.4, H2, 0.04), 0x8e8e8a, left - 0.5, 0.7, 0); add(B(0.4, 1.4, H2, 0.04), 0x8e8e8a, right + 0.5, 0.7, 0);
+    for (let k = 0; k < 10; k++) add(B(W2 / 10, 0.14, 0.42, 0.02), k % 2 ? 0x2a2a2e : 0xffd23a, -W2 / 2 + (k + 0.5) * W2 / 10, 0.07, top - 0.5);
+    for (const [x, z] of [[left - 0.3, top - 0.3], [right + 0.3, top - 0.3], [left - 0.3, bot + 0.3], [right + 0.3, bot + 0.3]]) add(B(0.7, 1.6, 0.7, 0.04), 0xa8a8a4, x, 0.8, z);
+    for (let k = 0; k < 4; k++) add(B(0.8, 0.08, 0.3, 0.02), 0xe8f4ff, left - 0.1, 1.42, top + 1 + k * (L.h + 0.5) / 3);
+    add(B(1.4, 0.5, 0.06, 0.03), 0x2a8a3a, right - 0.6, 1.1, top - 0.28);
+  } else {                                                               // the show: a big striped tent, string lights, spotlights
+    const z0 = top - 1.6, W2 = L.w + 5;
+    for (let k = 0; k < 10; k++) add(B(W2 / 10 + 0.01, 2.4, 1.6, 0.05), k % 2 ? 0xf4e8ff : 0x7a3fb8, -W2 / 2 + (k + 0.5) * W2 / 10, 1.2, z0);
+    add(new THREE.ConeGeometry(W2 * 0.55, 1.6, 10, 1), 0xe0458a, 0, 3.2, z0, 1, 1, 0.4);
+    for (const [x0, z0b, x1, z1] of [[left - 0.3, top - 0.2, right + 0.3, top - 0.2], [left - 0.4, top, left - 0.4, bot], [right + 0.4, top, right + 0.4, bot]]) {
+      const n = Math.round(Math.hypot(x1 - x0, z1 - z0b) / 0.5); for (let k = 0; k <= n; k++) { const t = k / n; add(new THREE.SphereGeometry(0.07, 8, 6), [0xffd84a, 0xff7ab8, 0x7ad8ff, 0xb8ff7a][k % 4], x0 + (x1 - x0) * t, 1.5 + Math.sin(t * Math.PI * 4) * 0.12, z0b + (z1 - z0b) * t); } }
+    for (const x of [left - 0.4, right + 0.4]) { add(new THREE.CylinderGeometry(0.05, 0.06, 1.6, 8), 0x3a3a46, x, 0.8, top); add(new THREE.CylinderGeometry(0.05, 0.06, 1.6, 8), 0x3a3a46, x, 0.8, bot); }
+    add(B(L.w + 30, 0.04, 1.5, 0.02), 0x8a2a4a, 0, 0.0, bot + 1.0);
+  }
+  return lotMerge(parts);
+}
+function lotGateArm() { const parts = []; for (let k = 0; k < 5; k++) parts.push([lotRBox(0.22, 0.12, 0.12, 0.04, 1), k % 2 ? 0xffffff : 0xe0303a, 0.11 + k * 0.22, 0, 0, 1, 1, 1, 0, 0, 0]); parts.push([lotRBox(0.18, 0.2, 0.16, 0.05, 1), 0x2a2a2e, -0.02, 0, 0, 1, 1, 1, 0, 0, 0]); return lotMerge(parts); }
+function lotPalette() { return [0xe8424a, 0xff8a3a, 0xffc93a, 0x5cc46a, 0x2fb8b0, 0x3a8cff, 0x9a6bff, 0xff7ab8, 0xf2f0ea, 0x7ad8c8, 0x4a5a8a, 0xc0c4ca]; }
+function lotLoad(li, quiet) {                                            // set out lot li: its ground, its walls and scenery, its cars (and napping cats), its gates, the neighbour; the camera fitted
+  const S = LOT, Ls = lotLevels(); li = Math.max(0, Math.min(Ls.length - 1, li | 0)); const L = Ls[li], P = lotPlaces()[L.p], sc = S.scene;
+  S.L = L; S.li = li; S.S = lotState(L); S.hist = []; S.moves = 0; S.hiss = 0; S.bonk = 0; S.hints = 0; S.undos = 0; S.onPath = 0; S.idle = 0; S.hint = null; S.hintJob = null; S.clearT = 0; S.won = false;
+  if (S.place !== L.p) { S.place = L.p; sc.background.setHex(P.sky); S.M.ground.color.setHex(P.gr); S.hemi.color.setHex(P.hemi[0]); S.hemi.groundColor.setHex(P.hemi[1]); S.hemi.intensity = P.hemi[2]; S.sun.intensity = P.sun;
+    if (S.signTex) S.signTex.dispose(); S.signTex = L.p >= 1 ? lotSignTex(L.p) : null; S.M.sign.map = S.signTex; S.M.sign.needsUpdate = true; S.signM.visible = !!S.signTex; }
+  const RW = lotRW(), hw = L.w / 2, hh = L.h / 2;
+  if (S.lotTex) S.lotTex.dispose(); S.lotTex = lotGroundTex(L); S.M.lot.map = S.lotTex; S.M.lot.needsUpdate = true; S.lotM.scale.set(L.w + RW * 2, L.h + RW * 2, 1);
+  S.decor.geometry.dispose(); S.decor.geometry = lotDecorGeo(L);
+  if (S.signTex) { const top = -hh - RW;                                 // (the store's sign and the show's banner on a low board at the top of the lot; the garage's on its wall; the street sign on a pole)
+    if (L.p === 1) { S.signM.scale.set(1.5, 0.375, 1); S.signM.position.set(-hw - 0.55, 1.55, top + 0.25); }
+    else if (L.p === 3) { S.signM.scale.set(2.6, 0.65, 1); S.signM.position.set(0, 0.95, top - 0.28); }
+    else { S.signM.scale.set(2.6, 0.65, 1); S.signM.position.set(0, 0.78, top - 0.32); } }
+  // the cars
+  for (const V of S.cars) { V.mesh.geometry.dispose(); sc.remove(V.mesh); if (V.cat) { sc.remove(V.cat); V.cat.geometry.dispose(); } }
+  S.cars = []; let sd = 31 + li * 977; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647, pal = lotPalette();
+  L.v.forEach((v, i) => {
+    const col = v.k === 'i' ? 0xffa8cf : pal[(rn() * pal.length) | 0], plate = (rn() * 36) | 0, mesh = new THREE.Mesh(lotVehGeo(v.k, col, plate, v.l), S.M.veh);
+    const [x, z] = lotCenter(L, v, v.hz ? v.x : v.y), yaw = v.hz ? (v.f > 0 ? Math.PI / 2 : -Math.PI / 2) : (v.f > 0 ? 0 : Math.PI);
+    mesh.position.set(x, 0, z); mesh.rotation.y = yaw; sc.add(mesh);
+    const V = { i, v, mesh, cat: null, x, z, yaw, yaw0: yaw, mode: 'park', vel: 0, tx: x, tz: z, sq: 0, sqv: 0, jx: 0, jz: 0, jvx: 0, jvz: 0, lur: 0, lurv: 0, pend: null, path: null, ps: 0, pop: 0, bob: rn() * 6 };
+    if (v.cat) { const hsl = new THREE.Color(col).getHSL({}), fk = hsl.l > 0.72 ? (rn() < 0.5 ? 4 : 1) : hsl.h > 0.02 && hsl.h < 0.17 ? (rn() < 0.5 ? 2 : 4) : (rn() < 0.6 ? 0 : 3);   /* (a cat that shows up against the paint: dark on a white car, white on orange or yellow, ginger on the rest) */
+      const c = new THREE.Mesh(lotCatGeo(fk), S.M.veh); c.position.set(x, lotRoofY(v.k), z); c.rotation.y = yaw + (rn() - 0.5); sc.add(c); V.cat = c; V.catY = lotRoofY(v.k); V.catUp = 0; V.catV = 0; }
+    S.cars.push(V);
+  });
+  // the gates' arms
+  for (const g of S.gates) { S.scene.remove(g.m); g.m.geometry.dispose(); } S.gates = [];
+  for (let s = 0; s < 4; s++) for (let i = 0; i < L.e[s].length; i++) { const c = L.e[s][i]; if (c === '0' || c === '1') continue;
+    const hz = s === 1 || s === 3, x = hz ? (s === 1 ? hw + 0.08 : -hw - 0.08) : i - hw + 0.5, z = hz ? i - hh + 0.5 : (s === 2 ? hh + 0.08 : -hh - 0.08);
+    const m = new THREE.Mesh(lotGateArm(), S.M.veh), px = x + (hz ? 0 : -0.55), pz = z + (hz ? -0.55 : 0); m.position.set(px, 0.42, pz); m.rotation.order = 'YZX'; m.rotation.y = hz ? -Math.PI / 2 : 0; sc.add(m);
+    S.gates.push({ m, c, up: lotGateOpen(c, 0) ? 1 : 0 }); }
+  // the neighbour
+  S.pedM.visible = L.hasPed; if (L.hasPed) { const [x, z] = lotCell(L, L.n[0][0], L.n[0][1]); S.pedM.position.set(x, 0, z); S.ped = { x, z, tx: x, tz: z, yaw: 0, t: 0, walk: 0 }; }
+  // PKR at her stand, by the road at the near side
+  S.home = { x: -hw + 0.55, z: hh + RW + 0.62 }; S.stand.position.set(S.home.x + 0.72, 0, S.home.z - 0.05); S.stand.rotation.y = -0.25;
+  if (S.rig) { S.rig.g.position.set(S.home.x, 0, S.home.z); }
+  S.camKey = ''; lotCamFit();
+  const p = lotProg(); p.last = li; if (!quiet) lotSave();
+  lotHud(); lotHintHide();
+}
+function lotCamFit() {                                                   // the camera: three-quarters down, the whole lot (and PKR) in the space between the top bar and the buttons
+  const S = LOT, L = S.L, cam = S.cam; if (!L) return;
+  renderer.getSize(S.size); const a = S.size.x > 0 && S.size.y > 0 ? S.size.x / S.size.y : 1.6, key = a.toFixed(3) + '/' + S.li + '/' + S.size.y;
+  if (key === S.camKey) return; S.camKey = key; cam.aspect = a; cam.fov = a < 0.75 ? 40 : 34; cam.updateProjectionMatrix();
+  const RW = lotRW(), hw = L.w / 2 + RW, hh = L.h / 2 + RW, pts = [], H = Math.max(1, S.size.y);
+  for (const x of [-hw, hw]) for (const z of [-hh - 0.3, hh + 0.2]) for (const y of [0, 0.7]) pts.push(new THREE.Vector3(x, y, z));
+  pts.push(new THREE.Vector3(S.home.x - 0.4, 1.1, S.home.z + 0.3), new THREE.Vector3(S.home.x - 0.4, 0, S.home.z + 0.5));
+  const pitch = a < 0.75 ? 0.98 : 0.9, dir = new THREE.Vector3(0, -Math.sin(pitch), -Math.cos(pitch)), tgt = new THREE.Vector3(0, 0, 0.35);
+  const Wd = Math.max(1, S.size.x), short = H <= 520 && a >= 0.75, topPx = a < 0.75 ? 112 : short ? 58 : 84, botPx = a < 0.75 ? 112 : short ? 8 : 92, lPx = 10, rPx = short ? 96 : 10;   /* (a short landscape phone: the buttons stand down the right side) */
+  const yTop = 1 - 2 * topPx / H, yBot = -1 + 2 * botPx / H, xL = -1 + 2 * lPx / Wd, xR = 1 - 2 * rPx / Wd, v = new THREE.Vector3();
+  const fits = d => { cam.position.copy(tgt).addScaledVector(dir, -d); cam.lookAt(tgt); cam.updateMatrixWorld(); let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+    for (const p of pts) { v.copy(p).project(cam); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); } return { ok: x0 > xL && x1 < xR && y1 < yTop && y0 > yBot, x0, x1, y0, y1 }; };
+  for (let pass = 0; pass < 4; pass++) {
+    let lo = 4, hi = 120; for (let k = 0; k < 26; k++) { const m = (lo + hi) / 2; if (fits(m).ok) hi = m; else lo = m; }
+    const r = fits(hi), cy = (r.y0 + r.y1) / 2, want = (yTop + yBot) / 2, cx = (r.x0 + r.x1) / 2 - (xL + xR) / 2;
+    const span = Math.tan(cam.fov * Math.PI / 360) * hi;                // (world per unit of screen, about, at the target)
+    tgt.x += cx * span * a * 0.9; tgt.z += (want - cy) * span / Math.sin(pitch) * 0.9;
+  }
+  let lo = 4, hi = 120; for (let k = 0; k < 26; k++) { const m = (lo + hi) / 2; if (fits(m).ok) hi = m; else lo = m; } fits(hi);
+  S.camT = tgt.clone(); S.camD = hi; S.camDir = dir.clone();
+}
+
+/* ---------- a move: the rules say what happens, then the cars act it out ---------- */
+function lotTry(i, d) {                                                  // a swipe on car i, forward (+1) or back (-1) along it; true if it counted as a move
+  const S = LOT, L = S.L; if (!L || S.phase !== 'play' || S.tipOn || S.won) return false;
+  const V = S.cars[i]; if (!V || S.S.pos[i] < 0) return false;
+  if (S.occ.length < L.w * L.h) S.occ = new Int16Array(L.w * L.h);
+  const T = lotCopy(S.S), R = S.R, moved = lotStep(L, T, i, d, S.occ, R), ax = L.v[i].hz ? [d, 0] : [0, d];
+  if (typeof initAudio === 'function') initAudio();
+  S.idle = 0;
+  if (!moved) {                                                          // it can't budge: a lurch, a honk, a glare (not a move)
+    S.bonk++; V.lurv += 3.2 * d; lotSfx('bonk'); vibrate(15);
+    lotContact(V, R, ax, true); lotHud(); return false;
+  }
+  S.idle = 0;
+  S.hist.push({ S: S.S, moves: S.moves, onPath: S.onPath });
+  if (S.onPath >= 0 && L.sol[S.onPath] && L.sol[S.onPath][0] === i && L.sol[S.onPath][1] === d) S.onPath++; else S.onPath = -1;
+  S.S = T; S.moves++; lotHintHide();
+  const v = L.v[i];
+  if (R.np === -1) { lotExitPath(V, R.side, d); lotSfx('vroom', v.l); lotSay(lotPick(['Bye bye!', 'Drive safe!', 'Off you go!', 'Next!', 'Mrrp!']), 0.18); }
+  else { const [x, z] = lotCenter(L, v, R.np); V.tx = x; V.tz = z; V.mode = 'slide'; V.vel = 0; V.dir = d; V.pend = { c: R.c, j: R.j, hiss: R.hiss, ax, side: R.side }; lotSfx('go', v.l); }
+  V.sqv -= 2.2; lotDust(V, ax, 4);
+  if (L.hasGate) { lotSfx('gate'); }
+  if (L.hasPed && S.ped) { const [x, z] = lotCell(L, L.n[S.S.pi][0], L.n[S.S.pi][1]); if (x !== S.ped.tx || z !== S.ped.tz) { S.ped.yaw = Math.atan2(x - S.ped.tx, z - S.ped.tz); S.ped.tx = x; S.ped.tz = z; } else if (R.pedMoved === false) lotEmo(S.ped.x, 1.25, S.ped.z, '😤'); }
+  if (lotDone(S.S)) { S.won = true; S.clearT = 0; }
+  lotHud(); return true;
+}
+function lotContact(V, R, ax, now) {                                     // what it ran into, acted out: the other car jolts and meow-honks (and a napping cat hisses), a wall thuds, the neighbour huffs
+  const S = LOT, L = S.L, c = R.c;
+  if (c === 'car' && R.j >= 0) { const J = S.cars[R.j]; J.jvx += ax[0] * 2.4; J.jvz += ax[1] * 2.4; J.sqv += 1.4;
+    if (R.hiss) { lotHissAt(R.j, V.i); }
+    else { lotSfx('honk', L.v[R.j].l, R.j); lotEmo(J.x, 1.0, J.z, lotPick(['💢', '😾', '😼', '🙀', '💢'])); } }
+  else if (c === 'block' || c === 'wall') { lotSfx('thud'); if (now) lotEmo(V.x + ax[0] * L.v[V.i].l * 0.5, 0.8, V.z + ax[1] * L.v[V.i].l * 0.5, '💥'); }
+  else if (c === 'gate') { lotSfx('thud'); lotEmo(V.x, 1.0, V.z, '🚧'); lotMsg('The barrier’s down!', 'Gates go up and down with every move'); }
+  else if (c === 'wait') { lotSfx('jingle'); lotEmo(V.x, 1.4, V.z, '🍦'); lotMsg('Ding-ding! Not yet!', 'The ice-cream truck leaves last'); }
+  else if (c === 'ped' && S.ped) { lotSfx('hmph'); lotEmo(S.ped.x, 1.35, S.ped.z, lotPick(['😠', '🗯️', '😤'])); lotSay(lotPick(['Sorry, sir!', 'Oops, after you!', 'Mrrp, sorry!']), 0.2); }
+}
+function lotHissAt(j, by) {                                              // bumped a car with a cat asleep on it: up she pops, fur on end, HISS (a star off)
+  const S = LOT, J = S.cars[j], K = J.cat ? J : S.cars[by];
+  S.hiss++; lotSfx('hiss'); vibrate(60);
+  if (K && K.cat) { K.catV = 4.2; lotEmo(K.x, 1.5, K.z, '🙀'); }
+  lotMsg('HISSSS!', 'Don’t bump a napping cat: a star off'); lotSay(lotPick(['Eep! Sorry!', 'Oops...', 'Sorry, kitty!']), 0.25); lotHud();
+}
+function lotUndo() {
+  const S = LOT; if (S.phase !== 'play' || S.tipOn || !S.hist.length || (S.won && S.clearT > 0.15)) return;
+  const h = S.hist.pop(); S.S = h.S; S.moves = h.moves; S.onPath = h.onPath; S.won = false; S.undos++; lotSnap(true); lotSfx('undo'); lotHintHide(); lotHud();
+}
+function lotRestart() {
+  const S = LOT; if (S.phase !== 'play' || S.tipOn) return;
+  if (S.won && S.clearT > 0.15) return;
+  S.S = lotState(S.L); S.hist = []; S.moves = 0; S.hiss = 0; S.bonk = 0; S.undos = 0; S.onPath = 0; S.won = false; lotSnap(true); lotSfx('restart'); lotHintHide(); lotHud();
+}
+function lotSnap(pop) {                                                  // every car (and the neighbour, the gates) straight to where the rules have them now
+  const S = LOT, L = S.L;
+  for (const V of S.cars) { const p = S.S.pos[V.i];
+    if (p < 0) { V.mode = 'gone'; V.mesh.visible = false; if (V.cat) V.cat.visible = false; continue; }
+    const back = V.mode === 'gone' || V.mode === 'exit', [x, z] = lotCenter(L, V.v, p); V.x = V.tx = x; V.z = V.tz = z; V.mode = 'park'; V.vel = 0; V.pend = null; V.yaw = V.yaw0; V.mesh.visible = true; if (V.cat) V.cat.visible = true;
+    V.jx = V.jz = V.jvx = V.jvz = V.lur = V.lurv = 0; if (back && pop) { V.pop = 1; } }
+  if (L.hasPed && S.ped) { const [x, z] = lotCell(L, L.n[S.S.pi][0], L.n[S.S.pi][1]); S.ped.x = S.ped.tx = x; S.ped.z = S.ped.tz = z; }
+}
+function lotExitPath(V, side, d) {                                       // out through the gap, onto the road, a turn, and away (a car backing out swings its nose round as it turns)
+  const S = LOT, L = S.L, RW = lotRW(), a = side === 1 ? [1, 0] : side === 3 ? [-1, 0] : side === 2 ? [0, 1] : [0, -1], hz = side === 1 || side === 3;
+  const lane = hz ? (side === 1 ? L.w / 2 + RW / 2 : -L.w / 2 - RW / 2) : (side === 2 ? L.h / 2 + RW / 2 : -L.h / 2 - RW / 2), r = 0.5;
+  const along = hz ? V.z : V.x, t = hz ? [0, along > 0.01 ? 1 : along < -0.01 ? -1 : (side === 1 ? 1 : -1)] : [along > 0.01 ? 1 : along < -0.01 ? -1 : (side === 2 ? -1 : 1), 0];
+  const P1 = hz ? [lane, V.z] : [V.x, lane], Q = [P1[0] - a[0] * r, P1[1] - a[1] * r], C = [Q[0] + t[0] * r, Q[1] + t[1] * r], px = [], pz = [], hx = [], hzz = [];
+  const put = (x, z, h0, h1) => { px.push(x); pz.push(z); hx.push(h0); hzz.push(h1); };
+  const d0 = Math.hypot(Q[0] - V.x, Q[1] - V.z), n0 = Math.max(1, Math.ceil(d0 / 0.08)); for (let k = 0; k < n0; k++) put(V.x + (Q[0] - V.x) * k / n0, V.z + (Q[1] - V.z) * k / n0, a[0], a[1]);
+  for (let k = 0; k <= 10; k++) { const th = k / 10 * Math.PI / 2, x = C[0] - t[0] * r * Math.cos(th) + a[0] * r * Math.sin(th), z = C[1] - t[1] * r * Math.cos(th) + a[1] * r * Math.sin(th); put(x, z, a[0] * Math.cos(th) + t[0] * Math.sin(th), a[1] * Math.cos(th) + t[1] * Math.sin(th)); }
+  const E = [P1[0] + t[0] * r, P1[1] + t[1] * r]; for (let k = 1; k <= 160; k++) put(E[0] + t[0] * k * 0.1, E[1] + t[1] * k * 0.1, t[0], t[1]);
+  const fwd = (L.v[V.i].f > 0) === (d > 0);                               // (driving out nose first, or backing out)
+  V.path = { px, pz, hx, hz: hzz, n: px.length, fwd, a, t }; V.ps = 0; V.mode = 'exit'; V.vel = 0; V.dir = d; V.exT = 0;
+}
+function lotPick(a) { return a[(Math.random() * a.length) | 0]; }
+
+/* ---------- each frame: the cars driving, stopping, jolting and squashing; the gates, the neighbour, the cats, PKR ---------- */
+function lotCarsStep(dt) {
+  const S = LOT, L = S.L, sp = (a, v, k, c) => { v += (-k * a - c * v) * dt; return [a + v * dt, v]; };
+  let n = 0; const M = S.vv.m, Q = S.vv.q, P = S.vv.a, Sc = S.vv.s;
+  for (const V of S.cars) {
+    if (V.mode === 'slide') {
+      const dx = V.tx - V.x, dz = V.tz - V.z, dist = Math.hypot(dx, dz);
+      V.vel = Math.min(9.5, V.vel + 30 * dt); const step = V.vel * dt;
+      if (step >= dist) { V.x = V.tx; V.z = V.tz; V.mode = 'park'; V.sqv += 2.6 + Math.min(3, V.vel * 0.25); const pe = V.pend; V.pend = null; if (pe) lotContact(V, pe, pe.ax, false); }
+      else { V.x += dx / dist * step; V.z += dz / dist * step; V.sq = Math.max(V.sq, -0.06 * Math.min(1, V.vel / 6)); }
+    } else if (V.mode === 'exit') {
+      const W = V.path; V.vel = Math.min(8.5, V.vel + 22 * dt); V.ps += V.vel * dt / 0.08; V.exT += dt;
+      const k = Math.min(W.n - 1, Math.floor(V.ps)), f = Math.min(1, V.ps - k), k2 = Math.min(W.n - 1, k + 1);
+      V.x = W.px[k] + (W.px[k2] - W.px[k]) * f; V.z = W.pz[k] + (W.pz[k2] - W.pz[k]) * f;
+      const hx = W.hx[k], hz = W.hz[k]; let yw = Math.atan2(hx, hz);
+      if (!W.fwd) { const back = Math.atan2(-hx, -hz), ty = Math.atan2(W.t[0], W.t[1]), arc = Math.max(0, Math.min(1, (k - (W.n - 171)) / 10)); yw = arc >= 1 ? ty : back + lotAng(ty - back) * arc; }
+      V.yaw = V.yaw + lotAng(yw - V.yaw) * Math.min(1, dt * 18);
+      const far = L.p === 3 ? lotRW() * 0.55 : lotRW() + 1.1, lim = (W.t[0] ? L.w / 2 : L.h / 2) + far,   /* (in the garage before its walls) */ al = W.t[0] ? V.x * W.t[0] : V.z * W.t[1];   /* (at the end of the road round the lot: a puff, and gone) */
+      if (al > lim && !V.vanT) { V.vanT = 0.001; chimFxBurst(S.fx, V.x, 0.3, V.z, 10, 0xd8d0c4, 1.6, 1.2, 0.2, 0.55, 0.6, 0.6, -0.5, 3); }
+      if (V.vanT) V.vanT += dt;
+      if (k >= W.n - 1 || V.exT > 4 || V.vanT > 0.22) { V.mode = 'gone'; V.vanT = 0; V.mesh.visible = false; if (V.cat) V.cat.visible = false; }
+    }
+    if (V.mode === 'gone') continue;
+    [V.sq, V.sqv] = sp(V.sq, V.sqv, 260, 11); [V.jx, V.jvx] = sp(V.jx, V.jvx, 320, 14); [V.jz, V.jvz] = sp(V.jz, V.jvz, 320, 14); [V.lur, V.lurv] = sp(V.lur, V.lurv, 240, 12);
+    V.sq = Math.max(-0.3, Math.min(0.3, V.sq));
+    const v = L.v[V.i], lx = v.hz ? V.lur : 0, lz = v.hz ? 0 : V.lur; let hop = 0;
+    if (S.hint && S.hint.i === V.i) { const b = Math.abs(Math.sin(S.t * 6)); hop = b * 0.12; }
+    if (V.pop > 0) { V.pop = Math.max(0, V.pop - dt * 3); }
+    const ps = (1 - V.pop * V.pop) * (V.vanT ? Math.max(0, 1 - V.vanT / 0.22) : 1);
+    V.mesh.position.set(V.x + V.jx + lx, hop, V.z + V.jz + lz); V.mesh.rotation.y = V.yaw;
+    V.mesh.scale.set((1 + V.sq * 0.35) * ps, (1 + V.sq * 0.8) * ps, (1 - V.sq) * ps);
+    if (V.cat) { [V.catUp, V.catV] = sp(V.catUp, V.catV - 9 * dt * (V.catUp > 0 ? 1 : 0), 40, 6); V.catUp = Math.max(0, V.catUp);
+      const br = 1 + Math.sin(S.t * 2 + V.bob) * 0.04, cs = 1.3 * ps; V.cat.position.set(V.mesh.position.x, V.catY * V.mesh.scale.y + hop + V.catUp, V.mesh.position.z); V.cat.scale.set(cs, cs * br, cs);
+      V.zT = (V.zT || V.bob * 0.5) - dt; if (V.zT <= 0 && V.mode === 'park' && S.phase === 'play') { V.zT = 3.2 + Math.random() * 2; lotEmo(V.x + 0.15, V.catY + 0.45, V.z, '💤'); } }
+    // its soft shadow
+    const len = v.l - 0.1, w = 0.95; Sc.set(v.hz ? len * 1.15 : w, 1, v.hz ? w : len * 1.15); if (V.mode === 'exit') { const c = Math.cos(V.yaw), s = Math.sin(V.yaw); Sc.set(Math.abs(s) * len * 1.15 + Math.abs(c) * w, 1, Math.abs(c) * len * 1.15 + Math.abs(s) * w); }
+    M.compose(P.set(V.mesh.position.x, 0.006, V.mesh.position.z), Q.identity(), Sc.multiplyScalar(ps)); S.shad.setMatrixAt(n++, M);
+  }
+  if (S.rig) { M.compose(P.set(S.rig.g.position.x, 0.006, S.rig.g.position.z + 0.05), Q.identity(), Sc.set(0.7, 1, 0.9)); S.shad.setMatrixAt(n++, M); }
+  if (S.ped && S.pedM.visible) { M.compose(P.set(S.pedM.position.x, 0.006, S.pedM.position.z), Q.identity(), Sc.set(0.6, 1, 0.5)); S.shad.setMatrixAt(n++, M); }
+  S.shad.count = n; S.shad.instanceMatrix.needsUpdate = true;
+}
+function lotAng(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
+function lotWorldStep(dt) {                                              // the gates swinging to where they should be, the neighbour stomping along his beat
+  const S = LOT, L = S.L;
+  for (const g of S.gates) { const want = lotGateOpen(g.c, S.S.par) ? 1 : 0; g.up += (want - g.up) * Math.min(1, dt * 9); g.m.rotation.z = g.up * 1.35; }
+  if (S.ped && S.pedM.visible) { const P = S.ped, dx = P.tx - P.x, dz = P.tz - P.z, d = Math.hypot(dx, dz);
+    if (d > 0.01) { const st = Math.min(d, dt * 2.2); P.x += dx / d * st; P.z += dz / d * st; P.walk += dt * 10; } else P.walk *= 0.9;
+    S.pedM.position.set(P.x, Math.abs(Math.sin(P.walk)) * 0.05, P.z); S.pedM.rotation.set(0, P.yaw + Math.sin(S.t * 1.3) * 0.1, Math.sin(P.walk) * 0.06); }
+}
+function lotRigSet() {                                                   // PKR: a clone of her Free roam self (coat, Closet outfit), in a red valet cap instead of her hat
+  const S = LOT, W = walk.rig; if (!W || !W.g) return;
+  if (S.rig && S.rig.g.parent) S.rig.g.parent.remove(S.rig.g);
+  W.g.rotation.set(0, 0, 0); W.g.scale.setScalar(1); W.body.scale.set(1, 1, 1); W.body.position.set(0, 0, 0); W.body.rotation.set(0, 0, 0); W.head.rotation.set(0, 0, 0);
+  const g = W.g.clone(true), a = [], b = []; W.g.traverse(o => a.push(o)); g.traverse(o => b.push(o));
+  const map = new Map(); for (let i = 0; i < a.length && i < b.length; i++) map.set(a[i], b[i]);
+  const R = { g, body: map.get(W.body), head: map.get(W.head), legs: W.legs.map(l => map.get(l)), tail: W.tail.map(t => map.get(t)).filter(Boolean) };
+  const crown = map.get(W.crown); if (crown) crown.visible = false;
+  if (W.ck && W.ck.hat && W.ck.hat.obj) { const h = map.get(W.ck.hat.obj); if (h) h.visible = false; }
+  const cap = new THREE.Mesh(S.capGeo, S.M.veh); cap.position.set(0, 0.125, -0.01); cap.rotation.x = -0.12; if (R.head) R.head.add(cap); R.cap = cap;
+  g.visible = true; g.scale.setScalar(1.1); g.position.set(S.home.x, 0, S.home.z); R.base = 2.2; g.rotation.set(0, R.base, 0); S.scene.add(g); S.rig = R; R.cheer = 0; R.look = 0; R.jump = 0; R.jv = 0;
+}
+function lotRigStep(dt) {                                                // she watches the car that's moving, bobs, swishes her tail; a cheer and a hop when the lot's clear
+  const S = LOT, R = S.rig; if (!R) return;
+  let tx = 0, tz = 0, any = false; for (const V of S.cars) if (V.mode === 'slide' || (V.mode === 'exit' && V.exT < 1.2)) { tx = V.x; tz = V.z; any = true; }
+  const base = R.base, want = any ? Math.max(-0.95, Math.min(0.95, lotAng(Math.atan2(tx - S.home.x, tz - S.home.z) - base))) : Math.sin(S.t * 0.5) * 0.3 - 0.2;
+  R.look += (lotAng(want) - R.look) * Math.min(1, dt * 5);
+  if (R.head) { R.head.rotation.y = Math.max(-0.8, Math.min(0.8, R.look * 0.8)); R.head.rotation.x = -0.15 + Math.sin(S.t * 1.7) * 0.04; }
+  R.tail.forEach((t, k) => { t.rotation.z = Math.sin(S.t * 2.2 - k * 0.5) * 0.18 * (1 + R.cheer); });
+  if (R.cheer > 0) { R.cheer = Math.max(0, R.cheer - dt * 0.4); if (R.jump <= 0 && R.jv <= 0 && R.cheer > 0.15) R.jv = 3.6; }
+  R.jv -= 14 * dt; R.jump = Math.max(0, R.jump + R.jv * dt); if (R.jump <= 0 && R.jv < 0) R.jv = 0;
+  R.g.position.set(S.home.x, R.jump, S.home.z); R.g.rotation.y = R.base + (R.cheer > 0 ? Math.sin(S.t * 9) * 0.25 * R.cheer : 0);
+  if (R.body) R.body.position.y = Math.sin(S.t * 3) * 0.008;
+  if (R.legs[0] && R.cheer > 0) { R.legs[0].rotation.x = -1.6 * Math.min(1, R.cheer * 2) + Math.sin(S.t * 14) * 0.3; }
+  else if (R.legs[0]) R.legs[0].rotation.x *= 0.9;
+}
+function lotDust(V, ax, n) { const S = LOT, L = S.L, v = L.v[V.i], b = v.l * 0.5; chimFxBurst(S.fx, V.x - ax[0] * b, 0.12, V.z - ax[1] * b, n, 0xb8b0a4, 1.0, 0.8, 0.1, 0.32, 0.55, 0.55, -0.3, 3); }
+function lotConfetti() { const S = LOT; for (let k = 0; k < 6; k++) chimFxBurst(S.fx, (Math.random() - 0.5) * S.L.w, 0.6, (Math.random() - 0.5) * S.L.h, 26, [0xff5a7a, 0xffd23a, 0x5ad8ff, 0x8aff7a, 0xc89aff, 0xffffff][k], 4.5, 6, 0.26, 0.18, 1.7, 1, 5, 1.2); }
+
+/* ---------- little words and faces over the lot (screen-positioned emoji) ---------- */
+function lotProject(x, y, z) { const S = LOT, v = S.vv.b.set(x, y, z).project(S.cam); return [(v.x + 1) / 2 * window.innerWidth, (1 - v.y) / 2 * window.innerHeight, v.z < 1]; }
+function lotEmo(x, y, z, txt) {
+  const S = LOT, u = S.ui; if (!u) return; let el = S.emo.find(e => !e.on); if (!el) { if (S.emo.length > 10) el = S.emo[0]; else { const d = document.createElement('div'); d.className = 'ml-emo'; u.root.appendChild(d); el = { d, on: false }; S.emo.push(el); } }
+  el.on = true; el.t = 0; el.x = x; el.y = y; el.z = z; el.d.textContent = txt; el.d.style.display = 'block';
+}
+function lotEmoStep(dt) { const S = LOT; for (const e of S.emo) { if (!e.on) continue; e.t += dt; if (e.t > 1.1) { e.on = false; e.d.style.display = 'none'; continue; }
+  const [sx, sy] = lotProject(e.x, e.y + e.t * 0.5, e.z), k = e.t < 0.15 ? e.t / 0.15 : 1; e.d.style.transform = `translate(${sx - 20}px,${sy - 24}px) scale(${0.5 + 0.6 * k - (e.t > 0.8 ? (e.t - 0.8) * 2 : 0)})`; e.d.style.opacity = e.t > 0.8 ? Math.max(0, 1 - (e.t - 0.8) / 0.3) : 1; } }
+function lotSay(text, p) { const S = LOT, u = S.ui; if (!u || (p && Math.random() > p * 2.5)) return; u.Say.textContent = text; u.Say.classList.remove('on'); void u.Say.offsetWidth; u.Say.classList.add('on'); S.sayT = 2.2; }
+function lotMsg(t, sub) { const u = LOT.ui; if (!u) return; u.Msg.textContent = t; if (sub) { const s = document.createElement('small'); s.textContent = sub; u.Msg.appendChild(s); } u.Msg.classList.remove('pop'); void u.Msg.offsetWidth; u.Msg.classList.add('pop'); }
+
+/* ---------- the hint: the solver's next move (from the best line if she's on it, else a fresh search), for a few fish ---------- */
+function lotHintCost() { return 5; }
+function lotHint() {
+  const S = LOT, L = S.L; if (S.phase !== 'play' || S.tipOn || S.won || S.hint || S.hintJob) return;
+  const c = lotHintCost(); if (lotWallet() < c) { lotMsg('Not enough fish', 'A hint costs 🐟 ' + c); lotSfx('nope'); return; }
+  S.hintT0 = performance.now();
+  if (S.onPath >= 0 && S.onPath < L.sol.length) { lotHintGive(L.sol[S.onPath]); return; }   /* (still on a best line: its next move, at once) */
+  S.hintJob = lotSolveJob(L, S.S, 260000); S.hintFor = lotKey(S.S); if (S.ui) S.ui.HintCost.textContent = '🤔 ...';
+  lotHintWork(6);
+}
+function lotHintWork(ms) {                                               // (each frame, while she thinks) a slice of the search; then the hint
+  const S = LOT, J = S.hintJob; if (!J) return;
+  if (S.hintFor !== lotKey(S.S)) { S.hintJob = null; lotHud(); return; }   /* (a move was made meanwhile: never mind) */
+  if (!lotSolveRun(J, ms)) return;
+  S.hintJob = null; let mv = J.res && J.res.length ? J.res[0] : null;
+  if (!mv && J.over) { const a = lotSolveAny(S.L, S.S, 40000); if (a && a.length) mv = a[0]; }
+  if (!mv) { lotHud(); lotMsg('Hmm, a real jam!', 'Try undo ↶ or start again ↺'); lotSfx('nope'); return; }
+  lotHintGive(mv);
+}
+function lotHintGive(mv) {
+  const S = LOT, c = lotHintCost(); S.hintMs = performance.now() - S.hintT0;
+  lotSetWallet(lotWallet() - c); S.hints++; const p = lotProg(); p.hints = (p.hints | 0) + 1; lotSave();
+  S.hint = { i: mv[0], d: mv[1] }; lotSfx('hint'); lotHud(); lotSay(lotPick(['Try that one!', 'Psst... this one!', 'Mrrp! That way!']), 1);
+}
+function lotHintHide() { const S = LOT; S.hint = null; if (S.ui) S.ui.Arrow.classList.remove('on'); }
+function lotHintStep() {                                                 // the arrow over the hinted car, pointing the way to swipe it
+  const S = LOT, H = S.hint, u = S.ui; if (!H || !u) return; const V = S.cars[H.i]; if (!V || V.mode === 'gone') { lotHintHide(); return; }
+  const v = S.L.v[H.i], ax = v.hz ? [H.d, 0] : [0, H.d], [x0, y0] = lotProject(V.x, 0.9, V.z), [x1, y1] = lotProject(V.x + ax[0], 0.9, V.z + ax[1]);
+  const ang = Math.atan2(y1 - y0, x1 - x0), o = 10 + Math.abs(Math.sin(S.t * 5)) * 14;
+  u.Arrow.style.transform = `translate(${x0 - 28 + Math.cos(ang) * o}px,${y0 - 28 + Math.sin(ang) * o}px) rotate(${ang}rad)`; u.Arrow.classList.add('on');
+}
+
+/* ---------- winning: stars, fish, the card ---------- */
+function lotStarsFor(moves, min, hiss) { const slack = Math.max(2, Math.ceil(min * 0.25)), b = moves <= min ? 3 : moves <= min + slack ? 2 : 1; return Math.max(1, b - hiss); }
+function lotWin() {
+  const S = LOT, L = S.L, p = lotProg(), li = S.li, st = lotStarsFor(S.moves, L.min, S.hiss), first = !p.st[li], prevSt = p.st[li], prevBm = p.bm[li];
+  let fish = 0; if (first) fish += 5 + 3 * L.p; const paid = p.paid[li] | 0; if (st > paid) { fish += (st - paid) * 3; p.paid[li] = st; }
+  p.st[li] = Math.max(p.st[li], st); p.bm[li] = p.bm[li] ? Math.min(p.bm[li], S.moves) : S.moves; if (li + 1 < p.st.length) p.last = li + 1; lotSave();
+  if (fish) lotSetWallet(lotWallet() + fish);
+  try { unlock('lotFirst');
+    if (p.st.every(x => x > 0)) unlock('lotAll'); if (p.st.every(x => x >= 3)) unlock('lotStars');
+    if (L.p === 3 && S.moves <= L.min && !S.hiss && !S.bonk && !S.undos && !S.hints) unlock('lotGarage'); } catch (e) {}
+  const u = S.ui; S.phase = 'won'; S.wonT = 0;
+  u.WinTitle.textContent = st === 3 ? lotPick(['Purr-fect parking!', 'Spotless!', 'Valet of the year!', 'Not a scratch!']) : st === 2 ? lotPick(['Lot cleared!', 'All clear!', 'Nicely done!']) : lotPick(['Phew, all clear!', 'Cleared!', 'Out they go!']);
+  u.WinSub.textContent = 'Lot ' + (li + 1) + ' · ' + lotPlaces()[L.p].name;
+  u.WinStars.innerHTML = ''; for (let k = 0; k < 3; k++) { const s = document.createElement('i'); s.textContent = '★'; if (k < st) { s.className = 'on'; s.style.animationDelay = (0.25 + k * 0.22) + 's'; } u.WinStars.appendChild(s); }
+  u.WinMoves.textContent = S.moves; u.WinMin.textContent = L.min; u.WinBest.textContent = p.bm[li];
+  u.WinNote.textContent = S.hiss ? '🙀 ' + S.hiss + ' hiss' + (S.hiss > 1 ? 'es' : '') + ': a star off for each' : S.moves <= L.min ? '🏆 The fewest moves possible!' : 'Three stars in ' + L.min + ' moves';
+  u.WinFish.textContent = fish ? '🐟 +' + fish + ' fish into the piggy bank!' : (prevSt >= st ? 'Your best: ' + '★'.repeat(prevSt) + (prevBm ? ' in ' + prevBm + ' moves' : '') : '');
+  u.Next.hidden = li + 1 >= lotLevels().length; u.Win.classList.add('on'); u.root.classList.add('won');
+  for (let k = 0; k < st; k++) setTimeout(() => lotSfx('star', k), 300 + k * 220);
+  lotHud();
+}
+
+/* ---------- the tips: each new thing explained once, the first lot it turns up in ---------- */
+function lotTips() {
+  return lotTips.T || (lotTips.T = [
+    ['start', L => true, '🚗', 'Swipe to drive!', 'Swipe a car forwards or backwards along its length: it drives till it bumps into something, or out through a gap and away. Clear every car out of the lot!'],
+    ['oneway', L => L.min > L.v.length, '↪️', 'Scoot over first', 'Cars can only leave through the gaps in the edge (follow the white arrows). Sometimes a car has to scoot over to make room for another, then leave later. Fewest moves = 3 stars!'],
+    ['block', L => L.hasBlock, '🪴', 'Planters stay put', 'Flower pots, hydrants, planters and pillars never move. Cars stop when they reach one.'],
+    ['cat', L => L.hasCat, '😺', 'Shh... a napping cat!', 'A cat is asleep on that car’s roof. Don’t let it bump into another car (either way round): she’ll wake up hissing, and that costs a star.'],
+    ['ice', L => L.hasIce, '🍦', 'The ice-cream truck', 'Ding-ding! The ice-cream truck won’t leave until every other car has gone. It can still scoot about, though.'],
+    ['gate', L => L.hasGate, '🚧', 'Barrier gates', 'The yellow-and-black gaps have barrier gates. They go up and down with every move you make, so count your moves!'],
+    ['ped', L => L.hasPed, '👴', 'The grumpy neighbour', 'He takes a step every time you move a car, back and forth along his path, and he won’t get out of your way. Time your moves around him!'],
+  ]);
+}
+function lotTipNext(L) { const p = lotProg(); for (const t of lotTips()) if (!p.tips[t[0]] && t[1](L)) return t; return null; }
+function lotTipShow(t) { const S = LOT, u = S.ui; S.tipOn = t[0]; u.TipIc.textContent = t[2]; u.TipT.textContent = t[3]; u.TipP.textContent = t[4]; u.Tip.classList.add('on'); }
+function lotTipOk() { const S = LOT, u = S.ui; if (!S.tipOn) return; const p = lotProg(); p.tips[S.tipOn] = 1; lotSave(); S.tipOn = null; u.Tip.classList.remove('on'); lotSfx('tap'); const t = lotTipNext(S.L); if (t) setTimeout(() => { if (S.active && S.phase === 'play') lotTipShow(t); }, 250); }
+
+/* ---------- the screen: the top bar (map, which lot, moves and stars), the buttons (undo, restart, hint), the cards ---------- */
+function lotBuildUI() {
+  const st = document.createElement('style'); st.id = 'lotStyle';
+  st.textContent = `
+#lotUI{position:fixed;inset:0;z-index:30;display:none;pointer-events:none;overflow:hidden;color:#3a1f2b;font-family:var(--display);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+#lotUI.on{display:block}
+#lotArea{position:absolute;inset:0;pointer-events:auto;touch-action:none;cursor:grab}
+#lotUI button{pointer-events:auto;font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulation}
+#lotUI .ml-top{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) + 10px);left:calc(env(safe-area-inset-left,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px}
+#lotUI .ml-rb{width:46px;height:46px;border-radius:14px;background:#fff8ee;box-shadow:0 4px 0 #c8303a,0 6px 14px rgba(0,0,0,.25);padding:0}
+#lotUI .ml-rb svg{display:block;width:22px;height:22px;margin:auto;fill:#c8303a}
+#lotUI .ml-title{justify-self:center;text-align:center;background:rgba(255,248,238,.92);border-radius:14px;padding:5px 14px 6px;box-shadow:0 4px 14px rgba(0,0,0,.2);line-height:1.05;min-width:0;max-width:100%}
+#lotUI .ml-title b{display:block;font-weight:400;font-size:22px;color:#c8303a;white-space:nowrap}
+#lotUI .ml-title small{display:block;font:800 12px var(--body);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#lotUI .ml-mv{justify-self:end;background:rgba(255,248,238,.92);border-radius:14px;padding:4px 10px 5px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.2);line-height:1}
+#lotUI .ml-mv b{font-weight:400;font-size:24px;font-variant-numeric:tabular-nums}
+#lotUI .ml-mv span{font:800 11px var(--body);opacity:.65;margin-left:3px}
+#lotUI .ml-st{display:flex;justify-content:center;gap:1px;font-size:15px;margin-top:2px}
+#lotUI .ml-st i{font-style:normal;color:#ffc531;text-shadow:0 1px 0 #b8801a;transition:color .3s,opacity .3s}
+#lotUI .ml-st i.off{color:#d8cfc6;text-shadow:none;opacity:.8}
+#lotUI .ml-par{display:block;font:800 10px var(--body);opacity:.6;margin-top:2px;white-space:nowrap}
+#lotUI .ml-bot{position:absolute;z-index:2;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:10px}
+#lotUI .ml-bb{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:76px;height:62px;border-radius:18px;background:#fff8ee;font-size:24px;line-height:1;box-shadow:0 5px 0 #b9a99a,0 8px 16px rgba(0,0,0,.25);padding:4px 8px}
+#lotUI .ml-bb span{font:800 12px var(--body);margin-top:4px;white-space:nowrap}
+#lotUI .ml-bb.hint{background:#ffe27a;box-shadow:0 5px 0 #c89a1a,0 8px 16px rgba(0,0,0,.25)}
+#lotUI .ml-bb:disabled{opacity:.45;cursor:default}
+#lotUI .ml-bb:active:not(:disabled),#lotUI .ml-rb:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.3)}
+#lotUI .ml-emo{position:absolute;left:0;top:0;display:none;font-size:32px;line-height:1;pointer-events:none;will-change:transform;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))}
+#lotUI .ml-say{position:absolute;left:0;top:0;display:none;background:#fff;border-radius:14px;padding:6px 11px;font:800 14px var(--body);box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;pointer-events:none}
+#lotUI .ml-say:after{content:'';position:absolute;left:18px;bottom:-7px;border:8px solid transparent;border-bottom:0;border-top-color:#fff}
+#lotUI .ml-say.on{display:block;animation:mlIn .3s cubic-bezier(.2,1.6,.4,1)}
+#lotUI .ml-arrow{position:absolute;left:0;top:0;width:56px;height:56px;display:none;pointer-events:none;filter:drop-shadow(0 3px 3px rgba(0,0,0,.35))}
+#lotUI .ml-arrow.on{display:block}
+#lotUI .ml-arrow svg{width:56px;height:56px}
+#lotUI .ml-msg{position:absolute;left:0;right:0;top:24%;padding:0 16px;text-align:center;font-size:clamp(28px,7.5vw,44px);color:#fff;line-height:1.05;text-shadow:0 3px 0 #c8303a,0 0 14px rgba(60,10,20,.6);opacity:0;pointer-events:none}
+#lotUI .ml-msg small{display:block;font:800 clamp(14px,3.6vw,17px) var(--body);margin-top:6px;text-shadow:0 1px 3px #000}
+#lotUI .ml-msg.pop{animation:mlPop 2s ease-out forwards}
+#lotUI .ml-over{position:absolute;z-index:3;inset:0;display:none;align-items:center;justify-content:center;background:rgba(40,16,26,.42);pointer-events:auto;padding:env(safe-area-inset-top,0px) 14px env(safe-area-inset-bottom,0px)}
+#lotUI .ml-over.on{display:flex}
+#lotUI .ml-card{position:relative;background:#fff8ee;border-radius:18px;padding:18px 18px 14px;width:min(350px,100%);max-height:calc(100% - 16px);overflow-y:auto;overscroll-behavior:contain;text-align:center;box-shadow:0 8px 0 #c8303a,0 20px 44px rgba(0,0,0,.45);animation:mlIn .35s cubic-bezier(.2,1.4,.4,1)}
+#lotUI .ml-card h2{margin:0;font-size:28px;font-weight:400;color:#c8303a;line-height:1.1}
+#lotUI .ml-card p{font:600 15px/1.4 var(--body);margin:8px 0 2px}
+#lotUI .ml-sub{font:700 14px var(--body);opacity:.7;margin-top:3px}
+#lotUI .ml-tipic{font-size:44px;line-height:1;margin-bottom:4px}
+#lotUI .ml-stars{display:flex;justify-content:center;gap:6px;margin:8px 0 2px}
+#lotUI .ml-stars i{font-style:normal;font-size:50px;line-height:1;color:#e4d9cd}
+#lotUI .ml-stars i.on{color:#ffc531;text-shadow:0 3px 0 #b8801a;animation:mlStar .5s cubic-bezier(.2,1.8,.4,1) both}
+#lotUI .ml-stats{display:flex;justify-content:space-around;margin:6px 0 2px}
+#lotUI .ml-stats b{display:block;font-size:24px;font-weight:400}
+#lotUI .ml-stats span{font:700 12px var(--body);opacity:.6}
+#lotUI .ml-note{font:800 13px var(--body);color:#8a4a20;margin-top:6px}
+#lotUI .ml-fish{font:800 14px var(--body);color:#2a64d8;margin-top:6px;min-height:1px}
+#lotUI .ml-btn{display:block;width:100%;margin-top:10px;padding:12px;border-radius:16px;background:#e23b45;color:#fff!important;font-size:19px;box-shadow:0 4px 0 #8a1020}
+#lotUI .ml-btn.alt{background:#3a1f2b;box-shadow:0 4px 0 #000;font-size:16px;padding:10px}
+#lotUI .ml-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+#lotUI .ml-btn[hidden]{display:none}
+#lotUI .ml-mapcard{width:min(420px,100%)}
+#lotUI .ml-tabs{display:flex;justify-content:center;gap:6px;margin:10px 0 4px}
+#lotUI .ml-tab{width:52px;height:46px;border-radius:12px;background:#efe3d4;font-size:24px!important;padding:0;position:relative}
+#lotUI .ml-tab.on{background:#e23b45;box-shadow:0 3px 0 #8a1020}
+#lotUI .ml-tab:disabled{opacity:.4;cursor:default}
+#lotUI .ml-tab small{position:absolute;right:-3px;top:-5px;background:#3a1f2b;color:#ffc531;border-radius:8px;padding:1px 4px;font:800 9px var(--body)}
+#lotUI .ml-pname{font-size:20px;color:#3a1f2b;margin-top:4px}
+#lotUI .ml-pname small{display:block;font:700 12px var(--body);opacity:.6}
+#lotUI .ml-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0 2px}
+#lotUI .ml-lv{position:relative;aspect-ratio:1;border-radius:14px;background:#fff;box-shadow:0 3px 0 #d8c8b8;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px!important;line-height:1;padding:0}
+#lotUI .ml-lv i{font-style:normal;font-size:11px;letter-spacing:-1px;color:#ffc531;margin-top:3px;min-height:11px}
+#lotUI .ml-lv i b{color:#e0d4c6;font-weight:400}
+#lotUI .ml-lv.cur{background:#ffe27a;box-shadow:0 3px 0 #c89a1a}
+#lotUI .ml-lv:disabled{background:#efe7de;color:#b8a898;box-shadow:none;cursor:default}
+#lotUI .ml-fade{position:absolute;inset:0;z-index:6;background:#1e1016;opacity:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
+#lotUI .ml-fade b{font-weight:400;font-size:26px;color:#ffe2b8}
+#lotUI.ghost,#lotUI.ghost *{pointer-events:none!important}
+#lotUI.mapping .ml-say,#lotUI.won .ml-say,#lotUI.mapping .ml-arrow,#lotUI.mapping .ml-emo{visibility:hidden}
+#lotUI.ghost .ml-top,#lotUI.ghost .ml-bot,#lotUI.ghost .ml-msg,#lotUI.mapping .ml-top,#lotUI.mapping .ml-bot,#lotUI.won .ml-bot{visibility:hidden}
+@keyframes mlPop{0%{opacity:0;transform:scale(.5)}10%{opacity:1;transform:scale(1.1)}18%{transform:scale(1)}75%{opacity:1}100%{opacity:0;transform:translateY(-16px)}}
+@keyframes mlIn{from{transform:scale(.7);opacity:0}}
+@keyframes mlStar{0%{transform:scale(0) rotate(-60deg)}100%{transform:scale(1)}}
+@media (max-width:420px){#lotUI .ml-bb{min-width:68px;height:58px;font-size:22px}#lotUI .ml-title b{font-size:19px}#lotUI .ml-grid{gap:6px}#lotUI .ml-tab{width:48px}}
+@media (max-height:520px){#lotUI .ml-bot{left:auto;right:calc(env(safe-area-inset-right,0px) + 10px);transform:none;flex-direction:column;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);gap:6px}#lotUI .ml-bb{height:50px;min-width:64px;font-size:20px}
+  #lotUI .ml-card{padding:10px 14px}#lotUI .ml-stars i{font-size:36px}#lotUI .ml-btn{padding:8px;margin-top:6px;font-size:16px}#lotUI .ml-grid{grid-template-columns:repeat(10,1fr)}#lotUI .ml-mapcard{width:min(620px,100%)}}
+body.lotting .banner,body.lotting #walkCaption,body.lotting #auntySubs,body.lotting #hopPill,body.lotting #chimSootPill,body.lotting #chimPill,body.lotting #jetPill,body.lotting #sledPill{display:none!important}
+body.lotting .ach-toast{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);z-index:40}`;
+  document.head.appendChild(st);
+  const ui = document.createElement('div'); ui.id = 'lotUI';
+  ui.innerHTML = `<div id="lotArea"></div>
+<div class="ml-top"><button class="ml-rb" id="lotMapBtn" aria-label="All lots"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg></button>
+<div class="ml-title"><b id="lotTitle">Lot 1</b><small id="lotPlace"></small></div>
+<div class="ml-mv"><b id="lotMoves">0</b><span>moves</span><div class="ml-st" id="lotStarRow"><i>★</i><i>★</i><i>★</i></div><span class="ml-par" id="lotPar"></span></div></div>
+<div class="ml-bot"><button class="ml-bb" id="lotUndo">&#x21B6;<span>Undo</span></button><button class="ml-bb" id="lotRestart">&#x21BA;<span>Restart</span></button><button class="ml-bb hint" id="lotHintBtn">&#x1F4A1;<span id="lotHintCost">Hint &#x1F41F;5</span></button></div>
+<div class="ml-say" id="lotSay"></div>
+<div class="ml-arrow" id="lotArrow"><svg viewBox="0 0 56 56"><path d="M6 22h26V10l20 18-20 18V34H6z" fill="#ffe27a" stroke="#c8303a" stroke-width="3.5" stroke-linejoin="round"/></svg></div>
+<div class="ml-msg" id="lotMsg"></div>
+<div class="ml-over" id="lotTip"><div class="ml-card"><div class="ml-tipic" id="lotTipIc"></div><h2 id="lotTipT"></h2><p id="lotTipP"></p><button class="ml-btn" id="lotTipOk">Got it!</button></div></div>
+<div class="ml-over" id="lotWin"><div class="ml-card"><h2 id="lotWinTitle"></h2><div class="ml-sub" id="lotWinSub"></div><div class="ml-stars" id="lotWinStars"></div>
+<div class="ml-stats"><div><b id="lotWinMoves">0</b><span>moves</span></div><div><b id="lotWinMin">0</b><span>fewest</span></div><div><b id="lotWinBest">0</b><span>your best</span></div></div>
+<div class="ml-note" id="lotWinNote"></div><div class="ml-fish" id="lotWinFish"></div>
+<button class="ml-btn" id="lotNext">Next lot &#x25B6;&#xFE0E;</button><button class="ml-btn alt" id="lotAgain">Play again</button><button class="ml-btn alt" id="lotWinMap">All lots</button></div></div>
+<div class="ml-over" id="lotMap"><div class="ml-card ml-mapcard"><h2>&#x1F17F;&#xFE0F; Meow Lot</h2><div class="ml-sub" id="lotMapSub"></div><div class="ml-tabs" id="lotTabs"></div><div class="ml-pname" id="lotPName"></div><div class="ml-grid" id="lotGrid"></div>
+<button class="ml-btn" id="lotResume" hidden></button><button class="ml-btn alt" id="lotHome">Back to the yard</button></div></div>
+<div class="ml-fade" id="lotFade"><b id="lotLoad"></b></div>`;
+  document.body.appendChild(ui);
+  const q = id => ui.querySelector('#' + id), u = LOT.ui = { root: ui }, S = LOT;
+  for (const k of ['Area', 'MapBtn', 'Title', 'Place', 'Moves', 'StarRow', 'Par', 'Undo', 'Restart', 'HintBtn', 'HintCost', 'Say', 'Arrow', 'Msg', 'Tip', 'TipIc', 'TipT', 'TipP', 'TipOk', 'Win', 'WinTitle', 'WinSub', 'WinStars', 'WinMoves', 'WinMin', 'WinBest', 'WinNote', 'WinFish', 'Next', 'Again', 'WinMap', 'Map', 'MapSub', 'Tabs', 'PName', 'Grid', 'Resume', 'Home', 'Fade', 'Load']) u[k] = q('lot' + k);
+  const area = u.Area;
+  area.addEventListener('pointerdown', e => { if (!S.active) return; e.preventDefault(); e.stopPropagation(); if (S.phase !== 'play' || S.tipOn || S.ptr) return;
+    if (typeof initAudio === 'function') initAudio();
+    S.ptr = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), car: lotPickCar(e.clientX, e.clientY), used: false }; try { area.setPointerCapture(e.pointerId); } catch (x) {} });
+  area.addEventListener('pointermove', e => { const G = S.ptr; if (!S.active || !G || G.id !== e.pointerId || G.used) return;
+    const dx = e.clientX - G.x, dy = e.clientY - G.y, d = Math.hypot(dx, dy); if (d < 14) return; G.used = true; if (G.car < 0) return;
+    const a = lotAxisScreen(G.car), s = (dx * a[0] + dy * a[1]) / d;
+    if (Math.abs(s) < 0.34) { const V = S.cars[G.car]; V.sqv += 1.2; lotSfx('bonk'); S.perp = (S.perp | 0) + 1; if (S.perp === 1 || S.perp % 6 === 0) lotMsg('Along the car!', 'Cars only drive forwards or backwards'); return; }
+    lotTry(G.car, s > 0 ? 1 : -1); });
+  const up = e => { const G = S.ptr; if (!G || G.id !== e.pointerId) return; S.ptr = null;
+    if (!G.used && G.car >= 0 && e.type === 'pointerup' && Math.hypot(e.clientX - G.x, e.clientY - G.y) < 14) { const V = S.cars[G.car]; if (V && V.mode === 'park') { V.sqv += 1.6; lotSfx('tap'); } S.taps = (S.taps | 0) + 1; if (S.taps === 3 || S.taps % 12 === 0) lotMsg('Swipe it!', 'Drag a car forwards or backwards'); } };
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) area.addEventListener(t, up);
+  area.addEventListener('contextmenu', e => e.preventDefault());
+  const tap = (el, fn) => el.addEventListener('click', e => { e.stopPropagation(); if (S.active) { if (typeof initAudio === 'function') initAudio(); fn(); } });
+  tap(u.MapBtn, () => lotMapOpen()); tap(u.Undo, lotUndo); tap(u.Restart, lotRestart); tap(u.HintBtn, lotHint); tap(u.TipOk, lotTipOk);
+  tap(u.Next, () => { if (S.wonT > 0.5) lotPlay(S.li + 1); }); tap(u.Again, () => { if (S.wonT > 0.5) lotPlay(S.li); }); tap(u.WinMap, () => { if (S.wonT > 0.5) lotMapOpen(); });
+  tap(u.Resume, () => lotMapClose()); tap(u.Home, () => lotLeave());
+  ui.addEventListener('pointerdown', e => { if (S.active) e.stopPropagation(); });
+  lotKeysOn();
+}
+function lotAxisScreen(i) { const S = LOT, V = S.cars[i], v = S.L.v[i], [x0, y0] = lotProject(V.x, 0.3, V.z), [x1, y1] = lotProject(V.x + (v.hz ? 1 : 0), 0.3, V.z + (v.hz ? 0 : 1)), l = Math.hypot(x1 - x0, y1 - y0) || 1; return [(x1 - x0) / l, (y1 - y0) / l]; }
+function lotPickCar(cx, cy) {                                            // the car under her finger (its box), or failing that the nearest one to where she touched the ground
+  const S = LOT, L = S.L, r = S.vv.r, B = new THREE.Box3(), hit = new THREE.Vector3(); if (!L) return -1;
+  r.setFromCamera({ x: cx / window.innerWidth * 2 - 1, y: -(cy / window.innerHeight) * 2 + 1 }, S.cam);
+  let best = -1, bd = 1e9;
+  for (const V of S.cars) { if (S.S.pos[V.i] < 0 || V.mode === 'exit' || V.mode === 'gone') continue; const v = L.v[V.i], hx = v.hz ? v.l / 2 - 0.04 : 0.42, hz = v.hz ? 0.42 : v.l / 2 - 0.04, top = lotRoofY(v.k) + (v.cat ? 0.25 : 0);
+    B.min.set(V.tx - hx, 0, V.tz - hz); B.max.set(V.tx + hx, top, V.tz + hz); if (r.ray.intersectBox(B, hit)) { const d = hit.distanceTo(r.ray.origin); if (d < bd) { bd = d; best = V.i; } } }
+  if (best >= 0) return best;
+  const t = (0.3 - r.ray.origin.y) / r.ray.direction.y; if (!(t > 0)) return -1; const px = r.ray.origin.x + r.ray.direction.x * t, pz = r.ray.origin.z + r.ray.direction.z * t;
+  bd = 0.75; for (const V of S.cars) { if (S.S.pos[V.i] < 0 || V.mode === 'exit' || V.mode === 'gone') continue; const v = L.v[V.i], hx = v.hz ? v.l / 2 : 0.5, hz = v.hz ? 0.5 : v.l / 2, dx = Math.max(0, Math.abs(px - V.tx) - hx), dz = Math.max(0, Math.abs(pz - V.tz) - hz), d = Math.hypot(dx, dz); if (d < bd) { bd = d; best = V.i; } }
+  return best;
+}
+function lotHud() {
+  const S = LOT, u = S.ui, L = S.L; if (!u || !L) return;
+  u.Title.textContent = 'Lot ' + (S.li + 1); u.Place.textContent = lotPlaces()[L.p].ic + ' ' + lotPlaces()[L.p].name; u.Moves.textContent = S.moves;
+  let left = 0; for (let i = 0; i < S.S.pos.length; i++) if (S.S.pos[i] >= 0) left++;
+  const best = lotStarsFor(S.moves + left, L.min, S.hiss), stars = u.StarRow.children; for (let k = 0; k < 3; k++) stars[k].classList.toggle('off', k >= best);
+  u.Par.textContent = '★★★ in ' + L.min; u.Undo.disabled = !S.hist.length; u.HintCost.textContent = 'Hint 🐟' + lotHintCost();
+}
+function lotPlay(li) {                                                   // into a lot (from the map, the next button, or the way in)
+  const S = LOT, u = S.ui; if (!lotUnlocked(li)) return;
+  lotLoad(li); S.phase = 'play'; S.confetti = false; u.Win.classList.remove('on'); u.Map.classList.remove('on'); u.root.classList.remove('won', 'mapping');
+  if (S.rig) S.rig.cheer = 0;
+  const t = lotTipNext(S.L); if (t) lotTipShow(t); else { u.Tip.classList.remove('on'); S.tipOn = null; }
+  lotSay(lotPick(['Let’s park!', 'Valet’s ready!', 'Keys, please!', 'Mrrp! Let’s go!', 'What a jam!']), 1); lotSfx('tap');
+}
+function lotMapOpen(place) {
+  const S = LOT, u = S.ui; lotHintHide(); S.ptr = null;
+  const inPlay = S.phase === 'play' && S.L && S.moves > 0 && !S.won; S.mapFrom = inPlay ? S.li : -1; u.Resume.hidden = !inPlay; if (inPlay) u.Resume.textContent = '▶︎ Back to Lot ' + (S.li + 1);
+  if (S.phase !== 'map') S.phaseB = S.phase; S.phase = 'map'; u.Win.classList.remove('on'); u.root.classList.add('mapping'); u.root.classList.remove('won');
+  lotMapRender(place === undefined ? (S.L ? S.L.p : 0) : place); u.Map.classList.add('on');
+}
+function lotMapClose() { const S = LOT, u = S.ui; if (S.mapFrom < 0) return; u.Map.classList.remove('on'); u.root.classList.remove('mapping'); S.phase = 'play'; }
+function lotMapRender(pl) {
+  const S = LOT, u = S.ui, Ls = lotLevels(), p = lotProg(), Pl = lotPlaces(); S.mapPlace = pl;
+  const tot = p.st.reduce((a, b) => a + b, 0), done = p.st.filter(x => x > 0).length; u.MapSub.textContent = '★ ' + tot + ' / ' + Ls.length * 3 + ' · ' + done + ' of ' + Ls.length + ' lots cleared · 🐟 ' + lotWallet();
+  u.Tabs.innerHTML = '';
+  Pl.forEach((P, k) => { const ids = Ls.map((L, i) => L.p === k ? i : -1).filter(i => i >= 0), open = ids.length && lotUnlocked(ids[0]), b = document.createElement('button'); b.className = 'ml-tab' + (k === pl ? ' on' : ''); b.textContent = P.ic; b.disabled = !open; b.title = P.name;
+    const sm = document.createElement('small'); sm.textContent = ids.reduce((a, i) => a + p.st[i], 0) + '★'; b.appendChild(sm);
+    b.addEventListener('click', e => { e.stopPropagation(); lotSfx('tap'); lotMapRender(k); }); u.Tabs.appendChild(b); });
+  u.PName.innerHTML = ''; u.PName.textContent = Pl[pl].ic + ' ' + Pl[pl].name; const sm = document.createElement('small'); sm.textContent = Pl[pl].sub; u.PName.appendChild(sm);
+  u.Grid.innerHTML = '';
+  Ls.forEach((L, i) => { if (L.p !== pl) return; const b = document.createElement('button'), open = lotUnlocked(i); b.className = 'ml-lv' + (i === p.last && open ? ' cur' : ''); b.disabled = !open;
+    b.textContent = open ? String(i + 1) : '🔒'; const st = document.createElement('i'); if (open) { st.textContent = '★'.repeat(p.st[i]); if (p.st[i] < 3) { const g = document.createElement('b'); g.textContent = '★'.repeat(3 - p.st[i]); st.appendChild(g); } } b.appendChild(st);
+    b.addEventListener('click', e => { e.stopPropagation(); if (S.active && lotUnlocked(i)) lotPlay(i); }); u.Grid.appendChild(b); });
+}
+
+/* ---------- sounds (the game's own little synth; meow-honks are short pitched chirps) ---------- */
+function lotSfx(n, k, j) {
+  if (!actx || actx.state !== 'running') return;
+  try {
+    if (n === 'honk') { const f = [1.6, 1.6, 1.25, 1.0, 0.8][Math.min(4, k || 2)] * (0.92 + ((j || 0) % 5) * 0.04); tone(640 * f, 980 * f, 0.07, 'square', 0.016); tone(980 * f, 620 * f, 0.13, 'triangle', 0.034, 0.07); }
+    else if (n === 'hiss') { const t = actx.currentTime, len = 0.5, b = actx.createBuffer(1, Math.floor(actx.sampleRate * len), actx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.min(1, i / 300) * Math.pow(1 - i / d.length, 1.4);
+      const s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain(); s.buffer = b; f.type = 'highpass'; f.frequency.value = 2600; g.gain.value = 0.09; s.connect(f); f.connect(g); g.connect(actx.destination); s.start(t); tone(420, 260, 0.25, 'sawtooth', 0.012); }
+    else if (n === 'bonk') tone(240, 150, 0.08, 'square', 0.018);
+    else if (n === 'thud') { tone(130, 60, 0.1, 'sine', 0.06); noise(0.08, 0.035, 700); }
+    else if (n === 'go') { const f = k >= 3 ? 0.8 : k === 1 ? 1.5 : 1; tone(110 * f, 190 * f, 0.18, 'sawtooth', 0.01); noise(0.12, 0.018, 900); }
+    else if (n === 'vroom') { const f = k >= 3 ? 0.8 : k === 1 ? 1.5 : 1; tone(120 * f, 330 * f, 0.42, 'sawtooth', 0.012); tone(240 * f, 640 * f, 0.36, 'triangle', 0.018, 0.04); tone(880, 880, 0.06, 'square', 0.01, 0.34); tone(880, 880, 0.06, 'square', 0.01, 0.44); }
+    else if (n === 'gate') tone(900, 700, 0.05, 'square', 0.008, 0.06);
+    else if (n === 'jingle') [1047, 1319, 1568, 1319, 1047].forEach((f, i) => tone(f, f, 0.1, 'triangle', 0.028, i * 0.09));
+    else if (n === 'hmph') tone(180, 120, 0.18, 'sawtooth', 0.018);
+    else if (n === 'undo') tone(700, 450, 0.1, 'triangle', 0.03);
+    else if (n === 'restart') { noise(0.25, 0.035, 1600); tone(500, 900, 0.15, 'triangle', 0.024); }
+    else if (n === 'hint') [1319, 1760, 2093].forEach((f, i) => tone(f, f, 0.12, 'sine', 0.025, i * 0.07));
+    else if (n === 'star') { const f = 784 * Math.pow(2, (k || 0) * 4 / 12); tone(f, f, 0.2, 'triangle', 0.04); tone(f * 2, f * 2, 0.15, 'sine', 0.014); }
+    else if (n === 'win') { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f * 1.01, 0.18, 'triangle', 0.035, i * 0.08)); if (sfx && sfx.meow) setTimeout(() => { try { sfx.meow(false); } catch (e) {} }, 420); }
+    else if (n === 'nope') tone(200, 160, 0.08, 'square', 0.03);
+    else if (n === 'tap') tone(1200, 1000, 0.03, 'sine', 0.018);
+  } catch (e) {}
+}
+function lotKeysOn() { if (LOT.keysOn) return; LOT.keysOn = true; addEventListener('keydown', lotKeyDown, true); }
+function lotKeyDown(e) {                                                     // Esc: the map (or back from it); U / Z / Backspace: undo; R: restart; H: hint; Enter: next lot
+  const S = LOT, k = e.key; if (!S.active || S.phase === 'enter' || S.phase === 'leave') return;
+  const esc = k === 'Escape', und = k === 'u' || k === 'U' || k === 'z' || k === 'Z' || k === 'Backspace', rs = k === 'r' || k === 'R', hn = k === 'h' || k === 'H', go = k === 'Enter' || k === ' ';
+  if (!esc && !und && !rs && !hn && !go) return; e.preventDefault(); e.stopPropagation(); if (e.repeat) return;
+  if (S.tipOn) { if (go || esc) lotTipOk(); return; }
+  if (S.phase === 'map') { if (esc) { if (S.mapFrom >= 0) lotMapClose(); else lotLeave(); } return; }
+  if (S.phase === 'won') { if (go && S.wonT > 0.5) lotPlay(Math.min(lotLevels().length - 1, S.li + 1)); else if (esc && S.wonT > 0.5) lotMapOpen(); return; }
+  if (esc) lotMapOpen(); else if (und) lotUndo(); else if (rs) lotRestart(); else if (hn) lotHint();
+}
+
+/* ---------- each frame, while she's in there ---------- */
+function lotFadeDom() { const S = LOT, v = Math.round(S.fade * 50) / 50; if (v !== S.fadeShown && S.ui) { S.fadeShown = v; S.ui.Fade.style.opacity = v; } }
+function lotUpdate(dt) {
+  const S = LOT; S.t += dt; S.pt += dt;
+  if (S.phase === 'enter') { lotEnterStep(dt); return; }
+  if (S.phase === 'leave') { S.fade = Math.min(1, S.pt / 0.35); lotFadeDom(); if (S.fade >= 1) lotHandoff(); return; }
+  if (S.fade > 0) S.fade = Math.max(0, S.fade - dt / 0.45);
+  lotCamFit(); if (S.hintJob) lotHintWork(9); lotCarsStep(dt); lotWorldStep(dt); lotRigStep(dt); chimFxStep(S.fx, dt); chimFxStep(S.gx, dt); lotEmoStep(dt); lotHintStep();
+  if (S.sayT > 0 && S.rig) { S.sayT -= dt; const [x, y] = lotProject(S.home.x, 1.35, S.home.z), u = S.ui; u.Say.style.transform = `translate(${x - 22}px,${y - 46}px)`; if (S.sayT <= 0) u.Say.classList.remove('on'); }
+  if (S.phase === 'play' && !S.tipOn && !S.won) { S.idle = (S.idle || 0) + dt;   /* (the very first lot: if she's stuck a while, a free nudge toward the right car) */
+    if (S.li <= 1 && S.idle > 5 && !S.hint && !S.hintJob && S.onPath >= 0 && S.onPath < S.L.sol.length) { const m = S.L.sol[S.onPath]; S.hint = { i: m[0], d: m[1] }; lotSay('Swipe that one!', 1); } }
+  if (S.won && S.phase === 'play') { S.clearT += dt;
+    if (S.clearT > 0.3 && !S.confetti) { S.confetti = true; lotConfetti(); lotSfx('win'); if (S.rig) S.rig.cheer = 1; lotSay(lotPick(['All clear!', 'Purr-fect!', 'Woohoo!', 'Valet kitty!']), 1); }
+    if (S.clearT > 1.5) lotWin(); }
+  if (S.phase === 'won') S.wonT += dt;
+}
+function lotDraw() {
+  const S = LOT;
+  if (S.phase === 'enter' || !S.built || !S.rig) { if (povEndWall) povEndWall.visible = true; if (typeof updateUpperLights === 'function') updateUpperLights(); const hid = typeof cullBegin === 'function' ? cullBegin() : null; renderer.render(scene, camera); if (hid) cullEnd(hid); }
+  else renderer.render(S.scene, S.cam);
+  lotFadeDom();
+}
+function lotFrame(dt) {                                                  // (frame) every frame: Meow Lot when it's on (its own world, drawn here: true); otherwise the valet stand out front and its 🅿️ button
+  const S = LOT;
+  if (state === 'lot') { try { lotUpdate(dt); lotDraw(); } catch (e) { if (S.err++ < 3) console.error(e); lotBail('🅿️ Oops, a fender bender! Back to the yard.'); } return true; }
+  try {
+    if (S.goQ) { S.goQ = false; if (S.pillOn) { lotStart(); if (state === 'lot') return lotFrame(0); } }
+    if (S.post > 0) { S.post -= dt; S.fade = Math.max(0, S.post / 0.45); lotFadeDom(); if (S.post <= 0 && S.ui) S.ui.root.classList.remove('on', 'ghost'); }
+    lotPill(dt);
+  } catch (e) { if (S.err++ < 3) console.error(e); }
+  return false;
+}
+
+/* ---------- in from the yard, and back out ---------- */
+function lotStart() {
+  const S = LOT; if (state !== 'playing' || !walk.on || !walk.rig || S.active) return;
+  markFound('lot'); if (typeof todAudioStop === 'function') todAudioStop(); if (typeof todActorsReset === 'function') todActorsReset();
+  S.back = { x: walk.pos.x, y: walk.pos.y, z: walk.pos.z, face: walk.face };
+  state = 'lot'; S.active = true; S.phase = 'enter'; S.pt = 0; S.fade = 0; S.ptr = null;
+  walk.stick.x = walk.stick.y = 0; walk.vel.set(0, 0, 0); walk.vy = 0; walk.jumpQ = -1;
+  document.body.classList.add('lotting'); $('walkUI').hidden = true; ui.hud.hidden = true; lotPillSet(false);
+  if (typeof ammoChip === 'function') ammoChip(); if (UPPER.aunty && typeof hideBubbles === 'function') hideBubbles(UPPER.aunty);
+  if (ZN && ZN.hud) ZN.hud.hidden = true; if (ZN && ZN.flashEl) ZN.flashEl.style.opacity = 0; if (TOD && TOD.flashEl) { TOD.flashEl.style.opacity = 0; TOD.flashOn = false; }
+  try { if (!S.ui) lotBuildUI(); } catch (e) { console.error(e); lotBail('🅿️ The valet stand’s locked... try again in a bit!'); return; }
+  const u = S.ui; S.post = 0; u.Load.textContent = S.built ? '' : '🅿️ Finding the keys...'; u.root.classList.add('on', 'ghost'); u.root.classList.remove('won', 'mapping'); u.Win.classList.remove('on'); u.Map.classList.remove('on'); u.Tip.classList.remove('on'); S.tipOn = null;
+  lotSfx('tap');
+}
+function lotEnterStep(dt) {                                              // (still in the yard) a beat to fade out; built behind the dark, then the map (or, the very first time, lot 1)
+  const S = LOT; S.fade = Math.min(1, S.pt / 0.35); lotFadeDom();
+  if (S.pt < 0.4) return;
+  try {
+    if (!S.built) lotBuild();
+    lotRigSet(); S.ui.root.classList.remove('ghost'); S.fade = 1;
+    const p = lotProg(); if (!p.st.some(x => x > 0)) lotPlay(0); else { lotLoad(p.last); S.phase = 'map'; lotMapOpen(S.L.p); }
+  } catch (e) { console.error(e); lotBail('🅿️ The valet stand’s locked... try again in a bit!'); }
+}
+function lotLeave() { const S = LOT; if (!S.active) return; S.phase = 'leave'; S.pt = 0; S.ptr = null; lotHintHide(); if (S.ui) { S.ui.Map.classList.remove('on'); S.ui.Win.classList.remove('on'); S.ui.Tip.classList.remove('on'); } S.tipOn = null; }
+function lotHandoff() {                                                  // back to Free roam, beside the valet stand on our driveway
+  const S = LOT, W = walk.rig, u = S.ui, P = lotSpotPos();
+  S.active = false; S.phase = 'off'; S.ptr = null; S.post = 0.45; S.fade = 1; S.fadeShown = -1;
+  if (u) { u.root.classList.add('on', 'ghost'); u.root.classList.remove('won', 'mapping'); u.Win.classList.remove('on'); u.Map.classList.remove('on'); u.Say.classList.remove('on'); for (const e of S.emo) { e.on = false; e.d.style.display = 'none'; } lotFadeDom(); }
+  if (S.rig && S.rig.g.parent) S.rig.g.parent.remove(S.rig.g); S.rig = null;   // (hand the clone back)
+  state = 'playing'; last = performance.now(); document.body.classList.remove('lotting'); $('walkUI').hidden = false; ui.hud.hidden = false;
+  if (W) { W.g.rotation.order = 'XYZ'; W.g.rotation.set(0, 0, 0); W.g.visible = true; W.shadow.visible = true; W.body.scale.set(1, 1, 1); W.body.position.set(0, 0, 0); W.body.rotation.set(0, 0, 0); W.head.rotation.set(0, 0, 0); }
+  walk.vel.set(0, 0, 0); walk.vy = 0; walk.grounded = true; walk.climb = null; walk.jumpQ = -1; walk.stick.x = walk.stick.y = 0; walk.squash = 0.4; walk.free = true;
+  if (typeof heist !== 'undefined' && heist.keys) for (const k in heist.keys) heist.keys[k] = false;
+  if (P) { walk.pos.set(P.sx, 0, P.sz); walk.face = Math.PI; } else if (S.back) { walk.pos.set(S.back.x, S.back.y, S.back.z); walk.face = S.back.face; }
+  if (typeof fc !== 'undefined' && fc.focus) { fc.focus.set(walk.pos.x, walk.pos.y + 0.55, walk.pos.z); if (fc.s && fc.s.focus) fc.s.focus.copy(fc.focus); }
+  if (W) { W.g.position.copy(walk.pos); W.g.rotation.y = walk.face; }
+  const p = lotProg(), tot = p.st.reduce((a, b) => a + b, 0);
+  showWalkName(tot ? '🅿️ Back at the valet stand. Meow Lot: ★ ' + tot + ' of ' + p.st.length * 3 : '🅿️ Back at the valet stand!');
+  S.saidVisit = walk.treesSeen;
+}
+function lotBail(msg) {                                                  // (something went wrong: back to Free roam, safe)
+  const S = LOT;
+  try { S.phase = 'leave'; lotHandoff(); } catch (e) { S.active = false; S.phase = 'off'; state = 'playing'; document.body.classList.remove('lotting'); try { $('walkUI').hidden = false; ui.hud.hidden = false; if (S.ui) S.ui.root.classList.remove('on'); } catch (x) {} }
+  if (msg) showWalkName(msg);
+}
+
+/* ---------- out front, on our driveway: the valet stand, two cars jammed beside it, and the 🅿️ button ---------- */
+function lotSpotPos() {
+  const S = LOT; if (typeof UPPER === 'undefined' || !UPPER || typeof UPPER.zF !== 'number') return null;
+  if (!S.spotP) { const zF = UPPER.zF, x = -3.4, z = zF - 16.8; S.spotP = { x, z, sx: x + 0.4, sz: z + 2.3 }; }
+  return S.spotP;
+}
+function lotBake(g, k0) {                                                // (out in the yard everything's unlit: the shading baked into the colours)
+  const n = g.attributes.normal, c = g.attributes.color, L = new THREE.Vector3(-0.45, 0.78, -0.43).normalize();
+  for (let i = 0; i < c.count; i++) { const k = (k0 || 0.62) + 0.45 * Math.max(0, n.getX(i) * L.x + n.getY(i) * L.y + n.getZ(i) * L.z); c.setXYZ(i, Math.min(1, c.getX(i) * k), Math.min(1, c.getY(i) * k), Math.min(1, c.getZ(i) * k)); }
+  return g;
+}
+function lotSpotBuild() {
+  const S = LOT, P = lotSpotPos(); if (!P || !povEndWall) return;
+  const g = S.spot = new THREE.Group(); g.userData.name = 'Valet stand'; g.userData.noWalk = true;
+  const mat = S.spotMat = new THREE.MeshBasicMaterial({ vertexColors: true, map: lotAtlas() }); mat.userData.noTod = true;
+  const add = (geo, x, z, ry, s, name) => { const m = new THREE.Mesh(lotBake(geo), mat); m.position.set(x, 0, z); m.rotation.y = ry; m.scale.setScalar(s); m.userData.noWalk = true; m.userData.name = name; g.add(m); return m; };
+  add(lotStandGeo(true), P.x, P.z, 0, 2.3, 'Valet stand');
+  add(lotVehGeo('c', 0x3a8cff, 0, 2), P.x + 5.0, P.z - 1.6, Math.PI / 2, 4.2, 'A jammed car');          // (nose to nose with the pink one: neither can budge)
+  add(lotVehGeo('c', 0xff7ab8, 4, 2), P.x + 10.8, P.z - 1.0, Math.PI, 4.2, 'A jammed car');
+  const cat = add(lotCatGeo(0), P.x + 10.8, P.z - 1.0, 0.6, 4.2, 'A cat, napping on a car roof'); cat.position.y = lotRoofY('c') * 4.2;
+  for (const [x, z, sx, sz] of [[P.x + 5.0, P.z - 1.6, 7.6, 3.3], [P.x + 10.8, P.z - 1.0, 3.3, 7.6], [P.x, P.z, 1.6, 1.0]]) {
+    const sh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), softShadowMat(0.3, true)); sh.rotation.x = -Math.PI / 2; sh.position.set(x, 0.012, z); sh.scale.set(sx / 0.53 * 0.62, sz / 0.53 * 0.62, 1); sh.renderOrder = 1; sh.userData.noWalk = true; g.add(sh); }
+  povEndWall.add(g);
+  // what she bumps into and hops up on: plain invisible boxes (the podium, the two car roofs)
+  const cg = S.spotCol = new THREE.Group(); cg.userData.name = 'Valet stand'; povEndWall.add(cg); const inv = new THREE.MeshBasicMaterial({ visible: false }), cols = [];
+  const box = (x0, x1, y1, z0, z1, name) => { const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1, z1 - z0), inv); m.position.set((x0 + x1) / 2, y1 / 2, (z0 + z1) / 2); m.userData.collider = true; m.userData.name = name; cg.add(m); cols.push(m); };
+  box(P.x - 0.75, P.x + 0.75, 1.8, P.z - 0.5, P.z + 0.5, 'Valet stand'); box(P.x + 5.0 - 3.6, P.x + 5.0 + 3.6, 2.3, P.z - 1.6 - 1.5, P.z - 1.6 + 1.5, 'A jammed car'); box(P.x + 10.8 - 1.5, P.x + 10.8 + 1.5, 2.3, P.z - 1.0 - 3.6, P.z - 1.0 + 3.6, 'A jammed car');
+  cg.updateMatrixWorld(true); if (walk.meshes && walk.on) for (const m of cols) if (!walk.meshes.includes(m)) walk.meshes.push(m);
+}
+function lotNear() {                                                     // standing by the valet stand (or on a jammed car's roof beside it)
+  const P = lotSpotPos(), p = walk.pos; if (!P) return false;
+  return state === 'playing' && gameMode === 'walk' && walk.on && !!walk.rig && walk.grounded && !walk.climb && !mirrorWorld && !(walk.napT > 0) && Math.hypot(p.x - P.x, p.z - P.z) < 3.0 && p.y < 3;
+}
+function lotPill(dt) {
+  const S = LOT;
+  if (!walk.on || !povEndWall) { if (S.pillOn) lotPillSet(false); return; }
+  if (!S.spot) { try { lotSpotBuild(); } catch (e) { console.error(e); S.spot = new THREE.Group(); } }
+  if (S.spotMat && TOD && TOD.tint) { const t = TOD.tint; if (!S.tint || Math.abs(S.tint - (t.r + t.g + t.b)) > 0.004) { S.tint = t.r + t.g + t.b; S.spotMat.color.setRGB(Math.min(1.2, t.r), Math.min(1.2, t.g), Math.min(1.2, t.b)); } }
+  const P = lotSpotPos(); if (!P) return;
+  let on = lotNear(); if (on && document.querySelector('#sledPill.on,#jetPill.on,#hopPill.on,#chimPill.on')) on = false;   /* (another button's showing there: that one first) */
+  if (state === 'playing' && gameMode === 'walk' && !mirrorWorld && S.saidVisit !== walk.treesSeen) {
+    const p = walk.pos, dd = Math.hypot(p.x - P.x, p.z - P.z), first = lotGet('catguard.lotSeen', '') !== '1';
+    if ((first && dd < 11 && p.y < 3) || on) { S.saidVisit = walk.treesSeen; if (first) lotPut('catguard.lotSeen', '1');
+      const pr = lotProg(), tot = pr.st.reduce((a, b) => a + b, 0);
+      showWalkName(first ? '🅿️ A valet stand on our driveway! And look at those cars, jammed nose to nose... Tap “Meow Lot” and sort them out!'
+        : tot ? '🅿️ PKR’s valet stand. Meow Lot: ★ ' + tot + ' of ' + pr.st.length * 3 + '. Tap to park some more!' : '🅿️ Tap “Meow Lot” to clear the jam!'); }
+  }
+  if (on !== S.pillOn) lotPillSet(on);
+}
+function lotPillSet(on) { const S = LOT; S.pillOn = on; (S.pill || lotPillMake()).classList.toggle('on', on); document.body.classList.toggle('lot-pill', on); }
+function lotPillMake() {
+  const S = LOT; if (S.pill) return S.pill;
+  const st = document.createElement('style'); st.textContent = `
+#lotPill{position:fixed;right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(236px + env(safe-area-inset-bottom,0px));z-index:6;display:none;align-items:center;gap:6px;padding:9px 16px 9px 12px;border-radius:999px;background:#2a6fdb;color:#fff;font:800 16px var(--body);border:3px solid #fff4f8;box-shadow:0 5px 0 #173f8a,0 10px 18px rgba(0,0,0,.3);touch-action:none;cursor:pointer;white-space:nowrap}
+#lotPill b{font-size:20px;line-height:1}
+#lotPill.on{display:flex;animation:mlPillIn .45s cubic-bezier(.2,1.6,.4,1),mlPillBob 1.8s ease-in-out .5s infinite}
+body.heist-ui #lotPill,body.hopping #lotPill,body.biking #lotPill,body.chimneying #lotPill,body.jetting #lotPill,body.jet-intro #lotPill,body.sledding #lotPill,body.lotting #lotPill{display:none}
+body.lot-pill #chimSootPill{display:none!important}
+@keyframes mlPillIn{from{transform:scale(.4);opacity:0}}
+@keyframes mlPillBob{50%{transform:translateY(-4px)}}`;
+  document.head.appendChild(st);
+  const b = S.pill = document.createElement('button'); b.id = 'lotPill'; b.innerHTML = '<b>&#x1F17F;&#xFE0F;</b>Meow Lot'; b.setAttribute('aria-label', 'Play Meow Lot at the valet stand');
+  ($('walkUI') || document.body).appendChild(b);
+  b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (LOT.pillOn) LOT.goQ = true; });
+  return b;
+}
+
+/* ---------- the title screen: 🅿️ Meow Lot, once she's played it (catguard.found.lot) ---------- */
+function lotSync() {                                                     // (syncSecretModes) no LOT here: this runs at load, before this block's consts are set
+  const box = document.getElementById('secretModes'); if (!box) return;
+  let b = document.getElementById('lotBtn');
+  if (!b) { const dot = document.createElement('span'); dot.className = 'dot'; dot.id = 'lotDot'; dot.hidden = true; dot.textContent = '·';
+    b = document.createElement('button'); b.className = 'link-btn chaos-link'; b.id = 'lotBtn'; b.hidden = true; b.textContent = '🅿️ Meow Lot'; box.appendChild(dot); box.appendChild(b);
+    const st = document.createElement('style'); st.textContent = '#secretModes{flex-wrap:wrap;justify-content:center;row-gap:3px;max-width:100%}#secretModes .ml-pair{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}#secretModes .dot.ml-lead{display:none}'; document.head.appendChild(st);
+    b.addEventListener('click', () => { startGame('walk'); setTimeout(() => { if (state !== 'playing' || !walk.on) return;   /* (Free roam, out front by the valet stand, and in) */
+      sliderGlass.forEach(g => { g.visible = false; }); const P = lotSpotPos(); if (!P) return;
+      walk.free = true; walk.pos.set(P.sx, 0, P.sz); walk.face = Math.PI; walk.vy = 0; walk.vel.set(0, 0, 0); walk.grounded = true;
+      if (typeof roamSave === 'function') try { roamSave({ free: 1 }); } catch (e) {}
+      lotStart(); }, 150); });
+    for (const d of Array.from(box.querySelectorAll('.dot'))) { const n = d.nextElementSibling; if (n && n.tagName === 'BUTTON' && !d.parentNode.classList.contains('ml-pair')) { const w = document.createElement('span'); w.className = 'ml-pair'; box.insertBefore(w, d); w.appendChild(d); w.appendChild(n); } }   /* (each dot stays with its button when the row wraps) */
+    addEventListener('resize', () => lotDots()); }
+  let on = false; try { on = localStorage.getItem('catguard.found.lot') === '1'; } catch (e) {}
+  b.hidden = !on; const others = ['rideBtn', 'hopBtn', 'jetBtn', 'sledBtn'].some(id => { const e = document.getElementById(id); return e && !e.hidden; });
+  document.getElementById('lotDot').hidden = !(on && others); if (on) box.hidden = false;
+  requestAnimationFrame(() => lotDots());
+}
+function lotDots() {                                                     // (a dot that wrapped to the start of a line hides; the pairs keep the rest together)
+  const box = document.getElementById('secretModes'); if (!box || box.hidden || !box.offsetParent) return;
+  let prev = null; for (const w of Array.from(box.children)) { if (w.offsetParent === null) continue; const d = w.querySelector && w.querySelector(':scope > .dot');
+    if (d) d.classList.toggle('ml-lead', !!prev && w.offsetTop > prev.offsetTop + 4); prev = w; }
+}
+/* (end of MEOW LOT) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
@@ -25815,6 +26913,7 @@ function frame(now) {
   if (state === 'stargaze') return;   /* (the telescope's eyepiece covers the whole screen: nothing to draw behind it) */
   if (chimFrame(dt)) return;                                         /* (Chimney Drop: down the flue in its own little world; in Free roam, the 🧱 button on the chimney top, and the soot she brings back) */
   if (sledFrame(dt)) return;                                           /* (Sled Rush: down the ice in its own little world; in Free roam, the red sled on the back fence and its 🛷 button) */
+  if (lotFrame(dt)) return;                                            /* (Meow Lot: a jammed lot in its own little world; in Free roam, the valet stand on our driveway and its 🅿️ button) */
   if (state === 'jet') { updateJet(dt); renderJet(); return; } jetPill();   /* (Sky Paws: the raccoon's jet, its own little world; in Free roam, the ✈️ button by the jet on our roof) */
   if (state === 'hop') { updateHop(dt); renderHop(); return; } hopPill();   /* (Treetop Hop: its own little world; in Free roam, the 🌳 button on a tree top) */
   if (state === 'bike') markFound('ride');                            /* (found the motorcycle: it gets a button on the title screen) */
