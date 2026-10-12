@@ -7156,7 +7156,7 @@ function bikeRow() {   // one row of the road, BIKE_AHEAD out. rows sit in track
     const r = Math.random(), p = B.powers[!B.shield && r < 0.24 ? 2 : r < 0.62 ? 0 : 1]; p.on = true;   /* (magnet, catnip, or a helmet if she hasn't one on) */ p.x = bikeLaneX(pl); p.y = 0.95; p.z = ahead; p.mesh.position.set(p.x, p.y, p.z); p.mesh.visible = true;
     B.powerAt = at + 520 + Math.random() * 320; B.laneLast[pl] = Math.max(B.laneLast[pl], at + 1);
   }
-  if (Math.random() < 0.82 + 0.09 * B.ups.luck) {   // one line of fish per row, favouring the ramp (more with lucky fish)
+  if (econBikeLine() && Math.random() < 0.82 + 0.09 * B.ups.luck) {   // one line of fish per row, favouring the ramp (more with lucky fish)
     let tl = -1, cnt = 0;
     for (let L = 0; L < 3; L++) {
       const ch = ln[L]; if (L === pl || at - 6 < B.laneBlock[L] || '.cspRh'.indexOf(ch) < 0) continue;
@@ -7325,7 +7325,7 @@ function bikeGameOver() {   // the card: score, treats, distance against her bes
   u.New.style.display = fresh && !rec ? '' : 'none';
   u.Rec.style.display = rec ? 'block' : 'none'; u.RecSub.textContent = rec ? dm + ' m \u00b7 ' + (dm - b0) + ' m past your old best' : '';
   bikeMsDraw(u.MsO);
-  u.Card.classList.toggle('rec', rec); u.Gain.textContent = gain; u.Bank.style.display = gain > 0 ? '' : 'none'; bikeOverWallet();
+  u.Card.classList.toggle('rec', rec); u.Gain.textContent = gain; u.Bank.style.display = gain > 0 ? '' : 'none'; bikeOverWallet(); econCard('bike');
   u.Over.classList.remove('shop'); u.Over.classList.add('on');
   if (rec) bikeSfx('record');
 }
@@ -10741,7 +10741,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-12 15:02';                                              // stamped when the site is published
+const BUILD = '2026-10-12 15:56';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -14457,7 +14457,7 @@ function hopLand(T, dx, dz) {   // down on a leafy top: +1 (and the ones she ski
   else {
     const perfect = d <= hopPerfR(T);
     if (perfect) { H.combo++; H.perfects++; } else H.combo = 0;
-    const pts = k + (perfect ? Math.min(9, H.combo) : 0); H.treesN += k; H.score += pts;   /* (a Perfect is worth ×2, ×3... up to ×10) */
+    const pts = k + (perfect ? Math.min(9, H.combo) : 0); H.treesN += k; H.score += pts; econHopLand(H, k, perfect);   /* (a Perfect is worth ×2, ×3... up to ×10) */
     if (perfect) { hopSfx('perfect', H.combo); hopSay(H.combo > 1 ? 'Perfect ×' + Math.min(10, H.combo + 1) + '!' : 'Perfect!', true, '+' + pts); hopBurst(H.v.pos.x, H.v.pos.y + 0.2, H.v.pos.z, 16, 0xffd23a, 3.2, 3.5, 5); }
     else { hopSfx('land'); if (k > 1) hopSay('Double hop!', true, '+' + pts); else if (H.jumps < 3 || Math.random() < 0.18) hopSay(['Nice!', 'Wheee!', 'Purrfect paws!', 'Hop!'][(Math.random() * 4) | 0]); }
     H.cur = T.i;
@@ -14515,7 +14515,7 @@ function hopGameOver() {   // the card: score and trees against her bests (a pro
   u.Final.textContent = H.score; u.OS.textContent = Math.max(H.score, H.bestS0); u.OT.textContent = H.treesN; u.OP.textContent = H.perfects; u.OB.textContent = Math.max(H.treesN, H.bestT0);
   u.Rec.style.display = rec ? 'block' : 'none'; u.RecSub.textContent = rec ? H.score + ' · ' + (H.score - H.bestS0) + ' past your old best' : '';
   u.New.style.display = fresh && !rec && H.score > 0 ? '' : 'none';
-  u.Gain.textContent = gain; u.Bank.style.display = gain > 0 ? '' : 'none'; hopOverWallet();
+  u.Gain.textContent = gain; u.Bank.style.display = gain > 0 ? '' : 'none'; hopOverWallet(); econCard('hop');
   u.Over.classList.add('on'); u.cb = null; H.hudT = 0;
   if (rec) hopSfx('record');
 }
@@ -15083,7 +15083,7 @@ const CK_LINES = ['Ooh la la!', 'Très chic!', 'Purrfect!', 'Meow-velous!', 'So 
 function ckGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function ckPut(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 function ckState() {
-  if (ckState.S) return ckState.S; roofCkReg(); ckSnReg(); ck4Reg();
+  if (ckState.S) return ckState.S; roofCkReg(); ckSnReg(); ck4Reg(); ck5Reg();
   const S = ckState.S = { owned: new Set(['crown']), outfit: {}, spent: 0, memFish: null };
   try { const a = JSON.parse(ckGet('catguard.closet') || '[]'); if (Array.isArray(a)) for (const id of a) if (typeof id === 'string' && CK_BY_ID[id]) S.owned.add(id); } catch (e) {}
   try { ckExLoad(S); } catch (e) { console.error(e); }
@@ -15494,6 +15494,7 @@ function ckCapeGeo(spec) {                                             // the dr
     Nn[i * 3] = d[0]; Nn[i * 3 + 1] = d[1]; Nn[i * 3 + 2] = d[2];
     c.set(spec.col(u, v, i)); C[i * 3] = c.r; C[i * 3 + 1] = c.g; C[i * 3 + 2] = c.b; UV[i * 2] = u; UV[i * 2 + 1] = v;
   }
+  if (spec.shape) ck5CapeShape(spec, P, Nn);   /* (CK5A_V1: each cape its own silhouette) */
   for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) { const a = r * (cols + 1) + k, b = a + 1, d = a + cols + 1, e = d + 1; I.push(a, b, d, b, e, d); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3)); g.setIndex(I); g.computeVertexNormals();
   g.userData.ck = { base: P.slice(), out: Nn, uv: UV, n };
@@ -15511,7 +15512,7 @@ function ckCapeStep(g, amt, t) {                                       // amt 0 
 }
 
 /* ---------- backpacks (body space: her back is about y 0.62, from her shoulders at z 0.2 to her rump at z -0.3) ---------- */
-function ckStraps(B, col, add) {                                           // a little harness: two flat straps round her middle, snug to the fur
+function ckStraps(B, col, add) { if (ckStraps.off) return;   /* (CK5A_V1: a thumbnail shows the bag, not the harness) */                                           // a little harness: two flat straps round her middle, snug to the fur
   const C = ckStraps.cache || (ckStraps.cache = [0.1, -0.11].map(z => { const pts = [];
     for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2, d = [Math.sin(a), Math.cos(a), 0], r = ckReach([0, 0.42, z], d, CK_BODY, 0.009, 0.4); pts.push(new THREE.Vector3(d[0] * r, 0.42 + d[1] * r, z)); }
     return new THREE.CatmullRomCurve3(pts, true, 'centripetal'); }));
@@ -16479,7 +16480,7 @@ function ckBuildUI() {
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) st.addEventListener(t, up);
   st.addEventListener('contextmenu', e => e.preventDefault());
   if (window.ResizeObserver) try { new ResizeObserver(() => { CK.rectDirty = true; }).observe(st); } catch (e) {}
-  CK.thumbQ = CK_ITEMS.map(it => it.id); ckExUI(); ckSnUI();
+  CK.thumbQ = CK_ITEMS.map(it => it.id); ckExUI(); ckSnUI(); ck5UI();
 }
 function ckBuild() { ckBuildUI(); ckBuildScene(); CK.built = true; }
 
@@ -16494,7 +16495,7 @@ function closetOpen(from) {
   if (from && $(from)) $(from).hidden = true;
   document.body.classList.add('closet-open'); u.root.hidden = false;
   CK.prev = Object.assign({}, S.outfit); CK.look = false; closetDress(CK.rig, CK.prev);
-  CK.sel = null; CK.tab = CK.tab || 'hat'; CK.view = 'full'; CK.spin = 0; CK.spinV = 0; CK.idleT = 9; ckExOpen();
+  CK.sel = null; CK.tab = CK.tab || 'hat'; CK.view = 'full'; CK.spin = 0; CK.spinV = 0; CK.idleT = 9; ckExOpen(); ck5Open();
   CK.fishTo = CK.fishShown = ckWallet(); u.Fish.textContent = CK.fishShown;
   try { ckSetOpen(); } catch (e) { console.error(e); }   /* (outfit sets + the collection book) */
   CK.rectDirty = true; ckMeasure(); ckAim(true);
@@ -16581,9 +16582,9 @@ function ckRefresh() {
   if (u.Cat) { const sl = CK_SLOTS.find(s => s.id === CK.tab); u.Cat.hidden = !sl; if (sl) u.Cat.textContent = sl.ic + ' ' + sl.name; }   /* (phones upright: the tabs are icons only, so the category's name goes over the grid) */
   if (u.Act) u.Act.classList.toggle('idle', !act && !sel);   /* (phones upright: the buy bar only while something's picked) */
   roofCkRefresh(); ckExRefresh(); ckSnRefresh();
-  ckSetRefresh(); ck4Refresh();
+  ckSetRefresh(); ck4Refresh(); ck5Refresh();
 }
-function ckMain() {
+function ckMain() { if (ck5Main()) return;   /* (CK5A_V1: buy the rest of a look) */
   const S = ckState(), it = CK.sel && CK_BY_ID[CK.sel], A = CK.anim;
   if (CK.act === 'buy' && it) {
     const w = ckWallet(); if (S.owned.has(it.id)) return;
@@ -16623,6 +16624,7 @@ function ckSurprise() {
     if (!Object.keys(next).length) next[mine[0].slot] = mine[0].id;
     if (CK_SLOTS.some(s => (next[s.id] || null) !== (CK.prev[s.id] || null))) break;
   }
+  if (ck5Same(next)) return;   /* (CK5A_V1: nothing to change, no Ta-da) */
   CK.prev = next; CK.look = true; closetDress(CK.rig, CK.prev); CK.sel = null; CK.view = 'full'; CK.idleT = 9;
   const A = CK.anim; A.hop = 1; A.flick = 1; A.tilt = 1; ckPuffAt(CK.rig.g.localToWorld(CK.v.set(0, 0.55, 0.05)), 40, true); ckSfx('try'); ckCaption(pickOf(['Ta-da! ✨', 'Surprise!', 'How about this?', 'Mix and match!']));
   ckRefresh();
@@ -16660,7 +16662,7 @@ function ckCheckAch() {                                              // (two at 
 function ckDot() {                                                     // the title's Closet button: a red dot when there's something new she can afford
   const b = $('closetBtn'), d = b && b.querySelector('.ck-dot'); if (!d) return;
   const S = ckState(), w = ckWallet(); d.hidden = !CK_ITEMS.some(it => !S.owned.has(it.id) && it.price <= w) && !ckExNew().length; d.hidden = ckSnDot(S, w, d.hidden);
-  if (d.hidden) d.hidden = !ckBookReady();   /* (a collection-book reward to claim) */
+  if (d.hidden) d.hidden = !ckBookReady();   /* (a collection-book reward to claim) */ ck5Dot(d);   /* (CK5A_V1: only something new lights it) */
 }
 
 /* ---------- each frame while it's open: her, the camera, the sparkles, the thumbnails, then the dressing room is drawn ---------- */
@@ -16714,7 +16716,7 @@ function ckThumbStep() {                                               // real l
     const it = CK_BY_ID[CK.thumbQ.shift()], card = CK.cards[it.id]; if (!it || !card) continue;
     let obj, capeGeo = null;
     if (it.id === 'crown') { obj = CK.rig.crown.clone(true); obj.visible = true; obj.position.set(0, 0, 0); obj.rotation.set(-0.14, 0, 0); }
-    else { const inst = ckInstance(it); obj = inst.obj; if (inst.clasp) inst.clasp.visible = true; capeGeo = inst.cape && inst.cape.geometry; T.fxInst = inst; }
+    else if (ck5Thumb(it, T)) obj = T.ck5o; else { const inst = ckInstance(it); obj = inst.obj; if (inst.clasp) inst.clasp.visible = true; capeGeo = inst.cape && inst.cape.geometry; T.fxInst = inst; }
     T.holder.add(obj); T.holder.updateMatrixWorld(true); T.box.setFromObject(T.holder);
     let c = T.box.getCenter(CK.v), r = Math.max(0.02, T.box.getSize(CK.v2).length() * 0.5); const dir = CK.v3.fromArray(it.thumbDir || DIRS[it.slot] || [0.5, 0.4, 1]).normalize();
     if (it.thumb) { c.fromArray(it.thumb); r = it.thumb[3]; }   // (a backpack: its straps are as big as she is, so frame the bag)
@@ -16913,7 +16915,7 @@ function roofSignDraw(c, w, h, won, mad) {                                 // th
   if (mad) { c.save(); c.translate(w * 0.76, h - 10); c.rotate(-0.08); c.fillStyle = '#1e1a1a'; c.font = 'bold 12px ' + (typeof SANS === 'string' ? SANS : 'sans-serif'); c.fillText('OR GUNS!', 0, 0); c.restore(); }   /* (she shot him: he means it) */
 }
 function roofHome(R) {                                                // him, back in his chair
-  const c = R.coon; if (!c) return; c.pos.copy(R.chair); c.pos.y = R.dk.top + 0.22; c.g.rotation.y = 0; R.coonY = c.pos.y; R.perch = R.leap = null; R.tauntOn = 0;
+  const c = R.coon; if (!c) return; c.pos.copy(R.chair); c.pos.y = R.dk.top + 0.22; c.g.rotation.y = 0; R.coonY = c.pos.y;
 }
 function roofHudMake() {
   if (document.getElementById('roofHud')) return; const ui = document.getElementById('walkUI'); if (!ui) return;
@@ -16934,7 +16936,7 @@ body.roof-on #walkCaption{top:calc(env(safe-area-inset-top,0px) + 82px)}
 }
 function roofHud(R, html) { const el = document.getElementById('roofHud'); if (!el || html === R.hud) return; R.hud = html; el.innerHTML = html; el.hidden = !html; document.body.classList.toggle('roof-on', !!html); }
 function roofNewVisit(R) {                                            // a fresh Free roam visit: he's back in his chair, the lines can be said again
-  R.st = roofRest(R); R.t = 0; R.tags = 0; R.said = 0; R.hint = {}; R.offT = 9; R.waved = false; R.starSeen = false; R.hudKey = null; roofHome(R); roofHud(R, '');
+  R.st = roofRest(R); R.t = 0; R.said = 0; R.hint = {}; R.offT = 9; R.waved = false; R.starSeen = false; R.hudKey = null; roofHome(R); roofHud(R, '');
   if (R.save.won) roofGrant(true);
   roofHurtVisit(R);
 }
@@ -16962,12 +16964,11 @@ function roofHints(R, p) {                                            // little 
   if (!H.see && walk.grounded && p.y > 11 && (theirs || clock - (walk.treeT || -9) < 0.5) && p.x < -12 && p.z > VD - 25) { H.see = 1; showWalkName('✨ What’s that twinkling on OUR roof, by the chimney?'); }
   if (!H.across && theirs && p.x > -27 && Math.abs(p.z - R.maple.z) < 9) { H.across = 1; showWalkName('🍁 That big red maple leans right across toward our roof...'); }
 }
-/* ---------- the raccoon on the roof: lounging, startled, chased, tagged, laughing, surrendering, and (once she's won) her roommate ---------- */
+/* ---------- the raccoon on the roof: lounging, a fright and a chat, his loot shared, and (once she's won) her roommate (ECON_V1: no tag game) ---------- */
 function roofCoon(R, dt, p) {
   const c = R.coon; if (!c) return; const g = c.g, pos = c.pos;
   const away = (typeof coon !== 'undefined' && coon.rig && coon.rig.g.visible && coon.state !== 'hidden') || (typeof coon !== 'undefined' && coon.dead);   // (he's down at the slider, taunting her: not up here too)
-  const chasing = R.st === 'startle' || R.st === 'chase' || R.st === 'tumble';
-  g.visible = !away || chasing; c.shadow.visible = g.visible; if (!g.visible) { roofHud(R, ''); if (R.st === 'laugh') roofHome(R); return; }
+  g.visible = !away; c.shadow.visible = g.visible; if (!g.visible) { roofHud(R, ''); return; }   /* (ECON_V1: the old rooftop tag game is gone for good) */
   R.t += dt; const t = R.t, b = c.body, dx = p.x - pos.x, dz = p.z - pos.z, d = Math.hypot(dx, dz), dy = p.y - pos.y;
   // reset the pose; each state strikes its own
   b.position.set(0, 0, 0); b.rotation.set(0, 0, 0); b.scale.setScalar(1); c.head.rotation.set(0, 0, 0); c.head.position.set(0, 1.0, 0.04); c.head.scale.set(1, 1, 1);
@@ -17001,33 +17002,11 @@ function roofCoon(R, dt, p) {
       sit(); c.arms[1].rotation.set(0.2, 0, -(Math.PI - 0.6) + Math.sin(clock * 14) * 0.3); c.head.rotation.y = lookYaw;
       if (t > 2.2) roofSet(R, 'camp');
       break;
-    case 'startle': {                                                  // out of the chair like a shot: eyes like saucers, then he's off
-      if (R.inChair) sit(); else roofStick(R, pos, dt); const k = Math.min(1, t / 0.3); b.position.y = Math.sin(Math.min(1, t / 0.5) * Math.PI) * 0.5; c.eyes.forEach(e => e.scale.setScalar(1.6));
-      c.arms.forEach((a, i) => a.rotation.set(0.1, 0, (i ? 1 : -1) * (Math.PI - 0.6) * k)); g.rotation.y = Math.atan2(dx, dz) * k;
-      if (t > 1.4) { roofSet(R, 'chase'); R.cool = 0.8; R.tgt = null; R.burst = 1.2; roofPick(R, p); }
-      break; }
-    case 'chase': roofChase(R, dt, p, d, dy, run); break;
-    case 'tumble': {                                                   // tagged! over he goes, then a fist shaken... and off again (or: he gives up)
-      const k = Math.min(1, t / 0.3); b.position.z = -0.3 * k; b.position.y = -0.2 * k; b.rotation.x = -0.7 * k; c.legs.forEach(l => l.rotation.x = -1.2 * k); c.arms.forEach((a, i) => a.rotation.set(-0.3, 0, (i ? -1 : 1) * 1.2 * k)); c.eyes.forEach(e => e.scale.setScalar(1.4));
-      roofStick(R, pos, dt);
-      if (t > 1.0) { if (R.tags >= 3) { roofSet(R, 'surrender'); roofSay('OKAY, OKAY! Uncle! You win! Take the loot!'); chitter(10, 2000); } else { roofSet(R, 'chase'); R.cool = 0.9; R.immune = 0.5; R.burst = 1.4; R.tgt = null; roofPick(R, p); } }
-      break; }
-    case 'laugh': {                                                    // she fell off: he points and laughs over the edge, then strolls home
-      g.rotation.y = Math.atan2(dx, dz); c.arms[1].rotation.set(-1.6, 0, -0.1); c.arms[0].rotation.set(-0.5, 0, 0.6); b.rotation.x = -0.2; b.position.y = Math.abs(Math.sin(t * 18)) * 0.04; c.head.rotation.x = -0.35; c.tongue.visible = true;
-      roofStick(R, pos, dt);
-      if (t > 2.6) { roofSet(R, 'home'); R.from = pos.clone(); }
-      break; }
     case 'home': {                                                     // waddling back to his chair
       const to = R.v.copy(R.chair), dd = Math.hypot(to.x - pos.x, to.z - pos.z);
       if (dd < 0.15) { roofSet(R, roofRest(R)); roofHome(R); break; }
       const st2 = Math.min(dd, 2.4 * dt); pos.x += (to.x - pos.x) / dd * st2; pos.z += (to.z - pos.z) / dd * st2; roofAvoidChimney(R, pos);
       g.rotation.y = Math.atan2(to.x - pos.x, to.z - pos.z); run(false); b.rotation.x = 0.2; b.position.y += 0.2; roofStick(R, pos, dt);
-      break; }
-    case 'surrender': {                                                // a white hanky, waved like mad... then the loot
-      g.rotation.y = Math.atan2(dx, dz); c.hanky.visible = true; c.arms[0].rotation.set(0.1, 0, Math.PI - 0.35 + Math.sin(clock * 16) * 0.35); c.arms[1].rotation.set(0.1, 0, -(Math.PI - 0.6)); c.eyes.forEach(e => e.scale.set(1, 0.5, 1));
-      roofStick(R, pos, dt);
-      if (t > 1.6 && !R.paid) roofWin(R);
-      if (t > 4.2) { roofSet(R, 'home'); }
       break; }
   }
   // his shadow, flat on the slope under him
@@ -17047,75 +17026,9 @@ function roofAvoidChimney(R, pos) {                                   // (he goe
   const e = [pos.x - (C.x0 - m), C.x1 + m - pos.x, pos.z - (C.z0 - m), C.z1 + m - pos.z], i = e.indexOf(Math.min(...e));
   if (i === 0) pos.x = C.x0 - m; else if (i === 1) pos.x = C.x1 + m; else if (i === 2) pos.z = C.z0 - m; else pos.z = C.z1 + m;
 }
-function roofPick(R, p) {                                             // where to run: far from her, out in the open, not past her
-  const c = R.coon, pos = c.pos, A = R.arena; let best = null, bs = -1e9;
-  for (let i = 0; i < 18; i++) {
-    const a = i / 12 * Math.PI * 2 + Math.random() * 0.4, r = i < 12 ? 4.5 + Math.random() * 3.5 : 0, x = i < 12 ? pos.x + Math.cos(a) * r : i < 15 ? R.xm - 0.4 : A.x0 + Math.random() * (A.x1 - A.x0), z = i < 12 ? pos.z + Math.sin(a) * r : i < 15 ? R.rz0 + (i - 12) / 2 * (R.rz1 - R.rz0) : A.z0 + Math.random() * (A.z1 - A.z0);
-    const cx = THREE.MathUtils.clamp(x, A.x0, A.x1), cz = THREE.MathUtils.clamp(z, A.z0, A.z1), C = R.ch;
-    if (cx > C.x0 - 0.5 && cx < C.x1 + 0.5 && cz > C.z0 - 0.5 && cz < C.z1 + 0.5) continue;
-    const dc = Math.hypot(cx - p.x, cz - p.z), dm = Math.hypot(cx - pos.x, cz - pos.z), room = Math.min(cx - A.x0, A.x1 - cx, cz - A.z0, A.z1 - cz);
-    const ux = cx - pos.x, uz = cz - pos.z, ul = Math.hypot(ux, uz) || 1, tcx = p.x - pos.x, tcz = p.z - pos.z, along = (tcx * ux + tcz * uz) / ul, side = Math.abs(tcx * uz - tcz * ux) / ul;
-    let s = dc - 0.2 * dm + 0.5 * Math.min(room, 3) + Math.random() * 0.8 + (i >= 12 && i < 15 ? 1.2 : 0);   // (he does like a run along the ridge)
-    if (along > 0 && along < ul && side < 1.8) s -= 8;                // (never straight past her)
-    if (s > bs) { bs = s; best = [cx, cz]; }
-  }
-  R.tgt = best || [THREE.MathUtils.clamp(pos.x + (pos.x - p.x), A.x0, A.x1), THREE.MathUtils.clamp(pos.z + (pos.z - p.z), A.z0, A.z1)]; R.pickT = 1.4;
-}
-function roofChase(R, dt, p, d, dy, run) {                            // the rooftop tag game
-  const c = R.coon, g = c.g, pos = c.pos, A = R.arena, C = R.ch;
-  R.cool -= dt; R.immune = (R.immune || 0) - dt; R.burst = (R.burst || 0) - dt; R.pickT -= dt; R.tauntT = (R.tauntT || 0) - dt; R.perchCool = (R.perchCool || 0) - dt;
-  if (R.offT > 0.35 && (p.y < 11 || R.offT > 4)) {                    // she's fallen off (or gone): he laughs, and it all starts again when she's back up
-    roofSet(R, 'laugh'); R.tags = 0; roofSay(R.offT > 4 ? 'Hah! Running away, Princess?' : pickOf(['HAHAHA! Watch that first step!', 'Gravity: 1, PKR: 0! Hahaha!', 'Ooh, that’s gotta sting! Hehehe!'])); chitter(10, 2200); return;
-  }
-  if (R.perch) {                                                       // up on the chimney top: taunting, till she gets up close, then he's off
-    const P = R.perch; P.t += dt; const k = Math.min(1, P.t / 0.45);
-    if (k < 1) { pos.lerpVectors(P.from, P.to, k); pos.y = P.from.y + (P.to.y - P.from.y) * k + Math.sin(k * Math.PI) * 1.2; b4(c, 0.6); }
-    else { pos.copy(P.to); g.rotation.y = Math.atan2(p.x - pos.x, p.z - pos.z); c.arms.forEach((a, i) => a.rotation.set(0.15, 0, (i ? 1 : -1) * (Math.PI - 0.4 + Math.sin(clock * 18) * 0.08))); c.tongue.visible = true; c.head.rotation.z = Math.sin(clock * 9) * 0.18;
-      if (!P.said) { P.said = 1; roofSay(pickOf(['Can’t reach me up here! Nyah!', 'King of the chimney!', 'Up here, slowpoke!'])); chitter(6); }
-      P.alarm = d < 1.9 && dy > -1.6 ? (P.alarm || 0) + dt : 0;   /* (a moment to react: quick paws can still tag him up there) */
-      if (P.t > 5 || P.alarm > 0.3) { R.perch = null; R.perchCool = 4; R.cool = 0.5; R.burst = 0.8; roofPick(R, p); const T = R.tgt; R.leap = { t: 0, from: pos.clone(), to: new THREE.Vector3(T[0], roofSurf(T[0], T[1]), T[1]) }; } }
-    R.coonY = pos.y; roofTag(R, d, dy); return;
-  }
-  if (R.leap) {                                                        // a flying leap (off the chimney, or a big dodge)
-    const L = R.leap; L.t += dt; const T = L.T || (L.T = Math.max(0.35, Math.min(0.75, L.from.distanceTo(L.to) / 9))), k = Math.min(1, L.t / T);
-    pos.lerpVectors(L.from, L.to, k); pos.y = L.from.y + (L.to.y - L.from.y) * k + Math.sin(k * Math.PI) * 0.9; g.rotation.y = Math.atan2(L.to.x - L.from.x, L.to.z - L.from.z); b4(c, 0.9);
-    if (k >= 1) { R.leap = null; R.coonY = pos.y; } roofTag(R, d, dy); return;
-  }
-  if (!R.tgt || R.pickT <= 0 || Math.hypot(R.tgt[0] - pos.x, R.tgt[1] - pos.z) < 0.5) roofPick(R, p);
-  // close to the chimney with her on his tail: up he goes
-  const dch = Math.hypot((C.x0 + C.x1) / 2 - pos.x, (C.z0 + C.z1) / 2 - pos.z);
-  if (d < 3.6 && dch < 3.6 && R.perchCool <= 0 && p.y < C.top - 0.5) { R.perch = { t: 0, from: pos.clone(), to: new THREE.Vector3((C.x0 + C.x1) / 2, C.top, (C.z0 + C.z1) / 2) }; chitter(4, 2400); return; }
-  // she's right on him: a dodge, a hop sideways (not every time: he gets winded)
-  if (d < 1.8 && R.cool <= 0) {
-    const ax = (pos.x - p.x) / (d || 1), az = (pos.z - p.z) / (d || 1); let best = null, bs = -1e9;
-    for (const sd of [-1, 1]) { const x = THREE.MathUtils.clamp(pos.x - az * sd * 2.9 + ax * 1.3, A.x0, A.x1), z = THREE.MathUtils.clamp(pos.z + ax * sd * 2.9 + az * 1.3, A.z0, A.z1), s = Math.hypot(x - p.x, z - p.z) + Math.random() * 0.5; if (s > bs) { bs = s; best = [x, z]; } }
-    R.leap = { t: 0, from: pos.clone(), to: new THREE.Vector3(best[0], 0, best[1]) }; R.leap.to.y = roofSurf(best[0], best[1]); roofAvoidChimney(R, R.leap.to); R.leap.to.y = roofSurf(R.leap.to.x, R.leap.to.z);
-    R.cool = Math.max(0.9, 1.6 - R.tags * 0.2); R.burst = 0; R.tired = 0.5;   /* (winded after a dodge: the moment to pounce) */ R.tgt = null; tone(1500, 2300, 0.08, 'triangle', 0.025); if (Math.random() < 0.4) roofSay(pickOf(['Whoops! Too slow!', 'Missed me!', 'Hehe! Nope!', 'Ole!'])); return;
-  }
-  // far ahead of her: he stops to taunt
-  if (d > 7.5 && R.tauntT <= 0 && !R.tauntOn) { R.tauntOn = 1.4; R.tauntT = 6; roofSay(pickOf(['Nyah nyah nyah!', 'Can’t catch meee!', '♪ Trash panda on the roof! ♪', 'Is that all you’ve got, Princess?'])); chitter(5); }
-  if (R.tauntOn > 0) { R.tauntOn -= dt; if (d < 3.2) R.tauntOn = 0;
-    g.rotation.y = 0; b4(c, 0); c.body.rotation.z = Math.sin(clock * 14) * 0.22; c.head.rotation.y = Math.PI * 0.7; c.tail.forEach((sg, i) => { sg.rotation.y = Math.sin(clock * 14 - i * 0.5) * 0.45; });
-    g.rotation.y = Math.atan2(pos.x - p.x, pos.z - p.z); roofStick(R, pos, dt); roofTag(R, d, dy); return; }
-  // run
-  R.tired = (R.tired || 0) - dt; const sp = (R.burst > 0 ? 8.0 : R.tired > 0 ? 4.2 : 5.5) * (d > 9 ? 0.8 : 1), tx = R.tgt[0] - pos.x, tz = R.tgt[1] - pos.z, tl = Math.hypot(tx, tz) || 1, step = Math.min(tl, sp * dt);
-  pos.x += tx / tl * step; pos.z += tz / tl * step; pos.x = THREE.MathUtils.clamp(pos.x, A.x0, A.x1); pos.z = THREE.MathUtils.clamp(pos.z, A.z0, A.z1); roofAvoidChimney(R, pos);
-  let want = Math.atan2(tx, tz), dd = want - g.rotation.y; dd = Math.atan2(Math.sin(dd), Math.cos(dd)); g.rotation.y += dd * Math.min(1, dt * 12);
-  run(true); roofStick(R, pos, dt); roofTag(R, d, dy);
-}
-function b4(c, k) { c.body.rotation.x = 0.85 * k; c.body.position.y = -0.24 * k; c.legs[0].rotation.x = c.legs[1].rotation.x = -0.8 * k; c.arms.forEach(a => a.rotation.set(-1.6 * k, 0, 0)); }   // (down on all fours, stretched out)
-function roofTag(R, d, dy) {                                          // she touched him: tag!
-  if (R.immune > 0 || d > 0.85 || Math.abs(dy) > 1.0 || R.st !== 'chase') return;
-  R.tags++; R.perch = null; R.leap = null; R.tauntOn = 0; roofSet(R, 'tumble'); R.immune = 1.2;
-  const c = R.coon; burst(c.pos.clone().setY(c.pos.y + 0.6), 0xffe27a, 10, 2.2, 2.6, 0.45); walk.puff = 0.3;
-  [659, 784, 1047].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.04, i * 0.08)); chitter(4, 900);
-  roofSay(R.tags >= 3 ? 'OOF! Three?! No fair...' : R.tags === 2 ? 'HEY! Two?! Lucky paw...' : pickOf(['Ow! Okay, that one counted.', 'Hey! Watch the fur!', 'Oof! Beginner’s luck!']));
-}
-function roofHudUpdate(R) {
-  const on = R.st === 'chase' || R.st === 'tumble' || R.st === 'startle' || R.st === 'laugh', tk = on ? 0 : roofTinKey(R), key = on ? R.st + R.tags : tk || ''; if (key === R.hudKey) return; R.hudKey = key;
-  if (!on) { roofHud(R, tk ? roofTinHtml(R) : ''); return; }
-  const pips = '🐾'.repeat(R.tags) + '<span style="opacity:.4;filter:grayscale(1)">' + '🐾'.repeat(Math.max(0, 3 - R.tags)) + '</span>';
-  roofHud(R, R.st === 'laugh' ? '<div>🦝 He’s laughing at you!</div><div class="sub">Climb back up and try again</div>' : `<div>🦝 Tag the raccoon! <b>${R.tags}</b>/3</div><div class="pips">${pips}</div>`);
+function roofHudUpdate(R) {                                          // (ECON_V1: the old tag game's HUD is gone) the tin count, when there is one
+  const tk = roofTinKey(R), key = tk || ''; if (key === R.hudKey) return; R.hudKey = key;
+  roofHud(R, tk ? roofTinHtml(R) : '');
 }
 function roofWin(R) {                                                 // the loot: fish, three secret things for the Closet, a trophy
   R.paid = true; roofSave({ won: 1, met: 1, found: 1, fr: R.save.fr === 'madeUp' ? 'madeUp' : 'friends' });
@@ -18532,7 +18445,7 @@ function chimFinish(ok) {                                             // the car
   u.Badge.style.display = sweep || best ? 'block' : 'none'; u.Badge.textContent = sweep ? 'Every fish! Clean sweep!' : best ? 'New best haul!' : '';
   u.Bank.innerHTML = ''; if (ok) { const line = t => { const d = document.createElement('div'); d.textContent = t; u.Bank.appendChild(d); }; line('+' + C.fishGain + ' 🐟 into the piggy bank'); }
   else { const d = document.createElement('div'); d.textContent = Math.round(Math.max(0, Math.min(1, C.d / C.L)) * 100) + '% of the way down · the fish tumbled back down the flue'; u.Bank.appendChild(d); }
-  u.Wal.textContent = '🐟 ' + chimGet('catguard.fish') + ' in the piggy bank';
+  u.Wal.textContent = '🐟 ' + chimGet('catguard.fish') + ' in the piggy bank'; econCard('chim');
   u.Go.style.display = ok ? '' : 'none'; u.Again.style.display = ok ? 'none' : ''; u.Roof.style.display = ok ? 'none' : '';
   u.Over.classList.add('on'); u.cb = null; C.hudT = 0;
   if (ok) chimSfx('win');
@@ -20983,7 +20896,7 @@ function jetStep(dt) {
   if (J.phase === 'win') { J.winT += dt; if (J.winT > 4.4 && !J.card) jetResults(true); }
 }
 function jetResults(won) {                                             // the card (fish banked, medals stamped), over a fresh idle flight of the same level
-  const J = JET; J.zoomed = false; jetEndRun(won); jetCard('results'); const R = J.run; jetLevelStart(J.L, J.D, true); J.run = R;
+  const J = JET; J.zoomed = false; jetEndRun(won); jetCard('results'); econCard('jet'); const R = J.run; jetLevelStart(J.L, J.D, true); J.run = R;
 }
 function renderJet() {
   const J = JET; if (!J.active) { if (typeof cullBegin === 'function') jetIntroRender(); return; }
@@ -21838,7 +21751,7 @@ function ckSnNow() {
 function ckSnKey(d) { d = d || ckSnNow(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function ckSnSeason(id) { return ckSnSeasons().find(s => s.id === id) || null; }
 function ckSnIn(id, d) {                                               // is it that season now? (a window can cross New Year: Dec 1 to Jan 6)
-  const s = typeof id === 'string' ? ckSnSeason(id) : id; if (!s) return false; d = d || ckSnNow();
+  const s = typeof id === 'string' ? ckSnSeason(id) : id; if (!s) return false; d = d || ckSnNow(); ck5Diwali(s, d);
   const md = (d.getMonth() + 1) * 100 + d.getDate(), a = s.from[0] * 100 + s.from[1], b = s.to[0] * 100 + s.to[1];
   return a <= b ? md >= a && md <= b : md >= a || md <= b;
 }
@@ -22490,6 +22403,7 @@ function mfK() {                                                     // the bala
     CHAOS_DONE: 15,                                                  // Chaos: lasting the whole two minutes
     STASH: 3, LEVEL: 5,                                              // Mouse mode: per mushroom stashed, per level reached
     POOL: 14,                                                        // flying fish on screen at once (more than that go straight onto the counter)
+    ...econMfK(),                                                    /* (ECON_V1: the rebalanced knobs win over the ones above) */
   });
 }
 function mfS() {
@@ -22647,6 +22561,7 @@ function mfTick(dt) {                                                // (every f
   if (S.popT > 0 && (S.popT -= dt) <= 0 && S.cell) S.cell.classList.remove('mf-pop');
 }
 function mfOver(mouse) {                                             // (top of closetGameOverPay: replaces the old hidden formula) bank the run, count it up on the card
+  setTimeout(() => econCard('main'), 0);                           /* (ECON_V1: her wish on the card, once the run's banked) */
   try {
     const S = mfInit(), K = mfK();
     if (gameMode === 'chaos' && endReason === 'chaos' && !S.chaosDone) { S.chaosDone = true; S.run += K.CHAOS_DONE; S.brk.extra += K.CHAOS_DONE; }
@@ -23463,7 +23378,7 @@ function sledContent() {                                                 // what
     if (c.s < S.s + 1) continue;
     if (c.t === 't') { if (S.beginner) S.tipQ.push(c); continue; }
     sledProfAt(c.s, pr); const q = sledQAt(c, pr), clear = c.s > T.clearTo;
-    if (c.t === 'f') { if (!sledInGap(c.s) || (c.h || 0) > 0.5) sledFishAdd(c.s, q, c.h || 0, c.gold); }
+    if (c.t === 'f') { if (!sledInGap(c.s) || (c.h || 0) > 0.5) econSledKeep(c) && sledFishAdd(c.s, q, c.h || 0, c.gold); }
     else if (c.t === 'o') { if (clear && pr.hw >= (c.minw || 0)) sledObsAdd(c.kind, c.s, q, c.mv); }
     else if (c.t === 'r') { if (clear) sledObsAdd('ramp', c.s, q); }
     else if (c.t === 'g') { if (clear) sledGapAdd(c.s, c.len); }
@@ -24085,7 +24000,7 @@ function sledOver() {
   u.OD.textContent = Math.max(0, r.d); u.OF.textContent = S.fishN; u.OT.textContent = S.tricksN; u.OB.textContent = Math.max(r.best0, r.d);
   const nb = r.d > r.best0 && r.best0 > 0; u.Badge.style.display = nb || r.best0 === 0 && r.d > 0 ? 'block' : 'none'; u.Badge.textContent = nb ? 'New best!' : 'First run!';
   u.Bank.textContent = gain0 > 0 ? '+' + gain0 + ' 🐟 into the piggy bank' : S.fishN ? 'Fish all banked' : 'No fish this time... grab some next run!';
-  sledOverWallet(); u.Card.classList.toggle('wide', S.aspect > 1.4);
+  sledOverWallet(); u.Card.classList.toggle('wide', S.aspect > 1.4); econCard('sled');
   u.Over.classList.add('on'); u.PauseOv.classList.remove('on'); u.root.classList.remove('paused');
   if (nb) sledSfx('best');
 }
@@ -25132,7 +25047,7 @@ function lotWin() {
   const S = LOT, L = S.L, p = lotProg(), li = S.li, st = lotStarsFor(S.moves, L.min, S.hiss), first = !p.st[li], prevSt = p.st[li], prevBm = p.bm[li];
   let fish = 0; if (first) fish += 5 + 3 * L.p; const paid = p.paid[li] | 0; if (st > paid) { fish += (st - paid) * 3; p.paid[li] = st; }
   p.st[li] = Math.max(p.st[li], st); p.bm[li] = p.bm[li] ? Math.min(p.bm[li], S.moves) : S.moves; if (li + 1 < p.st.length) p.last = li + 1; lotSave();
-  if (fish) lotSetWallet(lotWallet() + fish);
+  fish = econLotFish(fish, L, first, st, paid); if (fish) lotSetWallet(lotWallet() + fish);
   try { unlock('lotFirst');
     if (p.st.every(x => x > 0)) unlock('lotAll'); if (p.st.every(x => x >= 3)) unlock('lotStars');
     if (L.p === 3 && S.moves <= L.min && !S.hiss && !S.bonk && !S.undos && !S.hints) unlock('lotGarage'); } catch (e) {}
@@ -25143,7 +25058,7 @@ function lotWin() {
   u.WinMoves.textContent = S.moves; u.WinMin.textContent = L.min; u.WinBest.textContent = p.bm[li];
   u.WinNote.textContent = S.hiss ? '🙀 ' + S.hiss + ' hiss' + (S.hiss > 1 ? 'es' : '') + ': a star off for each' : S.moves <= L.min ? '🏆 The fewest moves possible!' : 'Three stars in ' + L.min + ' moves';
   u.WinFish.textContent = fish ? '🐟 +' + fish + ' fish into the piggy bank!' : (prevSt >= st ? 'Your best: ' + '★'.repeat(prevSt) + (prevBm ? ' in ' + prevBm + ' moves' : '') : '');
-  u.Next.hidden = li + 1 >= lotLevels().length; u.Win.classList.add('on'); u.root.classList.add('won');
+  u.Next.hidden = li + 1 >= lotLevels().length; u.Win.classList.add('on'); u.root.classList.add('won'); econCard('lot');
   for (let k = 0; k < st; k++) setTimeout(() => lotSfx('star', k), 300 + k * 220);
   lotHud();
 }
@@ -26288,13 +26203,13 @@ function crossyLand() {
     if (row.mush === P.x) { row.mush = -99; crossyPower(); }
     if (!S.low) chimFxBurst(S.fx, P.x, row.y + 0.03, -P.row, 5, row.t === 'grass' ? 0xc8d8a0 : 0xc8c4bc, 0.8, 0.5, 0.06, 0.14, 0.3, 0.55, 2, 3);
   }
-  if (P.row > P.maxRow) { P.maxRow = P.row; S.idle = 0; crossyGenTo(P.maxRow + 52);
+  if (P.row > P.maxRow) { P.maxRow = P.row; econCrossyRow(S, P); S.idle = 0; crossyGenTo(P.maxRow + 52);
     if (P.maxRow >= 100 && typeof unlock === 'function') unlock('crossy100'); if (P.maxRow >= 500 && typeof unlock === 'function') unlock('crossy500');
     if (P.maxRow % 100 === 0) { crossyPop(P.maxRow + '!', 'gold', ''); crossySfx('streak'); } }
   if (row.zone && row.zone !== S.zone) { S.zone = row.zone; const z = row.zone.replace(/ (express|collectors|divider)$/, ''); if (!S.zones[z] && P.row > 0) { S.zones[z] = 1; if (z !== 'The ravine' && z !== 'Riverbank') crossyBanner(crossyZoneWord(z)); } }
 }
 function crossyZoneWord(z) { return { 'The off-ramp': '🚗 The off-ramp', '401': '🛣️ The 401!', 'The 401': '🛣️ The 401!', 'GO train tracks': '🚆 GO tracks', 'The Don River': '🌊 The Don River', 'Lower Don Trail': '🚴 Lower Don Trail' }[z] || z; }
-function crossyFishGot() { const S = CROSSY; S.fishN++; crossySfx('fish', S.fishN); if (S.ui) { S.ui.FishB.classList.remove('bump'); void S.ui.FishB.offsetWidth; S.ui.FishB.classList.add('bump'); }
+function crossyFishGot() { const S = CROSSY; S.fishN++; S.fishN += econK().crossyFish - 1; crossySfx('fish', S.fishN); if (S.ui) { S.ui.FishB.classList.remove('bump'); void S.ui.FishB.offsetWidth; S.ui.FishB.classList.add('bump'); }
   chimFxBurst(S.gx, S.P.x, S.P.y + 0.4, -S.P.row, S.low ? 6 : 12, 0x8fd0ff, 1.6, 1.4, 0.08, 0.02, 0.45, 0.9, 2, 3); }
 function crossyPower() {                                                 // a 🍄: slow motion, or a one-hit shield (whichever she hasn't got)
   const S = CROSSY, k = S.shield ? 'slow' : S.slowT > 0 ? 'shield' : crossyRnd() < 0.5 ? 'slow' : 'shield';
@@ -26602,7 +26517,7 @@ function crossyOver() {
   u.OD.textContent = r.d; u.OF.textContent = S.fishN; u.OB.textContent = Math.max(r.best0, r.d);
   const nb = r.d > S.best0 && S.best0 > 0; u.Badge.style.display = nb || (S.best0 === 0 && r.d > 0) ? 'block' : 'none'; u.Badge.textContent = nb ? 'New best!' : 'First run!';
   u.Bank.textContent = gain0 > 0 ? '+' + gain0 + ' 🐟 into the piggy bank' : S.fishN ? 'Fish all banked' : 'No fish this time... grab some next run!';
-  crossyOverWallet(); u.Card.classList.toggle('wide', S.aspect > 1.4);
+  crossyOverWallet(); u.Card.classList.toggle('wide', S.aspect > 1.4); econCard('crossy');
   u.Over.classList.add('on'); u.PauseOv.classList.remove('on'); u.root.classList.remove('paused', 'hawk'); u.hw = false; u.Hint.classList.remove('on');
   if (nb) crossySfx('best');
 }
@@ -27410,7 +27325,7 @@ function pkrPurrBuy(sec) {                                               // boug
     if (!Q.f || !pkrPurr.p || Q.P !== pkrPurr.p || pkrPurr.p.ctx !== A) {   // not purring yet: start one, behind its own fader
       pkrPurrEnd(true);
       pkrPurr(true, 0.8); const P = pkrPurr.p; if (!P) return false;
-      const f = A.createGain(); f.gain.value = 0; try { P.g.disconnect(); } catch (e) {} P.g.connect(f); f.connect(A.destination);
+      const f = A.createGain(); f.gain.value = 0; try { P.g.disconnect(); } catch (e) {} P.g.connect(f); f.connect(A.destination); ck5PurrRoute(f, A);
       Q.f = f; Q.P = P;
     }
     const t = A.currentTime, g = Q.f.gain, end = t + sec, v = Math.max(0, Math.min(1, g.value || 0));
@@ -27792,6 +27707,581 @@ function world2Deck(inc) {                                               // (tod
   for (const m of world2Deck.mats) inc.add(m);
 }
 /* (end of WORLD2_V1) */
+/* =====================================================================
+   ECON_V1 (2026-10-12): 🐟 fish earned at a fairer rate in every mode (roughly 40-70 a minute for a decent player), and on every
+   results card a 👗 PKR's Closet link plus her wish-list progress ("🎯 Wish: Sparkle cape 🐟 1,240 / 1,600", or "Ready to buy!").
+   Measured with silent bots, per minute of play, before → after (decent player):
+     Classic 37 → ~57 · Chaos 26 → ~50 · Mouse 23 → ~46 · Treetop Hop 20 → ~54 · Crossy Kitty ~10 → ~50 · Meow Lot ~10 → ~50 (per lot,
+     by how long it takes) · Motorcycle ~120-150 → ~90-110 · Sled Rush ~100-170 → ~55-85 (its fish lines are thinned: it was paying like the bike)
+     Sky Paws (~60) and Chimney Drop (~60 decent, 129 flawless) were already in range: unchanged.
+   Hooks (one short insert each): ...econMfK() at the end of mfK's knobs; econHopLand() in hopLand; crossyFishGot (a fish is worth 2)
+   and a new-row hook (econCrossyRow: +5 every 10 rows); econSledKeep() before sledFishAdd in sledContent; econBikeLine() before the
+   bike's fish-line roll; econLotFish() before lotWin pays; econCard(game) where each card is shown (bike, hop, chimney, sled, crossy,
+   lot, Sky Paws, and Classic/Chaos/Mouse via mfOver). Everything is lazy (function declarations only: no TDZ). ckWishInfo() (the
+   Closet's wish list) is optional: without it the wish line simply doesn't show.
+   ===================================================================== */
+function econK() {
+  return econK.k || (econK.k = {
+    mf: { PER_MOUSE: 0.6, RAINBOW: 3, BOSS: 9, KAREN: 6, STREAK: 3, WAVE_PER_SHROOM: 3, MESS_PTS: 30, MESS_CAP: 6, CHAOS_DONE: 30, STASH: 6, LEVEL: 10 },   // (was 0.4, 2, 6, 4, 2, 2, 50, 4, 15, 3, 5)
+    hopTree: 1, hopPerfect: 1,       // Treetop Hop: a fish for every tree she lands on, one more for a Perfect (fish on the arcs still count)
+    crossyFish: 2, crossyRows: 10, crossyRowFish: 5,   // Crossy Kitty: a fish on the road is worth 2; every 10 new rows, +5
+    sledKeep: 2,                     // Sled Rush: every 2nd fish of a line is laid (golden fish always)
+    bikeLine: 0.73,                  // the motorcycle: a fish line on 73% of the rows it used to be on
+  });
+}
+function econMfK() { return econK().mf; }                               // (spread over mfK's own knobs: these win)
+function econHopLand(H, k, perfect) {                                    // (hopLand: she landed k trees on, maybe dead centre)
+  try { const K = econK(), n = (k | 0) * K.hopTree + (perfect ? K.hopPerfect : 0); if (n > 0) H.fishRun = (H.fishRun | 0) + n; } catch (e) {}
+}
+function econCrossyRow(S, P) {                                           // (a new best row in Crossy Kitty: every 10th pays)
+  try { const K = econK(); if (P.maxRow > 0 && P.maxRow % K.crossyRows === 0) { S.fishN += K.crossyRowFish; crossySfx('fish', S.fishN);
+    if (S.ui && S.ui.FishB) { S.ui.FishB.classList.remove('bump'); void S.ui.FishB.offsetWidth; S.ui.FishB.classList.add('bump'); }
+    if (P.maxRow % 100 !== 0) crossyPop('🐾 ' + P.maxRow + ' rows', '', '+' + K.crossyRowFish + ' 🐟'); } } catch (e) {}
+}
+function econSledKeep(c) { if (c.gold) return true; const K = econSledKeep; K.n = ((K.n | 0) + 1) % econK().sledKeep; return K.n === 1 || econK().sledKeep <= 1; }
+function econBikeLine() { return Math.random() < econK().bikeLine; }
+function econLotFish(fish0, L, first, st, paid) {                        // Meow Lot: paid by how long a lot takes (its fewest moves): first clear 4 + 3 per place + 3 per move; each star 2/3 of a fish per move
+  try { let n = 0; const m = Math.max(1, L.min | 0);
+    if (first) n += 4 + 3 * (L.p | 0) + 3 * m;
+    if (st > paid) n += (st - paid) * Math.max(3, Math.round(m * 2 / 3));
+    return n; } catch (e) { return fish0; }
+}
+
+/* ---------- the results cards: her wish, and the way to the Closet ---------- */
+function econS() { return econS.s || (econS.s = { css: false, watch: 0, dress: null, dT: 0 }); }
+function econCss() {
+  const S = econS(); if (S.css) return; S.css = true;
+  const st = document.createElement('style'); st.id = 'econCss';
+  st.textContent = `
+.econ-cl{display:flex;flex-direction:column;align-items:center;gap:2px;margin:8px auto 0;width:100%;max-width:320px;pointer-events:auto}
+.econ-cl[hidden]{display:none}
+.econ-wish{width:100%;box-sizing:border-box;padding:6px 10px 7px;border-radius:12px;background:#fff;border:1.5px solid rgba(176,70,126,.28);color:#5a2a4a;font:800 12.5px/1.25 var(--body,system-ui),system-ui,sans-serif;text-align:left;letter-spacing:0}
+.econ-wish[hidden]{display:none}
+.econ-wish .econ-r{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.econ-wish .econ-n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.econ-wish .econ-f{flex:none;white-space:nowrap;font-variant-numeric:tabular-nums;color:#2a6aa8}
+.econ-wish.ready .econ-f{color:#1d8f45}
+.econ-bar{display:block;height:6px;margin-top:5px;border-radius:3px;background:#f3dbe8;overflow:hidden}
+.econ-bar>i{display:block;height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,#ff9ccb,#ff5fa2)}
+.econ-wish.ready .econ-bar>i{background:linear-gradient(90deg,#6ee39a,#26b45f)}
+.econ-link{appearance:none;-webkit-appearance:none;border:0;background:none;cursor:pointer;min-height:40px;padding:8px 12px;font:800 14px var(--body,system-ui),system-ui,sans-serif;color:#b0467e;text-decoration:underline;text-underline-offset:3px;pointer-events:auto}
+.econ-link[hidden]{display:none}
+.econ-link .econ-lb,.econ-wish.ready .econ-fi{display:none}.econ-link.ready .econ-lb{display:inline}
+#overScreen .econ-cl{margin-top:6px}
+@media (max-height:720px){                                        /* (short screens: the wish and the link share one row) */
+  .econ-cl{flex-direction:row;align-items:center;justify-content:center;gap:4px;margin-top:6px}.econ-wish{flex:1;min-width:0;padding:4px 8px 5px;font-size:12px}.econ-bar{height:5px;margin-top:3px}
+  .econ-wish:not([hidden])~.econ-link{flex:none;min-height:36px;padding:4px 4px 4px 6px;font-size:13px}.econ-wish:not([hidden])~.econ-link .econ-lp,.econ-wish:not([hidden])~.econ-link .econ-lb,.econ-wl,.econ-tg,.econ-fi{display:none}}
+`;
+  document.head.appendChild(st);
+}
+function econWish() {                                                    // her wish (from the Closet), or null
+  try { if (typeof ckWishInfo !== 'function') return null; const w = ckWishInfo(); return w && w.name && +w.price > 0 ? w : null; } catch (e) { return null; }
+}
+function econFmt(n) { try { return Math.round(n).toLocaleString('en-US'); } catch (e) { return String(Math.round(n)); } }
+function econHost(g) {                                                   // where each card's line goes: [the element, 'after' | 'before', show our own Closet link?]
+  const $q = id => document.getElementById(id);
+  if (g === 'main') { const o = $q('ckOverFish'); return o ? [o, 'after', !!o.hidden || !o.querySelector('button')] : null; }
+  if (g === 'bike') { const r = $q('bikeRevive'); return r ? [r, 'before', true] : null; }
+  if (g === 'hop') { const u = typeof HOP !== 'undefined' && HOP.ui; if (!u || !u.Wal) return null; const l = u.Wal.parentElement && u.Wal.parentElement.parentElement && u.Wal.parentElement.parentElement.querySelector('.ck-hoplink');
+    return l ? [l, 'before', false] : u.Wal.parentElement ? [u.Wal.parentElement, 'after', false] : null; }   /* (above its own Closet link) */
+  if (g === 'chim') { const w = $q('chimWal'); return w ? [w, 'after', true] : null; }
+  if (g === 'sled') { const w = $q('sledWal'); return w ? [w, 'after', true] : null; }
+  if (g === 'crossy') { const w = $q('cyWal'); return w ? [w, 'after', true] : null; }
+  if (g === 'lot') { const w = $q('lotWinFish'); return w ? [w, 'after', true] : null; }
+  if (g === 'jet') { const u = typeof JET !== 'undefined' && JET.ui; const c = u && u.Card; const a = c && (c.querySelector('.jt-gain') || c.querySelector('.jt-unl')); return a ? [a, 'after', true] : null; }
+  return null;
+}
+function econCard(g) {                                                   // (each card, as it's shown, and again after the Closet) her wish line, and the link
+  try {
+    econCss(); const H = econHost(g); if (!H) return;
+    const [at, where, link] = H, id = 'econ-' + g; let box = document.getElementById(id);
+    if (!box) {
+      box = document.createElement('div'); box.className = 'econ-cl'; box.id = id;
+      box.innerHTML = '<div class="econ-wish" hidden><div class="econ-r"><span class="econ-n"><span class="econ-tg">🎯 </span><span class="econ-wl">Wish: </span><span class="econ-wn"></span></span><span class="econ-f"><span class="econ-fi">🐟 </span><span class="econ-fv"></span></span></div><i class="econ-bar"><i></i></i></div>'
+        + '<button type="button" class="econ-link" tabindex="-1">👗 <span class="econ-lb">Buy it in </span><span class="econ-lp">PKR’s </span>Closet</button>';
+      box.querySelector('button').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); econOpen(g); });
+      for (const t of ['pointerdown', 'touchstart', 'mousedown']) box.addEventListener(t, e => e.stopPropagation(), { passive: true });   /* (a tap here isn't a tap on the game's card behind) */
+    }
+    if (where === 'before' ? at.previousElementSibling !== box : at.nextElementSibling !== box) { if (where === 'before') at.before(box); else at.after(box); }
+    const w = econWish(), wl = box.querySelector('.econ-wish'), b = box.querySelector('button');
+    if (w) {
+      const have = typeof ckWallet === 'function' ? ckWallet() : 0, ready = have >= w.price;
+      wl.hidden = false; wl.classList.toggle('ready', ready);
+      wl.querySelector('.econ-wn').textContent = (w.ic ? w.ic + ' ' : '') + w.name;
+      wl.querySelector('.econ-fv').textContent = ready ? 'Ready to buy!' : econFmt(Math.min(have, w.price)) + ' / ' + econFmt(w.price);
+      wl.querySelector('.econ-bar>i').style.width = Math.round(Math.min(1, have / w.price) * 100) + '%';
+    } else wl.hidden = true;
+    b.hidden = !link; b.classList.toggle('ready', !!w && w.price <= (typeof ckWallet === 'function' ? ckWallet() : 0));
+    box.hidden = wl.hidden && b.hidden;
+  } catch (e) { if (!econCard.err) { econCard.err = 1; console.error(e); } }
+}
+function econUp(g) {                                                     // is that game's card still up (and has it been up a moment)?
+  try {
+    if (g === 'main') return state === 'over';
+    if (g === 'bike') return BIKE.active && BIKE.phase === 'over' && (BIKE.overT || 0) > 0.4;
+    if (g === 'hop') return HOP.active && HOP.phase === 'over';
+    if (g === 'chim') return CHIM.active && CHIM.phase === 'over' && (CHIM.overT || 0) > 0.4;
+    if (g === 'sled') return SLED.active && SLED.phase === 'over' && (SLED.overT || 0) > 0.4;
+    if (g === 'crossy') return CROSSY.active && CROSSY.phase === 'over' && (CROSSY.overT || 0) > 0.4;
+    if (g === 'lot') return LOT.active && LOT.phase === 'won';
+    if (g === 'jet') return JET.active && JET.card === 'results';
+  } catch (e) {}
+  return false;
+}
+function econOpen(g) {                                                   // the card's link: the Closet over the card; shut it and she's back on the card (wallets and her clone brought up to date)
+  if (typeof closetOpen !== 'function' || (typeof CK !== 'undefined' && CK.on) || !econUp(g)) return;
+  closetOpen(g === 'main' ? 'overScreen' : null);
+  if (typeof CK === 'undefined' || !CK.on) return;
+  const S = econS(); if (S.watch) clearInterval(S.watch);
+  S.watch = setInterval(() => { if (typeof CK !== 'undefined' && CK.on) return; clearInterval(S.watch); S.watch = 0; econBack(g); }, 150);
+}
+function econBack(g) {                                                   // the Closet shut: the card's piggy bank and her wish brought up to date, and her outfit onto the game's PKR
+  try {
+    if (g === 'bike' && typeof bikeOverWallet === 'function') bikeOverWallet();
+    else if (g === 'sled' && typeof sledOverWallet === 'function') sledOverWallet();
+    else if (g === 'crossy' && typeof crossyOverWallet === 'function') crossyOverWallet();
+    else if (g === 'chim' && CHIM.ui && CHIM.ui.Wal) CHIM.ui.Wal.textContent = '🐟 ' + chimGet('catguard.fish') + ' in the piggy bank';
+    else if (g === 'lot' && typeof lotHud === 'function') lotHud();
+  } catch (e) {}
+  econCard(g); if (g !== 'main' && g !== 'hop') econDress(g);   /* (Treetop Hop: closetRedress already re-dresses its clone; the main games use the photo) */
+}
+function econDress(g) {                                                  // her clone in that game, re-made from her (newly dressed) Free roam self: now if that's safe, or as the next run starts
+  const S = econS(); S.dress = g; if (econDressStep()) return;
+  if (!S.dT) S.dT = setInterval(() => { let done = true; try { done = econDressStep(); } catch (e) { console.error(e); } if (done) { clearInterval(S.dT); S.dT = 0; } }, 200);
+}
+function econDressStep() {                                               // true: done (or nothing to do)
+  const S = econS(), g = S.dress, W = typeof walk !== 'undefined' && walk.rig; if (!g || !W || !W.g) { S.dress = null; return true; }
+  const fin = () => { S.dress = null; return true; };
+  if (typeof CK !== 'undefined' && CK.on) return false;
+  if (g === 'lot') { if (LOT.active && typeof lotRigSet === 'function') lotRigSet(); return fin(); }
+  if (g === 'sled') { if (!SLED.active) return fin(); if (SLED.phase !== 'run') return false; sledCatSet(W.g.clone(true)); return fin(); }
+  if (g === 'crossy') { if (!CROSSY.active) return fin(); if (CROSSY.phase !== 'run') return false; crossyRigSet(); return fin(); }
+  if (g === 'chim') { if (!CHIM.active) return fin(); if (CHIM.phase !== 'fall') return false; chimCatSet(W.g.clone(true)); return fin(); }
+  if (g === 'jet') { if (!JET.active) return fin(); if (JET.phase !== 'play') return false; jetKitSet(W.g.clone(true)); return fin(); }
+  if (g === 'bike') { const B = BIKE; if (!B.active) return fin(); if (B.phase !== 'count' && B.phase !== 'ride') return false;
+    const r = W.g.clone(true); r.position.set(0, 0, 0); r.rotation.set(0, 0, 0); r.scale.setScalar(1); r.visible = true;
+    if (B.rider && B.rider !== B.rv.cat && B.rider.parent) B.rider.parent.remove(B.rider);
+    B.rider = r; if (B.opts) B.opts.rider = r; B.rv.scaleG.add(r); bikeRagBind(); return fin(); }
+  return fin();
+}
+/* (end of ECON_V1) */
+/* CK5A_V1 */
+/* =====================================================================
+   PKR'S CLOSET, PHASE 0: FIXING WHAT'S THERE (2026-10-12).
+   - Descriptions always readable: the real description even when she can't afford it; the "earn fish" hint, the deal, the
+     season and the ✨ Functional note each on their own small line; the set line its own tappable chip (it opens the book).
+   - Set bonuses about 17.5% of a set's price (a secret counts as 300), rounded nicely; never lower than before; paid once.
+   - A first purchase for a new player (about 36 🐟): the Party hat is 35 and the Ribbon bow 30.
+   - Premium things look it: a thick glowing halo with pearls and glints, a tall filigree tiara with a heart gem, a royal cape
+     with an ermine roll, a train and a gold crown on the back, a big chrome jetpack; a double strand of pearls.
+   - Every cape its own silhouette (ck5CapeShape): swallowtail, scallops, bat points, a train, waves, a ghost's sheet...
+   - Phones: one slim strip over the grid (season, today's deal, the wish or the featured thing), 44 px tabs that scroll
+     (room for more slots), the active tab says its name, 44 px close buttons, 12 px card and description text.
+   - ⭐ Wish list: one wish (localStorage catguard.wish), from its card or the buy bar; its progress in the strip.
+     ckWishInfo() -> { id, name, ic, price } or null (the result cards use it).
+   - Fixes: buy the rest of a tried-on look; the seasonal view has its own 🎃 tab; Diwali follows the real date (2026-2032);
+     Surprise me with nothing to change says so; the purchase purr goes through the effects bus (master chain); the title
+     button's red dot means something new (catguard.ckSeen), not just "40+ fish".
+   - Thumbnails: backpacks without their harness, halo/tiara/pearls/scarf framed close; capes told apart by shape.
+   Hooks: ckState (ck5Reg), ckCapeGeo (ck5CapeShape), ckStraps (off for thumbnails), ckThumbStep (ck5Thumb), ckBuildUI (ck5UI),
+   ckRefresh (ck5Refresh), ckMain (ck5Main), ckSurprise (ck5Same), ckDot (ck5Dot), closetOpen (ck5Open), ckSnIn (ck5Diwali),
+   pkrPurrBuy (ck5PurrRoute). Everything here is a hoisted function (no TDZ).
+   ===================================================================== */
+function ck5Reg() {                                                    // (from ckState, after ck4Reg: before anything is baked or priced)
+  if (ck5Reg.done) return; ck5Reg.done = true;
+  try {
+    const I = CK_BY_ID, set = (id, o) => { if (I[id]) Object.assign(I[id], o); };
+    set('party', { price: 35 }); set('tailbow', { price: 30 });       /* (a first buy on the first visit: a new player has about 36 🐟) */
+    set('halo', { build: B => ck5Halo(B), fit: 0.46, thumb: [0, 0.25, -0.01, 0.135], thumbDir: [0.35, 0.95, 1] });
+    set('tiara', { build: B => ck5Tiara(B), fit: 0.46, thumb: [0, 0.12, 0.08, 0.16], thumbDir: [0.3, 0.3, 1] });
+    set('royal', { build: B => ck5Royal(B) });
+    set('jetpack', { build: B => ck5Jetpack(B) });
+    set('pearls', { build: B => ck5Pearls(B), thumb: [0, 0.5, 0.29, 0.2], thumbDir: [0.2, 0.3, 1] });
+    set('aviatorScarf', { thumb: [0, 0.6, 0.1, 0.3], thumbDir: [-0.8, 0.5, 0.7] });
+    const shape = { hero: 'swallow', rainbow: 'scallop', vampire: 'bat', fireflyCape: 'wave', starCape: 'long', ghostCape: 'ghost', rangoliCape: 'point', poncho: 'short', pawCape: 'petal', sparkle: 'trio' };
+    for (const id in shape) { const it = I[id]; if (!it || !it.build) continue; const b0 = it.build; it.build = B => { b0(B); if (B.cape) B.cape.shape = shape[id]; }; }
+    for (const it of CK_ITEMS) if (it.slot === 'pack' && it.thumb) delete it.thumb;   /* (no harness in the picture now: frame the bag itself) */
+    const val = id => { const it = I[id]; return !it ? 0 : ckIsEx(it) ? 300 : (it.snFull || it.price) || 0; };
+    for (const s of ckSetBase()) s.fish = Math.max(s.fish | 0, ck5Nice(s.items.reduce((a, id) => a + val(id), 0) * 0.175));
+    for (const s of ckSnSeasons()) s.fish = Math.max(s.fish | 0, ck5Nice(CK_ITEMS.filter(it => it.season === s.id).reduce((a, it) => a + (it.price || 0), 0) * 0.175));
+  } catch (e) { console.error(e); }
+}
+function ck5Nice(v) { const st = v < 100 ? 5 : v < 300 ? 10 : 25; return Math.round(v / st) * st; }
+
+/* ---------- capes: each its own silhouette (the sheet's grid is reshaped; the colours, the flutter and the pictures follow it) ---------- */
+function ck5CapeShapes() {                                             // len(u): how far back each column reaches (over 1: a train off her rump); side(v): how far down her sides
+  if (ck5CapeShapes.T) return ck5CapeShapes.T;
+  const tri = x => 1 - Math.abs((((x % 1) + 1) % 1) * 2 - 1), slit = (u, w) => Math.exp(-Math.pow(u / w, 2));   /* (slit: a gap for her tail) */
+  return (ck5CapeShapes.T = {
+    swallow: { len: u => 1 + 0.32 * Math.min(1, Math.abs(u) / 0.55) - 0.24 * Math.max(0, Math.abs(u) - 0.75) },   // a superhero's swallowtail: two tails streaming behind
+    scallop: { len: u => 0.93 + 0.12 * Math.abs(Math.cos(u * Math.PI * 2)), side: v => 1.0 + 0.14 * Math.abs(Math.sin(v * Math.PI * 3)) },
+    bat: { len: u => 0.9 + 0.24 * tri(u * 2 + 0.5), side: v => 0.98 + 0.15 * tri(v * 3) },           // jagged bat-wing points
+    regal: { len: u => 1.32 - 0.3 * slit(u, 0.17) - 0.1 * u * u, side: () => 1.13, flare: 0.9 },      // long and full, a train either side of her tail
+    wave: { len: u => 1 + 0.07 * Math.cos(u * Math.PI * 4), side: v => 1.03 + 0.07 * Math.sin(v * Math.PI * 5) },
+    long: { len: u => 1.24 - 0.24 * slit(u, 0.2), side: () => 0.92 },
+    ghost: { len: u => 1.05 + 0.08 * Math.cos(u * Math.PI * 3), side: v => 1.15 + 0.07 * Math.sin(v * Math.PI * 4) },   // a ghost's sheet: deep, wavy all round
+    point: { len: u => 1.3 - 0.62 * Math.abs(u), side: () => 0.9 },                               // a shawl, one long point down her back
+    short: { len: u => 0.7 - 0.1 * u * u, side: () => 1.17 },                                         // a poncho: short and wide
+    petal: { len: u => 0.86 + 0.16 * Math.abs(Math.cos(u * Math.PI * 1.5)), side: v => 0.93 + 0.05 * Math.abs(Math.sin(v * Math.PI * 2)) },   // a capelet with soft round lobes
+    trio: { len: u => 0.92 + 0.26 * tri(u * 1.5 + 0.5), side: () => 0.97 },                          // three points, like a star's
+  });
+}
+function ck5CapeAt(sh, u, v, out) {                                    // one point of a shaped sheet: [x, y, z] and which way is out
+  const { z0, z1 } = CK_CAPE, L = sh && sh.len ? sh.len(u) : 1, sd = sh && sh.side ? sh.side(v, u) : 1, vv = v * L, vb = Math.min(1, vv);
+  const z = z0 + (z1 - z0) * vb, tMax = (1.42 + 0.3 * vb - 0.3 * (1 - vb) * (1 - vb)) * sd, th = u * tMax, cy = 0.43, d = [Math.sin(th), Math.cos(th), -0.18 * vb];
+  const dl = Math.hypot(d[0], d[1], d[2]); d[0] /= dl; d[1] /= dl; d[2] /= dl;
+  const R = ckReach([0, cy, z], d, CK_BODY, 0.022 + 0.01 * vb, 0.5);
+  let x = d[0] * R * (1 + 0.04 * vb * Math.abs(u)), y = cy + d[1] * R - 0.012 * vb * vb, zz = z + d[2] * R;
+  if (vv > 1) { const e = (vv - 1) * (z0 - z1); zz -= e * 0.75; y -= e * 0.6; x *= 1 + (vv - 1) * ((sh && sh.flare) || 0.6); }   /* (past her rump: it falls back and down) */
+  out[0] = x; out[1] = y; out[2] = zz; out[3] = d[0]; out[4] = d[1]; out[5] = d[2]; return out;
+}
+function ck5CapeShape(spec, P, Nn) {                                   // (ckCapeGeo, before the faces) the sheet in its own shape
+  const sh = ck5CapeShapes()[spec.shape]; if (!sh) return;
+  const { cols, rows } = CK_CAPE, q = [0, 0, 0, 0, 0, 0];
+  for (let r = 0; r <= rows; r++) for (let k = 0; k <= cols; k++) { const i = (r * (cols + 1) + k) * 3; ck5CapeAt(sh, k / cols * 2 - 1, r / rows, q);
+    P[i] = q[0]; P[i + 1] = q[1]; P[i + 2] = q[2]; Nn[i] = q[3]; Nn[i + 1] = q[4]; Nn[i + 2] = q[5]; }
+}
+
+/* ---------- the premium things, rebuilt ---------- */
+function ck5Halo(B) {                                                  // a thick glowing gold halo just over her ears: pearls round it, four little glints, a warm glow
+  const y = 0.235, z = -0.012, r = 0.104, gold = new THREE.Color(0xffc23a), pale = new THREE.Color(0xfff5c2), c = new THREE.Color();
+  B.frame([0, y, z], [Math.PI / 2 - 0.2, 0, 0]);                       /* (the ring's own +z is down) */
+  B.g(CKG.tor(r, 0.02, 12, 56), (x, yy) => c.copy(gold).lerp(pale, 0.5 + 0.5 * Math.sin(Math.atan2(yy, x) * 4)).getHex());
+  B.g(CKG.tor(r, 0.0085, 6, 56), 0xfffbe6, [0, 0, -0.014]);
+  for (let i = 0; i < 16; i++) { const a = (i + 0.5) / 16 * Math.PI * 2; B.s(CKG.sph(0.0078, 8, 6), 0xfff8f0, [Math.cos(a) * (r + 0.013), Math.sin(a) * (r + 0.013), -0.006]); }
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + Math.PI / 4, x = Math.cos(a) * r, yy = Math.sin(a) * r;
+    B.g(new THREE.OctahedronGeometry(1, 0), 0xfffde8, [x, yy, -0.032], null, [0.011, 0.011, 0.034]); B.g(new THREE.OctahedronGeometry(1, 0), 0xfffde8, [x, yy, -0.032], null, [0.026, 0.006, 0.006]); }
+  B.frame();
+  B.sprite = { color: 0xffe68a, pos: [0, y, z], scale: 0.5, opacity: 0.8 }; B.anim = 'bob';
+}
+function ck5Tiara(B) {                                                 // a tall silver tiara: filigree arches, a pink heart in the middle, blue and pink gems, pearls on the tips
+  const base = () => B.mat([0, 0.004, 0.052], [0.36, 0, 0]), sil = 0xeef2fa, R = 0.14, sx = 1.19, sy = 0.955;
+  B.M = base(); B.s(CKG.tor(R, 0.0105, 7, 48, 2.1), sil, [0, 0, 0], [0, 0, Math.PI / 2 - 1.05], [sx, sy, 1]);
+  const at = a => [Math.sin(a) * R * sx, Math.cos(a) * R * sy];
+  for (let k = -9; k <= 9; k++) { if (k % 3 === 0) continue; const a = k / 9 * 0.98, [x, y] = at(a); B.M = base().multiply(B.mat([x, y, 0.011], [0, 0, -a])); B.s(new THREE.OctahedronGeometry(0.0062, 0), k % 2 ? 0xffa6cf : 0x9fe8ff); }
+  const arch = (w, h) => [[-w, 0], [w, 0], [w * 0.92, h * 0.28], [w * 0.55, h * 0.6], [0, h], [-w * 0.55, h * 0.6], [-w * 0.92, h * 0.28]];
+  const peaks = [[0, 0.11, 0.034], [0.34, 0.072, 0.026], [-0.34, 0.072, 0.026], [0.66, 0.05, 0.02], [-0.66, 0.05, 0.02], [0.9, 0.032, 0.015], [-0.9, 0.032, 0.015]];
+  for (const [a, h, w] of peaks) {
+    const [x, y] = at(a); B.M = base().multiply(B.mat([x, y, 0], [0, 0, -a]));
+    B.s(ckFlat(arch(w, h), 0.0065, [arch(w * 0.55, h * 0.62).map(([px, py]) => [px, py + h * 0.14])]), sil);   /* (open filigree: an arch with a window) */
+    B.s(CKG.sph(a ? 0.0075 : 0.0105, 10, 8), 0xfff6ee, [0, h + 0.006, 0]);                                     // a pearl on the tip
+    if (!a) B.s(ckFlat(ckHeartPts(0.026), 0.012), 0xff4f9a, [0, h * 0.34, 0.006]);                           // the big pink heart
+    else B.s(new THREE.OctahedronGeometry(1, 0), Math.abs(a) < 0.5 ? 0x7fdcff : 0xff8fc4, [0, h * 0.4, 0.006], null, [w * 0.42, w * 0.62, 0.008]);
+    for (const s of [-1, 1]) B.s(CKG.tor(w * 0.42, 0.0028, 4, 12, Math.PI), sil, [s * w * 1.05, h * 0.12, 0], [0, 0, s > 0 ? -Math.PI / 2 : Math.PI / 2]);   /* (little curls either side) */
+  }
+  B.frame();
+}
+function ck5Pearls(B) {                                                // two strands of pearls, the lower one with a pink pearl drop on a gold cap
+  const N1 = ckNeck(0.018, 0.035), N2 = ckNeck(0.021, 0.095), all = [], cols = [0xfff4ea, 0xfbe9f0];
+  for (let i = 0; i < 30; i++) { const p = ckOnCurve(N1.curve, i / 30); all.push(p.clone()); B.s(CKG.sph(0.0128, 10, 8), cols[i % 2], [p.x, p.y, p.z]); }
+  for (let i = 0; i < 40; i++) { const p = ckOnCurve(N2.curve, i / 40); if (all.some(q => q.distanceTo(p) < 0.022)) continue; B.s(CKG.sph(0.0112, 10, 8), cols[(i + 1) % 2], [p.x, p.y, p.z]); }
+  const f = ckFrontOf(N2, 0.75), p = f.p;
+  B.s(CKG.cyl(0.009, 0.012, 0.012, 12), 0xf2c14a, [p.x, p.y - 0.017, p.z + 0.012]);
+  B.s(CKG.sph(0.024, 16, 12), 0xffaed0, [p.x, p.y - 0.044, p.z + 0.016], null, [1, 1.22, 1]);
+  B.s(CKG.sph(0.007, 8, 6), 0xffffff, [p.x - 0.008, p.y - 0.036, p.z + 0.036]);   /* (a glint) */
+}
+function ck5Jetpack(B) {                                               // a proper jetpack: two big chrome tanks with red noses and fins, a red housing with a gold star, glowing nozzles
+  const sil = 0xdfe4ec, red = 0xe8283c, dark = 0x3e3946, gold = 0xffc93c, y = 0.66, X = 0.064; B.flamePivot = [0, y, -0.215];
+  B.s(ck4RBox(0.092, 0.1, 0.2, 0.014, 3), red, [0, y - 0.022, -0.03]);
+  B.s(ckFlat(ckStarPts(0.032), 0.006), gold, [0, y + 0.033, -0.035], [-Math.PI / 2, 0, 0]);
+  B.g(CKG.sph(0.015, 10, 8), 0x7fe3ff, [0, y + 0.03, 0.055], null, [1, 0.6, 1]);
+  for (const sx of [-1, 1]) {
+    B.s(CKG.cyl(0.05, 0.05, 0.25, 22), sil, [sx * X, y, -0.03], [Math.PI / 2, 0, 0]);
+    B.s(CKG.cone(0.05, 0.1, 22), red, [sx * X, y, 0.145], [Math.PI / 2, 0, 0]);
+    for (const zz of [0.06, -0.06]) B.s(CKG.tor(0.0505, 0.0075, 6, 24), red, [sx * X, y, zz]);
+    B.s(ckFlat([[0, 0], [0.06, -0.035], [0.065, -0.085], [0, -0.07]], 0.007), red, [sx * (X + 0.045), y, -0.1], [0, sx * Math.PI / 2, 0]);   /* (a fin out each side) */
+    B.s(ckFlat([[0, 0], [0.05, -0.03], [0.055, -0.07], [0, -0.06]], 0.007), red, [sx * X, y + 0.045, -0.1], [Math.PI / 2, sx > 0 ? Math.PI / 2 : -Math.PI / 2, 0]);
+    B.s(CKG.cyl(0.03, 0.044, 0.05, 18), dark, [sx * X, y, -0.18], [Math.PI / 2, 0, 0]);
+    B.g(CKG.cyl(0.028, 0.028, 0.004, 16), 0xff9a3a, [sx * X, y, -0.2055], [Math.PI / 2, 0, 0]);
+    B.g(CKG.sph(0.0065, 8, 6), sx > 0 ? 0x6fff8a : 0xff5a6a, [sx * X, y + 0.048, 0.05]);
+    B.f(CKG.cone(0.036, 0.2, 12), (x, yy) => new THREE.Color(0xffe27a).lerp(new THREE.Color(0xff3a12), Math.min(1, Math.max(0, (yy + 0.1) / 0.2))).getHex(), [sx * X, 0, -0.1], [-Math.PI / 2, 0, 0]);
+  }
+  ckStraps(B, dark, B.s);
+}
+function ck5Royal(B) {                                                 // the Royal velvet cape: a train, an ermine roll at her shoulders, a crown brooch, a gold crown on the back
+  ckCape(B, 'royal'); B.cape.shape = 'regal';
+  const sh = ck5CapeShapes().regal, pts = [], q = [0, 0, 0, 0, 0, 0];
+  for (let i = 0; i <= 28; i++) { ck5CapeAt(sh, i / 28 * 2 - 1, 0, q); pts.push(new THREE.Vector3(q[0] + q[3] * 0.022, q[1] + q[4] * 0.022, q[2] + 0.012)); }
+  B.m(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 64, 0.03, 9, false), (x, y, z, i) => (i * 37) % 29 === 7 ? 0x1c1620 : 0xfbf8f0);   /* (ermine: white, flecked black) */
+  for (const s of [-1, 1]) B.m(ckFluff(CKG.sph(0.034, 10, 8), 0.25, s), 0xfbf8f0, [pts[s < 0 ? 0 : 28].x, pts[s < 0 ? 0 : 28].y, pts[s < 0 ? 0 : 28].z]);
+  B.s(ckFlat([[-0.03, -0.012], [0.03, -0.012], [0.032, 0.018], [0.016, 0.004], [0, 0.026], [-0.016, 0.004], [-0.032, 0.018]], 0.008), 0xf2c14a, [0, 0.482, 0.392], [-0.35, 0, 0]);
+  B.post = G => { G.g = ckSnSheetDeco(G.cape, blob => {
+    const gold = 0xf5c84c, deep = 0xd9a520;
+    const mu = 0.34, mv = 0.55, top = 0.46 - 0.022 / mv;                 /* (about how many metres one step of u and v is, mid-back) */
+    for (let k = -3; k <= 3; k++) blob(k * 0.026 / mu, 0.46, [[-0.0165, -0.022], [0.0165, -0.022], [0.0165, 0.022], [-0.0165, 0.022]], 0.003, gold);   // the crown: a band (in short pieces, so it follows the cloth round her back)...
+    for (const [x, h, w] of [[-0.064, 0.055, 0.024], [0, 0.078, 0.03], [0.064, 0.055, 0.024]]) blob(x / mu, top - h / 2 / mv, [[-w, -h / 2], [w, -h / 2], [0, h / 2]], 0.003, gold, deep);   // ...and three points
+    for (const [x, y, r, c] of [[0, 0, 0.014, 0xe0264a], [-0.058, 0, 0.008, 0x3a8cff], [0.058, 0, 0.008, 0x3a8cff], [-0.064, 0.022 + 0.055, 0.009, 0xffffff], [0, 0.022 + 0.078, 0.01, 0xffffff], [0.064, 0.022 + 0.055, 0.009, 0xffffff]]) blob(x / mu, 0.46 - y / mv, ckSnDisc(r, r, 12), 0.0042, c);   // gems, and pearls on the points
+    for (const [u, v] of [[-0.62, 0.2], [0.62, 0.2], [-0.5, 0.72], [0.5, 0.72], [0, 0.82], [-0.78, 0.48], [0.78, 0.48], [-0.3, 0.12], [0.3, 0.12]]) blob(u, v, ckStarPts(0.016, 0.42), 0.003, gold);
+  }); };
+}
+
+/* ---------- thumbnails: a backpack without its harness ---------- */
+function ck5Thumb(it, T) {                                             // (ckThumbStep) true: T.ck5o is the picture's object (built just for it)
+  if (T.ck5g) { T.ck5g.forEach(g => g.dispose()); T.ck5g = null; }
+  if (it && it.id === 'aviatorScarf' && it.build) try {                 /* (the scarf's long end streaming out, as when she runs: not a stick) */
+    const inst = ckInstance(it), w = { collar: inst, amt: 1 }; ckFxWear(w, 0.016, 0.9); ckFxWear(w, 0.016, 1.1);
+    T.ck5g = inst.cape ? [inst.cape.geometry] : null; T.fxInst = inst; T.ck5o = inst.obj; return true;
+  } catch (e) { return false; }
+  if (!it || it.slot !== 'pack' || !it.build) return false;
+  try {
+    const B = ckB(); ckStraps.off = true; try { it.build(B); } finally { ckStraps.off = false; }
+    const G = {}; for (const k of ['m', 's', 'g', 'l']) G[k] = ckMerge(B.parts[k]); B.parts.f.forEach(([g]) => g.dispose());
+    if (B.post) try { B.post(G, it); } catch (e) {}
+    const M = ckMat(), o = new THREE.Group(), gs = [];
+    for (const k of ['m', 's', 'g', 'l']) { const g = G[k]; if (!g) continue; gs.push(g); const m = new THREE.Mesh(g, k === 'g' && g.userData && g.userData.add ? (M.gAdd || M.g) : M[k]); if (k === 'l') m.renderOrder = 2; o.add(m); }
+    T.ck5g = gs; T.ck5o = o; T.fxInst = null; return true;
+  } catch (e) { ckStraps.off = false; return false; }
+}
+
+/* ---------- the wish list ---------- */
+function ck5WishId() { const v = ckGet('catguard.wish'); return typeof v === 'string' && v.length < 60 && v ? v : null; }
+function ck5WishSet(id) { try { if (id) localStorage.setItem('catguard.wish', id); else localStorage.removeItem('catguard.wish'); } catch (e) {} }
+function ck5Wishable(it) { try { return !!it && !!it.build && !ckIsEx(it) && isFinite(it.price) && it.price > 0 && !ckState().owned.has(it.id) && ckSnBuyable(it); } catch (e) { return false; } }
+function ckWishInfo() {                                                // her wish: { id, name, ic, price } (today's price), or null (none, or hers already)
+  try { const S = ckState(), id = ck5WishId(), it = id && CK_BY_ID[id]; if (!it || !it.build || S.owned.has(id) || ckIsEx(it) || !isFinite(it.price)) return null;
+    return { id, name: it.name, ic: it.ic, price: it.price }; } catch (e) { return null; }
+}
+function ck5WishToggle(id) {
+  const it = CK_BY_ID[id]; if (!it) return; const on = ck5WishId() === id;
+  if (on) { ck5WishSet(null); ckSfx('off'); ckCaption('Maybe something else...'); }
+  else if (ck5Wishable(it)) { ck5WishSet(id); ckSfx('wear'); CK.anim.hop = 1; ckCaption(pickOf(['🎯 My wish! Every game gets me closer', '🎯 I want it SO much!', '🎯 Saving up for this!'])); const S = ck5Seen(); S.w = null; ck5SeenSave(S); }
+  else return;
+  ckRefresh();
+}
+
+/* ---------- the title button's red dot: only for something new ---------- */
+function ck5Seen() {
+  if (ck5Seen.S) return ck5Seen.S;
+  let o = null; try { o = JSON.parse(ckGet('catguard.ckSeen') || 'null'); } catch (e) {}
+  const S = ck5Seen.S = { i: new Set(), s: new Set(), sets: new Set(), w: null, fresh: false };
+  if (o && typeof o === 'object') { for (const k of ['i', 's', 'sets']) if (Array.isArray(o[k])) o[k].forEach(v => { if (typeof v === 'string' && v.length < 60) S[k].add(v); }); if (typeof o.w === 'string') S.w = o.w; }
+  else if (['catguard.outfit', 'catguard.closetSpent', 'catguard.closetSeen', 'catguard.closetBook'].some(k => ckGet(k) != null)) ck5SeenMark(S, false);   /* (she's been in the Closet before this: what's there now isn't news) */
+  else S.fresh = true;                                                 /* (never been in: everything's new) */
+  return S;
+}
+function ck5SeenSave(S) { ckPut('catguard.ckSeen', JSON.stringify({ i: [...S.i].slice(-400), s: [...S.s].slice(-40), sets: [...S.sets].slice(-100), w: S.w })); }
+function ck5Shop() { return CK_ITEMS.filter(it => it.build && !ckIsEx(it) && isFinite(it.price) && it.price > 0 && ckSnBuyable(it)); }
+function ck5SeasonKeys() { const y = ckSnNow().getFullYear(); return ckSnLive().map(s => s.id + '-' + y); }
+function ck5SetsReady() { const B = ckBookLoad(); return ckSetList().filter(s => ckSetOwnedAll(s) && !B.sets.includes(s.id)).map(s => s.id); }
+function ck5SeenMark(S, save) {
+  ck5Shop().forEach(it => S.i.add(it.id)); ck5SeasonKeys().forEach(k => S.s.add(k)); ck5SetsReady().forEach(id => S.sets.add(id));
+  const wi = ckWishInfo(); S.w = wi && ckWallet() >= wi.price ? wi.id : S.w; S.fresh = false;
+  if (save !== false) ck5SeenSave(S);
+}
+function ck5News() {                                                   // what's new since she last looked: { items, seasons, sets, wish }
+  const S = ck5Seen(), own = ckState().owned, wi = ckWishInfo();
+  return { items: S.fresh ? ck5Shop().filter(it => !own.has(it.id)) : ck5Shop().filter(it => !S.i.has(it.id) && !own.has(it.id)), seasons: ck5SeasonKeys().filter(k => !S.s.has(k)),
+    sets: ck5SetsReady().filter(id => !S.sets.has(id)), wish: !!wi && ckWallet() >= wi.price && S.w !== wi.id };
+}
+function ck5Dot(d) {                                                   // (ckDot, last) a new thing, a new season, a set to finish, a book reward, a new secret, or her wish is affordable
+  try { const N = ck5News(); d.hidden = !(N.items.length || N.seasons.length || N.sets.length || N.wish || ckExNew().length || ckBookReady()); } catch (e) {}
+}
+function ck5Open() {                                                   // (closetOpen) the new things get a NEW badge this visit; then it's all been seen
+  try { const N = ck5News(); CK.ck5New = new Set(N.items.map(it => it.id)); if (ck5Seen().fresh) CK.ck5New.clear(); ck5SeenMark(ck5Seen()); } catch (e) { CK.ck5New = new Set(); }
+}
+
+/* ---------- small fixes ---------- */
+function ck5Diwali(s, d) {                                             // (ckSnIn) Diwali moves: from 2 weeks before to 12 days after Lakshmi Puja
+  if (!s || s.id !== 'diwali' || !d) return;
+  const T = { 2026: [11, 8], 2027: [10, 29], 2028: [10, 17], 2029: [11, 5], 2030: [10, 26], 2031: [11, 14], 2032: [11, 2] }, y = d.getFullYear(), m = T[y];
+  if (!m) { s.from = [10, 20]; s.to = [11, 20]; return; }
+  const day = new Date(y, m[0] - 1, m[1], 12), a = new Date(day.getTime() - 14 * 864e5), b = new Date(day.getTime() + 12 * 864e5);
+  s.from = [a.getMonth() + 1, a.getDate()]; s.to = [b.getMonth() + 1, b.getDate()];
+}
+function ck5Same(next) {                                               // (ckSurprise) nothing new to put on: say so, no "Ta-da!"
+  if (CK_SLOTS.some(s => (next[s.id] || null) !== (CK.prev[s.id] || null))) return false;
+  ckSfx('nope'); CK.anim.flick = 1; CK.anim.tilt = 1; ckCaption(pickOf(['Buy a few more things!', 'That’s everything I’ve got!', 'I need more outfits!'])); return true;
+}
+function ck5PurrRoute(f, A) {                                          // (pkrPurrBuy) the purr's fader into the effects bus: the sfx switch, the compressor and the limiter, like every other effect
+  try { const bus = A.__sfx; if (bus && bus !== A.destination) { f.disconnect(); f.connect(bus); } } catch (e) {}
+}
+
+/* ---------- buy the rest of a look she's trying on ---------- */
+function ck5Missing() {
+  const S = ckState(), miss = [];
+  for (const s of CK_SLOTS) { const v = CK.prev[s.id]; if (v && v !== 'none' && !S.owned.has(v) && CK_BY_ID[v]) miss.push(CK_BY_ID[v]); }
+  const buy = miss.filter(it => !ckIsEx(it) && isFinite(it.price) && ckSnBuyable(it));
+  return { miss, buy, cost: buy.reduce((a, it) => a + it.price, 0) };
+}
+function ck5Main() {                                                   // (ckMain, first) true: handled here
+  if (CK.act !== 'ck5set') return false;
+  const S = ckState(), M = ck5Missing(), w = ckWallet();
+  if (!M.buy.length || w < M.cost) { ckSfx('nope'); ckRefresh(); return true; }
+  ckSetWallet(w - M.cost); for (const it of M.buy) { S.owned.add(it.id); S.spent += it.price; }
+  for (const s of CK_SLOTS) { const v = CK.prev[s.id]; if (v && (v === 'none' || S.owned.has(v))) S.outfit[s.id] = v; else delete S.outfit[s.id]; }
+  CK.look = false; CK.sel = null; ckSave(); CK.prev = Object.assign({}, S.outfit); closetDress(CK.rig, CK.prev);
+  ckCelebrate(M.buy[M.buy.length - 1]); ckCheckAch(); M.buy.forEach(it => ckSnBought(it));
+  setTimeout(() => { if (CK.on) ckCaption(M.buy.length > 1 ? 'The whole look is mine! 💖' : 'It’s mine! 💖'); }, 50);
+  ckRefresh(); return true;
+}
+
+/* ---------- the page: CSS ---------- */
+function ck5Css() {
+  if (ck5Css.done) return; ck5Css.done = true;
+  const st = document.createElement('style'); st.id = 'ck5Css'; st.textContent = `
+#closet .ck-x,#closet .ckb-hbtn,#closet .ckb-x{width:44px;height:44px}
+#closet .ck-sbtn{width:44px;height:44px}
+#closet .ck-tabs{display:flex;flex-wrap:nowrap;gap:5px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding:2px 2px 8px;margin:0 -2px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scroll-snap-type:x proximity}
+#closet .ck-tabs::-webkit-scrollbar{display:none}
+#closet .ck-tabs.ck5-more{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 34px),rgba(0,0,0,.15));mask-image:linear-gradient(90deg,#000 calc(100% - 34px),rgba(0,0,0,.15))}
+#closet .ck-tab{flex:0 0 auto;min-width:48px;min-height:44px;display:flex;align-items:center;justify-content:center;gap:5px;padding:4px 10px;scroll-snap-align:start;white-space:nowrap;font:800 12.5px/1.1 var(--body)!important}
+#closet .ck-tab b{font-size:20px;line-height:1}
+#closet .ck-tab span{display:inline;overflow:visible}
+#closet .ck-tab[hidden]{display:none}
+#closet .ck5-sntab:not(.on){background:#ffe7cf}
+#closet .ck-cat{display:none}
+#closet .ck-nm{font-size:12px}#closet .ck-tag{font-size:12px}#closet .ck-hl{font-size:12px}
+#closet .ck-sn{display:flex;align-items:stretch;gap:6px;padding:0 0 2px}
+#closet .ck-sn-ban{flex:0 0 auto;width:auto;max-width:36%;padding:4px 8px;font-size:12px!important}
+#closet .ck-sn-ban .t{display:none}#closet .ck-sn-ban .s{display:block}#closet .ck-sn-ban i{font-size:16px}
+#closet .ck-sn-day{flex:1 1 auto;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}
+#closet .ck-sn-lbl{display:none}
+#closet .ck-sn-chip{font-size:12px!important;padding:3px 6px 3px 3px;min-height:36px}
+#closet .ck-sn-chip small{font-size:12px}
+#closet .ck-sn-chip .e{width:27px;height:27px;font-size:15px}
+#closet .ck-sn-chip[hidden]{display:none}
+#closet .ck5-wish{background:linear-gradient(90deg,#ffe9a8 var(--p,0%),#fff var(--p,0%))}
+#closet .ck5-wish::after{content:'';position:absolute;left:36px;right:7px;bottom:3px;height:4px;border-radius:99px;background:linear-gradient(90deg,#ff6fae var(--p,0%),#f3e3ec var(--p,0%))}
+#closet .ck5-wish.ready{background:linear-gradient(#fff4c8,#ffe27a)}#closet .ck5-wish.ready small{color:#2f8a3a}
+#closet .ck5-wish .e{background:#fff0a8}
+#closet .ck5-star{position:absolute;right:-3px;bottom:-3px;z-index:2;width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:#fff;border:2px solid var(--ink);font:400 16px/1 var(--body);box-shadow:0 2px 0 rgba(45,19,40,.3);cursor:pointer}
+#closet .ck5-star[hidden]{display:none}
+#closet .ck-card.ck5-wished .ck5-star{background:#ffd23a}
+#closet .ck-card.ck5-newsn::before{left:20px}
+#closet .ck-card.ck5-new::before{content:'NEW';position:absolute;top:-9px;left:-5px;z-index:2;background:#ff6fae;color:#fff;border:2px solid var(--ink);border-radius:999px;padding:1px 6px;font:900 10px/1.2 var(--body);letter-spacing:.05em;pointer-events:none}
+#closet .ck-act{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name name" "blurb blurb" "meta meta" "main wish" "links links";align-items:center}
+#closet .ck-info{display:contents}
+#closet #ckName{grid-area:name;min-width:0}
+#closet #ckBlurb{grid-area:blurb;display:block;font:600 13px/1.32 var(--body);color:#7a5a6a;min-width:0}
+#closet .ck5-meta{grid-area:meta;display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;min-width:0}
+#closet .ck5-meta[hidden],#closet .ck5-meta>[hidden]{display:none}
+#closet #ckMain{grid-area:main;min-width:0}
+#closet .ck5-wbtn{grid-area:wish;flex:none;width:44px;height:44px;padding:0;border-radius:50%;border:2.5px solid var(--ink);background:#fff;color:var(--ink);box-shadow:0 2px 0 var(--ink);font:400 21px/1 var(--body)!important;display:grid;place-items:center;cursor:pointer}
+#closet .ck5-wbtn[hidden]{display:none}#closet .ck5-wbtn.on{background:#ffd23a}#closet .ck5-wbtn:active{transform:translateY(2px);box-shadow:none}
+#closet .ck-links{grid-area:links}
+#closet #ckBlurb .ck5-fn{font-weight:800;color:#5b2d8a;background:#efe6ff;border-radius:6px;padding:0 4px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+#closet .ck5-note{font:700 12px/1.25 var(--body);color:#8a6a5a}
+#closet .ck5-set,#closet .ck5-pc{font:800 12px/1.2 var(--body)!important;color:#6e3a5c;background:#fff1c9;border:1.5px dashed #e0a92a;border-radius:999px;padding:3px 9px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#closet .ck5-pc{background:#ffe1ee;border-color:#ff6fae;border-style:solid}#closet .ck5-pc.cant{background:#f1ecef;border-color:#a898a1;color:#8a7f86}
+@media (orientation:portrait) and (max-width:539px){
+  #closet{grid-template-rows:auto minmax(0,.6fr) minmax(0,1fr)}
+  #closet .ck-x{font-size:18px!important}
+  #closet .ck-tabs{gap:4px;padding:1px 0 6px;margin:0}
+  #closet .ck-tab{min-width:46px;padding:4px 9px;border-width:2px;border-radius:12px}
+  #closet .ck-tab span{display:none}#closet .ck-tab.on span{display:inline}
+  #closet .ck-grid{gap:7px 7px}
+  #closet .ck-card{padding:4px 4px 5px;gap:2px}
+  #closet .ck-th{width:80%;margin:0 auto}
+  #closet .ck-nm{font-size:12px;line-height:1.15;min-height:2.3em}
+  #closet .ck-tag{font-size:12px;padding:1px 5px;top:3px;right:3px}
+  #closet .ck-hl{font-size:12px;line-height:1.2}
+  #closet .ck-act{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"name wish main" "blurb blurb blurb" "meta meta meta";gap:3px 7px;padding-top:6px}
+  #closet #ckName{font-size:17px}
+  #closet #ckBlurb{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;font-size:12.5px;line-height:1.3;white-space:normal}
+  #closet #ckBlurb.ck5-open{-webkit-line-clamp:unset;display:block}
+  #closet #ckMain{max-width:52vw}
+  #closet .ck-tabs{padding-bottom:5px}
+}
+@media (orientation:portrait) and (max-width:539px) and (max-height:700px){
+  #closet{grid-template-rows:auto minmax(0,.4fr) minmax(0,1fr)}
+  #closet #ckBlurb{-webkit-line-clamp:2}
+  #closet .ck-th{width:76%}
+  #closet .ck-sbtn{bottom:6px}
+}
+@media (orientation:landscape) and (min-width:560px) and (max-height:520px){
+  #closet .ck-tab span{display:none}#closet .ck-tab.on span{display:inline}
+  #closet .ck-tab{min-width:44px;padding:3px 8px}
+  #closet .ck-act{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"name wish main" "blurb blurb blurb" "meta meta meta" "links links links";gap:2px 6px}
+  #closet #ckMain{white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis;font-size:15px!important;padding:7px 11px}
+  #closet #ckName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #closet #ckBlurb{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:12px;line-height:1.28}
+  #closet #ckBlurb.ck5-open{-webkit-line-clamp:unset;display:block}
+  #closet .ck5-wbtn{width:40px;height:40px}
+  #closet .ck-nm{font-size:12px}
+}`;
+  document.head.appendChild(st);
+}
+
+/* ---------- the page: the new bits, built once (ckBuildUI, last) ---------- */
+function ck5UI() {
+  try {
+    ck5Css(); const u = CK.ui, X = u.ck5 = {};
+    const sn = document.createElement('button'); sn.className = 'ck-tab ck5-sntab'; sn.setAttribute('role', 'tab'); sn.hidden = true; sn.innerHTML = '<b>🎃</b><span>Limited</span>';
+    sn.addEventListener('click', () => ckTab('sn')); if (u.tabs.secrets) u.tabs.secrets.before(sn); else u.Tabs.appendChild(sn); X.snTab = sn; X.snIc = sn.querySelector('b');
+    const more = () => { const t = u.Tabs; t.classList.toggle('ck5-more', t.scrollLeft + t.clientWidth < t.scrollWidth - 4); };
+    u.Tabs.addEventListener('scroll', more, { passive: true }); X.more = more;
+    const meta = document.createElement('div'); meta.className = 'ck5-meta'; meta.hidden = true;
+    meta.innerHTML = '<span class="ck5-note" hidden></span><span class="ck5-sets" hidden></span><span class="ck5-miss" hidden></span>';
+    u.Blurb.parentElement.after(meta); Object.assign(X, { meta, note: meta.querySelector('.ck5-note'), sets: meta.querySelector('.ck5-sets'), miss: meta.querySelector('.ck5-miss') });
+    X.sets.style.display = X.miss.style.display = 'contents';
+    meta.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return;
+      if (b.dataset.book) ckBookOpen(); else if (b.dataset.pick) { const it = CK_BY_ID[b.dataset.pick]; if (it) { ckTab(it.slot); ckPick(it.id); } } });
+    u.Blurb.addEventListener('click', () => u.Blurb.classList.toggle('ck5-open'));   /* (phones: a tap shows all of it) */
+    const wb = document.createElement('button'); wb.className = 'ck5-wbtn'; wb.hidden = true; wb.setAttribute('aria-label', 'Make it my wish'); wb.textContent = '☆';
+    wb.addEventListener('click', () => { if (CK.sel) ck5WishToggle(CK.sel); }); u.Main.before(wb); X.wbtn = wb;
+    if (u.sn) { const c = document.createElement('button'); c.className = 'ck-sn-chip ck5-wish'; c.hidden = true; c.innerHTML = '<span class="e"></span><span class="x"><em></em><small></small></span>';
+      c.addEventListener('click', () => { const wi = ckWishInfo(); if (!wi) return; const it = CK_BY_ID[wi.id]; ckTab(it.slot); ckPick(it.id); const cd = CK.cards[it.id]; if (cd && cd.el.scrollIntoView) try { cd.el.scrollIntoView({ block: 'nearest' }); } catch (e) {} });
+      u.sn.feat.after(c); X.wchip = c; }
+    for (const it of CK_ITEMS) { const c = CK.cards[it.id]; if (!c || ckIsEx(it)) continue; const s = document.createElement('span'); s.className = 'ck5-star'; s.hidden = true; s.setAttribute('role', 'button'); s.setAttribute('aria-label', 'Wish for ' + it.name); s.textContent = '☆';
+      s.addEventListener('pointerdown', e => e.stopPropagation()); s.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); ck5WishToggle(it.id); });
+      (c.el.querySelector('.ck-th') || c.el).appendChild(s); c.ck5s = s; }
+  } catch (e) { console.error(e); }
+}
+
+/* ---------- the page: after every refresh (ckRefresh, last) ---------- */
+function ck5Refresh() {
+  try {
+    const u = CK.ui, X = u && u.ck5; if (!X) return;
+    const S = ckState(), w = ckWallet(), sel = CK.sel && CK_BY_ID[CK.sel];
+    let wid = ck5WishId(); if (wid && (S.owned.has(wid) || !CK_BY_ID[wid])) { const got = S.owned.has(wid); ck5WishSet(null); wid = null; if (got && CK.on) setTimeout(() => { if (CK.on) ckCaption('🎯 Wish come true! 💖'); }, 1800); }
+    const live = ckSnLive(), snOn = CK.tab === 'sn';                    // the 🎃 tab
+    X.snTab.hidden = !live.length; if (live.length) X.snIc.textContent = live.map(s => s.ic).join('');
+    X.snTab.classList.toggle('on', snOn); X.snTab.setAttribute('aria-selected', snOn ? 'true' : 'false');
+    const at = snOn ? X.snTab : u.tabs[CK.tab];
+    if (at && X.tab !== CK.tab) { X.tab = CK.tab; try { const t = u.Tabs, l = at.offsetLeft - t.offsetLeft, r = l + at.offsetWidth; if (l < t.scrollLeft + 8) t.scrollLeft = Math.max(0, l - 24); else if (r > t.scrollLeft + t.clientWidth - 8) t.scrollLeft = r - t.clientWidth + 34; } catch (e) {} }
+    X.more();
+    for (const it of CK_ITEMS) { const c = CK.cards[it.id]; if (!c) continue;   // cards: the ⭐ and NEW
+      const isNew = !!(CK.ck5New && CK.ck5New.has(it.id)) && !S.owned.has(it.id) && !c.el.hidden; c.el.classList.toggle('ck5-new', isNew); c.el.classList.toggle('ck5-newsn', isNew && !!c.snb && !c.snb.hidden);
+      if (!c.ck5s) continue; const wish = wid === it.id; c.ck5s.hidden = !(wish || (CK.sel === it.id && ck5Wishable(it))); c.ck5s.textContent = wish ? '⭐' : '☆'; c.el.classList.toggle('ck5-wished', wish); }
+    const wi = ckWishInfo();                                           // the wish, in the strip (in place of the featured thing)
+    if (X.wchip && u.sn) { X.wchip.hidden = !wi; if (wi) { u.sn.feat.hidden = true; const ok = w >= wi.price, p = Math.max(0, Math.min(100, w / wi.price * 100));
+        X.wchip.querySelector('.e').textContent = wi.ic; X.wchip.querySelector('em').textContent = '🎯 ' + wi.name; X.wchip.querySelector('small').textContent = ok ? 'Ready to buy!' : '🐟 ' + w + ' / ' + wi.price;
+        X.wchip.style.setProperty('--p', p.toFixed(1) + '%'); X.wchip.classList.toggle('ready', ok); X.wchip.setAttribute('aria-label', 'My wish: ' + wi.name + (ok ? ', ready to buy' : ', ' + w + ' of ' + wi.price + ' fish')); } }
+    // the buy bar: the real description, and the small lines under it
+    const meta = { note: '', sets: '', miss: '' }; let wbtn = false;
+    const locked = sel && ckIsEx(sel) && !S.owned.has(sel.id);
+    if (sel && !locked) {
+      const m = /^(✨ Functional:[^!]*!)\s*([\s\S]*)$/.exec(sel.blurb || '');   /* (the Functional note first, and styled: never clamped away) */
+      if (m) { u.Blurb.textContent = ''; const f = document.createElement('strong'); f.className = 'ck5-fn'; f.textContent = m[1]; u.Blurb.append(f, ' ' + m[2]); } else u.Blurb.textContent = sel.blurb || '';
+      const own = S.owned.has(sel.id), sn = sel.season && ckSnSeason(sel.season), notes = [];
+      if (!own && !ckIsEx(sel)) {
+        if (sn && !ckSnIn(sn)) notes.push('🗓️ Back for ' + sn.name + ' next year');
+        else { if (sel.snFull) notes.push('🏷️ Today only: 40% off (was ' + sel.snFull + ')'); else if (sn) notes.push(sn.ic + ' Limited, until ' + ckSnUntil(sn));
+          if (w < sel.price) notes.push('🎮 Earn fish in any game'); }
+        wbtn = ck5Wishable(sel);
+      }
+      meta.note = notes.join(' · ');
+      const B = ckBookLoad(), sets = ckSetList().filter(s => s.items.indexOf(sel.id) >= 0);
+      meta.sets = sets.map(s => { const n = s.items.filter(id => S.owned.has(id)).length, done = B.sets.indexOf(s.id) >= 0;
+        return '<button class="ck5-set" data-book="1" title="' + ckbEsc(s.items.map(id => ckIsEx(CK_BY_ID[id]) && !S.owned.has(id) ? '🔒 a secret' : CK_BY_ID[id].name).join(' + ')) + '">🧩 ' + ckbEsc(s.name) + ' ' + n + '/' + s.items.length + (done ? ' ✓' : ' · +' + s.fish + '🐟') + '</button>'; }).join('');
+    } else if (!sel && ckPrevDiffers() && !ckPrevOwned()) {   // a tried-on look with things she doesn't have: buy the rest
+      const M = ck5Missing();
+      u.Name.textContent = 'Love this look?';
+      u.Blurb.textContent = M.buy.length === M.miss.length ? 'Get the rest and wear the whole thing!' : M.buy.length ? 'Some of it can’t be bought right now.' : 'These can’t be bought right now.';
+      meta.miss = M.miss.map(it => { const can = M.buy.includes(it); return '<button class="ck5-pc' + (can ? '' : ' cant') + '" data-pick="' + ckbEsc(it.id) + '">' + it.ic + ' ' + ckbEsc(it.name) + (can ? ' 🐟 ' + it.price : '') + '</button>'; }).join('');
+      if (M.buy.length) { const ok = w >= M.cost; u.Main.textContent = ok ? (M.buy.length > 1 ? 'Buy the rest: 🐟 ' + M.cost : 'Buy it: 🐟 ' + M.cost) : 'Need ' + (M.cost - w) + ' more 🐟'; u.Main.disabled = !ok; u.Main.className = 'btn ck-main' + (ok ? ' wear' : ''); CK.act = ok ? 'ck5set' : null; if (!ok) meta.note = '🎮 Earn fish in any game'; }
+      else { u.Main.textContent = 'Can’t buy these now'; u.Main.disabled = true; u.Main.className = 'btn ck-main'; CK.act = null; }
+      if (u.Act) u.Act.classList.remove('idle');
+    }
+    X.note.hidden = !meta.note; X.note.textContent = meta.note;
+    for (const k of ['sets', 'miss']) { X[k].hidden = !meta[k]; if (X[k].ck5 !== meta[k]) { X[k].innerHTML = meta[k]; X[k].ck5 = meta[k]; } }
+    X.meta.hidden = !(meta.note || meta.sets || meta.miss);
+    X.wbtn.hidden = !wbtn; if (wbtn) { const on = wid === sel.id; X.wbtn.textContent = on ? '⭐' : '☆'; X.wbtn.classList.toggle('on', on); X.wbtn.setAttribute('aria-pressed', on ? 'true' : 'false'); X.wbtn.setAttribute('aria-label', on ? 'My wish (tap to un-wish)' : 'Make it my wish'); }
+    if (X.sel !== CK.sel) { X.sel = CK.sel; u.Blurb.classList.remove('ck5-open');   /* (a new pick: its card in view, above the buy bar) */
+      const c = CK.sel && CK.cards[CK.sel]; if (c && !c.el.hidden) setTimeout(() => { try { if (CK.on) c.el.scrollIntoView({ block: 'nearest' }); } catch (e) {} }, 40); }
+  } catch (e) { if (!ck5Refresh.err) { ck5Refresh.err = 1; console.error(e); } }
+}
+
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
