@@ -10741,7 +10741,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-12 15:56';                                              // stamped when the site is published
+const BUILD = '2026-10-12 16:43';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -15083,7 +15083,7 @@ const CK_LINES = ['Ooh la la!', 'Très chic!', 'Purrfect!', 'Meow-velous!', 'So 
 function ckGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function ckPut(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 function ckState() {
-  if (ckState.S) return ckState.S; roofCkReg(); ckSnReg(); ck4Reg(); ck5Reg();
+  if (ckState.S) return ckState.S; roofCkReg(); ckSnReg(); ck4Reg(); ck5Reg(); ck5bReg();
   const S = ckState.S = { owned: new Set(['crown']), outfit: {}, spent: 0, memFish: null };
   try { const a = JSON.parse(ckGet('catguard.closet') || '[]'); if (Array.isArray(a)) for (const id of a) if (typeof id === 'string' && CK_BY_ID[id]) S.owned.add(id); } catch (e) {}
   try { ckExLoad(S); } catch (e) { console.error(e); }
@@ -15771,7 +15771,7 @@ function ckFxWear(W, dt, t) {                                          // (ckWea
     if (w.rot) { const A = w.rotA || (w.rotA = []); w.rot.forEach((m, k) => { const q = m.userData.ckRot; A[k] = ((A[k] || 0) + dt * q.sp * (1 + q.run * amt)) % (Math.PI * 200); ckRotSet(m, A[k], t); }); }
     if (w.sway) ckSwayStep(w.sway, t, amt);
     if (w.flick) ckFlick(w.flick, t);
-    if (w.it && w.it.fx && w.it.fx.snFlap) ckSnFlap(w, t, amt);
+    if (w.it && w.it.fx && w.it.fx.snFlap) ckSnFlap(w, t, amt); if (w.col) ck5bFixFlap(w);
   }
 }
 
@@ -16046,7 +16046,7 @@ function ckMat() {
     glow: new THREE.SpriteMaterial({ map: candleGlowTex, color: 0xffe68a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.8 }),
   });
 }
-function ckBake(it) {
+function ckBake(it) { { const v = ck5bBakeHook(it); if (v) return v; }   /* (CK5B_V1: a colourway) */
   if (it.geo || !it.build) return it.geo;
   const B = ckB(); it.build(B);
   const G = it.geo = {}; for (const k of ['m', 's', 'g', 'l', 'f']) G[k] = ckMerge(B.parts[k]);
@@ -16077,15 +16077,16 @@ function closetDress(R, outfit) {
   const W = R.ck || (R.ck = {});
   for (const s of CK_SLOTS) {
     const v = outfit[s.id], want = s.id === 'hat' ? (v && v !== 'none' && v !== 'crown' ? v : null) : v || null, cur = W[s.id];
+    if (cur && cur.id === want && (cur.col || 0) !== ck5bColFor(R, want)) cur.id = '#';   /* (CK5B_V1: a new colourway: built again) */
     if (cur && cur.id === want) continue;
-    if (cur) { if (cur.obj.parent) cur.obj.parent.remove(cur.obj); if (cur.cape) cur.cape.geometry.dispose(); ckFxDrop(cur); W[s.id] = null; }
+    if (cur) { if (cur.obj.parent) cur.obj.parent.remove(cur.obj); if (cur.cape) cur.cape.geometry.dispose(); ck5bUndress(cur); ckFxDrop(cur); W[s.id] = null; }
     const it = want && CK_BY_ID[want]; if (!it || !it.build) continue;
-    const inst = ckInstance(it), par = s.id === 'hat' || s.id === 'specs' || s.id === 'ears' ? R.head : s.id === 'tail' ? R.tail[Math.min(R.tail.length - 1, it.seg || 3)] : R.body;
-    par.add(inst.obj); W[s.id] = inst;
+    ck5bCol.want = ck5bColFor(R, want); const inst = ckInstance(it), par = s.id === 'hat' || s.id === 'specs' || s.id === 'ears' ? R.head : s.id === 'tail' ? R.tail[Math.min(R.tail.length - 1, it.seg || 3)] : R.body;
+    par.add(inst.obj); W[s.id] = inst; inst.col = ck5bCol.want; ck5bCol.want = 0; ck5bDressX(R, s.id, inst, par);   /* (CK5B_V1: a fit wrapper; paws on all four legs; a hood or sleeves) */
   }
   if (R.crown) R.crown.visible = !outfit.hat || outfit.hat === 'crown';   // her own gold crown, unless another hat's on (or she's gone bare-headed)
   if (W.cape && W.cape.clasp) W.cape.clasp.visible = !W.collar;          // (a collar covers the cape's chain)
-  if (R === walk.rig) closetTodSync(R);
+  if (R === walk.rig) closetTodSync(R); ck5bDressEnd(R);   /* (CK5B_V1: worn together, fitted round each other) */
 }
 function closetTodSync(R) {                                            // outdoors at night her fur is tinted to the sky: her new things too (todActors keeps the list)
   if (!R.todMats || !R.todF || !R.ck) return;
@@ -16118,7 +16119,7 @@ function closetTick(dt) {
       else if (walk.on) ckWear(W, dt, Math.min(1, Math.hypot(walk.vel.x, walk.vel.z) / 6 + (walk.grounded ? 0 : 0.4)), !walk.grounded && !walk.climb && walk.vy > -3, clock);
     }
     ckSetRoam(dt);
-    ckCardHat(false);
+    ckCardHat(false); ck5bRoam(dt);
     if (state === 'hop' && HOP.ui && !HOP.ui.ckLink) ckHopLink();
   } catch (e) { if (!closetTick.err) { closetTick.err = 1; console.error(e); } }
 }
@@ -16480,7 +16481,7 @@ function ckBuildUI() {
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) st.addEventListener(t, up);
   st.addEventListener('contextmenu', e => e.preventDefault());
   if (window.ResizeObserver) try { new ResizeObserver(() => { CK.rectDirty = true; }).observe(st); } catch (e) {}
-  CK.thumbQ = CK_ITEMS.map(it => it.id); ckExUI(); ckSnUI(); ck5UI();
+  CK.thumbQ = CK_ITEMS.map(it => it.id); ckExUI(); ckSnUI(); ck5UI(); ck5bUI();
 }
 function ckBuild() { ckBuildUI(); ckBuildScene(); CK.built = true; }
 
@@ -16495,7 +16496,7 @@ function closetOpen(from) {
   if (from && $(from)) $(from).hidden = true;
   document.body.classList.add('closet-open'); u.root.hidden = false;
   CK.prev = Object.assign({}, S.outfit); CK.look = false; closetDress(CK.rig, CK.prev);
-  CK.sel = null; CK.tab = CK.tab || 'hat'; CK.view = 'full'; CK.spin = 0; CK.spinV = 0; CK.idleT = 9; ckExOpen(); ck5Open();
+  CK.sel = null; CK.tab = CK.tab || 'hat'; CK.view = 'full'; CK.spin = 0; CK.spinV = 0; CK.idleT = 9; ckExOpen(); ck5Open(); ck5bOpen();
   CK.fishTo = CK.fishShown = ckWallet(); u.Fish.textContent = CK.fishShown;
   try { ckSetOpen(); } catch (e) { console.error(e); }   /* (outfit sets + the collection book) */
   CK.rectDirty = true; ckMeasure(); ckAim(true);
@@ -16540,9 +16541,9 @@ function ckPick(id) {
   if (!CK.look) CK.prev = Object.assign({}, ckState().outfit);         /* (the preview: her saved outfit plus just this one thing; or, after Surprise me, the surprise look with this swapped in) */
   CK.sel = id; ckTryOn(it); ckRefresh();
 }
-function ckTryOn(it, quiet) {                                          // on it goes: a puff of sparkles, a pop, a happy hop and a word from her
+function ckTryOn(it, quiet) { ck5bSnap();                                          // on it goes: a puff of sparkles, a pop, a happy hop and a word from her
   const R = CK.rig, A = CK.anim;
-  if (it.slot === 'hat') { if (it.id === 'crown') delete CK.prev.hat; else CK.prev.hat = it.id; } else CK.prev[it.slot] = it.id;
+  if (it.slot === 'hat') { if (it.id === 'crown') delete CK.prev.hat; else CK.prev.hat = it.id; } else CK.prev[it.slot] = it.id; ck5bClashTry(it);   /* (CK5B_V1: whatever can't go with it comes off) */
   closetDress(R, CK.prev);
   const w = R.ck[it.slot], obj = w ? w.obj : it.id === 'crown' ? R.crown : null;
   CK.view = (CK_SLOTS.find(s => s.id === it.slot) || {}).view || 'full'; CK.fit = it.fit || 0; CK.idleT = 9;
@@ -16582,9 +16583,9 @@ function ckRefresh() {
   if (u.Cat) { const sl = CK_SLOTS.find(s => s.id === CK.tab); u.Cat.hidden = !sl; if (sl) u.Cat.textContent = sl.ic + ' ' + sl.name; }   /* (phones upright: the tabs are icons only, so the category's name goes over the grid) */
   if (u.Act) u.Act.classList.toggle('idle', !act && !sel);   /* (phones upright: the buy bar only while something's picked) */
   roofCkRefresh(); ckExRefresh(); ckSnRefresh();
-  ckSetRefresh(); ck4Refresh(); ck5Refresh();
+  ckSetRefresh(); ck4Refresh(); ck5Refresh(); ck5bRefresh();
 }
-function ckMain() { if (ck5Main()) return;   /* (CK5A_V1: buy the rest of a look) */
+function ckMain() { if (ck5Main()) return; if (ck5bMain()) return;   /* (CK5B_V1: colourways) */   /* (CK5A_V1: buy the rest of a look) */
   const S = ckState(), it = CK.sel && CK_BY_ID[CK.sel], A = CK.anim;
   if (CK.act === 'buy' && it) {
     const w = ckWallet(); if (S.owned.has(it.id)) return;
@@ -16605,14 +16606,14 @@ function ckMain() { if (ck5Main()) return;   /* (CK5A_V1: buy the rest of a look
 }
 function ckWearSaved(it) {                                             // what she's trying on becomes what she wears (for that slot)
   const S = ckState();
-  if (it.slot === 'hat') { if (it.id === 'crown') delete S.outfit.hat; else S.outfit.hat = it.id; } else S.outfit[it.slot] = it.id;
+  if (it.slot === 'hat') { if (it.id === 'crown') delete S.outfit.hat; else S.outfit.hat = it.id; } else S.outfit[it.slot] = it.id; ck5bClashOut(S.outfit, it);
   if (S.outfit[it.slot] === undefined) delete CK.prev[it.slot]; else CK.prev[it.slot] = S.outfit[it.slot];
   closetDress(CK.rig, CK.prev);
 }
 function ckUndo() {
   CK.look = false;
   if (!ckPrevDiffers()) return;
-  CK.prev = Object.assign({}, ckState().outfit); closetDress(CK.rig, CK.prev); CK.sel = null; CK.view = 'full'; ckSfx('off'); CK.anim.flick = 1; ckCaption('Back to my usual!'); ckRefresh();
+  CK.prevCol = {}; CK.prev = Object.assign({}, ckState().outfit); closetDress(CK.rig, CK.prev); CK.sel = null; CK.view = 'full'; ckSfx('off'); CK.anim.flick = 1; ckCaption('Back to my usual!'); ckRefresh();
 }
 function ckSurprise() {
   const S = ckState(), mine = CK_ITEMS.filter(it => it.build && S.owned.has(it.id));
@@ -16624,7 +16625,7 @@ function ckSurprise() {
     if (!Object.keys(next).length) next[mine[0].slot] = mine[0].id;
     if (CK_SLOTS.some(s => (next[s.id] || null) !== (CK.prev[s.id] || null))) break;
   }
-  if (ck5Same(next)) return;   /* (CK5A_V1: nothing to change, no Ta-da) */
+  ck5bClashFix(next); if (ck5Same(next)) return;   /* (CK5A_V1: nothing to change, no Ta-da) */
   CK.prev = next; CK.look = true; closetDress(CK.rig, CK.prev); CK.sel = null; CK.view = 'full'; CK.idleT = 9;
   const A = CK.anim; A.hop = 1; A.flick = 1; A.tilt = 1; ckPuffAt(CK.rig.g.localToWorld(CK.v.set(0, 0.55, 0.05)), 40, true); ckSfx('try'); ckCaption(pickOf(['Ta-da! ✨', 'Surprise!', 'How about this?', 'Mix and match!']));
   ckRefresh();
@@ -16716,7 +16717,7 @@ function ckThumbStep() {                                               // real l
     const it = CK_BY_ID[CK.thumbQ.shift()], card = CK.cards[it.id]; if (!it || !card) continue;
     let obj, capeGeo = null;
     if (it.id === 'crown') { obj = CK.rig.crown.clone(true); obj.visible = true; obj.position.set(0, 0, 0); obj.rotation.set(-0.14, 0, 0); }
-    else if (ck5Thumb(it, T)) obj = T.ck5o; else { const inst = ckInstance(it); obj = inst.obj; if (inst.clasp) inst.clasp.visible = true; capeGeo = inst.cape && inst.cape.geometry; T.fxInst = inst; }
+    else if (ck5bThumb(it, T)) obj = T.ck5o; else if (ck5Thumb(it, T)) obj = T.ck5o; else { const inst = ckInstance(it); obj = inst.obj; if (inst.clasp) inst.clasp.visible = true; capeGeo = inst.cape && inst.cape.geometry; T.fxInst = inst; }
     T.holder.add(obj); T.holder.updateMatrixWorld(true); T.box.setFromObject(T.holder);
     let c = T.box.getCenter(CK.v), r = Math.max(0.02, T.box.getSize(CK.v2).length() * 0.5); const dir = CK.v3.fromArray(it.thumbDir || DIRS[it.slot] || [0.5, 0.4, 1]).normalize();
     if (it.thumb) { c.fromArray(it.thumb); r = it.thumb[3]; }   // (a backpack: its straps are as big as she is, so frame the bag)
@@ -16733,7 +16734,7 @@ function closetFrame(dt) {
   const C = CK; C.dt = dt; C.t += dt;
   try {
     if (C.rectDirty) ckMeasure();
-    ckThumbStep(); ckAnim(dt); ckAim(false); ckFxStep(dt);
+    ckThumbStep(); ckAnim(dt); ckAim(false); ckFxStep(dt); ck5bCkFrame(dt);
     if (C.fishShown !== C.fishTo) { const d = C.fishTo - C.fishShown, st = Math.max(1, Math.ceil(Math.abs(d) * Math.min(1, dt * 3.5)));
       if (d > 0 && C.fishShown + st >= C.fishTo) { C.ui.wallet.classList.remove('gain'); void C.ui.wallet.offsetWidth; C.ui.wallet.classList.add('gain'); }
       C.fishShown += Math.sign(d) * Math.min(Math.abs(d), st); C.ui.Fish.textContent = C.fishShown; }
@@ -21700,7 +21701,7 @@ function ckBookTry(id) {                                               // the wh
   const s = ckSetList().find(q => q.id === id); if (!s) return; const S = ckState();
   const next = Object.assign({}, CK.prev);
   for (const iid of s.items) { const it = CK_BY_ID[iid]; if (ckIsEx(it) && !S.owned.has(iid)) return; if (it.slot === 'hat' && iid === 'crown') delete next.hat; else next[it.slot] = iid; }
-  CK.prev = next; CK.look = true; CK.sel = null; CK.view = 'full'; CK.idleT = 9; closetDress(CK.rig, CK.prev); ckBookClose(true); ckSfx('try'); ckRefresh();
+  ck5bClashFix(next, s.items); CK.prev = next; CK.look = true; CK.sel = null; CK.view = 'full'; CK.idleT = 9; closetDress(CK.rig, CK.prev); ckBookClose(true); ckSfx('try'); ckRefresh();
 }
 
 /* =====================================================================
@@ -21762,7 +21763,7 @@ function ckSeasonSets() {                                              // (for t
   try {
     ckSnReg(); const S = ckState(), out = [];
     for (const s of ckSnSeasons()) { const items = CK_ITEMS.filter(it => it.season === s.id).map(it => it.id), live = ckSnIn(s);
-      if (items.length && (live || items.some(id => S.owned.has(id)))) out.push({ id: s.id, name: s.set, ic: s.ic, items, fish: s.fish, season: s.id, live }); }
+      if (items.length && (live || items.some(id => S.owned.has(id)))) (Array.isArray(s.items) && items.splice(0, items.length, ...s.items.filter(id => CK_BY_ID[id]))), out.push({ id: s.id, name: s.set, ic: s.ic, items, fish: s.fish, season: s.id, live }); }
     return out;
   } catch (e) { console.error(e); return []; }
 }
@@ -22288,6 +22289,7 @@ function rxOutfit() {                                                 // what sh
   let S = null; try { S = ckState(); } catch (e) { return null; }
   const o = (S && S.outfit) || {}, ids = {}; let n = 0;
   for (const s of ['hat', 'collar', 'cape', 'pack', 'specs', 'ears', 'tail']) { const id = ckWornId(o, s); if (id && CK_BY_ID[id]) { ids[s] = id; if (id !== 'crown') n++; } }
+  for (const s of ['outfit', 'paws', 'trail']) { const id = ckWornId(o, s); if (id && CK_BY_ID[id]) { ids[s] = id; n++; } }   /* (CK5B_V1: the new slots) */
   let set = null; if (typeof ckSetWorn === 'function') { try { set = ckSetWorn(o) || null; } catch (e) { set = null; } }   /* (the outfit sets, once merged) */
   return { ids, n, none: !Object.keys(ids).length, set, sig: JSON.stringify(ids) };
 }
@@ -28282,6 +28284,861 @@ function ck5Refresh() {
   } catch (e) { if (!ck5Refresh.err) { ck5Refresh.err = 1; console.error(e); } }
 }
 
+/* CK5B_V1 */
+/* =====================================================================
+   PKR'S CLOSET, PHASE 1 (2026-10-12): three new slots, the clash rules, saved looks, colourways, tags, the Spooky Season set.
+   - 👕 Outfits: garment shells fitted round her body (built from CK_BODY with ckReach, so they hug her and ride the body
+     group: walking, jumping, napping, the bike and the sled all just work). A ghost sheet has a hood on her head group;
+     the hockey jersey has sleeves on her front legs.
+   - 🧦 Paws: one item built in a leg's own space, worn on all four legs (the leg groups), so it walks with her. Roller
+     skates make her glide (ck5bSkate, cosmetic).
+   - ✨ Trails: pooled sprites behind her in Free roam (one Points, one draw call, no lights, a small sprite atlas and a
+     tiny shader for per-sprite fade, size and spin); fewer on the 'low' tier. In the Closet they drift round the pedestal.
+   - Clash rules (ck5bRules): a few pairs can't look right and take the other thing off (with a toast and an Undo); the
+     rest are fitted (ck5bDressEnd): a pack worn over a cape or a garment is eased out round it, a cape over a garment,
+     a collar over a garment, a hat over the ghost's hood; trained capes leave a slot for her tail. Surprise me, the
+     sets' Try it on, and saved looks all keep to the rules.
+   - 👗 Saved looks: five slots (catguard.looks): save, name, wear; in the Closet and from a 👗 button in Free roam.
+   - 🎨 Colourways: three more per item (dyed in the vertex colours: no new shapes), each about 30% of the price;
+     catguard.ckColors keeps what she owns and wears.
+   - Tags on every item (cozy, spooky, royal, sporty, cute, cool, sparkly...): shown small in the buy bar, kept for the
+     Fashion Show. NPC lines for the new slots. New sets; the 🎃 Spooky Season set is six pieces across six slots.
+   Hooks: ckState (ck5bReg), closetDress (colour, fit wrapper, legs and head parts, undress, fit-fixes), ckBake (a
+   colourway's geometry), ckThumbStep (ck5bThumb), ckRefresh (ck5bRefresh), ckMain (ck5bMain), ckTryOn (snapshot, clash),
+   ckWearSaved (clash), ckSurprise and ckBookTry (ck5bClashFix), closetOpen (ck5bOpen), ckUndo (colours), closetTick
+   (ck5bRoam), closetFrame (ck5bCkFrame), ckFxWear (dyed wings), ckSeasonSets (a season's own piece list), rxOutfit (the
+   new slots), updateWalk (ck5bSkate). Everything is a hoisted function: no top-level const (TDZ).
+   ===================================================================== */
+function ck5bCK() { try { return CK; } catch (e) { return null; } }   /* (closetDress can run before the Closet's const exists) */
+function ck5bCol() {}                                                 // (a namespace: ck5bCol.want is the colourway closetDress is building)
+function ck5bReg() {                                                  // (from ckState, after ck5Reg: before anything is baked, priced or read)
+  if (ck5bReg.done) return; ck5bReg.done = true;
+  try {
+    const add = [{ id: 'outfit', ic: '👕', name: 'Outfits', view: 'body' }, { id: 'paws', ic: '🧦', name: 'Paws', view: 'paws' }, { id: 'trail', ic: '✨', name: 'Trails', view: 'trail' }];
+    for (const s of add) if (!CK_SLOTS.some(q => q.id === s.id)) { if (s.id === 'outfit') { const i = CK_SLOTS.findIndex(q => q.id === 'collar'); CK_SLOTS.splice(i < 0 ? CK_SLOTS.length : i + 1, 0, s); } else CK_SLOTS.push(s); }
+    for (const it of ck5bItems()) if (!CK_BY_ID[it.id]) { CK_ITEMS.push(it); CK_BY_ID[it.id] = it; }
+    const T = ck5bTagMap(); for (const it of CK_ITEMS) { if (!it.tags) it.tags = T[it.id] || (it.season === 'halloween' ? ['spooky', 'festive'] : it.season ? ['festive'] : ['cute']); }
+    const L = ckSetBase();
+    for (const s of ck5bSets()) if (!L.some(q => q.id === s.id)) { s.fish = ck5Nice(s.items.reduce((a, id) => a + ((CK_BY_ID[id] && CK_BY_ID[id].price) || 0), 0) * 0.175); L.push(s); }
+    const goth = L.find(q => q.id === 'spooky'); if (goth) { goth.name = 'Goth'; goth.ic = '🦇'; }   /* (the audit: "Spooky" and "Spooky Season" read the same) */
+    const hw = ckSnSeason('halloween');
+    if (hw) { hw.items = ['witch', 'batWings', 'ghostSheet', 'pumpkinTrail', 'spiderEars', 'catBooties']; hw.set = 'Spooky Season';
+      hw.fish = ck5Nice(hw.items.reduce((a, id) => a + ((CK_BY_ID[id] && CK_BY_ID[id].price) || 0), 0) * 0.175); }
+    const SH = ck5CapeShapes();                                         // trained capes: a slot for her tail (the train parts either side of it)
+    for (const k in SH) { const sh = SH[k]; if (!sh.len || sh.ck5bTail) continue; const L0 = sh.len; sh.ck5bTail = true;
+      sh.len = u => { const l = L0(u); return l <= 1 ? l : 1 + (l - 1) * (1 - Math.exp(-Math.pow(u / 0.15, 2))); }; }
+    ck5bRx();
+  } catch (e) { console.error(e); }
+}
+
+/* ---------- the new things ---------- */
+function ck5bItems() {
+  const O = (id, name, price, ic, blurb, say, build, x) => Object.assign({ id, slot: 'outfit', name, price, ic, blurb, say, build, thumbDir: [0.75, 0.55, 0.9] }, x || {});
+  const P = (id, name, price, ic, blurb, say, build, x) => Object.assign({ id, slot: 'paws', name, price, ic, blurb, say, build, thumbDir: [0.85, 0.45, 1] }, x || {});
+  const R = (id, name, price, ic, blurb, say, x) => Object.assign({ id, slot: 'trail', name, price, ic, blurb, say, build: () => {}, trail: id }, x || {});
+  return [
+    O('sweater', 'Cosy knit sweater', 140, '🧶', 'Cream wool with cherry-red Fair Isle hearts and a roll neck. Snuggly.', 'So snuggly!', B => ck5bSweater(B), { k5: 'shell' }),
+    O('hoodie', 'Comfy hoodie', 190, '🧥', 'Soft lavender, hood down, drawstrings to chew on and a paw print on the back.', 'Chill mode!', B => ck5bHoodie(B), { k5: 'hoodie' }),
+    O('tutu', 'Ballet tutu', 230, '🩰', 'A pink leotard and a frothy tulle tutu. Pirouettes not included.', 'Et voilà!', B => ck5bTutu(B), { k5: 'tutu' }),
+    O('raincoat', 'Rain slicker', 260, '🌧️', 'Sunshine-yellow and shiny, with wooden toggles and a reflective stripe.', 'Puddle time!', B => ck5bRaincoat(B), { k5: 'shell' }),
+    O('jersey', 'Hockey jersey', 320, '🏒', 'Blue and white, stripes on the sleeves and a big 7 on the back. She shoots, she scores!', 'She shoots, she scores!', B => ck5bJersey(B), { k5: 'shell', legs: B => ck5bSleeve(B), legsOn: [0, 1] }),
+    O('gown', 'Princess ball gown', 880, '👗', 'A rose-pink satin ball gown, gold trim, a sparkly skirt and a big bow. For the royal ball.', 'Shall we dance?', B => ck5bGown(B), { k5: 'gown' }),
+    O('ghostSheet', 'Ghost sheet', 240, '👻', 'A floaty white sheet with eye holes, her ears poking through. The cutest ghost on the street.', 'Boooo!', B => ck5bGhost(B), { k5: 'sheet', season: 'halloween', head: B => ck5bGhostHood(B) }),
+    P('socks', 'Stripy socks', 55, '🧦', 'Candy-striped knee socks on all four paws. Toasty toes!', 'Toasty toes!', B => ck5bSocks(B)),
+    P('rainBoots', 'Rain boots', 95, '🥾', 'Four shiny yellow wellies. Every puddle is a splash zone.', 'Splish splash!', B => ck5bBoots(B, 'rain')),
+    P('booties', 'Fluffy booties', 130, '🧸', 'Pink suede booties with fluffy cuffs. Like walking on clouds.', 'Cloud paws!', B => ck5bBoots(B, 'fluffy')),
+    P('skates', 'Roller skates', 380, '🛼', 'White boots, pink wheels. She glides when she walks!', 'Wheee!', B => ck5bSkates(B), { glide: true }),
+    P('slippers', 'Glass slippers', 620, '👠', 'Four sparkling glass slippers. Home by midnight, princess.', 'A perfect fit!', B => ck5bSlippers(B)),
+    P('catBooties', 'Black-cat booties', 160, '🐈‍⬛', 'Black booties with little cat faces on the toes. Meow-ween!', 'Meow-ween!', B => ck5bBoots(B, 'cat'), { season: 'halloween' }),
+    R('sparkles', 'Sparkle trail', 85, '✨', 'Golden sparkles twinkle behind her wherever she runs.', 'Sparkle on!'),
+    R('heartTrail', 'Heart trail', 120, '💕', 'Little pink hearts float up behind her. Everybody loves PKR.', 'Love is in the air!'),
+    R('leaves', 'Autumn leaves', 150, '🍂', 'Maple leaves tumble down behind her. Very Toronto in October.', 'Crunch crunch!'),
+    R('snow', 'Snowflake trail', 165, '❄️', 'Soft snowflakes drift behind her, even in July.', 'Let it snow!'),
+    R('bubbles', 'Bubble trail', 190, '🫧', 'Shimmering bubbles bob up behind her and pop.', 'Pop pop pop!'),
+    R('spores', 'Mushroom spores', 260, '🍄', 'Glowing magic spores from her very own mushrooms. Dreamy.', 'Mushroom magic!'),
+    R('pumpkinTrail', 'Jack-o’-lantern trail', 210, '🎃', 'Little glowing pumpkins and bats bob along behind her. Spooky!', 'Trick or treat!', { season: 'halloween' }),
+    { id: 'spiderEars', slot: 'ears', season: 'halloween', name: 'Spider earrings', price: 120, ic: '🕷️', blurb: 'Two fuzzy black spiders dangling on silver threads. They wiggle when she walks!', say: 'Itsy bitsy!', build: B => ck5bSpiderEars(B), thumb: [0.19, 0.07, 0, 0.075] },
+  ];
+}
+function ck5bSets() {                                                 // new outfit sets (each piece in its own slot, nothing in a set clashes)
+  return [
+    { id: 'cozyDay', name: 'Cosy Day', ic: '☕', items: ['sweater', 'booties', 'leaves', 'toque'] },
+    { id: 'rainyDay', name: 'Rainy Day', ic: '🌧️', items: ['raincoat', 'rainBoots', 'bubbles'] },
+    { id: 'ballerina', name: 'Prima Ballerina', ic: '🩰', items: ['tutu', 'flowers', 'heartTrail', 'pearls'] },
+    { id: 'hockey', name: 'Hockey Night', ic: '🏒', items: ['jersey', 'socks', 'snow', 'bandana'] },
+    { id: 'skatePark', name: 'Skate Park', ic: '🛼', items: ['hoodie', 'skates', 'catEye', 'backpack'] },
+    { id: 'royalBall', name: 'Royal Ball', ic: '👑', items: ['gown', 'slippers', 'tiara', 'sparkles'] },
+  ];
+}
+function ck5bTagMap() {
+  return {
+    crown: ['royal', 'classic'], party: ['cute', 'party'], bunny: ['cute'], flowers: ['cute', 'nature'], toque: ['cozy', 'canadian'], chef: ['funny', 'food'], cowboy: ['cool'],
+    pirate: ['cool', 'funny'], witch: ['spooky', 'magic'], tiara: ['royal', 'sparkly'], halo: ['sparkly', 'cute'], bandana: ['sporty', 'cool'], bowtie: ['cute', 'fancy'],
+    bell: ['cute', 'classic'], marigold: ['festive', 'nature'], punk: ['cool', 'rock'], pearls: ['royal', 'fancy'], hero: ['sporty', 'hero'], rainbow: ['sparkly', 'cute'],
+    vampire: ['spooky', 'fancy'], royal: ['royal', 'fancy'], strawberry: ['cute', 'food'], pizza: ['funny', 'food'], basket: ['cozy', 'food'], jetpack: ['cool', 'hero'],
+    nerd: ['funny', 'hero'], hearts: ['cute', 'cool'], stars: ['sparkly', 'cool'], monocle: ['fancy', 'funny'], tailbow: ['cute', 'classic'], tailbell: ['cute', 'festive'],
+    scrunchie: ['sparkly', 'retro'], ratCrown: ['royal', 'funny'], darkCrown: ['spooky', 'cool'], propBeanie: ['funny', 'sporty'], noodleHat: ['funny', 'food'],
+    sweepHat: ['fancy', 'funny'], zombieBandana: ['spooky', 'sporty'], porterCollar: ['cool', 'funny'], aviatorScarf: ['sporty', 'cool'], fireflyCape: ['magic', 'sparkly'],
+    starCape: ['magic', 'sparkly'], zombieLantern: ['spooky', 'cozy'], discoShades: ['sparkly', 'party'], raceGoggles: ['sporty', 'cool'], jhumkas: ['festive', 'fancy'],
+    banditMask: ['cool', 'funny'], coonBow: ['cute', 'funny'], moonCrown: ['magic', 'royal'], beret: ['fancy', 'cool'], devilHorns: ['spooky', 'cute'], strawHat: ['cute', 'nature'],
+    lei: ['nature', 'party'], locket: ['fancy', 'cute'], poncho: ['cozy', 'sporty'], pawCape: ['cute', 'hero'], sparkle: ['sparkly', 'magic'], backpack: ['cute', 'sporty'],
+    teddy: ['cute', 'cozy'], guitar: ['rock', 'cool'], threeD: ['funny', 'retro'], catEye: ['cool', 'fancy'], cherries: ['cute', 'food'], hoops: ['cool', 'fancy'],
+    pompom: ['cute'], tailHeart: ['cute', 'sparkly'], pumpkinHat: ['spooky', 'cute'], batWings: ['spooky', 'cute'], ghostCape: ['spooky', 'cute'], diyaLamp: ['festive', 'cozy'],
+    rangoliCape: ['festive', 'sparkly'], diwaliLights: ['festive', 'sparkly'], santaHat: ['festive', 'cozy'], antlers: ['festive', 'funny'], candyScarf: ['festive', 'cozy'],
+    heartWings: ['cute', 'magic'], cupidBand: ['cute', 'festive'], mapleCape: ['canadian', 'festive'], mountieHat: ['canadian', 'cool'],
+    sweater: ['cozy', 'cute'], hoodie: ['cozy', 'cool'], tutu: ['cute', 'fancy'], raincoat: ['cozy', 'sporty'], jersey: ['sporty', 'canadian'], gown: ['royal', 'fancy', 'sparkly'],
+    ghostSheet: ['spooky', 'cute'], socks: ['cozy', 'cute'], rainBoots: ['sporty', 'cute'], booties: ['cozy', 'cute'], skates: ['sporty', 'cool', 'retro'], slippers: ['royal', 'sparkly'],
+    catBooties: ['spooky', 'cute'], sparkles: ['sparkly', 'magic'], heartTrail: ['cute', 'sparkly'], leaves: ['cozy', 'nature'], snow: ['cozy', 'magic'], bubbles: ['cute', 'funny'],
+    spores: ['magic', 'nature'], pumpkinTrail: ['spooky', 'festive'], spiderEars: ['spooky', 'funny'],
+  };
+}
+function ck5bRx() {                                                   // what the neighbours say about the new slots (and a few of the new things)
+  try {
+    const L = rxLines(), slot = (who, s, lines) => { const D = L[who]; if (D && D.slot && !D.slot[s]) D.slot[s] = lines; }, item = (who, id, lines) => { const D = L[who]; if (D && D.item && !D.item[id]) D.item[id] = lines; };
+    slot('aunty', 'outfit', ["New clothes! So smart, beta. Now don't roll in the garden.", [['a', "Arre, look at this outfit!"], ['k', "Do you like it, Aunty-ji?"], ['a', "Like it? I'm knitting you a matching one!"]]]);
+    slot('aunty', 'paws', ["Shoes on all four feet? Very good, my floors are clean!", "Arre, little shoes! Take them off inside, beta. Indian house rules."]);
+    slot('aunty', 'trail', ["Why is everything sparkling behind you? Is it Diwali already?", "So much glitter! Who is going to sweep this up, hmm?"]);
+    slot('roof', 'outfit', ["Ooh, an outfit! Very fancy for a rooftop.", "Nice threads, roomie! Got one in raccoon size?"]);
+    slot('roof', 'paws', ["Shoes?! How do you even climb in those?", "Little booties! Your paws must be so warm."]);
+    slot('roof', 'trail', ["Whoa, you leave sparkly stuff everywhere! Like me with snacks.", "Ooh, a trail! Can I follow it? To snacks?"]);
+    slot('slider', 'outfit', ["Ooh, all dressed up! Still can't open the glass though! Nyah!"]);
+    slot('slider', 'paws', ["Shoes?! Hahaha! Clip-clop, clip-clop!"]);
+    slot('slider', 'trail', ["Ooh, shiny trail! Very fancy for a cat who can't open doors!"]);
+    slot('porter', 'outfit', [["🐕 Porter sniffs your new outfit... and wags!", 'wag'], ["🐕 Porter tilts his head. Is she wearing CLOTHES?", 'tilt']]);
+    slot('porter', 'paws', [["🐕 Porter stares at your little shoes and barks!", 'bark'], ["🐕 Porter play-bows at your booties!", 'bow']]);
+    slot('porter', 'trail', [["🐕 Porter tries to catch the things floating behind you!", 'bow']]);
+    item('aunty', 'sweater', ["A sweater! Very good. October is coming, beta. Did you eat?"]);
+    item('aunty', 'gown', ["Hai, a ball gown! Like a bride! When is the wedding?", "So pretty! Like a princess in a Yash Raj film!"]);
+    item('aunty', 'jersey', ["Hockey! Like Sharma-ji's son. He also never studies."]);
+    item('aunty', 'ghostSheet', ["Hai Ram, a GHOST! ...Oh, it's only you. Come, have a ladoo."]);
+    item('aunty', 'skates', ["Roller skates?! Not on my stairs, beta!"]);
+    item('aunty', 'spiderEars', ["SPIDERS?! On your ears?! Arre, take them off! ...Oh. Fake. Okay."]);
+    item('roof', 'ghostSheet', ["BOO! ...Wait. Is that you? Nice sheet!"]);
+    item('roof', 'skates', ["Roller skates on a ROOF? Bold. I like it."]);
+    item('roof', 'pumpkinTrail', ["Little pumpkins! Can I eat one? Asking for me."]);
+    item('slider', 'ghostSheet', ["A ghost? Pfft. I can see your tail. Nyah!"]);
+    item('slider', 'jersey', ["Hockey? I'd totally win. I have hands!"]);
+    item('porter', 'ghostSheet', [["🐕 Porter barks at the ghost! ...then wags. It's only PKR!", 'bark']]);
+    item('porter', 'skates', [["🐕 Porter chases your wheels round and round!", 'wag']]);
+    item('porter', 'bubbles', [["🐕 Porter snaps at your bubbles! Pop!", 'bow']]);
+  } catch (e) {}
+}
+
+/* ---------- garment geometry (body space: her body runs along z, chest at +z, rump at -z; legs hang from y 0.42) ---------- */
+function ck5bNeckOK(p, d) { return (p[1] - 0.585) * 0.8601 + (p[2] - 0.285) * 0.5101 <= -d; }   // below the collar line (ckNeck's ring) by d
+function ck5bGrid(P, cols, rows, flip) {                              // a grid of (cols+1) x (rows+1) points -> an indexed geometry, wound outward
+  const I = [];
+  for (let j = 0; j < rows; j++) for (let k = 0; k < cols; k++) { const a = j * (cols + 1) + k, b = a + 1, c = a + cols + 1, d = c + 1; if (flip) I.push(a, c, b, b, c, d); else I.push(a, b, c, b, d, c); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals(); return g;
+}
+function ck5bShell(o) {                                               // a garment shell hugging her (CK_BODY + o.m), from the neckline back to a hem; o.col(u, f, k, j) colours it
+  const cols = o.cols || 48, rows = o.rows || 22, full = o.f0 == null, f0 = full ? -Math.PI : o.f0, f1 = full ? Math.PI : o.f1;
+  const n = (cols + 1) * (rows + 1), P = new Float32Array(n * 3), cols3 = new Array(n), front = [], back = [], q = [0, 0, 0];
+  const ax = s => [0, 0.5 - 0.06 * s, 0.37 - 0.79 * s], sOf = z => (0.37 - z) / 0.79;
+  const pt = (s, f, out, m) => { const a = ax(s), d = [Math.sin(f), Math.cos(f), 0], r = ckReach(a, d, CK_BODY, m == null ? o.m : m, 0.5) || 0.2; out[0] = d[0] * r; out[1] = a[1] + d[1] * r; out[2] = a[2]; return out; };
+  const SF = [];                                                       // the neckline: where each column starts (smoothed, so the edge runs clean)
+  for (let k = 0; k <= cols; k++) { const f = f0 + (f1 - f0) * k / cols; let sf = 0; for (; sf < 0.6; sf += 0.005) { pt(sf, f, q); if (ck5bNeckOK(q, o.nd == null ? 0.03 : o.nd)) break; } SF.push(sf); }
+  for (let pass = 0; pass < 4; pass++) { const c = SF.slice(); for (let k = 0; k <= cols; k++) { const a = full ? (k + cols - 1) % cols : Math.max(0, k - 1), b = full ? (k + 1) % cols : Math.min(cols, k + 1); SF[k] = Math.max(c[k], (c[a] + 2 * c[k] + c[b]) / 4); } if (full) SF[cols] = SF[0]; }
+  for (let k = 0; k <= cols; k++) {
+    const f = f0 + (f1 - f0) * k / cols, sf = SF[k];
+    const zb = o.zb + ((o.zbB == null ? o.zb : o.zbB) - o.zb) * (1 - Math.cos(f)) / 2, sb = Math.max(sf + 0.12, sOf(zb));
+    for (let j = 0; j <= rows; j++) { const u = j / rows, s = sf + (sb - sf) * u, i = j * (cols + 1) + k; pt(s, f, q);
+      if (o.bump) { const b = o.bump(u, f, k, j); q[0] += Math.sin(f) * b; q[1] += Math.cos(f) * b; }
+      P[i * 3] = q[0]; P[i * 3 + 1] = q[1]; P[i * 3 + 2] = q[2]; cols3[i] = o.col ? o.col(u, f, k, j, q) : 0xffffff;
+      if (j === 0) front.push(new THREE.Vector3(q[0], q[1], q[2])); if (j === rows) back.push(new THREE.Vector3(q[0], q[1], q[2])); }
+  }
+  const g = ck5bGrid(P, cols, rows, false);
+  return { g, c: (x, y, z, i) => cols3[i], front, back, full, at: (u, f, m) => { const k = Math.round((f - f0) / (f1 - f0) * cols), kk = Math.max(0, Math.min(cols, k)), j = Math.max(0, Math.min(rows, Math.round(u * rows))), i = (j * (cols + 1) + kk) * 3; return new THREE.Vector3(P[i], P[i + 1], P[i + 2]).addScaledVector(new THREE.Vector3(Math.sin(f), Math.cos(f), 0), m || 0); } };
+}
+function ck5bHem(pts, closed, r, out) {                               // a rolled edge along a garment's edge (pushed out a touch)
+  const L = closed ? pts.slice(0, -1) : pts.slice(), c = new THREE.Vector3(0, 0.45, 0);
+  const P = L.map(p => { const d = new THREE.Vector3(p.x, p.y - c.y, 0).normalize(); return p.clone().addScaledVector(d, out || 0); });
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(P, !!closed, 'centripetal'), Math.max(24, P.length * 2), r, 6, !!closed);
+}
+function ck5bOn(B, k, geo, col, p, n, spin, s) {                      // lay a flat thing (its +z out) on a surface at p, facing n
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n.clone().normalize()), q2 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), spin || 0);
+  const M = new THREE.Matrix4().compose(p, q.multiply(q2), new THREE.Vector3(s || 1, s || 1, s || 1)); B.parts[k].push([geo, col, B.M.clone().multiply(M)]);
+}
+function ck5bHash(a, b) { const h = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return h - Math.floor(h); }
+function ck5bSweater(B) {                                             // cream knit, a red heart band and a dotted band, ribbed hem, a red roll neck
+  const cream = 0xf6efe2, cream2 = 0xebe1cf, red = 0xd2283d, deep = 0xa81c31, HEART = ['.X.X.', 'XXXXX', '.XXX.', '..X..'];
+  const sh = ck5bShell({ m: 0.02, nd: 0.03, zb: -0.31, zbB: -0.16, cols: 60, rows: 30, bump: (u, f, k, j) => 0.0016 * Math.sin(k * 2.1) * Math.sin(j * 2.7),
+    col: (u, f, k, j) => {
+      if (j >= 27) return k % 2 ? red : deep;                          // ribbed hem
+      if (j === 4 || j === 9) return red;
+      if (j >= 5 && j <= 8) return (j === 6 || j === 7) && k % 4 === 1 ? cream : red;   // a red band with cream dots
+      if (j >= 14 && j <= 17) { const c = k % 10, r = j - 14; return c < 5 && HEART[r][c] === 'X' ? red : cream; }   // a row of little hearts
+      if (j === 12 || j === 19) return deep;
+      return (k + j) % 2 ? cream : cream2;                             // (stitches)
+    } });
+  B.m(sh.g, sh.c);
+  B.m(ck5bHem(sh.front, true, 0.019, 0.004), (x, y, z, i) => (i >> 2) % 2 ? red : deep);   // the roll neck
+  B.m(ck5bHem(sh.back, true, 0.009, 0.002), deep);
+}
+function ck5bHoodie(B) {                                              // lavender fleece, hood down on her shoulders, drawstrings, a paw print on the back
+  const lav = 0xb9a6e3, lav2 = 0xab97d9, deep = 0x8a74c4, white = 0xffffff;
+  const sh = ck5bShell({ m: 0.021, nd: 0.03, zb: -0.32, zbB: -0.17, cols: 52, rows: 24, col: (u, f, k, j) => j >= 22 ? deep : (k + j) % 3 ? lav : lav2 });
+  B.m(sh.g, sh.c);
+  B.m(ck5bHem(sh.front, true, 0.013, 0.003), deep); B.m(ck5bHem(sh.back, true, 0.011, 0.002), deep);
+  const top = sh.at(0, 0, 0);                                          // the hood: a soft pouch lying back over her shoulders, its opening darker
+  B.m(ckFluff(CKG.sph(1, 22, 14), 0.05, 3), (x, y, z) => y > 0.55 && Math.hypot(x, (z + 0.1) * 1.2) < 0.62 ? deep : lav, [0, top.y + 0.004, top.z - 0.05], [-0.12, 0, 0], [0.15, 0.05, 0.1]);
+  for (const sx of [-1, 1]) {                                          // drawstrings with white tips
+    const a = sh.at(0, Math.PI - sx * 0.55, 0.008), b = a.clone().add(new THREE.Vector3(sx * 0.006, -0.07, 0.03));
+    B.m(ckTaper([[a.x, a.y, a.z], [(a.x + b.x) / 2, (a.y + b.y) / 2 - 0.004, (a.z + b.z) / 2 + 0.01], [b.x, b.y, b.z]], 0.0035, 0.0035, 10, 5), white);
+    B.m(CKG.cyl(0.005, 0.005, 0.016, 8), white, [b.x, b.y - 0.006, b.z]);
+  }
+  const p = sh.at(0.55, 0, 0.004), n = new THREE.Vector3(0, 1, 0);   // a paw print on her back
+  ck5bOn(B, 'm', ckFlat(ckSnDisc(0.03, 0.025, 16), 0.004), white, p, n, 0);
+  for (const [x, z] of [[-0.036, 0.03], [-0.013, 0.048], [0.013, 0.048], [0.036, 0.03]]) ck5bOn(B, 'm', ckFlat(ckSnDisc(0.011, 0.013, 12), 0.004), white, p.clone().add(new THREE.Vector3(x, 0.0, z)), n, 0);
+}
+function ck5bTutu(B) {                                                // a satin leotard; three layers of frothy tulle flaring back over her hips from the waist; a bow
+  const pink = 0xffa8cc, pink2 = 0xff8fbf, L = [0xffd9ea, 0xffc0dc, 0xffa3cd];
+  const sh = ck5bShell({ m: 0.012, nd: 0.035, zb: -0.31, zbB: -0.14, cols: 48, rows: 20, col: (u, f, k, j) => j % 5 === 0 ? pink2 : pink });
+  B.s(sh.g, sh.c); B.s(ck5bHem(sh.front, true, 0.008, 0.002), pink2);
+  for (let l = 0; l < 3; l++) {
+    const cols = 48, rows = 4, P = new Float32Array((cols + 1) * (rows + 1) * 3), C = new Array((cols + 1) * (rows + 1)), z0 = -0.03 - l * 0.035;
+    for (let k = 0; k <= cols; k++) { const f = -2.05 + 4.1 * k / cols, a = [0, 0.5 - 0.06 * (0.37 - z0) / 0.79, z0], d = [Math.sin(f), Math.cos(f), 0], r = ckReach(a, d, CK_BODY, 0.02 + l * 0.006, 0.5) || 0.2;
+      for (let j = 0; j <= rows; j++) { const t = j / rows, len = (0.15 - l * 0.02) * t, out = 0.55 * len + 0.016 * Math.sin(f * 13 + l * 1.7) * t + 0.012 * Math.sin(t * Math.PI), i = (j * (cols + 1) + k) * 3;
+        P[i] = d[0] * (r + out); P[i + 1] = a[1] + d[1] * (r + out) - 0.035 * t * t; P[i + 2] = z0 - len * 0.82;
+        C[j * (cols + 1) + k] = ck5bHash(k, j + l * 7) > 0.92 ? 0xffffff : L[l]; } }
+    B.m(ckTwoSided(ck5bGrid(P, cols, rows, false)), (x, y, z, i) => C[i % C.length]);
+  }
+  const p = sh.at(0.36, 0, 0.014);                                    // the bow on her back, where the tulle starts
+  for (const sx of [-1, 1]) B.s(CKG.tor(0.026, 0.009, 6, 16), pink2, [p.x + sx * 0.028, p.y + 0.008, p.z], [Math.PI / 2, sx * 0.5, 0], [1, 0.55, 1]);
+  B.s(CKG.sph(0.013, 10, 8), pink2, [p.x, p.y + 0.008, p.z]);
+}
+function ck5bRaincoat(B) {                                            // shiny yellow, a reflective stripe, a stand-up collar, toggles, pocket flaps
+  const y = 0xffd21f, y2 = 0xf2c200, grey = 0xdfe5ec, brown = 0x8a5a2e;
+  const sh = ck5bShell({ m: 0.017, nd: 0.025, zb: -0.33, zbB: -0.2, cols: 48, rows: 22, col: (u, f, k, j) => j === 12 || j === 13 ? grey : j >= 21 ? y2 : y });
+  B.s(sh.g, sh.c);
+  B.s(ck5bHem(sh.front, true, 0.017, 0.008), y2); B.s(ck5bHem(sh.back, true, 0.009, 0.002), y2);
+  for (const u of [0.06, 0.16, 0.26]) { const p = sh.at(u, Math.PI, 0.006); B.s(CKG.cyl(0.0055, 0.0055, 0.03, 8), brown, [p.x, p.y, p.z], [0, 0, Math.PI / 2]);
+    B.s(CKG.tor(0.008, 0.0018, 4, 10), 0x3a2a1a, [p.x, p.y - 0.001, p.z + 0.004], [Math.PI / 2, 0, 0], [1.5, 1, 1]); }
+  for (const sx of [-1, 1]) { const f = sx * 1.95, p = sh.at(0.5, f, 0.004), n = new THREE.Vector3(Math.sin(f), Math.cos(f), 0); ck5bOn(B, 's', ck4RBox(0.07, 0.035, 0.006, 0.006, 3), y2, p, n, sx * Math.PI / 2); }
+}
+function ck5bJersey(B) {                                              // blue, white stripes round the hem, a white neck, a big white 7 on the back
+  const blue = 0x1d4fa8, blue2 = 0x1a479a, white = 0xf4f6fb;
+  const sh = ck5bShell({ m: 0.018, nd: 0.03, zb: -0.32, zbB: -0.18, cols: 52, rows: 24, col: (u, f, k, j) => (j >= 17 && j <= 18) || (j >= 21 && j <= 22) ? white : (k + j) % 2 ? blue : blue2 });
+  B.m(sh.g, sh.c);
+  B.m(ck5bHem(sh.front, true, 0.015, 0.004), white); B.m(ck5bHem(sh.back, true, 0.009, 0.002), blue2);
+  const p = sh.at(0.45, 0, 0.003), n = new THREE.Vector3(0, 1, 0.12);   // the 7, lying along her back (its top toward her head)
+  ck5bOn(B, 'm', ck4RBox(0.085, 0.022, 0.004, 0.008, 2), white, p.clone().add(new THREE.Vector3(0, 0.002, 0.045)), n, 0);
+  ck5bOn(B, 'm', ck4RBox(0.022, 0.1, 0.004, 0.008, 2), white, p.clone().add(new THREE.Vector3(0.012, 0.0, -0.005)), n, Math.PI - 0.38);
+}
+function ck5bSleeve(B) {                                              // (a front leg's space) a jersey sleeve over her shoulder, two white stripes at the cuff
+  const blue = 0x1d4fa8, white = 0xf4f6fb;
+  B.m(ckTwoSided(CKG.cyl(0.086, 0.06, 0.15, 22, true)), (x, y) => (y < -0.05 && y > -0.064) || (y < -0.025 && y > -0.039) ? white : blue, [0, -0.13, 0.004], null, [0.88, 1, 1.02]);
+}
+function ck5bGown(B) {                                                // a rose satin bodice, gold trim, a bell skirt (open at the front for her legs), a big bow
+  const rose = 0xf27aa8, rose2 = 0xe7659a, gold = 0xf2c14a, sk0 = new THREE.Color(0xf9b6d2), sk1 = new THREE.Color(0xe86fa0), c = new THREE.Color();
+  const sh = ck5bShell({ m: 0.013, nd: 0.035, zb: -0.36, zbB: -0.12, cols: 48, rows: 20, col: (u, f, k, j) => j % 4 === 0 ? rose2 : rose });
+  B.s(sh.g, sh.c); B.s(ck5bHem(sh.front, true, 0.009, 0.003), gold);
+  for (let l = 0; l < 2; l++) {                                        // the skirt: a pleated bell from high on her sides to her knees (open at the front for her legs); an overskirt with a scalloped hem
+    const cols = 56, rows = l ? 6 : 12, P = new Float32Array((cols + 1) * (rows + 1) * 3), C = new Array((cols + 1) * (rows + 1)), yw = 0.47 + l * 0.01, yh = l ? 0.3 : 0.12;
+    for (let k = 0; k <= cols; k++) { const f = -2.6 + 5.2 * k / cols, d = [Math.sin(f), 0, -Math.cos(f)], r = (ckReach([0, yw, -0.02], d, CK_BODY, 0.022 + l * 0.012, 0.6) || 0.22), fl = (0.12 + 0.13 * (Math.cos(f) + 1) / 2) * (l ? 0.62 : 1);
+      for (let j = 0; j <= rows; j++) { const t = j / rows, sc = l ? 1 - 0.35 * Math.pow(Math.abs(Math.sin(f * 4.5)), 2) * t : 1, R = r + fl * Math.pow(t, 1.25) + (l ? 0.012 : 0.022) * Math.sin(f * 15) * t, i = (j * (cols + 1) + k) * 3;
+        P[i] = d[0] * R; P[i + 1] = yw + (yh - yw) * t * sc; P[i + 2] = -0.02 + d[2] * R;
+        c.copy(l ? new THREE.Color(0xf590bb) : sk0).lerp(l ? new THREE.Color(0xd94a85) : sk1, l ? t : t * 0.8); if (ck5bHash(k, j + 9 * l) > 0.9) c.lerp(new THREE.Color(0xffffff), 0.35);
+        C[j * (cols + 1) + k] = (l ? j === rows : j >= rows - 1) ? gold : c.getHex(); } }
+    B.m(ckTwoSided(ck5bGrid(P, cols, rows, true)), (x, y, z, i) => C[i % C.length]);
+  }
+  const p = sh.at(0.86, 0, 0.012);                                     // a big bow on the small of her back
+  for (const sx of [-1, 1]) { B.s(CKG.tor(0.042, 0.013, 7, 20), rose2, [p.x + sx * 0.045, p.y + 0.014, p.z], [Math.PI / 2 - 0.25, sx * 0.55, 0], [1, 0.5, 1]);
+    B.s(ckFlat([[-0.013, 0], [0.013, 0], [0.018, -0.12], [0.0, -0.1], [-0.018, -0.12]], 0.004), rose2, [p.x + sx * 0.03, p.y + 0.004, p.z - 0.035], [-1.1, 0, sx * 0.35]); }
+  B.s(CKG.sph(0.018, 10, 8), gold, [p.x, p.y + 0.016, p.z]);
+  const g = sh.at(0, Math.PI, 0.015); B.s(CKG.sph(0.014, 10, 8), 0xff3f7f, [g.x, g.y + 0.02, g.z + 0.01]);
+}
+function ck5bGhost(B) {                                               // a sheet over her back and down her sides to her knees (open underneath: her legs walk out of it), a wavy hem
+  const W = 0xfbfbff, S = new THREE.Color(0xdfe3ee), cc = new THREE.Color(), cols = 48, r1 = 12, r2 = 5, rows = r1 + r2, P = new Float32Array((cols + 1) * (rows + 1) * 3), C = new Array((cols + 1) * (rows + 1));
+  const O = [0, 0.43, -0.02];
+  for (let k = 0; k <= cols; k++) { const f = -Math.PI + 2 * Math.PI * k / cols, hx = Math.sin(f), hz = Math.cos(f); let eq = null;
+    for (let j = 0; j <= rows; j++) { const i = (j * (cols + 1) + k) * 3; let x, y, z;
+      if (j <= r1) { const th = j / r1 * Math.PI / 2, d = [Math.sin(th) * hx, Math.cos(th), Math.sin(th) * hz], r = ckReach(O, d, CK_BODY, 0.034, 0.7) || 0.25;
+        x = O[0] + d[0] * r; y = O[1] + d[1] * r; z = O[2] + d[2] * r; if (j === r1) eq = [x, y, z]; }
+      else { const t = (j - r1) / r2, yh = 0.24 + 0.028 * Math.sin(f * 7), fl = 0.05 * t * t; x = eq[0] + hx * fl; z = eq[2] + hz * fl; y = eq[1] + (yh - eq[1]) * t; }
+      P[i] = x; P[i + 1] = y; P[i + 2] = z;
+      C[j * (cols + 1) + k] = cc.set(W).lerp(S, Math.max(0, Math.sin(f * 6 + 0.5)) * 0.5 * Math.min(1, j / r1)).getHex(); } }
+  B.m(ckTwoSided(ck5bGrid(P, cols, rows, true)), (x, y, z, i) => C[i % C.length]);
+}
+function ck5bGhostHood(B) {                                           // (head space) the sheet over her head: eye holes with dark rims, her ears poking through, pink cheeks
+  const W = 0xfbfbff, rim = 0x3a3442, blush = 0xffb3cc, O = [0, -0.01, 0.02], list = [[0, 0, 0, 0.1728, 0.152, 0.1568], [0, -0.058, 0.128, 0.092, 0.064, 0.072]];
+  const eyes = [[-0.07, 0.018, 0.159], [0.07, 0.018, 0.159]].map(e => new THREE.Vector3(e[0] - O[0], e[1] - O[1], e[2] - O[2]).normalize());
+  const cheeks = [[-0.1, -0.035, 0.12], [0.1, -0.035, 0.12]].map(e => new THREE.Vector3(e[0] - O[0], e[1] - O[1], e[2] - O[2]).normalize()), mouth = new THREE.Vector3(0, -0.1 - O[1], 0.16 - O[2]).normalize();
+  const cols = 40, rows = 26, P = new Float32Array((cols + 1) * (rows + 1) * 3), C = [], D = [], v = new THREE.Vector3();
+  for (let j = 0; j <= rows; j++) for (let k = 0; k <= cols; k++) { const th = j / rows * Math.PI, ph = k / cols * Math.PI * 2, d = [Math.sin(th) * Math.sin(ph), Math.cos(th), Math.sin(th) * Math.cos(ph)];
+    const r = ckReach(O, d, list, 0.022, 0.4) || 0.18, i = (j * (cols + 1) + k) * 3; P[i] = O[0] + d[0] * r; P[i + 1] = O[1] + d[1] * r; P[i + 2] = O[2] + d[2] * r;
+    v.set(d[0], d[1], d[2]); D.push(v.clone()); const ea = Math.min(...eyes.map(e => e.angleTo(v)));
+    C.push(ea < 0.34 ? rim : cheeks.some(e => e.angleTo(v) < 0.13) ? blush : mouth.angleTo(v) < 0.07 ? rim : W); }
+  const I = [], hole = i => Math.min(...eyes.map(e => e.angleTo(D[i]))) < 0.2;
+  for (let j = 0; j < rows; j++) for (let k = 0; k < cols; k++) { const a = j * (cols + 1) + k, b = a + 1, c = a + cols + 1, d = c + 1;
+    if (!(hole(a) || hole(c) || hole(b))) I.push(a, c, b);
+    if (!(hole(b) || hole(c) || hole(d))) I.push(b, c, d); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+  B.m(g, (x, y, z, i) => C[i]);
+}
+
+/* ---------- paws (a leg's own space: the leg runs down from y 0 to her paw at y -0.38, toes toward +z) ---------- */
+function ck5bLegR(y) { return 0.04 + 0.012 * (1 + y / 0.36); }       // her leg's radius at y
+function ck5bSocks(B) {                                               // candy stripes up to her knees, a white cuff
+  const S = [0xff5f8f, 0xffffff, 0x7fc8ff, 0xffffff];
+  const tube = CKG.cyl(1, 1, 0.19, 16, true), a = tube.attributes.position;
+  for (let i = 0; i < a.count; i++) { const y = a.getY(i) - 0.285, r = ck5bLegR(Math.max(-0.36, y)) + 0.007; a.setXYZ(i, a.getX(i) * r, y, a.getZ(i) * r); }
+  tube.computeVertexNormals(); B.m(tube, (x, y) => S[Math.floor((y + 1) / 0.022) % 4]);
+  B.m(CKG.sph(1, 16, 10), (x, y, z) => z > 0.4 ? 0xff5f8f : S[Math.floor((y + 1) * 3) % 4], [0, -0.38, 0.02], null, [0.061, 0.039, 0.077]);
+  B.m(CKG.tor(ck5bLegR(-0.19) + 0.008, 0.008, 6, 18), 0xffffff, [0, -0.19, 0], [Math.PI / 2, 0, 0]);
+}
+function ck5bBoots(B, kind) {                                         // wellies, fluffy booties or black-cat booties: a shaft, a foot, a sole
+  const col = { rain: 0xffcc1a, fluffy: 0xf3b6c8, cat: 0x26222b }[kind], sole = { rain: 0x5a4630, fluffy: 0xd9a0b3, cat: 0x111014 }[kind], k = kind === 'rain' ? B.s : B.m;
+  const top = kind === 'cat' ? -0.29 : -0.235, h = -0.37 - top;
+  k(CKG.cyl(ck5bLegR(top) + 0.011, ck5bLegR(-0.36) + 0.012, -h, 18, true), col, [0, top - (-h) / 2, 0]);
+  k(CKG.sph(1, 18, 12), (x, y) => y < -0.6 ? sole : col, [0, -0.381, 0.026], null, [0.066, 0.037, 0.088]);
+  if (kind === 'rain') k(CKG.tor(ck5bLegR(top) + 0.011, 0.006, 6, 20), 0xf0b800, [0, top, 0], [Math.PI / 2, 0, 0]);
+  if (kind === 'fluffy') B.m(ckFluff(CKG.tor(ck5bLegR(top) + 0.014, 0.017, 8, 20), 0.35, 4), (x, y, z) => ck5bHash(x * 50, z * 50) > 0.7 ? 0xffe8f1 : 0xfff8fb, [0, top, 0], [Math.PI / 2, 0, 0]);
+  if (kind === 'cat') {                                                // a little cat face on each toe
+    for (const sx of [-1, 1]) { B.m(CKG.cone(0.012, 0.022, 4), col, [sx * 0.024, -0.352, 0.078], [0.5, 0, -sx * 0.3]);
+      B.m(CKG.sph(0.0085, 8, 6), 0xc8f04a, [sx * 0.018, -0.37, 0.104], null, [1, 1.2, 0.6]); B.m(CKG.sph(0.004, 6, 5), 0x111111, [sx * 0.018, -0.37, 0.109], null, [0.5, 1.2, 0.5]); }
+    B.m(CKG.sph(0.005, 6, 5), 0xff8fb0, [0, -0.381, 0.112]);
+  }
+}
+function ck5bSkates(B) {                                              // white boots, pink laces, a grey plate and four pink wheels
+  const w = 0xfafafa, pink = 0xff4f9a;
+  B.s(CKG.cyl(ck5bLegR(-0.24) + 0.012, ck5bLegR(-0.36) + 0.012, 0.13, 18, true), w, [0, -0.305, 0]);
+  B.s(CKG.sph(1, 18, 12), w, [0, -0.381, 0.026], null, [0.066, 0.037, 0.088]);
+  B.s(CKG.tor(ck5bLegR(-0.24) + 0.012, 0.006, 6, 20), pink, [0, -0.24, 0], [Math.PI / 2, 0, 0]);
+  for (const y of [-0.26, -0.29, -0.32]) B.s(CKG.box(0.034, 0.004, 0.004), pink, [0, y, ck5bLegR(y) + 0.013], [0, 0, 0.35]);
+  B.s(CKG.box(0.04, 0.01, 0.12), 0x9aa0a8, [0, -0.422, 0.026]);
+  for (const z of [-0.022, 0.074]) for (const sx of [-1, 1]) B.s(CKG.cyl(0.017, 0.017, 0.014, 14), pink, [sx * 0.024, -0.44, z], [0, 0, Math.PI / 2]);
+}
+function ck5bSlippers(B) {                                            // glass: an open slipper round her paw, a little heel, a jewel on the toe
+  const g = 0x9fd6ff, rim = 0xe8f7ff;
+  B.l(new THREE.SphereGeometry(1, 18, 12, 0, Math.PI * 2, Math.PI * 0.42, Math.PI * 0.58), (x, y) => y > -0.3 ? rim : g, [0, -0.376, 0.024], null, [0.065, 0.043, 0.085]);
+  B.l(CKG.cyl(0.006, 0.009, 0.026, 8), g, [0, -0.405, -0.042]);
+  B.l(CKG.sph(0.013, 10, 8), 0xffffff, [0, -0.357, 0.09], null, [1, 0.8, 0.8]); for (const sx of [-1, 1]) B.l(CKG.sph(0.011, 8, 6), 0xd8f0ff, [sx * 0.015, -0.355, 0.086], null, [1.2, 0.7, 0.6]);
+}
+function ck5bSpiderEars(B) {                                          // (head space, like ck4Earrings) a fuzzy spider on a silver thread from each ear
+  const silver = 0xd8dde6, black = 0x1a1620, cnt = () => B.parts.s.reduce((n, [g]) => n + g.attributes.position.count, 0), groups = [];
+  for (const [sx, H, n] of [[1, [0.1237, 0.1145, -0.0015], [0.9967, 0.066, -0.0473]], [-1, [-0.1237, 0.1135, -0.0137], [-0.9967, 0.0727, 0.0361]]]) {
+    B.frame(H, [0, Math.atan2(n[0], n[2]), 0]); B.s(CKG.sph(0.0055, 8, 6), silver, [0, 0, 0.001], null, [1, 1, 0.6]); B.frame();
+    const Pv = [sx * 0.188, 0.096, H[2]];
+    B.s(ckTaper([[H[0] + sx * 0.003, H[1] - 0.002, H[2]], [H[0] + sx * 0.026, H[1] + 0.01, H[2]], [sx * 0.174, 0.11, H[2]], [Pv[0], Pv[1] + 0.003, Pv[2]]], 0.0019, 0.0019, 14, 5), silver);
+    const a = cnt();
+    B.frame(Pv, [0, sx * 0.75, 0]);
+    B.s(ckTaper([[0, 0, 0], [0, -0.012, 0.001], [0, -0.024, 0]], 0.0011, 0.0011, 6, 4), 0xf4f6fb);
+    B.s(CKG.sph(0.0125, 12, 9), black, [0, -0.042, 0], null, [1, 0.9, 1.15]); B.s(CKG.sph(0.0075, 10, 8), black, [0, -0.028, 0.004]);
+    B.s(CKG.sph(0.0042, 6, 5), 0xd8143a, [0, -0.044, 0.012], null, [1, 1.3, 0.5]);
+    for (const ex of [-1, 1]) B.s(CKG.sph(0.0022, 6, 5), 0xffffff, [ex * 0.0035, -0.025, 0.0105]);
+    for (const s of [-1, 1]) for (let i = 0; i < 4; i++) { const a2 = -0.6 + i * 0.4, y0 = -0.034;
+      B.s(ckTaper([[s * 0.006, y0, a2 * 0.006], [s * 0.017, y0 + 0.008, a2 * 0.014], [s * 0.026, y0 - 0.01, a2 * 0.022]], 0.0016, 0.001, 6, 4), black); }
+    B.frame();
+    groups.push({ c: Pv, a, b: cnt(), sx, ph: sx > 0 ? 0.4 : 2.2 });
+  }
+  B.fx = { sway: { k: 's', groups } };
+}
+
+/* ---------- colourways: the item's main colour dyed (vertex colours only; the shapes are shared) ---------- */
+function ck5bCols() {                                                 // { on: id -> colourway she wears it in, own: id -> [colourways she's bought] } (catguard.ckColors)
+  if (ck5bCols.S) return ck5bCols.S;
+  const S = ck5bCols.S = { on: Object.create(null), own: Object.create(null) }, ok = v => Number.isInteger(v) && v > 0 && v < 4;
+  try { const o = JSON.parse(ckGet('catguard.ckColors') || 'null');
+    if (o && typeof o === 'object') { if (o.on && typeof o.on === 'object') for (const k in o.on) if (CK_BY_ID[k] && ok(o.on[k])) S.on[k] = o.on[k];
+      if (o.own && typeof o.own === 'object') for (const k in o.own) if (CK_BY_ID[k] && Array.isArray(o.own[k])) { const a = [...new Set(o.own[k].filter(ok))]; if (a.length) S.own[k] = a; } } } catch (e) {}
+  for (const k in S.on) if (!(S.own[k] || []).includes(S.on[k])) delete S.on[k];   /* (only a colour she owns) */
+  return S;
+}
+function ck5bColSave() { const S = ck5bCols(); ckPut('catguard.ckColors', JSON.stringify({ on: S.on, own: S.own })); }
+function ck5bColOwned(id, i) { return !i || ((ck5bCols().own[id] || []).includes(i)); }
+function ck5bColFor(R, id) { const K = ck5bCK(); if (K && R && R === K.rig && K.prevCol && K.prevCol[id] != null) return K.prevCol[id]; return ck5bCols().on[id] || 0; }
+function ck5bVarOK(it) { return !!it && !!it.build && it.id !== 'crown' && it.id !== 'rainbow' && it.id !== 'discoShades'; }
+function ck5bVarPrice(it) { const p = isFinite(it.price) && it.price > 0 ? (it.snFull || it.price) : 300; return Math.max(10, ck5Nice(p * 0.3)); }
+function ck5bPal() {
+  return ck5bPal.L || (ck5bPal.L = [{ n: 'Rose', h: 0.94 }, { n: 'Coral', h: 0.025 }, { n: 'Sunny', h: 0.13 }, { n: 'Mint', h: 0.43 }, { n: 'Sky', h: 0.56 }, { n: 'Navy', h: 0.62, dk: 1 }, { n: 'Lilac', h: 0.77 }, { n: 'Plum', h: 0.85, dk: 1 }]);
+}
+function ck5bChroma(c) { return Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b); }   // (how coloured: HSL's saturation calls pale cream 'saturated')
+function ck5bHD(a, b) { const d = Math.abs(a - b) % 1; return Math.min(d, 1 - d); }
+function ck5bBase(it) { const w = ck5bCol.want; ck5bCol.want = 0; try { return ckBake(it); } finally { ck5bCol.want = w; } }
+function ck5bHue(it) {                                                // the item's main colour: the biggest family of its fabric's vertex colours
+  if (it.ck5bH) return it.ck5bH;
+  const c = new THREE.Color(), t = {}, bins = new Map(); let G = null;
+  if (it.slot === 'trail') { const D = ck5bTrailDef(it.trail); c.setHex(D.cols[0][0]); c.getHSL(t); return (it.ck5bH = { chroma: ck5bChroma(c) > 0.12, h: t.h, s: t.s, l: t.l, hex: D.cols[0][0] }); }
+  try { G = ck5bBase(it); } catch (e) { G = null; }
+  const lists = G ? [[G.m, G.cape], [G.s], [G.l]].map(L => L.filter(Boolean)).find(L => L.length) || [] : [];
+  const A = new THREE.Vector3(), Bv = new THREE.Vector3(), Cv = new THREE.Vector3();
+  for (const g of lists) { const C = g.attributes.color, P = g.attributes.position, I = g.index; if (!C || !P) continue;   /* (weighted by area: a fine trim with many vertices doesn't outvote the fabric) */
+    const n = I ? I.count : P.count, wv = new Float32Array(C.count);
+    for (let q = 0; q + 2 < n; q += 3) { const a = I ? I.getX(q) : q, b = I ? I.getX(q + 1) : q + 1, d = I ? I.getX(q + 2) : q + 2; A.fromBufferAttribute(P, a); Bv.fromBufferAttribute(P, b); Cv.fromBufferAttribute(P, d);
+      const ar = Bv.sub(A).cross(Cv.sub(A)).length() / 6; wv[a] += ar; wv[b] += ar; wv[d] += ar; }
+    for (let i = 0; i < C.count; i++) { if (!wv[i]) continue; c.setRGB(C.getX(i), C.getY(i), C.getZ(i)); c.getHSL(t); const ch = ck5bChroma(c), k = ch > 0.12 ? 'h' + Math.round(t.h * 20) % 20 : 'n' + Math.round(t.l * 2), w = wv[i];
+      const b = bins.get(k) || { n: 0, h: 0, hx: 0, hy: 0, s: 0, l: 0 }; b.n += w; b.hx += Math.cos(t.h * 6.2832) * w; b.hy += Math.sin(t.h * 6.2832) * w; b.s += t.s * w; b.l += t.l * w; bins.set(k, b); } }
+  let best = null, bk = ''; for (const [k, b] of bins) if (!best || b.n > best.n) { best = b; bk = k; }
+  if (!best) return (it.ck5bH = { chroma: false, h: 0, s: 0, l: 0.8, hex: 0xdddddd });
+  const h = ((Math.atan2(best.hy, best.hx) / 6.2832) + 1) % 1, s = best.s / best.n, l = best.l / best.n;
+  return (it.ck5bH = { chroma: bk[0] === 'h', h, s, l, hex: c.setHSL(h, bk[0] === 'h' ? s : 0, l).getHex() });
+}
+function ck5bVars(it) {                                               // [original, and three colourways]: { n, hex, h, dk }
+  if (it.ck5bVs) return it.ck5bVs;
+  if (!ck5bVarOK(it)) return (it.ck5bVs = null);
+  const M = ck5bHue(it), P = ck5bPal(), out = [{ n: 'Original', hex: M.hex }];
+  if (it.slot === 'trail') { const D = ck5bTrailDef(it.trail); D.cols.slice(1, 4).forEach((cs, i) => out.push({ n: D.names[i + 1], hex: cs[0], tr: i + 1 })); return (it.ck5bVs = out); }
+  let seed = 0; for (let i = 0; i < it.id.length; i++) seed = (seed * 31 + it.id.charCodeAt(i)) % 997;
+  const order = P.map((p, i) => ({ p, k: ((i * 7 + seed) % 8) + (M.chroma ? -ck5bHD(p.h, M.h) * 10 : 0) })).sort((a, b) => a.k - b.k).map(q => q.p), picked = [];
+  for (const p of order) { if (picked.length >= 3) break; if (M.chroma && ck5bHD(p.h, M.h) < 0.09) continue; if (picked.some(q => ck5bHD(q.h, p.h) < 0.1)) continue; if (!M.chroma && M.l < 0.3 && !p.dk && picked.length < 1) continue; picked.push(p); }
+  for (const p of order) { if (picked.length >= 3) break; if (!picked.includes(p)) picked.push(p); }
+  const c = new THREE.Color();
+  for (const p of picked) { c.setHex(M.hex); ck5bDye(c, M, p); out.push({ n: p.n, hex: c.getHex(), h: p.h, dk: p.dk }); }
+  return (it.ck5bVs = out);
+}
+function ck5bDye(c, M, T) {                                           // one vertex colour, dyed: the main family turns to T's hue (a white or black thing is tinted)
+  const t = ck5bDye.t || (ck5bDye.t = {}); c.getHSL(t);
+  const ch = ck5bChroma(c);
+  if (M.chroma) { if (ch > 0.1 && ck5bHD(t.h, M.h) < 0.1) { let h = T.h + (t.h - M.h); h = ((h % 1) + 1) % 1; c.setHSL(h, Math.min(1, t.s * (T.dk ? 0.9 : 1)), T.dk ? t.l * 0.62 : t.l); } }
+  else if (ch < 0.13 && Math.abs(t.l - M.l) < 0.22) { const dark = M.l < 0.3; c.setHSL(T.h, dark ? 0.5 : 0.55, dark ? Math.min(0.4, t.l + 0.16) : T.dk ? t.l * 0.55 : t.l * 0.9); }
+}
+function ck5bDyeGeo(g, M, T) {                                        // a geometry that shares her shape but has its own (dyed) colours
+  const h = new THREE.BufferGeometry(); for (const a in g.attributes) h.setAttribute(a, g.attributes[a]); if (g.index) h.setIndex(g.index);
+  h.boundingSphere = g.boundingSphere; h.boundingBox = g.boundingBox; h.userData = g.userData;
+  const C0 = g.attributes.color; if (!C0) return h; const C = C0.clone(), c = new THREE.Color();
+  for (let i = 0; i < C.count; i++) { c.setRGB(C.getX(i), C.getY(i), C.getZ(i)); ck5bDye(c, M, T); C.setXYZ(i, c.r, c.g, c.b); }
+  h.setAttribute('color', C); return h;
+}
+function ck5bDyeSet(it, G, idx) {
+  const V = ck5bVars(it), T = V && V[idx]; if (!T) return G; const M = ck5bHue(it), out = {};
+  for (const k in G) { const g = G[k];
+    if (!g || k === 'g' || k === 'f' || (it.fx && it.fx.snFlap && it.fx.snFlap.k === k)) { out[k] = g; continue; }   /* (glows and flames stay; flapping wings are dyed on her own copy: ck5bFixFlap) */
+    if (k === 'cape') { const cg = g.clone(); cg.userData = g.userData; cg.boundingSphere = g.boundingSphere ? g.boundingSphere.clone() : null; const C = cg.attributes.color, c = new THREE.Color();
+      for (let i = 0; i < C.count; i++) { c.setRGB(C.getX(i), C.getY(i), C.getZ(i)); ck5bDye(c, M, T); C.setXYZ(i, c.r, c.g, c.b); } out[k] = cg; continue; }
+    out[k] = ck5bDyeGeo(g, M, T); }
+  return out;
+}
+function ck5bVarGeo(it, idx) { const C = it.ck5bV || (it.ck5bV = {}); if (C[idx]) return C[idx]; const G = ck5bBase(it); if (!G || it.slot === 'trail') return null; return (C[idx] = ck5bDyeSet(it, G, idx)); }
+function ck5bBakeHook(it) {                                           // (ckBake, first) a colourway's geometry, while closetDress is building one
+  const w = ck5bCol.want; if (!w || !it || !it.build || ck5bBakeHook.busy) return null;
+  ck5bBakeHook.busy = true; try { return ck5bVarGeo(it, w); } catch (e) { console.error(e); return null; } finally { ck5bBakeHook.busy = false; }
+}
+function ck5bFixFlap(w) {                                             // (ckFxWear) dyed wings: their flapping copy gets the colourway too
+  const F = w.snF; if (!F || F.off || !F.g || w.ck5bDyed === w.col) return; w.ck5bDyed = w.col;
+  const V = ck5bVars(w.it), T = V && V[w.col]; if (!T) return; const M = ck5bHue(w.it), C = F.g.attributes.color; if (!C) return;
+  const c = new THREE.Color(), C0 = C.clone(); for (let i = 0; i < C.count; i++) { c.setRGB(C0.getX(i), C0.getY(i), C0.getZ(i)); ck5bDye(c, M, T); C.setXYZ(i, c.r, c.g, c.b); }
+  F.g.setAttribute('color', C); C.needsUpdate = true;
+}
+function ck5bPart(it, key, col) {                                     // a garment's extra part (a ghost's hood on her head, jersey sleeves on her legs), in the same colourway
+  const C = it.ck5bP || (it.ck5bP = {}), k0 = key + ':0';
+  if (!C[k0]) { const B = ckB(); it[key](B); const g0 = {}; for (const k of ['m', 's', 'g', 'l']) g0[k] = ckMerge(B.parts[k]); C[k0] = g0; }
+  const ck = key + ':' + (col || 0); if (!C[ck]) C[ck] = ck5bDyeSet(it, C[k0], col);
+  const G = C[ck], M = ckMat(), o = new THREE.Group(); o.userData.ck5bPart = key;
+  for (const k of ['m', 's', 'g', 'l']) if (G[k]) { const m = new THREE.Mesh(G[k], M[k]); if (k === 'l') m.renderOrder = 2; o.add(m); }
+  return o;
+}
+
+/* ---------- dressing (closetDress): a fit wrapper round each thing, the legs and head parts, the fit-fixes ---------- */
+function ck5bDressX(R, sid, inst, par) {                              // (closetDress, after a thing goes on) par -> fit -> the thing; paws on all four legs
+  try {
+    const it = inst.it, f = new THREE.Group(); par.add(f); f.add(inst.obj); inst.fit = f; inst.xs = [];
+    if (sid === 'paws' && R.legs && R.legs[0]) { par.remove(f); R.legs[0].add(f); for (let i = 1; i < R.legs.length; i++) { const c = inst.obj.clone(true); R.legs[i].add(c); inst.xs.push(c); } }
+    if (it.head && R.head) { const h = ck5bPart(it, 'head', inst.col); R.head.add(h); inst.xs.push(h); }
+    if (it.legs && R.legs) for (const li of (it.legsOn || [0, 1, 2, 3])) { const L = R.legs[li]; if (!L) continue; const h = ck5bPart(it, 'legs', inst.col); L.add(h); inst.xs.push(h); }
+  } catch (e) { console.error(e); }
+}
+function ck5bUndress(cur) { try { if (cur.fit && cur.fit.parent) cur.fit.parent.remove(cur.fit); if (cur.xs) for (const x of cur.xs) if (x.parent) x.parent.remove(x); cur.xs = null; } catch (e) {} }
+function ck5bDressEnd(R) {                                            // (closetDress, last) the night tint on the extra parts; then what's worn together is fitted round each other
+  try {
+    const W = R.ck; if (!W) return;
+    if (R.todMats && R.todF) { const map = R.ckTod || (R.ckTod = new Map());
+      for (const s of CK_SLOTS) { const w = W[s.id]; if (!w || !w.xs) continue;
+        for (const x of w.xs) x.traverse(o => { const m0 = o.material; if (!o.isMesh || !m0 || !m0.color || m0.isMeshBasicMaterial || (m0.userData && m0.userData.c0)) return;
+          let m = map.get(m0); if (!m) { m = m0.clone(); m.userData = { c0: m0.color.clone(), e0: m0.emissive ? m0.emissive.clone() : null }; map.set(m0, m); R.todMats.push(m); }
+          m.color.copy(m.userData.c0).multiply(R.todF); if (m.userData.e0) m.emissive.copy(m.userData.e0).multiply(R.todF); o.material = m; }); } }
+    const C = [0, 0.43, -0.02], fit = (w, s) => { if (!w || !w.fit) return; w.fit.scale.setScalar(s); w.fit.position.set(C[0] * (1 - s), C[1] * (1 - s), C[2] * (1 - s)); };
+    for (const s of CK_SLOTS) { const w = W[s.id]; if (w && w.fit) { w.fit.position.set(0, 0, 0); w.fit.scale.setScalar(1); } }
+    const out = W.outfit && W.outfit.it, ok = out ? out.k5 : '', hood = !!(out && out.head);
+    if (W.cape && out) fit(W.cape, ok === 'gown' ? 1.075 : 1.05);                                   // a cape over a garment
+    if (W.pack) { let s = 1; if (W.cape) s = 1.1; if (out) s = W.cape ? 1.15 : ok === 'sheet' ? 1.13 : 1.07; if (s > 1) fit(W.pack, s); }   // a pack over a cape or a garment
+    if (W.collar && out) fit(W.collar, 1.05);                                                      // a collar over a neckline
+    if (W.hat && W.hat.fit) W.hat.fit.position.y = hood ? 0.036 : 0;                               // a hat on top of the ghost's hood (her own crown too)
+    if (R.crown) { const u = R.crown.userData; if (u.ck5bY == null) u.ck5bY = R.crown.position.y; R.crown.position.y = u.ck5bY + (hood ? 0.036 : 0); }
+  } catch (e) { console.error(e); }
+}
+
+/* ---------- the clash rules: the few pairs that can't look right (the rest are fitted, above) ---------- */
+function ck5bRules() {
+  return ck5bRules.L || (ck5bRules.L = [
+    { a: 'outfit:sheet', b: 'cape', why: 'a sheet and a cape can’t both drape over her back' },
+    { a: 'outfit:sheet', b: 'collar', why: 'it would be hidden under the sheet' },
+    { a: 'outfit:sheet', b: 'specs', why: 'the sheet covers her face' },
+    { a: 'outfit:tutu', b: 'cape', why: 'a cape would squash the tutu' },
+    { a: 'outfit:hoodie', b: 'cape', why: 'the hood would poke through the cape' },
+  ]);
+}
+function ck5bIs(it, sel) { if (!it) return false; const i = sel.indexOf(':'); return i < 0 ? it.slot === sel || it.id === sel : it.slot === sel.slice(0, i) && it.k5 === sel.slice(i + 1); }
+function ck5bClash(a, b) { if (!a || !b || a === b || a.slot === b.slot) return null; for (const r of ck5bRules()) if ((ck5bIs(a, r.a) && ck5bIs(b, r.b)) || (ck5bIs(a, r.b) && ck5bIs(b, r.a))) return r; return null; }
+function ck5bWorn(o, slot) { const id = ckWornId(o, slot), it = id && CK_BY_ID[id]; return it && it.build ? it : null; }
+function ck5bClashOut(o, it) {                                        // put on it: take off whatever clashes with it (returns what came off)
+  const gone = []; if (!o || !it || !it.build) return gone;
+  for (const s of CK_SLOTS) { if (s.id === it.slot) continue; const w = ck5bWorn(o, s.id); if (w && ck5bClash(it, w)) { gone.push(w); delete o[s.id]; } }
+  return gone;
+}
+function ck5bClashFix(o, keep) {                                      // a whole look (Surprise me, a set, a saved look): keep's pieces first, then slot order; a clashing piece is left off
+  try { const K = new Set(keep || []), kept = [], order = CK_SLOTS.map(s => s.id).sort((a, b) => (K.has(o[b]) ? 1 : 0) - (K.has(o[a]) ? 1 : 0));
+    for (const sid of order) { const w = ck5bWorn(o, sid); if (!w) continue; if (kept.some(k => ck5bClash(k, w))) delete o[sid]; else kept.push(w); } } catch (e) {}
+  return o;
+}
+function ck5bSnap() { const K = ck5bCK(); if (!K) return; ck5bSnap.s = { prev: Object.assign({}, K.prev), col: Object.assign({}, K.prevCol || {}), out: Object.assign({}, ckState().outfit), on: Object.assign({}, ck5bCols().on), sel: K.sel }; }
+function ck5bClashTry(it) {                                           // (ckTryOn, before she's dressed) whatever can't go with it comes off, and she says so (Undo puts things back)
+  try { const gone = ck5bClashOut(CK.prev, it); if (!gone.length) return; const snap = ck5bSnap.s;
+    ck5bToast('Took off the ' + gone.map(g => g.name).join(' and the ') + ' so the ' + it.name + ' fits 🐾', snap); } catch (e) { console.error(e); }
+}
+function ck5bToast(text, snap) {
+  const u = CK.ui; if (!u || !u.Stage) return; let t = u.ck5bT;
+  if (!t) { t = u.ck5bT = document.createElement('div'); t.className = 'ck5b-toast'; t.innerHTML = '<span></span><button type="button">↺ Undo</button>'; u.Stage.appendChild(t);
+    t.addEventListener('pointerdown', e => e.stopPropagation()); t.querySelector('button').addEventListener('click', e => { e.stopPropagation(); ck5bUndoClash(); }); }
+  t.querySelector('span').textContent = text; t.ck5bSnap = snap; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show'); t.hidden = false;
+  clearTimeout(ck5bToast.t); ck5bToast.t = setTimeout(() => { t.classList.remove('show'); }, 5200);
+}
+function ck5bUndoClash() {                                            // back to just before: the thing that came off goes back on, the new thing comes off
+  const t = CK.ui && CK.ui.ck5bT, s = t && t.ck5bSnap; if (!s || !CK.on) return;
+  const S = ckState(), C = ck5bCols(); CK.prev = Object.assign({}, s.prev); CK.prevCol = Object.assign({}, s.col);
+  for (const k of Object.keys(S.outfit)) delete S.outfit[k]; Object.assign(S.outfit, s.out);
+  for (const k of Object.keys(C.on)) delete C.on[k]; Object.assign(C.on, s.on);
+  ckSave(); ck5bColSave(); CK.sel = s.sel && CK_BY_ID[s.sel] ? s.sel : null; CK.look = ckPrevDiffers(); closetDress(CK.rig, CK.prev);
+  t.ck5bSnap = null; t.classList.remove('show'); ckSfx('off'); CK.anim.flick = 1; ckCaption('Put it back!'); ckRefresh();
+}
+
+/* ---------- trails: pooled sprites (one Points, one draw call, no lights), a small atlas and a tiny shader (per-sprite fade, size, spin) ---------- */
+function ck5bTrailDef(id) {
+  const D = ck5bTrailDef.D || (ck5bTrailDef.D = {
+    sparkles: { cells: [0], life: 0.9, size: [0.11, 0.18], vy: 0.25, g: -0.15, spread: 0.2, spin: 2.5, rate: 28, add: 1, names: ['Gold', 'Rose gold', 'Ice', 'Rainbow'],
+      cols: [[0xfff3a0, 0xffffff, 0xffe066], [0xffb3d1, 0xffffff, 0xff8fc0], [0xbfe9ff, 0xffffff, 0x9fd8ff], [0xff6f8f, 0xffd23a, 0x6fe0bf, 0x8fb6ff, 0xc9a8ff]] },
+    heartTrail: { cells: [1], life: 1.3, size: [0.13, 0.19], vy: 0.45, g: 0.02, spread: 0.12, sway: 1.2, spin: 0.6, rate: 17, names: ['Pink', 'Red', 'Lilac', 'Gold'],
+      cols: [[0xff5fa2, 0xff9fc9, 0xff7fb8], [0xff3050, 0xe0203a, 0xff6070], [0xc9a8ff, 0xb08cff, 0xe0ccff], [0xffd23a, 0xffc020, 0xffe680]] },
+    leaves: { cells: [2], life: 1.7, size: [0.14, 0.2], vy: 0.3, g: -0.45, spread: 0.2, sway: 1.6, spin: 3, rate: 17, names: ['Maple', 'Golden', 'Rosy', 'Evergreen'],
+      cols: [[0xe8661a, 0xd9381e, 0xf2a534, 0xb5461c], [0xf2c434, 0xe8a81a, 0xffd85a], [0xf27aa8, 0xe8566a, 0xffa0c0], [0x4fa84a, 0x2f8a3a, 0x8acb5a]] },
+    snow: { cells: [3], life: 1.8, size: [0.11, 0.17], vy: 0.14, g: -0.18, spread: 0.2, sway: 0.9, spin: 1, rate: 20, add: 1, names: ['Snow', 'Frost blue', 'Pink snow', 'Gold dust'],
+      cols: [[0xffffff, 0xe8f6ff], [0x9fd8ff, 0xcfeeff], [0xffc8e4, 0xffe6f2], [0xffe27a, 0xfff2b8]] },
+    bubbles: { cells: [4], life: 1.6, size: [0.1, 0.19], vy: 0.4, g: 0.04, spread: 0.15, sway: 1.1, rate: 16, pop: 1, names: ['Rainbow', 'Pink', 'Mint', 'Sunny'],
+      cols: [[0xbfefff, 0xffd6f5, 0xd8ffd9, 0xfff3b8], [0xffc0e0, 0xffd6ee], [0xb8ffd8, 0xd8fff0], [0xfff0a0, 0xffe080]] },
+    spores: { cells: [5], life: 2, size: [0.08, 0.13], vy: 0.22, g: 0.02, spread: 0.22, sway: 0.7, rate: 20, add: 1, names: ['Fairy', 'Moon', 'Ember', 'Ocean'],
+      cols: [[0xb8ff7a, 0xff9fe0, 0xfff59a], [0xd8e0ff, 0xffffff, 0xb0c0ff], [0xffb05a, 0xff7a3a, 0xffe08a], [0x6fe0ff, 0x6fffd0, 0x8fb6ff]] },
+    pumpkinTrail: { cells: [6, 6, 7], life: 1.4, size: [0.15, 0.21], vy: 0.35, g: -0.05, spread: 0.16, sway: 0.7, spin: 0.4, rate: 13, names: ['Classic', 'Ghostly', 'Toxic', 'Midnight'],
+      cols: [[0xffffff], [0xd8e6ff], [0xb8ff8a], [0xc0a0ff]] },
+  });
+  return D[id] || D.sparkles;
+}
+function ck5bSprite(c, i) {                                           // one atlas cell, drawn round (0, 0), about 28 px out (white where the trail's colour tints it)
+  c.lineCap = c.lineJoin = 'round';
+  if (i === 0) { const g = c.createRadialGradient(0, 0, 0, 0, 0, 28); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.22, 'rgba(255,255,255,.5)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(-30, -30, 60, 60);
+    c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, -28); c.quadraticCurveTo(3, -3, 28, 0); c.quadraticCurveTo(3, 3, 0, 28); c.quadraticCurveTo(-3, 3, -28, 0); c.quadraticCurveTo(-3, -3, 0, -28); c.fill(); }
+  else if (i === 1) { c.fillStyle = '#fff'; c.strokeStyle = 'rgba(80,0,40,.28)'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(0, 22); c.bezierCurveTo(-30, 2, -22, -24, 0, -10); c.bezierCurveTo(22, -24, 30, 2, 0, 22); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.85)'; c.beginPath(); c.ellipse(-9, -9, 5, 3.5, -0.6, 0, 6.3); c.fill(); }
+  else if (i === 2) { const P = ckMaplePts(25); c.fillStyle = '#fff'; c.beginPath(); P.forEach(([x, y], k) => k ? c.lineTo(x, -y) : c.moveTo(x, -y)); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(60,20,0,.35)'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(0, 26); c.lineTo(0, -18); c.moveTo(0, 2); c.lineTo(-16, -6); c.moveTo(0, 2); c.lineTo(16, -6); c.stroke(); }
+  else if (i === 3) { c.strokeStyle = '#fff'; c.lineWidth = 3.2; c.beginPath();
+    for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3, ca = Math.cos(a), sa = Math.sin(a); c.moveTo(0, 0); c.lineTo(ca * 25, sa * 25);
+      for (const d of [11, 18]) { const bx = ca * d, by = sa * d, l = d === 11 ? 7 : 5; for (const s of [-1, 1]) { const b = a + s * 0.8; c.moveTo(bx, by); c.lineTo(bx + Math.cos(b) * l, by + Math.sin(b) * l); } } }
+    c.stroke(); c.fillStyle = '#fff'; c.beginPath(); c.arc(0, 0, 4, 0, 6.3); c.fill(); }
+  else if (i === 4) { c.fillStyle = 'rgba(255,255,255,.16)'; c.beginPath(); c.arc(0, 0, 24, 0, 6.3); c.fill(); c.strokeStyle = 'rgba(255,255,255,.95)'; c.lineWidth = 2.6; c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,.95)'; c.lineWidth = 3.5; c.beginPath(); c.arc(0, 0, 17, 3.5, 4.4); c.stroke(); c.fillStyle = '#fff'; c.beginPath(); c.arc(9, 9, 2.5, 0, 6.3); c.fill(); }
+  else if (i === 5) { const g = c.createRadialGradient(0, 0, 0, 0, 0, 26); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.3, 'rgba(255,255,255,.7)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.beginPath(); c.arc(0, 0, 26, 0, 6.3); c.fill(); }
+  else if (i === 6) { c.lineWidth = 2;                                 // a little jack-o'-lantern, glowing
+    for (const [x, rx, col] of [[-11, 11, '#e8661a'], [11, 11, '#e8661a'], [0, 13, '#ff8a1f']]) { c.fillStyle = col; c.strokeStyle = '#8a3a0a'; c.beginPath(); c.ellipse(x, 4, rx, 18, 0, 0, 6.3); c.fill(); c.stroke(); }
+    c.fillStyle = '#3a8a2a'; c.fillRect(-3, -20, 6, 9); c.fillStyle = '#ffe66a';
+    for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 9, -4); c.lineTo(s * 3, 4); c.lineTo(s * 14, 4); c.closePath(); c.fill(); }
+    c.beginPath(); c.moveTo(-12, 9); c.lineTo(12, 9); c.lineTo(8, 15); c.lineTo(4, 12); c.lineTo(0, 16); c.lineTo(-4, 12); c.lineTo(-8, 15); c.closePath(); c.fill(); }
+  else if (i === 7) { c.fillStyle = '#1e1826'; c.beginPath(); c.moveTo(0, -8); c.quadraticCurveTo(-8, -14, -12, -6); c.quadraticCurveTo(-20, -14, -29, -4); c.quadraticCurveTo(-22, -2, -21, 5); c.quadraticCurveTo(-15, 0, -11, 7);
+    c.quadraticCurveTo(-6, 2, 0, 10); c.quadraticCurveTo(6, 2, 11, 7); c.quadraticCurveTo(15, 0, 21, 5); c.quadraticCurveTo(22, -2, 29, -4); c.quadraticCurveTo(20, -14, 12, -6); c.quadraticCurveTo(8, -14, 0, -8); c.fill();
+    c.beginPath(); c.moveTo(-4, -8); c.lineTo(-6, -15); c.lineTo(-1, -9); c.moveTo(4, -8); c.lineTo(6, -15); c.lineTo(1, -9); c.fill(); c.fillStyle = '#ffd23a'; for (const s of [-1, 1]) { c.beginPath(); c.arc(s * 2.6, -4, 1.4, 0, 6.3); c.fill(); } }
+}
+function ck5bAtlas() {
+  if (ck5bAtlas.t) return ck5bAtlas.t;
+  const t = ck5bAtlas.t = canvasTex(512, 64, c => { for (let i = 0; i < 8; i++) { c.save(); c.translate(i * 64 + 32, 32); c.scale(0.98, 0.98); ck5bSprite(c, i); c.restore(); } }, 1, 1);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.repeat.set(1, 1); t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; t.anisotropy = 1; return t;
+}
+function ck5bTrailMat(add) {
+  const C = ck5bTrailMat.C || (ck5bTrailMat.C = {}), K = add ? 'a' : 'n'; if (C[K]) return C[K];
+  return (C[K] = new THREE.ShaderMaterial({ uniforms: { map: { value: ck5bAtlas() }, scale: { value: 400 } },
+    vertexShader: 'attribute vec3 tc; attribute vec4 tq; uniform float scale; varying vec3 vC; varying vec3 vQ;\nvoid main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = tq.y * scale / max(0.05, -mv.z); vC = tc; vQ = vec3(tq.x, tq.z, tq.w); }',
+    fragmentShader: 'uniform sampler2D map; varying vec3 vC; varying vec3 vQ;\nvoid main() { if (vQ.x < 0.01) discard; vec2 p = gl_PointCoord - 0.5; float c = cos(vQ.y), s = sin(vQ.y); p = vec2(c * p.x - s * p.y, s * p.x + c * p.y) * 1.08 + 0.5;\n  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) discard; vec4 t = texture2D(map, vec2((vQ.z + 0.02 + p.x * 0.96) / 8.0, 1.0 - p.y)); float a = t.a * vQ.x; if (a < 0.02) discard; gl_FragColor = vec4(t.rgb * vC, a); }',
+    transparent: true, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending }));
+}
+function ck5bTrailSys(scene, n) {                                     // a pool of n sprites in one Points
+  const P = new Float32Array(n * 3), TC = new Float32Array(n * 3), TQ = new Float32Array(n * 4), g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('tc', new THREE.BufferAttribute(TC, 3).setUsage(THREE.DynamicDrawUsage)); g.setAttribute('tq', new THREE.BufferAttribute(TQ, 4).setUsage(THREE.DynamicDrawUsage));
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
+  const pts = new THREE.Points(g, ck5bTrailMat(false)); pts.frustumCulled = false; pts.renderOrder = 7; pts.visible = false; scene.add(pts);
+  pts.onBeforeRender = (r, sc, cam, gg, mat) => { const rt = r.getRenderTarget(), v = ck5bTrailSys.v || (ck5bTrailSys.v = new THREE.Vector2()), h = rt ? rt.height : r.getDrawingBufferSize(v).y;
+    if (mat.uniforms && mat.uniforms.scale) { mat.uniforms.scale.value = h / (2 * Math.tan(((cam && cam.fov) || 50) * Math.PI / 360)); mat.uniformsNeedUpdate = true; } };
+  return { pts, g, P, TC, TQ, V: new Float32Array(n * 3), L: new Float32Array(n), L0: new Float32Array(n), SZ: new Float32Array(n), SP: new Float32Array(n), PH: new Float32Array(n), n, i: 0, live: 0, was: false, kind: null, var: 0, acc: 0 };
+}
+function ck5bTrailEmit(T, D, x, y, z, vx, vy, vz, cols, k) {
+  const i = T.i, j = i * 3, q = i * 4, c = ck5bTrailEmit.c || (ck5bTrailEmit.c = new THREE.Color()); T.i = (T.i + 1) % T.n;
+  T.P[j] = x; T.P[j + 1] = y; T.P[j + 2] = z; T.V[j] = vx + (Math.random() - 0.5) * D.spread; T.V[j + 1] = vy * (0.7 + Math.random() * 0.6); T.V[j + 2] = vz + (Math.random() - 0.5) * D.spread;
+  T.L[i] = T.L0[i] = D.life * (0.75 + Math.random() * 0.5); T.SZ[i] = (D.size[0] + Math.random() * (D.size[1] - D.size[0])) * (k || 1); T.SP[i] = (Math.random() - 0.5) * 2 * (D.spin || 0); T.PH[i] = Math.random() * 6.283;
+  c.setHex(cols[(Math.random() * cols.length) | 0]); T.TC[j] = c.r; T.TC[j + 1] = c.g; T.TC[j + 2] = c.b;
+  T.TQ[q] = 0; T.TQ[q + 1] = 0; T.TQ[q + 2] = Math.random() * 6.283 * (D.spin ? 1 : 0.08); T.TQ[q + 3] = D.cells[(Math.random() * D.cells.length) | 0];
+}
+function ck5bTrailStep(T, D, dt) {
+  let live = 0;
+  for (let i = 0; i < T.n; i++) { const q = i * 4; if (T.L[i] <= 0) { T.TQ[q] = 0; continue; }
+    T.L[i] -= dt; const j = i * 3, k = Math.max(0, T.L[i] / T.L0[i]), age = 1 - k;
+    T.V[j + 1] += (D.g || 0) * dt; const sw = D.sway ? Math.cos(T.PH[i] + age * 7) * D.sway * 0.22 : 0;
+    T.P[j] += (T.V[j] + sw) * dt; T.P[j + 1] += T.V[j + 1] * dt; T.P[j + 2] += (T.V[j + 2] + sw * 0.6) * dt; T.V[j] *= 1 - dt * 1.2; T.V[j + 2] *= 1 - dt * 1.2;
+    let a = Math.min(1, age * 7) * Math.min(1, k * 2.5), s = T.SZ[i] * (0.65 + 0.35 * Math.min(1, age * 5));
+    if (D.pop && k < 0.12) { s *= 1 + (0.12 - k) * 5; a *= k / 0.12; }
+    T.TQ[q] = T.L[i] > 0 ? a : 0; T.TQ[q + 1] = s; T.TQ[q + 2] += T.SP[i] * dt; if (T.L[i] > 0) live++;
+  }
+  T.live = live; T.pts.visible = live > 0;
+  if (live || T.was) { const A = T.g.attributes; A.position.needsUpdate = true; A.tc.needsUpdate = true; A.tq.needsUpdate = true; } T.was = live > 0;
+}
+function ck5bRoam(dt) {                                               // (closetTick) her trail in Free roam: sprites spawn behind her as she moves, and drift where they're left
+  try {
+    const R = walk.rig, w = R && R.ck && R.ck.trail, F = ck5bRoam;
+    ck5bRoamUI(dt);
+    if (!w && !F.T) return;
+    const on = !!w && walk.on && state === 'playing' && gameMode === 'walk' && R.g.visible && !walk.fp;
+    if (on && !F.T) F.T = ck5bTrailSys(scene, devTier() === 'low' ? 24 : 64);
+    if (!F.T) return;
+    const T = F.T; if (w) { T.kind = w.it.trail; T.var = w.col || 0; } const D = ck5bTrailDef(T.kind), mat = ck5bTrailMat(!!D.add); if (T.pts.material !== mat) T.pts.material = mat;
+    if (on) { const sp = Math.hypot(walk.vel.x, walk.vel.z), amt = Math.min(1, sp / 3) + (walk.grounded ? 0 : 0.4), gs = walk.gScale || 1, v = F.v || (F.v = new THREE.Vector3());
+      F.acc = Math.min(4, (F.acc || 0) + dt * D.rate * amt * (devTier() === 'low' ? 0.5 : 1)); if (F.acc >= 1) R.g.updateMatrixWorld();
+      while (F.acc >= 1) { F.acc -= 1; v.set((Math.random() - 0.5) * 0.32, 0.06 + Math.random() * 0.4, -0.32 + Math.random() * 0.3).applyMatrix4(R.g.matrixWorld);
+        ck5bTrailEmit(T, D, v.x, v.y, v.z, -walk.vel.x * 0.1, D.vy * gs, -walk.vel.z * 0.1, D.cols[T.var] || D.cols[0], gs); } }
+    ck5bTrailStep(T, D, dt);
+  } catch (e) { if (!ck5bRoam.err) { ck5bRoam.err = 1; console.error(e); } }
+}
+function ck5bTrailThumb(it) {                                          // a card's picture: a swoosh of the trail's sprites
+  const D = ck5bTrailDef(it.trail), n = 9, T = { P: new Float32Array(n * 3), TC: new Float32Array(n * 3), TQ: new Float32Array(n * 4) }, c = new THREE.Color();
+  for (let i = 0; i < n; i++) { const u = i / (n - 1), x = -0.15 + u * 0.3, y = -0.07 + Math.sin(u * Math.PI * 0.9) * 0.11 + u * 0.02; T.P.set([x, y, 0], i * 3);
+    c.setHex(D.cols[0][i % D.cols[0].length]); T.TC.set([c.r, c.g, c.b], i * 3); T.TQ.set([0.55 + 0.45 * u, (0.075 + 0.085 * u) * (D.cells[0] === 6 ? 1.1 : 1), (i * 0.9) % 6.28 * (D.spin ? 1 : 0.1), D.cells[i % D.cells.length]], i * 4); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(T.P, 3)); g.setAttribute('tc', new THREE.BufferAttribute(T.TC, 3)); g.setAttribute('tq', new THREE.BufferAttribute(T.TQ, 4)); g.computeBoundingBox(); g.computeBoundingSphere();
+  const o = new THREE.Points(g, ck5bTrailMat(false)); o.frustumCulled = false;
+  o.onBeforeRender = (r, sc, cam, gg, mat) => { const rt = r.getRenderTarget(); mat.uniforms.scale.value = (rt ? rt.height : 256) / (2 * Math.tan(((cam && cam.fov) || 30) * Math.PI / 360)); mat.uniformsNeedUpdate = true; };
+  return o;
+}
+
+/* ---------- saved looks (catguard.looks: five slots, each { n: name, o: slot -> id, c: id -> colourway }) ---------- */
+function ck5bLooks() {
+  if (ck5bLooks.L) return ck5bLooks.L;
+  const L = ck5bLooks.L = [null, null, null, null, null];
+  try { const a = JSON.parse(ckGet('catguard.looks') || '[]');
+    if (Array.isArray(a)) a.slice(0, 5).forEach((q, i) => { if (!q || typeof q !== 'object' || !q.o || typeof q.o !== 'object') return; const o = {}, c = {};
+      for (const s of CK_SLOTS) { const id = q.o[s.id]; if (typeof id === 'string' && (id === 'none' ? s.id === 'hat' : CK_BY_ID[id] && CK_BY_ID[id].slot === s.id)) o[s.id] = id; }
+      if (q.c && typeof q.c === 'object') for (const k in q.c) if (CK_BY_ID[k] && Number.isInteger(q.c[k]) && q.c[k] > 0 && q.c[k] < 4) c[k] = q.c[k];
+      L[i] = { n: typeof q.n === 'string' ? q.n.slice(0, 18) : 'Look ' + (i + 1), o, c }; }); } catch (e) {}
+  return L;
+}
+function ck5bLooksSave() { ckPut('catguard.looks', JSON.stringify(ck5bLooks())); }
+function ck5bLookIcons(q) { return CK_SLOTS.map(s => { const id = q.o[s.id], it = id && id !== 'none' && CK_BY_ID[id]; return it ? it.ic : ''; }).join('') || '👑'; }
+function ck5bLookApply(q) {                                           // wear a saved look: what she still owns of it, in its colours, kept to the clash rules
+  const S = ckState(), C = ck5bCols(), o = {};
+  for (const s of CK_SLOTS) { const id = q.o[s.id]; if (id === 'none' && s.id === 'hat') o.hat = 'none'; else if (id && S.owned.has(id)) o[s.id] = id; }
+  ck5bClashFix(o, Object.values(o));
+  for (const k of Object.keys(S.outfit)) delete S.outfit[k]; Object.assign(S.outfit, o);
+  for (const id of Object.values(o)) { const i = q.c[id] || 0; if (i && ck5bColOwned(id, i)) C.on[id] = i; else delete C.on[id]; }
+  ckSave(); ck5bColSave(); return o;
+}
+
+/* ---------- the Closet page: CSS and the new bits (ckBuildUI, after ck5UI) ---------- */
+function ck5bCss() {
+  if (ck5bCss.done) return; ck5bCss.done = true;
+  const st = document.createElement('style'); st.id = 'ck5bCss'; st.textContent = `
+#closet .ck5b-dots{position:absolute;left:1px;bottom:0;display:flex;gap:2px;pointer-events:none;z-index:1}
+#closet .ck5b-dots[hidden]{display:none}
+#closet .ck5b-dots i{width:8px;height:8px;border-radius:50%;border:1.5px solid rgba(45,19,40,.75);background:#ddd}
+#closet .ck5b-swr{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#closet .ck5b-swr[hidden]{display:none}
+#closet .ck5b-swl{font:800 12px/1 var(--body);color:#7a5a6a}
+#closet .ck5b-sw{position:relative;width:32px;height:32px;padding:0;border-radius:50%;border:2.5px solid var(--ink);background:var(--c);box-shadow:0 2px 0 rgba(45,19,40,.35);cursor:pointer}
+#closet .ck5b-sw.on{outline:3px solid var(--cheese);outline-offset:2px}
+#closet .ck5b-sw.lock::after{content:'🔒';position:absolute;right:-6px;top:-7px;font-size:11px;line-height:1}
+#closet .ck5b-sw:active{transform:translateY(2px);box-shadow:none}
+#closet .ck5b-tags{font:700 12px/1.2 var(--body);color:#9a7a8a;letter-spacing:.02em}
+#closet .ck5b-tags[hidden]{display:none}
+#closet .ck5b-toast{position:absolute;left:50%;bottom:58px;z-index:4;transform:translateX(-50%) translateY(12px);display:flex;align-items:center;gap:8px;max-width:calc(100% - 20px);width:max-content;padding:6px 6px 6px 13px;border-radius:16px;background:rgba(45,19,40,.9);color:#fff;font:700 13px/1.25 var(--body);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s}
+#closet .ck5b-toast.show{opacity:1;transform:translateX(-50%);pointer-events:auto}
+#closet .ck5b-toast button{flex:none;min-height:36px;padding:4px 11px;border-radius:999px;border:2px solid #fff;background:var(--cheese);color:#fff;font:800 13px var(--body);cursor:pointer}
+#closet .ck5b-sb-looks{left:62px}
+#closet .ck5b-looks{position:absolute;inset:0;z-index:6;display:grid;align-items:end;justify-items:center;background:rgba(45,19,40,.42)}
+#closet .ck5b-looks[hidden]{display:none}
+#closet .ck5b-lk-card{width:min(440px,100%);max-height:88%;overflow-y:auto;background:var(--paper);border:3px solid var(--ink);border-bottom:0;border-radius:22px 22px 0 0;padding:12px max(12px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 12px) max(12px,env(safe-area-inset-left,0px));display:grid;gap:8px}
+#closet .ck5b-lk-top{display:flex;align-items:center;gap:10px}
+#closet .ck5b-lk-top b{flex:1;font:400 22px/1.1 var(--display);color:var(--cheese-deep)}
+#closet .ck5b-lk-x{width:44px;height:44px;border-radius:50%;border:3px solid var(--ink);background:#fff;font:800 18px/1 var(--body);cursor:pointer;color:var(--ink)}
+#closet .ck5b-lk-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:6px;padding:6px 8px;border:2px solid var(--ink);border-radius:14px;background:#fff}
+#closet .ck5b-lk-row .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#ffe1ee;font:800 12px var(--body);color:#8a3a6a}
+#closet .ck5b-lk-mid{display:grid;gap:2px;min-width:0}
+#closet .ck5b-lk-mid input{width:100%;min-width:0;border:0;border-bottom:1.5px dashed #d9b8c8;background:transparent;font:800 14px var(--body);color:var(--ink);padding:2px 0;border-radius:0}
+#closet .ck5b-lk-mid span{font-size:17px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#closet .ck5b-lk-mid span.e{font:700 12px var(--body);color:#9a7a8a}
+#closet .ck5b-lk-row button{min-height:40px;padding:4px 11px;border-radius:12px;border:2.5px solid var(--ink);box-shadow:0 2px 0 var(--ink);font:800 13.5px var(--body);cursor:pointer;color:var(--ink);background:#fff}
+#closet .ck5b-lk-row button.w{background:#8fdc8a}
+#closet .ck5b-lk-row button:disabled{opacity:.4;cursor:default}
+#closet .ck5b-lk-tip{font:600 12px/1.35 var(--body);color:#8a6a7a;text-align:center}
+#ck5bRoam{right:calc(118px + env(safe-area-inset-right,0px));bottom:calc(160px + env(safe-area-inset-bottom,0px));width:52px;height:52px;background:#ff8fc0;box-shadow:0 4px 0 #c0567f,0 8px 14px rgba(0,0,0,.28)}
+#ck5bRoam b{font-size:24px}#ck5bRoam[hidden]{display:none}#ck5bRoam:active{transform:translateY(3px);box-shadow:0 1px 0 #c0567f}
+body.heist-ui #ck5bRoam,body.biking #ck5bRoam{display:none}
+#ck5bRoamPop{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(222px + env(safe-area-inset-bottom,0px));z-index:9;display:grid;gap:6px;padding:8px;border-radius:18px;background:rgba(58,20,52,.92);border:2px solid rgba(255,244,248,.5);box-shadow:0 8px 20px rgba(0,0,0,.35);max-width:min(300px,calc(100vw - 28px))}
+#ck5bRoamPop[hidden]{display:none}
+#ck5bRoamPop b{color:#ffd6ea;font:800 12px var(--body);letter-spacing:.06em;text-transform:uppercase;padding:0 4px}
+#ck5bRoamPop button{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 12px;border-radius:12px;border:0;background:#fff4f8;color:#3a1434;font:800 14px var(--body);text-align:left;cursor:pointer}
+#ck5bRoamPop button span{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+@media (orientation:portrait) and (max-width:539px){#closet .ck5b-sw{width:30px;height:30px}#closet .ck5b-toast{bottom:62px;font-size:12px}}
+@media (orientation:landscape) and (min-width:560px) and (max-height:520px){#closet .ck5b-sw{width:28px;height:28px}#closet .ck5b-tags{display:none}}`;
+  document.head.appendChild(st);
+}
+function ck5bUI() {
+  try {
+    ck5bCss(); const u = CK.ui, X = u.ck5, Y = u.ck5b = {};
+    Object.assign(CK_VIEWS, { body: { yaw: 0.9, el: 0.24, r: 0.62, at: 'root', off: [0, 0.42, 0] }, paws: { yaw: 0.75, el: 0.26, r: 0.46, at: 'root', off: [0, 0.18, 0.03] }, trail: { yaw: 1.5, el: 0.32, r: 0.95, at: 'root', off: [0, 0.4, -0.1] } });
+    for (const it of CK_ITEMS) { const c = CK.cards[it.id]; if (!c) continue; const th = c.el.querySelector('.ck-th'); if (!th) continue;
+      const d = document.createElement('span'); d.className = 'ck5b-dots'; d.hidden = true; d.innerHTML = '<i></i><i></i><i></i><i></i>'; th.appendChild(d); c.ck5bD = d; }
+    const row = document.createElement('span'); row.className = 'ck5b-swr'; row.hidden = true; const tags = document.createElement('span'); tags.className = 'ck5b-tags'; tags.hidden = true;
+    if (X && X.meta) { X.meta.prepend(row); X.meta.appendChild(tags); }
+    row.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-col]'); if (b) ck5bPickCol(+b.dataset.col); });
+    Object.assign(Y, { row, tags });
+    const sb = document.createElement('button'); sb.className = 'ck-sbtn ck5b-sb-looks'; sb.setAttribute('aria-label', 'My saved looks'); sb.textContent = '👗';
+    sb.addEventListener('pointerdown', e => e.stopPropagation()); sb.addEventListener('click', e => { e.stopPropagation(); ck5bLooksOpen(); }); u.Stage.appendChild(sb);
+    if (u.Undo && u.Undo.parentElement) { const dot = document.createElement('span'); dot.setAttribute('aria-hidden', 'true'); dot.textContent = '·'; const lb = document.createElement('button'); lb.className = 'link-btn'; lb.textContent = '👗 My looks';
+      lb.addEventListener('click', ck5bLooksOpen); u.Undo.parentElement.append(dot, lb); }
+    const lk = document.createElement('div'); lk.className = 'ck5b-looks'; lk.hidden = true;
+    lk.innerHTML = '<div class="ck5b-lk-card" role="dialog" aria-label="My saved looks"><div class="ck5b-lk-top"><b>👗 My looks</b><button class="ck5b-lk-x" aria-label="Close">✕</button></div><div class="ck5b-lk-list"></div><div class="ck5b-lk-tip">Save the look she has on, then wear it again with one tap. In Free roam too: the 👗 button.</div></div>';
+    u.root.appendChild(lk); Y.looks = lk; Y.list = lk.querySelector('.ck5b-lk-list');
+    lk.addEventListener('click', e => { if (e.target === lk) ck5bLooksClose(); const b = e.target.closest && e.target.closest('button'); if (!b) return;
+      if (b.classList.contains('ck5b-lk-x')) ck5bLooksClose(); else if (b.dataset.wear) ck5bLookWear(+b.dataset.wear); else if (b.dataset.save) ck5bLookSave(+b.dataset.save); });
+    lk.addEventListener('change', e => { const i = e.target && e.target.dataset ? +e.target.dataset.nm : NaN, L = ck5bLooks(); if (i >= 0 && L[i]) { L[i].n = (e.target.value || '').trim().slice(0, 18) || 'Look ' + (i + 1); ck5bLooksSave(); } });
+  } catch (e) { console.error(e); }
+}
+function ck5bLooksOpen() { const Y = CK.ui && CK.ui.ck5b; if (!Y) return; Y.looks.hidden = false; ck5bLooksRender(); ckSfx('tab'); }
+function ck5bLooksClose() { const Y = CK.ui && CK.ui.ck5b; if (Y && Y.looks) Y.looks.hidden = true; }
+function ck5bLooksRender() {
+  const Y = CK.ui.ck5b, L = ck5bLooks(), can = ckPrevOwned();
+  Y.list.innerHTML = L.map((q, i) => '<div class="ck5b-lk-row"><span class="n">' + (i + 1) + '</span><span class="ck5b-lk-mid">' + (q ? '<input data-nm="' + i + '" maxlength="18" value="' + ckbEsc(q.n) + '" aria-label="Name of look ' + (i + 1) + '"><span>' + ck5bLookIcons(q) + '</span>' : '<span class="e">Empty</span>') + '</span>' +
+    '<button class="w" data-wear="' + i + '"' + (q ? '' : ' disabled') + '>Wear</button><button data-save="' + i + '"' + (can ? '' : ' disabled title="Buy the pieces first"') + '>' + (q ? 'Save here' : 'Save') + '</button></div>').join('');
+}
+function ck5bLookSave(i) {
+  const L = ck5bLooks(), S = ckState(); if (!ckPrevOwned()) { ckSfx('nope'); ckCaption('Buy the pieces first!'); return; }
+  const o = {}, c = {}; for (const s of CK_SLOTS) { const v = CK.prev[s.id]; if (v && (v === 'none' || S.owned.has(v))) o[s.id] = v; }
+  for (const id of Object.values(o)) { const k = ck5bColFor(CK.rig, id); if (k && ck5bColOwned(id, k)) c[id] = k; }
+  L[i] = { n: (L[i] && L[i].n) || 'Look ' + (i + 1), o, c }; ck5bLooksSave(); ckSfx('wear'); CK.anim.hop = 1; ckCaption('Look saved! 💾'); ck5bLooksRender();
+}
+function ck5bLookWear(i) {
+  const q = ck5bLooks()[i]; if (!q) return; const o = ck5bLookApply(q);
+  CK.prev = Object.assign({}, o); CK.prevCol = {}; CK.look = false; CK.sel = null; CK.view = 'full'; closetDress(CK.rig, CK.prev);
+  ck5bLooksClose(); ckSfx('wear'); const A = CK.anim; A.hop = 1; A.wave = 1; ckPuffAt(CK.rig.g.localToWorld(CK.v.set(0, 0.55, 0)), 36, true); ckCaption('👗 ' + q.n + '!'); ckCheckAch(); ckRefresh();
+}
+
+/* ---------- the buy bar: colour swatches, tags, and buying or wearing a colourway (ckRefresh / ckMain) ---------- */
+function ck5bOpen() { CK.prevCol = {}; ck5bLooksClose(); const t = CK.ui && CK.ui.ck5bT; if (t) t.classList.remove('show'); }
+function ck5bHex(n) { return '#' + (n >>> 0).toString(16).padStart(6, '0'); }
+function ck5bPickCol(i) {                                             // a swatch: try that colour on (free)
+  const it = CK.sel && CK_BY_ID[CK.sel], V = it && ck5bVars(it); if (!V || !V[i]) return;
+  CK.prevCol = CK.prevCol || {}; CK.prevCol[it.id] = i;
+  if (ckWornId(CK.prev, it.slot) !== it.id) ckTryOn(it, true); else { closetDress(CK.rig, CK.prev); const w = CK.rig.ck[it.slot]; if (w) { CK.rig.g.updateMatrixWorld(true); ckPuffAt(w.obj.localToWorld(ckCenter(w, CK.v)), 18); } }
+  ckSfx('try'); ckCaption(i ? 'Ooh, ' + V[i].n.toLowerCase() + '!' : 'The original!'); ckRefresh();
+}
+function ck5bRefresh() {
+  try {
+    const u = CK.ui, X = u && u.ck5, Y = u && u.ck5b; if (!X || !Y) return;
+    const S = ckState(), C = ck5bCols(), w = ckWallet(), sel = CK.sel && CK_BY_ID[CK.sel];
+    ck5bDots();
+    const locked = sel && ckIsEx(sel) && !S.owned.has(sel.id), V = sel && !locked ? ck5bVars(sel) : null, cur = V ? ck5bColFor(CK.rig, sel.id) : 0;
+    let html = '';
+    if (V) html = '<span class="ck5b-swl">🎨</span>' + V.map((v, i) => '<button class="ck5b-sw' + (i === cur ? ' on' : '') + (ck5bColOwned(sel.id, i) ? '' : ' lock') + '" data-col="' + i + '" style="--c:' + ck5bHex(v.hex) + '" aria-label="' + ckbEsc(v.n) + '" title="' + ckbEsc(v.n) + '"></button>').join('');
+    if (Y.row.ck5b !== html) { Y.row.innerHTML = html; Y.row.ck5b = html; } Y.row.hidden = !html;
+    const tg = sel && !locked && sel.tags ? sel.tags.map(t => '#' + t).join(' ') : ''; if (Y.tags.textContent !== tg) Y.tags.textContent = tg; Y.tags.hidden = !tg;
+    if (html || tg) X.meta.hidden = false;
+    if (!sel || !V) return;
+    const saved = C.on[sel.id] || 0, own = S.owned.has(sel.id), cOwn = ck5bColOwned(sel.id, cur), dye = ck5bVarPrice(sel), nm = V[cur] ? V[cur].n : '';
+    let label = null, act = null, ok = false;
+    if (cur && !own) { if (!ckIsEx(sel) && ckSnBuyable(sel) && isFinite(sel.price)) { const cost = sel.price + dye; ok = w >= cost; label = ok ? 'Buy in ' + nm + ': 🐟 ' + cost : 'Need ' + (cost - w) + ' more 🐟'; act = 'ck5bbuy'; } }
+    else if (own && cur && !cOwn) { ok = w >= dye; label = ok ? 'Dye it ' + nm + ': 🐟 ' + dye : 'Need ' + (dye - w) + ' more 🐟'; act = 'ck5bdye'; }
+    else if (own && cOwn && cur !== saved) { ok = true; label = 'Wear it in ' + nm + ' 💖'; act = 'ck5bwear'; }
+    if (label) { u.Main.textContent = label; u.Main.disabled = !ok; u.Main.className = 'btn ck-main' + (ok ? ' wear' : ''); CK.act = ok ? act : null; if (u.Act) u.Act.classList.remove('idle'); }
+    if (cur && !cOwn) { const n = '🎨 ' + nm + ': ' + dye + ' 🐟 to dye it' + (own ? '' : ' (with the ' + sel.name.toLowerCase() + ')'); X.note.textContent = X.note.textContent ? X.note.textContent + ' · ' + n : n; X.note.hidden = false; }
+  } catch (e) { if (!ck5bRefresh.err) { ck5bRefresh.err = 1; console.error(e); } }
+}
+function ck5bDots() {                                                 // little colour dots on the cards (once each is baked)
+  try { const S = ckState();
+    for (const it of CK_ITEMS) { const c = CK.cards[it.id]; if (!c || !c.ck5bD || c.el.hidden) continue;
+      const lock = ckIsEx(it) && !S.owned.has(it.id); if (lock) { c.ck5bD.hidden = true; continue; } if (c.ck5bOk) { c.ck5bD.hidden = !c.ck5bV; continue; }
+      if (!it.geo && it.slot !== 'trail') continue; const V = ck5bVars(it); c.ck5bOk = true; c.ck5bV = !!V; if (!V) { c.ck5bD.hidden = true; continue; } [...c.ck5bD.children].forEach((d, i) => { d.style.background = ck5bHex(V[i].hex); }); c.ck5bD.hidden = false; } } catch (e) {}
+}
+function ck5bOwnCol(id, i) { if (!i) return; const C = ck5bCols(), a = C.own[id] || (C.own[id] = []); if (!a.includes(i)) a.push(i); }
+function ck5bMain() {                                                 // (ckMain, after ck5Main) true: handled here
+  const a = CK.act, S = ckState(), C = ck5bCols(), it = CK.sel && CK_BY_ID[CK.sel];
+  if (a === 'look') { for (const s of CK_SLOTS) { const id = CK.prev[s.id]; if (!id || !CK_BY_ID[id]) continue; const i = CK.prevCol && CK.prevCol[id]; if (i == null) continue; if (i && ck5bColOwned(id, i)) C.on[id] = i; else if (!i) delete C.on[id]; } ck5bColSave(); return false; }   /* ('Wear this look': in the colours she's trying, the ones she owns) */
+  if (!it || (a !== 'ck5bbuy' && a !== 'ck5bdye' && a !== 'ck5bwear')) return false;
+  const i = ck5bColFor(CK.rig, it.id), w = ckWallet(), dye = ck5bVarPrice(it);
+  if (a === 'ck5bbuy') { const cost = it.price + dye; if (S.owned.has(it.id) || w < cost) { ckSfx('nope'); ckRefresh(); return true; }
+    ckSetWallet(w - cost); S.owned.add(it.id); S.spent += cost; ck5bOwnCol(it.id, i); C.on[it.id] = i; ckWearSaved(it); ckSave(); ck5bColSave(); ckCelebrate(it); ckCheckAch(); ckSnBought(it); }
+  else if (a === 'ck5bdye') { if (w < dye) { ckSfx('nope'); ckRefresh(); return true; }
+    ckSetWallet(w - dye); S.spent += dye; ck5bOwnCol(it.id, i); C.on[it.id] = i; ckWearSaved(it); ckSave(); ck5bColSave(); ckCelebrate(it); setTimeout(() => { if (CK.on) ckCaption('A brand-new colour! 🎨'); }, 60); ckCheckAch(); }
+  else { if (i) C.on[it.id] = i; else delete C.on[it.id]; ckWearSaved(it); ckSave(); ck5bColSave(); ckSfx('wear'); CK.anim.hop = 1; ckCaption(pickOf(['Love this colour!', 'So me!', 'Perfect shade!'])); }
+  if (CK.prevCol) delete CK.prevCol[it.id];
+  ckRefresh(); return true;
+}
+
+/* ---------- thumbnails (ckThumbStep): a pair of paws, a ghost with its hood, a swoosh of trail ---------- */
+function ck5bThumb(it, T) {
+  if (!it || !it.build || (it.slot !== 'paws' && it.slot !== 'trail' && !it.head && !it.legs)) return false;
+  try {
+    if (T.ck5g) { T.ck5g.forEach(g => g.dispose()); T.ck5g = null; }
+    if (it.slot === 'trail') { const o = ck5bTrailThumb(it); T.ck5g = [o.geometry]; T.ck5o = o; T.fxInst = null; return true; }
+    const inst = ckInstance(it), o = new THREE.Group(); o.add(inst.obj); T.fxInst = inst;
+    if (it.slot === 'paws') { const c = inst.obj.clone(true); c.position.set(0.13, 0, -0.07); o.add(c); }
+    if (it.head) { const h = ck5bPart(it, 'head', 0); h.position.set(0, 0.68, 0.36); o.add(h); }
+    if (it.legs) for (const [x, z] of [[-0.1, 0.24], [0.1, 0.24]]) { const h = ck5bPart(it, 'legs', 0); h.position.set(x, 0.42, z); o.add(h); }
+    T.ck5o = o; return true;
+  } catch (e) { console.error(e); return false; }
+}
+
+/* ---------- every frame ---------- */
+function ck5bCkFrame(dt) {                                            // (closetFrame, after the sparkles) roller skates lift her; her trail drifts round the pedestal
+  try {
+    const R = CK.rig, W = R && R.ck; if (!W) return;
+    if (W.paws && W.paws.it.glide) R.body.position.y += 0.04;
+    ck5bCkFrame.dt = (ck5bCkFrame.dt || 0) - dt; if (ck5bCkFrame.dt <= 0) { ck5bCkFrame.dt = 0.5; ck5bDots(); }
+    const w = W.trail, F = ck5bCkFrame;
+    if (w && !F.T) F.T = ck5bTrailSys(CK.scene, 64);
+    if (!F.T) return; const T = F.T; if (w) { T.kind = w.it.trail; T.var = w.col || 0; } const D = ck5bTrailDef(T.kind), mat = ck5bTrailMat(!!D.add); if (T.pts.material !== mat) T.pts.material = mat;
+    if (w) { F.acc = Math.min(4, (F.acc || 0) + dt * D.rate * (0.85 + Math.min(1.2, Math.abs(CK.spinV) * 0.25)));
+      while (F.acc >= 1) { F.acc -= 1; const a = Math.random() * 6.283, r = 0.32 + Math.random() * 0.22;
+        ck5bTrailEmit(T, D, Math.cos(a) * r, 0.04 + Math.random() * 0.45, Math.sin(a) * r * 1.25, Math.cos(a) * 0.08, D.vy * 0.7, Math.sin(a) * 0.08, D.cols[T.var] || D.cols[0], CK.view === 'full' || CK.view === 'trail' ? 0.6 : 0.4); } }
+    ck5bTrailStep(T, D, dt);
+  } catch (e) { if (!ck5bCkFrame.err) { ck5bCkFrame.err = 1; console.error(e); } }
+}
+function ck5bSkate(W, a, sw) {                                        // (updateWalk, after her gait) roller skates: long gliding strokes, a gentle sway, a few cm taller
+  try {
+    const on = !!(W.ck && W.ck.paws && W.ck.paws.it.glide);
+    if (!on) { if (W.ck5bSk) { W.ck5bSk = false; W.body.rotation.z = 0; } return; }
+    W.ck5bSk = true; W.body.position.y += 0.04;
+    if (!walk.grounded) return;
+    const ph = walk.phase * 0.45, p = Math.sin(ph);
+    W.legs[0].rotation.x = W.legs[1].rotation.x = -0.08 * a; W.legs[2].rotation.x = Math.max(0, p) * 0.6 * a; W.legs[3].rotation.x = Math.max(0, -p) * 0.6 * a;
+    W.body.rotation.z = p * 0.07 * a; W.body.position.y -= Math.abs(sw) * 0.03 * a * 0.8;
+  } catch (e) {}
+}
+function ck5bRoamUI(dt) {                                             // (ck5bRoam) the 👗 button over the meow button, once she has a saved look; tap: her looks, tap one: she's wearing it
+  const F = ck5bRoamUI; F.t = (F.t || 0) - dt; if (F.t > 0) return; F.t = 0.4;
+  try {
+    const wu = document.getElementById('walkUI'); if (!wu) return;
+    const has = ck5bLooks().some(Boolean), show = has && walk.on && gameMode === 'walk' && state === 'playing';
+    if (!F.b) { if (!show) return; const b = F.b = document.createElement('button'); b.className = 'walk-btn'; b.id = 'ck5bRoam'; b.setAttribute('aria-label', 'My saved looks'); b.innerHTML = '<span><b>👗</b></span>';
+      const p = F.p = document.createElement('div'); p.id = 'ck5bRoamPop'; p.hidden = true; wu.append(b, p);
+      for (const el of [b, p]) { el.addEventListener('pointerdown', e => e.stopPropagation()); el.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); }
+      b.addEventListener('click', e => { e.stopPropagation(); if (p.hidden) ck5bRoamPop(); else p.hidden = true; });
+      p.addEventListener('click', e => { e.stopPropagation(); const q = e.target.closest && e.target.closest('[data-lk]'); if (q) ck5bRoamWear(+q.dataset.lk); }); }
+    F.b.hidden = !show; if (!show) F.p.hidden = true;
+  } catch (e) {}
+}
+function ck5bRoamPop() {
+  const p = ck5bRoamUI.p, L = ck5bLooks(); if (!p) return;
+  p.innerHTML = '<b>👗 My looks</b>' + L.map((q, i) => q ? '<button data-lk="' + i + '"><span>' + ck5bLookIcons(q) + '</span>' + ckbEsc(q.n) + '</button>' : '').join(''); p.hidden = false;
+}
+function ck5bRoamWear(i) {
+  const q = ck5bLooks()[i], p = ck5bRoamUI.p; if (p) p.hidden = true; if (!q || !walk.rig) return;
+  ck5bLookApply(q); closetDress(walk.rig, ckState().outfit); ckCardHat(true);
+  try { showWalkName('👗 ' + q.n + '! Looking fabulous'); } catch (e) {}
+  try { if (typeof tone === 'function' && SET.sfx !== false) [988, 1319, 1568].forEach((f, k) => tone(f, f * 1.01, 0.12, 'triangle', 0.022, k * 0.06)); } catch (e) {}
+}
+
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
@@ -28542,6 +29399,7 @@ function updateWalk(dt) {
     W.legs[0].rotation.x = W.legs[1].rotation.x = sw * 1.05; W.legs[2].rotation.x = W.legs[3].rotation.x = -sw * 1.05;
     W.body.rotation.x = Math.sin(walk.phase) * 0.16; W.body.position.y = Math.abs(sw) * 0.08;
   }
+  ck5bSkate(W, a, sw);   /* (CK5B_V1: roller skates glide) */
   if (walk.batT > 0) W.legs[1].rotation.x = -Math.sin((1 - walk.batT / 0.35) * Math.PI) * 1.8;
   walk.meowT = Math.max(0, walk.meowT - dt); walk.puff = Math.max(0, walk.puff - dt * 0.8);
   const pf = 1 + walk.puff * 0.28;                                   // the big yowl: she puffs right up
