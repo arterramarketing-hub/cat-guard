@@ -10738,10 +10738,18 @@ const ACHIEVEMENTS = [
     ['crossyTrain', '🚆', 'Close call', 'In Crossy Kitty, hop off the GO tracks a split second before the train flies by'],
     ['crossy500', '🏅', 'Don Valley legend', 'In Crossy Kitty, hop 500 rows in one run'],
   ]],
+  ['Fashion Show', [
+    ['showFirst', '🎀', 'Strike a pose', 'In PKR’s Closet, walk the runway in the Fashion Show'],
+    ['showPerfect', '💯', 'Perfect 30', 'In the Fashion Show, get a 10 from all three judges'],
+    ['showStreak', '📅', 'Supermodel week', 'Walk the Fashion Show runway 7 days in a row'],
+    ['showAll', '🌈', 'Theme queen', 'Walk the Fashion Show runway for every theme of the day'],
+    ['photoFirst', '📸', 'Say cheese!', 'Take a picture in PKR’s Photo Booth'],
+    ['reqFive', '📬', 'Good neighbour', 'In Free roam, grant 5 of the neighbours’ outfit requests'],
+  ]],
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-12 19:01';                                              // stamped when the site is published
+const BUILD = '2026-10-12 19:09';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -15083,7 +15091,7 @@ const CK_LINES = ['Ooh la la!', 'Très chic!', 'Purrfect!', 'Meow-velous!', 'So 
 function ckGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function ckPut(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 function ckState() {
-  if (ckState.S) return ckState.S; roofCkReg(); ckSnReg(); ck4Reg(); ck5Reg(); ck5bReg(); ck6Reg(); ears2Reg();
+  if (ckState.S) return ckState.S; roofCkReg(); ckSnReg(); ck4Reg(); ck5Reg(); ck5bReg(); ck6Reg(); ears2Reg(); charmReg();
   const S = ckState.S = { owned: new Set(['crown']), outfit: {}, spent: 0, memFish: null };
   try { const a = JSON.parse(ckGet('catguard.closet') || '[]'); if (Array.isArray(a)) for (const id of a) if (typeof id === 'string' && CK_BY_ID[id]) S.owned.add(id); } catch (e) {}
   try { ckExLoad(S); } catch (e) { console.error(e); }
@@ -15736,7 +15744,7 @@ function ckRotSet(m, a, t) {                                           // a part
 }
 function ckSwayStep(f, t, amt) {                                       // the jhumkas: each bell swings on its hook (out from her cheek, never into it)
   const g = f.geo, P = g.attributes.position.array, N = g.attributes.normal.array;
-  for (const q of f.groups) { if (q.e2) { ears2Sway(f, q, t, amt); continue; }   /* (EARS2_V1: a charm on the ear swings across it) */
+  for (const q of f.groups) { if (q.e2) { ears2Sway(f, q, t, amt); continue; } if (q.ch) { charmSway(f, q, t, amt); continue; }   /* (CHARM_V1: it hangs straight down) */   /* (EARS2_V1: a charm on the ear swings across it) */
     let az = (0.05 + 0.13 * amt) * Math.sin(t * 2.7 + q.ph); az = Math.max(-0.045, az) * q.sx; const ax = (0.06 + 0.14 * amt) * Math.sin(t * 2.1 + q.ph * 1.7);
     const cz = Math.cos(az), sz = Math.sin(az), cx = Math.cos(ax), sx = Math.sin(ax), px = q.c[0], py = q.c[1], pz = q.c[2];
     for (let i = q.a * 3; i < q.b * 3; i += 3) {
@@ -16086,7 +16094,7 @@ function closetDress(R, outfit) {
   }
   if (R.crown) R.crown.visible = !outfit.hat || outfit.hat === 'crown';   // her own gold crown, unless another hat's on (or she's gone bare-headed)
   if (W.cape && W.cape.clasp) W.cape.clasp.visible = !W.collar;          // (a collar covers the cape's chain)
-  if (R === walk.rig) closetTodSync(R); ck5bDressEnd(R);   /* (CK5B_V1: worn together, fitted round each other) */ ck6DressEnd(R);   /* (CK6_V1: a cape over a sash) */ ears2DressEnd(R);   /* (EARS2_V1: earrings up out of a hood; a cap that lets her ears through) */
+  if (R === walk.rig) closetTodSync(R); ck5bDressEnd(R);   /* (CK5B_V1: worn together, fitted round each other) */ ck6DressEnd(R);   /* (CK6_V1: a cape over a sash) */ ears2DressEnd(R);   /* (EARS2_V1: earrings up out of a hood; a cap that lets her ears through) */ charmDressEnd(R);   /* (CHARM_V1) */
 }
 function closetTodSync(R) {                                            // outdoors at night her fur is tinted to the sky: her new things too (todActors keeps the list)
   if (!R.todMats || !R.todF || !R.ck) return;
@@ -16114,12 +16122,12 @@ function ckWear(W, dt, amt, fire, t) {
 function closetTick(dt) {
   try {
     const R = walk.rig, W = R && R.ck;
-    if (W && (W.cape || W.pack || W.hat || W.collar || W.specs || W.ears)) {
+    if (W && (W.cape || W.pack || W.hat || W.collar || W.specs || W.ears || (W.tail && W.tail.sway))) {
       if (state === 'hop' || state === 'bike') ckCloneFx(dt, W);
       else if (walk.on) ckWear(W, dt, Math.min(1, Math.hypot(walk.vel.x, walk.vel.z) / 6 + (walk.grounded ? 0 : 0.4)), !walk.grounded && !walk.climb && walk.vy > -3, clock);
     }
     ckSetRoam(dt);
-    ckCardHat(false); ck5bRoam(dt); ck6Tick(dt);
+    ckCardHat(false); ck5bRoam(dt); ck6Tick(dt); ck7Tick(dt);
     if (state === 'hop' && HOP.ui && !HOP.ui.ckLink) ckHopLink();
   } catch (e) { if (!closetTick.err) { closetTick.err = 1; console.error(e); } }
 }
@@ -16482,7 +16490,7 @@ function ckBuildUI() {
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) st.addEventListener(t, up);
   st.addEventListener('contextmenu', e => e.preventDefault());
   if (window.ResizeObserver) try { new ResizeObserver(() => { CK.rectDirty = true; }).observe(st); } catch (e) {}
-  CK.thumbQ = CK_ITEMS.map(it => it.id); ckExUI(); ckSnUI(); ck5UI(); ck5bUI(); ck6UI();
+  CK.thumbQ = CK_ITEMS.map(it => it.id); ckExUI(); ckSnUI(); ck5UI(); ck5bUI(); ck6UI(); ck7UI();
 }
 function ckBuild() { ckBuildUI(); ckBuildScene(); CK.built = true; }
 
@@ -16507,7 +16515,7 @@ function closetOpen(from) {
   setTimeout(() => { if (CK.on) ckCaption(CK.exHi || pickOf(['Welcome to my closet!', 'What shall I wear?', 'Ooh, shopping!', 'Dress me up!'])); }, 350);
   try { u.Close.focus({ preventScroll: true }); } catch (e) {}
 }
-function closetClose() {
+function closetClose() { ck7Close();   /* (CK7_V1: off the runway, out of the booth) */
   if (!CK.on) return;
   CK.on = false; CK.drag = null; ckPopEnd(); try { pkrPurrEnd(true); } catch (e) {}   /* (AUDIO2_V1) */
   const u = CK.ui; u.root.hidden = true; document.body.classList.remove('closet-open'); u.fx.innerHTML = '';
@@ -16526,6 +16534,7 @@ function ckMeasure() {
 function ckKey(e) {   // (capture: while the Closet's open, the game underneath hears no keys)
   if (!CK.on) return;
   e.stopImmediatePropagation();
+  if (e.key === 'Escape' && ck7Esc()) { e.preventDefault(); return; }   /* (CK7_V1: the show or the booth first) */
   if (e.key === 'Escape' && ckBookShut()) { e.preventDefault(); return; }   /* (the collection book first) */
   if (e.key === 'Escape' && !e.repeat) { e.preventDefault(); closetClose(); }
   else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); CK.spin += e.key === 'ArrowLeft' ? -0.35 : 0.35; CK.idleT = 0; }
@@ -16584,7 +16593,7 @@ function ckRefresh() {
   if (u.Cat) { const sl = CK_SLOTS.find(s => s.id === CK.tab); u.Cat.hidden = !sl; if (sl) u.Cat.textContent = sl.ic + ' ' + sl.name; }   /* (phones upright: the tabs are icons only, so the category's name goes over the grid) */
   if (u.Act) u.Act.classList.toggle('idle', !act && !sel);   /* (phones upright: the buy bar only while something's picked) */
   roofCkRefresh(); ckExRefresh(); ckSnRefresh();
-  ckSetRefresh(); ck4Refresh(); ck5Refresh(); ck5bRefresh();
+  ckSetRefresh(); ck4Refresh(); ck5Refresh(); ck5bRefresh(); ck7Refresh();
 }
 function ckMain() { if (ck5Main()) return; if (ck5bMain()) return;   /* (CK5B_V1: colourways) */   /* (CK5A_V1: buy the rest of a look) */
   const S = ckState(), it = CK.sel && CK_BY_ID[CK.sel], A = CK.anim;
@@ -16668,7 +16677,7 @@ function ckDot() {                                                     // the ti
 }
 
 /* ---------- each frame while it's open: her, the camera, the sparkles, the thumbnails, then the dressing room is drawn ---------- */
-function ckAim(snap) {                                                 // the camera: the view for what she's trying on, fitted to the window's shape
+function ckAim(snap) { if (ck7Aim(snap)) return;   /* (CK7_V1) */                                                 // the camera: the view for what she's trying on, fitted to the window's shape
   const V = CK_VIEWS[CK.view] || CK_VIEWS.full, R = CK.rig, t = CK.v2;
   if (V.at === 'head') R.head.getWorldPosition(t); else if (V.at === 'tail') R.tail[3].getWorldPosition(t); else t.set(0, 0, 0);
   t.x += V.off[0]; t.y += V.off[1]; t.z += V.off[2];
@@ -16681,7 +16690,7 @@ function ckAim(snap) {                                                 // the ca
   cam.position.set(CK.camT.x, CK.camT.y + Math.sin(CK.el) * CK.camD, CK.camT.z + Math.cos(CK.el) * CK.camD); cam.lookAt(CK.camT);
   if (snap) CK.yaw = V.yaw;
 }
-function ckAnim(dt) {                                                  // her, alive: breathing, blinking, looking about, tail swaying, and the happy hop
+function ckAnim(dt) { if (ck7Anim(dt)) return;   /* (CK7_V1: the runway, the photo booth) */                                                  // her, alive: breathing, blinking, looking about, tail swaying, and the happy hop
   const R = CK.rig, A = CK.anim, V = CK_VIEWS[CK.view] || CK_VIEWS.full, t = CK.t;
   if (!CK.drag) { CK.spin += CK.spinV * dt; CK.spinV *= Math.exp(-dt * 3.5); CK.idleT += dt;
     if (CK.idleT > 1.6) { const home = Math.round(CK.spin / (Math.PI * 2)) * Math.PI * 2; CK.spin += (home - CK.spin) * Math.min(1, dt * 1.3); if (Math.abs(home - CK.spin) < 1e-3) CK.spin = 0; } }
@@ -30257,6 +30266,1265 @@ function ears2Rx() {                                                     // what
   } catch (e) {}
 }
 /* (end of EARS2_V1) */
+
+/* CK7_V1 */
+/* =====================================================================
+   PKR'S CLOSET, PHASE 3 (2026-10-12): 🎀 the Fashion Show, 📸 the Photo Booth, 📬 the neighbours' requests.
+   - 🎀 Fashion Show: a theme of the day (ck7Theme: picked from the local date, so everyone gets the same one; a seasonal
+     theme wins in its window: Spooky Night in late October, Snow Day at Christmas, All Pink before Valentine's, True North
+     for Canada Day, Festival of Lights round Diwali). 16 themes, each defined by tags, items, a colour family or a slot it
+     wants. In the Closet a runway rolls out from the pedestal (a catwalk, sweeping spotlights, an audience of cats with
+     their phones flashing, a marquee curtain), PKR struts it in what she's wearing (strut, pause, turn, a pose at the end)
+     and three judges -- Aunty-ji, Porter and the raccoon (merged clones of their own models) -- hold up 1-10 cards with a
+     line each, in character. Scoring (ck7Score): theme matches, slots filled (not cluttered), colour harmony (colourways
+     count), a full set, novelty (the exact look from an earlier day's show scores less), then each judge's own taste. A
+     results card says why. Fish: score x 3 (+30 for a perfect 30), paid once a day; a retry pays only the improvement; a
+     streak bonus for days in a row. localStorage catguard.show keeps each day's best. Trophies: first show, a perfect 30,
+     7 days in a row, every theme (plus a first photo and five requests).
+   - 📸 Photo Booth (from the stage, or the results card): 7 poses, 9 backdrops (the Closet itself, the back yard by day and
+     by night, the street out front, a pumpkin patch, a snowy bank, a Toronto skyline, a starry sky, a pastel studio), 6
+     frames (date stamps, paw prints, PKR). A snap renders a 1080x1350 PNG (supersampled, fresh canvases every time, for
+     Safari), with Save (a download) and Share (navigator.share with a file, only where it can); the last 8 are kept in
+     IndexedDB (catguard-photos) to save again later.
+   - 📬 Requests: 1-2 a day (catguard.req), from a pool by tag, colour family or a thing she owns. In the Closet strip (a
+     📬 chip, with a sheet) and as a bubble over that neighbour in Free roam; walk up to them wearing a match for their
+     line, a little fish and a burst of hearts.
+   Hooks: ckAnim (ck7Anim), ckAim (ck7Aim), closetTick (ck7Tick), ckBuildUI (ck7UI), ckRefresh (ck7Refresh), closetClose
+   (ck7Close), ckKey (ck7Esc), and a 'Fashion Show' section in ACHIEVEMENTS. Everything is a hoisted function (no TDZ).
+   ===================================================================== */
+
+/* ---------- state, storage, dates ---------- */
+function ck7S() {                                                       // the runtime state (built on first use)
+  return ck7S.s || (ck7S.s = { mode: null, t: 0, show: null, booth: null, ui: null, built: false, reqN: 0 });
+}
+function ck7Get(k, def) { try { const v = JSON.parse(ckGet(k) || 'null'); return v && typeof v === 'object' ? v : def; } catch (e) { return def; } }
+function ck7Put(k, o) { return ckPut(k, JSON.stringify(o)); }
+function ck7Now() { return ckSnNow(); }                                 // (catguard.fakeDate works here too)
+function ck7Key(d) { return ckSnKey(d || ck7Now()); }
+function ck7DayN(d) { d = d || ck7Now(); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5); }   // (a whole number per calendar day: no DST drift)
+function ck7KeyN(n) { const d = new Date(n * 864e5); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0'); }
+function ck7Rand(seed) { let s = (seed >>> 0) || 1; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function ck7Hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function ck7ShowSave() { const D = ck7ShowData(); const keys = Object.keys(D.days).sort(); while (keys.length > 60) delete D.days[keys.shift()]; ck7Put('catguard.show', D); }
+function ck7ShowData() {                                                // catguard.show: { days: { key: { best, paid, sig, th } }, streak: { last, n }, themes: [...], n }
+  const S = ck7S(); if (S.data) return S.data;
+  const o = ck7Get('catguard.show', {}), D = { days: {}, streak: { last: null, n: 0 }, themes: [], n: 0, photos: 0 };
+  if (o.days && typeof o.days === 'object') for (const k in o.days) { const v = o.days[k]; if (/^\d{4}-\d\d-\d\d$/.test(k) && v && typeof v === 'object')
+    D.days[k] = { best: Math.max(0, Math.min(30, v.best | 0)), paid: Math.max(0, v.paid | 0), sig: typeof v.sig === 'string' ? v.sig.slice(0, 400) : '', th: typeof v.th === 'string' ? v.th : '' }; }
+  if (o.streak && typeof o.streak === 'object') { D.streak.last = typeof o.streak.last === 'string' ? o.streak.last : null; D.streak.n = Math.max(0, o.streak.n | 0); }
+  if (Array.isArray(o.themes)) D.themes = o.themes.filter(t => typeof t === 'string').slice(0, 40);
+  D.n = Math.max(0, o.n | 0); D.photos = Math.max(0, o.photos | 0);
+  return (S.data = D);
+}
+
+/* ---------- the themes ---------- */
+function ck7Themes() {                                                  // tags: weight per tag (1 a full match, 0.5 a nod); ids: things that count whatever their tags; col: a colour family; need: a slot it wants
+  return ck7Themes.L || (ck7Themes.L = [
+    { id: 'cozy', name: 'Cozy Day', ic: '🧣', bg: '#ffe2c4', tags: { cozy: 1, nature: 0.5 }, need: 'collar', needWhy: 'a scarf or a collar', blurb: 'Knits, scarves and fluffy booties. Snuggle up!' },
+    { id: 'spooky', name: 'Spooky Night', ic: '🎃', bg: '#ffd9b0', tags: { spooky: 1, magic: 0.5 }, need: 'hat', needWhy: 'a spooky hat', season: [[10, 20], [10, 31]], blurb: 'Bats, ghosts and pumpkins. Be the scariest thing on the street!' },
+    { id: 'royal', name: 'Royal Ball', ic: '👑', bg: '#efe0ff', tags: { royal: 1, fancy: 1, sparkly: 0.5 }, need: 'hat', needWhy: 'a crown or a tiara', blurb: 'Gowns, tiaras and capes. Dress like the princess she is.' },
+    { id: 'sporty', name: 'Sporty Fan', ic: '🏒', bg: '#dce9ff', tags: { sporty: 1, canadian: 0.5 }, blurb: 'Jerseys, caps and foam fingers. Game night energy!' },
+    { id: 'garden', name: 'Garden Party', ic: '🍄', bg: '#dff5d6', tags: { nature: 1, cute: 0.5, food: 0.5 }, ids: ['flowers', 'strawHat', 'basket', 'lei', 'marigold', 'toadStuds', 'toadCrown', 'parasol', 'spores', 'sporeSparkle'], blurb: 'Mushrooms, flowers and a picnic on the lawn.' },
+    { id: 'snow', name: 'Snow Day', ic: '❄️', bg: '#e1f0ff', tags: { cozy: 0.5 }, ids: ['parka', 'earmuffs', 'mittenBoots', 'sledBell', 'snow', 'toque', 'candyScarf', 'santaHat', 'socks', 'booties', 'harvestToque', 'chunkyScarf', 'fanScarf'], need: 'paws', needWhy: 'something on her paws', season: [[12, 20], [1, 2]], blurb: 'Parkas, earmuffs and mittens. It’s minus twenty out there!' },
+    { id: 'rock', name: 'Rock Star', ic: '🎸', bg: '#e6dcf2', tags: { rock: 1, cool: 1 }, col: 'black', colW: 0.5, blurb: 'Leather, spikes and shades. Turn it up to eleven!' },
+    { id: 'beach', name: 'Beach Day', ic: '🏖️', bg: '#fff1c2', tags: { party: 0.5 }, ids: ['strawHat', 'lei', 'hearts', 'stars', 'catEye', 'bubbles', 'strawberry', 'basket', 'threeD', 'scrunchie'], need: 'specs', needWhy: 'sunglasses', blurb: 'Sunnies, a sun hat and a lei. Surf’s up, princess!' },
+    { id: 'rainy', name: 'Rainy Day', ic: '🌧️', bg: '#dfe9f2', tags: { cozy: 0.5 }, ids: ['raincoat', 'rainBoots', 'bubbles', 'parasol', 'poncho', 'hoodie', 'socks'], need: 'paws', needWhy: 'boots for the puddles', blurb: 'Slickers, wellies and an umbrella. Splash in every puddle!' },
+    { id: 'pink', name: 'All Pink', ic: '🩷', bg: '#ffd9ea', col: 'pink', colW: 1, season: [[2, 10], [2, 14]], blurb: 'Pink, pink and more pink. Every single piece!' },
+    { id: 'mono', name: 'Monochrome', ic: '🖤', bg: '#ececec', mono: true, blurb: 'Black, white and grey only... or one colour, head to tail.' },
+    { id: 'sparkle', name: 'Sparkle Queen', ic: '✨', bg: '#fff3c9', tags: { sparkly: 1, magic: 0.5 }, need: 'trail', needWhy: 'a sparkly trail', blurb: 'Glitter, jewels and twinkles. The shinier the better!' },
+    { id: 'hero', name: 'Superhero', ic: '🦸', bg: '#ffdede', tags: { hero: 1, sporty: 0.5 }, ids: ['hero', 'jetpack', 'nerd', 'pawCape', 'guardBadge', 'aceHelmet', 'aceScarf'], need: 'cape', needWhy: 'a cape', blurb: 'Capes, masks and jetpacks. Saving the street, one mushroom at a time.' },
+    { id: 'snack', name: 'Snack Attack', ic: '🍕', bg: '#ffe6d1', tags: { food: 1, funny: 0.5 }, blurb: 'Pizza packs, noodle hats and strawberries. Yum!' },
+    { id: 'festival', name: 'Festival of Lights', ic: '🪔', bg: '#ffe0b8', tags: { festive: 1, sparkly: 0.5 }, ids: ['jhumkas', 'marigold', 'diyaLamp', 'rangoliCape', 'diwaliLights', 'tailbell'], col: 'gold', colW: 0.5, season: 'diwali', blurb: 'Marigolds, diyas and gold jhumkas. Aunty-ji approves.' },
+    { id: 'canada', name: 'True North', ic: '🍁', bg: '#ffe0e0', tags: { canadian: 1 }, col: 'red', colW: 0.5, season: [[6, 29], [7, 1]], blurb: 'Red and white, toques and maple leaves, eh?' },
+  ]);
+}
+function ck7ThemeIn(th, d) {                                            // is d inside this theme's season?
+  const s = th.season; if (!s) return false;
+  if (s === 'diwali') { const T = { 2026: [11, 8], 2027: [10, 29], 2028: [10, 17], 2029: [11, 5], 2030: [10, 26], 2031: [11, 14], 2032: [11, 2] }[d.getFullYear()]; if (!T) return false;
+    const day = Date.UTC(d.getFullYear(), T[0] - 1, T[1]) / 864e5, n = ck7DayN(d); return n >= day - 3 && n <= day + 2; }
+  const md = (d.getMonth() + 1) * 100 + d.getDate(), a = s[0][0] * 100 + s[0][1], b = s[1][0] * 100 + s[1][1];
+  return a <= b ? md >= a && md <= b : md >= a || md <= b;
+}
+function ck7Theme(d) {                                                  // today's theme: a seasonal one in its window, else a shuffled round of all of them (every theme once per round, never twice running)
+  d = d || ck7Now(); const n = ck7DayN(d), sz = ck7ThemeSeason(n);
+  if (sz) return sz;
+  const L = ck7Themes(), N = L.length, c = Math.floor(n / N), i = ((n % N) + N) % N, p = ck7ThemePerm(c);
+  let th = L[p[i]]; const y = ck7ThemeSeason(n - 1);
+  if (y && y === th) th = L[p[(i + 1) % N]];                            /* (the day after a seasonal run: not that one again) */
+  return th;
+}
+function ck7ThemeSeason(n) { const d = new Date(n * 864e5), dl = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12); for (const th of ck7Themes()) if (th.season && ck7ThemeIn(th, dl)) return th; return null; }
+function ck7ThemePerm(c) {                                              // round c's order (seeded); its first theme is never the last round's last
+  const L = ck7Themes(), raw = k => { const r = ck7Rand(ck7Hash('pkr-show-' + k)), a = L.map((_, i) => i); for (let i = a.length - 1; i > 0; i--) { const j = (r() * (i + 1)) | 0; const q = a[i]; a[i] = a[j]; a[j] = q; } return a; };
+  const p = raw(c), prev = raw(c - 1); if (p[0] === prev[prev.length - 1]) { const q = p[0]; p[0] = p[1]; p[1] = q; } return p;
+}
+function ck7ThemeTags(th) { const t = Object.keys(th.tags || {}); return t; }
+function ck7ThemeHint(th) {                                             // what scores, in a line: "#cozy #nature, pieces like 🌧️ 🥾 🫧, and a scarf or a collar"
+  const bits = [], tg = ck7ThemeTags(th).filter(k => th.tags[k] >= 1);
+  if (tg.length) bits.push(tg.map(t => '#' + t).join(' '));
+  if (th.col) bits.push((th.colW >= 1 ? 'everything ' : 'a touch of ') + ck7ColName(th.col) + ' ' + ck7ColIc(th.col));
+  if (th.mono) bits.push('one colour (or black and white), head to tail');
+  if (th.ids) { const ic = th.ids.map(id => CK_BY_ID[id] && CK_BY_ID[id].ic).filter(Boolean).slice(0, 5); if (ic.length) bits.push('pieces like ' + ic.join(' ')); }
+  let s = bits.join(', '); if (th.need) s += (s ? ', and ' : '') + th.needWhy; return s;
+}
+
+/* ---------- colours: each piece's main colour (its colourway counts) and its family ---------- */
+function ck7ColName(f) { return ({ red: 'red', pink: 'pink', orange: 'orange', gold: 'gold', green: 'green', blue: 'blue', purple: 'purple', brown: 'brown', black: 'black', white: 'white', grey: 'grey' })[f] || f; }
+function ck7ColIc(f) { return ({ red: '❤️', pink: '🩷', orange: '🧡', gold: '💛', green: '💚', blue: '💙', purple: '💜', brown: '🤎', black: '🖤', white: '🤍', grey: '🩶' })[f] || '🎨'; }
+function ck7Fam(hex) {                                                  // a colour → its family
+  const c = ck7Fam.c || (ck7Fam.c = new THREE.Color()), t = ck7Fam.t || (ck7Fam.t = {}); c.setHex(hex); c.getHSL(t); const ch = ck5bChroma(c), h = t.h;
+  if (ch < 0.12) return t.l < 0.25 ? 'black' : t.l > 0.78 ? 'white' : 'grey';
+  if (h < 0.04 || h >= 0.95) return t.l > 0.7 ? 'pink' : t.l < 0.25 ? 'brown' : 'red';
+  if (h < 0.1) return t.l < 0.36 ? 'brown' : 'orange';
+  if (h < 0.17) return t.l < 0.3 ? 'brown' : 'gold';
+  if (h < 0.45) return 'green';
+  if (h < 0.69) return 'blue';
+  if (h < 0.84) return 'purple';
+  return 'pink';
+}
+function ck7Neutral(f) { return f === 'black' || f === 'white' || f === 'grey' || f === 'brown'; }
+function ck7PieceHex(it, col) {                                         // its main colour, in the colourway she has it in
+  try { if (col) { const V = ck5bVars(it); if (V && V[col]) return V[col].hex; } return ck5bHue(it).hex; } catch (e) { return 0xdddddd; }
+}
+function ck7Pieces(outfit, colOf) {                                     // what's on: [{ it, slot, col, fam }] (her own gold crown counts when no other hat's on)
+  const out = [];
+  for (const s of CK_SLOTS) { const id = ckWornId(outfit, s.id), it = id && CK_BY_ID[id]; if (!it) continue;
+    const col = it.id === 'crown' ? 0 : (colOf ? colOf(it.id) : 0) | 0, hex = it.id === 'crown' ? 0xf2c14a : ck7PieceHex(it, col);
+    out.push({ it, slot: s.id, col, hex, fam: ck7Fam(hex) }); }
+  return out;
+}
+function ck7Sig(P) { return P.map(p => p.slot + ':' + p.it.id + (p.col ? '~' + p.col : '')).sort().join('|'); }
+
+/* ---------- the judges ---------- */
+function ck7Judges() {
+  return ck7Judges.L || (ck7Judges.L = [
+    { id: 'aunty', name: 'Aunty-ji', ic: '👵', mood: 0, likes: { royal: 1, fancy: 1, festive: 1, sparkly: 0.5, cozy: 0.5, classic: 0.5 }, dislikes: { spooky: 1, rock: 1 }, cols: { pink: 0.5, gold: 0.5, red: 0.5, purple: 0.5 },
+      lines: { top: ['Arre wah! Bahut sundar! Ten, ten, TEN! Like a Bollywood heroine!', 'Perfect, beta. I’m sending a photo to the whole family group.', 'Ten! Even Sharma-ji’s daughter never looked this good, and she’s a doctor.'],
+        high: ['Very nice, very nice! Only one thing... more gold. Always more gold.', 'So classy! Just like I wore in 1987. Very good taste.', 'Wah, the {item}! Where did you buy? Tell me, I won’t tell anyone.'],
+        mid: ['Nice, beta, but where is the colour? Life is not black and white!', 'Okay, okay. Not bad. Eat something, you look thin.', 'Hmm. The {item} is nice. The rest... we’ll talk.'],
+        low: ['Hai Ram! Did you get dressed in the dark?', 'Beta... this is {theme}? Because I am not seeing it.', 'I’ll pretend I didn’t see. Go and change, I’ll make chai.'] } },
+    { id: 'porter', name: 'Porter', ic: '🐕', mood: 0.5, likes: { sporty: 1, funny: 1, food: 1, canadian: 0.5, cute: 0.5 }, dislikes: { fancy: 0.5 }, cols: { blue: 0.5 },
+      lines: { top: ['WOOF! WOOF! WOOF! *spins three times* TEN!!', '*wags so hard the table shakes* BEST. CAT. EVER. TEN!', '*howls with joy* AROOOO! A TEN!'],
+        high: ['WOOF! *tail like a propeller* He wants to sniff the {item}!', '*play-bow* So cool! Can we play now? CAN WE?', '*happy wiggle* The {item}! Is it a toy? Is it for me?'],
+        mid: ['*head tilt* Woof? Okay! Good! Is that a snack?', '*sniffs the air* Smells like a good cat. Needs more ball.', '*wags politely* Fun! Woof!'],
+        low: ['*small whine* ...He still likes you!', '*sits down, confused* Is this {theme}? Woof?', '*sneezes at it* Achoo! Sorry, sorry.'] } },
+    { id: 'coon', name: 'The raccoon', ic: '🦝', mood: -0.25, likes: { cool: 1, sparkly: 1, spooky: 0.5, funny: 0.5, food: 0.5 }, dislikes: { cozy: 0.5, classic: 0.5 }, cols: { black: 0.5, gold: 0.5 },
+      lines: { top: ['Okay, roomie... I’d steal ALL of that. Ten from me.', 'Ten. And nobody even bribed me. ...Did somebody bribe me?', 'Shiny, sharp, iconic. This look is going in my stash.'],
+        high: ['Ooh, the {item}. I’d lift that. Respectfully.', 'Not bad, roomie. The trash cans are SHOOK.', 'Very slick. You’d fit right in with my crew. Fancier, though.'],
+        mid: ['Eh. I’ve found better looks in the green bin. Kidding! Kinda.', 'Cute. Needs more shine. Trust me, I know shiny.', 'It’s fine. Fine-ish. Fine-adjacent.'],
+        low: ['Roomie. Buddy. Pal. What is THIS?', '{theme}? I don’t see it. And I see EVERYTHING at night.', 'I’m only being nice because we share a roof.'] } },
+  ]);
+}
+
+/* ---------- scoring: the theme, the slots, the colours, a set, something new; then each judge's own taste ---------- */
+function ck7Score(outfit, colOf, th, key) {
+  th = th || ck7Theme(); key = key || ck7Key();
+  const P = ck7Pieces(outfit, colOf), lines = [], add = (v, t) => { lines.push({ v, t }); return v; };
+  const tags = it => it.tags || [], n = P.filter(p => p.it.id !== 'crown').length;
+  // the theme: each piece up to 1 (a full match), 0.5 (a nod); up to 4.5 in all
+  const chrom = P.filter(p => !ck7Neutral(p.fam)), fams = [...new Set(chrom.map(p => p.fam))];
+  let monoOK = false, dom = null;
+  if (th.mono) { const cnt = {}; chrom.forEach(p => { cnt[p.fam] = (cnt[p.fam] || 0) + 1; }); dom = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || null; monoOK = fams.length <= 1 && P.length >= 2; }
+  for (const p of P) { let w = 0, why = '';
+    for (const t of tags(p.it)) { const tw = (th.tags && th.tags[t]) || 0; if (tw > w) { w = tw; why = '#' + t; } }
+    if (th.ids && th.ids.indexOf(p.it.id) >= 0 && w < 1) { w = 1; why = 'perfect for ' + th.name; }
+    if (th.col && p.fam === th.col && (th.colW || 1) > w) { w = th.colW || 1; why = ck7ColIc(p.fam) + ' ' + ck7ColName(p.fam); }
+    if (th.mono) { w = monoOK ? 1 : (ck7Neutral(p.fam) || p.fam === dom) ? 0.5 : 0; why = ck7ColIc(p.fam) + ' ' + ck7ColName(p.fam); }
+    p.w = Math.min(1, w); p.why = why; }
+  let themePts = 0; const on = P.filter(p => p.w > 0).sort((a, b) => b.w - a.w);
+  for (const p of on) { const v = Math.min(p.w, 4.5 - themePts); if (v <= 0) break; themePts += v; lines.push({ v, t: p.it.ic + ' ' + p.it.name + (p.why ? ' (' + p.why + ')' : '') }); }
+  if (th.mono && monoOK && P.length >= 2) lines.push({ v: 0, t: fams.length ? 'all ' + ck7ColName(fams[0]) + ', head to tail' : 'pure black and white' });
+  if (!on.length) add(-1, 'nothing here says ' + th.name);
+  let pts = 2 + themePts + (on.length ? 0 : -1);
+  // the slot the theme wants
+  if (th.need) { const p = P.find(q => q.slot === th.need); if (p && p.w > 0) pts += add(0.5, th.needWhy + ': ✓'); else pts += add(-1, 'missing: ' + th.needWhy); }
+  // filled, not cluttered
+  const off = P.filter(p => p.w === 0 && p.it.id !== 'crown').length;
+  if (n === 0) pts += add(-2, 'she’s barely dressed!'); else if (n === 1) pts += add(-0.75, 'only one piece');
+  else if (n >= 4) { pts += add(0.5, 'a complete look (' + n + ' pieces)'); if (n >= 7 && off >= 3) pts += add(-1, 'a bit cluttered: ' + off + ' pieces off-theme'); }
+  // the colours (colourways count)
+  const fd = (a, b) => { const W = ['red', 'orange', 'gold', 'green', 'blue', 'purple', 'pink'], d = Math.abs(W.indexOf(a) - W.indexOf(b)); return Math.min(d, 7 - d); };
+  if (!th.mono && th.id !== 'pink') {
+    if (fams.length === 1 && chrom.length >= 2) pts += add(1.5, 'all ' + ck7ColIc(fams[0]) + ' ' + ck7ColName(fams[0]) + ': so coordinated!');
+    else if (fams.length === 2) { const d = fd(fams[0], fams[1]); pts += add(d === 1 ? 1 : d === 3 ? 1 : 0.5, ck7ColName(fams[0]) + ' and ' + ck7ColName(fams[1]) + (d === 3 ? ': a bold contrast' : d === 1 ? ' go together' : ', nicely paired')); }
+    else if (fams.length === 3) { const ok = fams.every(a => fams.every(b => fd(a, b) <= 2)); if (ok) pts += add(0.5, fams.map(ck7ColName).join(', ') + ' blend nicely'); }
+    else if (fams.length >= 4) pts += add(-0.5, 'a lot of colours at once (' + fams.length + ')');
+    else if (!chrom.length && n >= 3) pts += add(0.5, 'classy neutrals');
+  }
+  // a complete set
+  let set = null; try { set = ckSetWorn(outfit); } catch (e) { set = null; }
+  if (set) { const st = new Set((set.tags || []).concat(...set.items.map(id => (CK_BY_ID[id] && CK_BY_ID[id].tags) || []))), hit = th.tags && Object.keys(th.tags).some(t => st.has(t));
+    pts += add(hit ? 1 : 0.5, 'the whole ' + set.ic + ' ' + set.name + ' set' + (hit ? ', on theme' : '')); }
+  // something new: the exact look from an earlier day's show scores less
+  const sig = ck7Sig(P), D = ck7ShowData(), nk = ck7DayN();
+  for (let i = 1; i <= 14; i++) { const k = ck7KeyN(nk - i), r = D.days[k]; if (r && r.sig && r.sig === sig) { const wd = new Date((nk - i) * 864e5).toLocaleDateString('en-CA', { weekday: 'long', timeZone: 'UTC' });
+    pts += add(-1.5, 'the exact look from ' + (i === 1 ? 'yesterday' : wd) + '’s show'); break; } }
+  const base = Math.max(0, Math.min(10, pts));
+  // each judge: the base, plus their own taste
+  const best = (on[0] || P.find(p => p.it.id !== 'crown') || P[0] || null), J = [];
+  for (const j of ck7Judges()) {
+    let b = j.mood; for (const p of P) { let lk = 0, dk = 0; for (const t of tags(p.it)) { lk = Math.max(lk, j.likes[t] || 0); if (!(th.tags && th.tags[t])) dk = Math.max(dk, j.dislikes[t] || 0); }
+      lk = Math.max(lk, (j.cols && j.cols[p.fam]) || 0); b += 0.35 * lk - 0.4 * dk; }
+    b = Math.max(-1.5, Math.min(1.5, b));
+    const score = Math.max(1, Math.min(10, Math.round(base + b))), band = score >= 10 ? 'top' : score >= 8 ? 'high' : score >= 5 ? 'mid' : 'low', L = j.lines[band];
+    const r = ck7Rand(ck7Hash(sig + key + j.id)), line = L[(r() * L.length) | 0].replace(/\{item\}/g, best ? best.it.name : 'crown').replace(/\{theme\}/g, th.name).replace(/\{score\}/g, score);
+    J.push({ id: j.id, name: j.name, ic: j.ic, score, line, bias: b }); }
+  const total = J.reduce((a, j) => a + j.score, 0);
+  return { th, P, n, base, lines, judges: J, total, sig, set, key };
+}
+function ck7Pay(total) { return total * 3 + (total >= 30 ? 30 : 0); }   // fish for a score (paid once a day: a retry pays only the improvement)
+function ck7StreakBonus(n) { return Math.min(5, Math.max(0, n - 1)) * 10; }   // day 2 in a row: +10 ... day 6+: +50 (once, on that day's first show)
+
+/* ---------- the runway: built once, the first time (a group in the Closet's own scene; no lights of its own) ---------- */
+function ck7MergeRig(root, scale) {                                     // a model of many meshes → one mesh per material (a judge is a handful of draw calls, not sixty)
+  root.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), groups = new Map(), M = new THREE.Matrix4();
+  const shown = o => { for (let q = o; q && q !== root; q = q.parent) if (!q.visible) return false; return true; };
+  root.traverse(o => { if (!o.isMesh || !o.geometry || !o.material || Array.isArray(o.material) || !shown(o) || (o.userData && o.userData.ck7Skip)) return;
+    let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); M.multiplyMatrices(inv, o.matrixWorld); g.applyMatrix4(M);
+    const k = o.material.uuid; if (!groups.has(k)) groups.set(k, { mat: o.material, list: [] }); groups.get(k).list.push(g); });
+  const out = new THREE.Group();
+  for (const { mat, list } of groups.values()) {
+    let n = 0; for (const g of list) n += g.attributes.position.count;
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2), wantC = !!mat.vertexColors, col = wantC ? new Float32Array(n * 3).fill(1) : null; let o = 0;
+    for (const g of list) { const c = g.attributes.position.count; pos.set(g.attributes.position.array, o * 3);
+      if (g.attributes.normal) nor.set(g.attributes.normal.array, o * 3); if (g.attributes.uv) uv.set(g.attributes.uv.array.subarray(0, c * 2), o * 2);
+      if (col && g.attributes.color && g.attributes.color.itemSize === 3) col.set(g.attributes.color.array, o * 3); o += c; g.dispose(); }
+    const G = new THREE.BufferGeometry(); G.setAttribute('position', new THREE.BufferAttribute(pos, 3)); G.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); G.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    if (col) G.setAttribute('color', new THREE.BufferAttribute(col, 3)); G.computeBoundingSphere();
+    const m2 = mat.clone(); if (mat.userData && mat.userData.tod0 && m2.color) m2.color.copy(mat.userData.tod0); if (m2.fog !== undefined) m2.fog = false;   /* (her own copy: never tinted by the night outside) */
+    out.add(new THREE.Mesh(G, m2)); }
+  if (scale) out.scale.setScalar(scale); return out;
+}
+function ck7JudgeModel(id) {                                            // Aunty-ji, Porter, the raccoon: their own models, merged, posed to sit at the table
+  let src = null, rm = null;
+  try {
+    if (id === 'aunty') { const A = typeof UPPER !== 'undefined' && UPPER.aunty; if (A && A.g) { src = A.g.clone(true); src.position.set(0, 0, 0); src.rotation.set(0, 0, 0); src.scale.set(1, 1, 1); } }
+    else if (id === 'porter') { const R = makeDog(); rm = R; R.g.parent && R.g.parent.remove(R.g); R.shadow.parent && R.shadow.parent.remove(R.shadow); R.g.visible = true;
+      R.head.rotation.x = -0.15; R.tail.rotation.set(-0.9, 0, 0); src = R.g; }
+    else if (id === 'coon') { const R = makeRaccoon(); rm = R; R.g.parent && R.g.parent.remove(R.g); R.shadow.parent && R.shadow.parent.remove(R.shadow); R.g.visible = true; if (R.snack) R.snack.visible = false; if (R.tongue) R.tongue.visible = false; src = R.g; }
+  } catch (e) { console.error(e); src = null; }
+  if (!src) {                                                           // (a stand-in, if a model isn't there: a round cat in her colours)
+    const B = ckB(), c = id === 'aunty' ? 0xd98a3d : id === 'porter' ? 0x5a6472 : 0x86817b;
+    B.m(CKG.sph(0.4, 16, 12), c, [0, 0.42, 0], null, [1, 1.1, 1]); B.m(CKG.sph(0.28, 16, 12), c, [0, 0.98, 0.06]);
+    for (const s of [-1, 1]) B.m(CKG.cone(0.1, 0.2, 8), c, [s * 0.16, 1.24, 0.02], [0, 0, -s * 0.3]);
+    if (id === 'aunty') B.m(CKG.cyl(0.47, 0.5, 0.42, 20), 0xc2185b, [0, 0.21, 0]);
+    const g = new THREE.Group(); g.add(new THREE.Mesh(ckMerge(B.parts.m), ckMat().m)); return g;
+  }
+  const out = ck7MergeRig(src);
+  if (rm) rm.g.traverse(o => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
+  return out;
+}
+function ck7Tex(w, h, draw) { return ckTexOf(w, h, draw); }
+function ck7RunBuild() {
+  const S = ck7S(); if (S.run) return S.run;
+  const G = new THREE.Group(), R = S.run = { g: G, judges: [], cards: [], t: 0 }; G.visible = false; CK.scene.add(G);
+  const M = ckMat(), gold = 0xf2c14a;
+  // the floor beyond the rug, the catwalk, the bleachers, the judges' table (merged: matte + shiny + glowing)
+  const B = ckB();
+  B.m(CKG.box(1.02, 0.16, 3.85), (x, y) => y > 0.07 ? 0xffffff : 0x6a2350, [0, -0.08, 2.4]);
+  for (const s of [-1, 1]) B.s(CKG.box(0.03, 0.03, 3.85), gold, [s * 0.515, 0.0, 2.4]);
+  for (let i = 0; i < 3; i++) { const x = -1.05 - i * 0.5, h = 0.06 + i * 0.16; B.m(CKG.box(0.5, h, 3.6), (xx, y) => y > h / 2 - 0.01 ? 0xb03a7c : 0x5a1e46, [x, -0.16 + h / 2, 2.45]); }
+  for (let i = 0; i < 2; i++) { const x = 1.1 + i * 0.5, h = 0.06 + i * 0.16; B.m(CKG.box(0.5, h, 1.7), (xx, y) => y > h / 2 - 0.01 ? 0xb03a7c : 0x5a1e46, [x, -0.16 + h / 2, 1.5]); }
+  B.m(CKG.box(0.5, 0.46, 1.9), (x, y) => y > 0.22 ? 0xfff4f8 : 0xff8fc0, [1.65, 0.07, 3.75]);                 // the judges' table: a pink skirt, a white top
+  B.s(CKG.box(0.52, 0.03, 1.92), gold, [1.65, 0.3, 3.75]); B.s(CKG.box(0.02, 0.03, 1.92), gold, [1.39, -0.1, 3.75]);
+  const plat = new THREE.Group(); plat.add(new THREE.Mesh(ckMerge(B.parts.m), M.m), new THREE.Mesh(ckMerge(B.parts.s), M.s)); G.add(plat);
+  // the catwalk's top: glossy pink, a white centre line, gold edges
+  const topT = ck7Tex(64, 512, (c, w, h) => { const g = c.createLinearGradient(0, 0, w, 0); g.addColorStop(0, '#d94f93'); g.addColorStop(0.5, '#ff8fc0'); g.addColorStop(1, '#d94f93'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,255,255,.85)'; for (let y = 0; y < h; y += 32) c.fillRect(w / 2 - 2, y, 4, 18); c.fillStyle = 'rgba(255,255,255,.18)'; for (let y = 0; y < h; y += 64) c.fillRect(0, y, w, 2); });
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 3.85), new THREE.MeshLambertMaterial({ map: topT })); top.rotation.x = -Math.PI / 2; top.position.set(0, 0.002, 2.4); G.add(top);
+  const fl = new THREE.Mesh(new THREE.CircleGeometry(7.2, 48), new THREE.MeshBasicMaterial({ color: 0x3a1430 })); fl.rotation.x = -Math.PI / 2; fl.position.y = -0.17; G.add(fl);
+  // the curtain behind the judges and the cameras: plum velvet, gold fringe, a marquee
+  const cur = ck7Tex(2048, 512, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#2a0b24'); g.addColorStop(1, '#5a1a4a'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 22) { const k = 0.5 + 0.5 * Math.sin(x * 0.29); c.fillStyle = `rgba(${150 + k * 60 | 0},${30 + k * 20 | 0},${100 + k * 40 | 0},.55)`; c.fillRect(x, 0, 11, h); }
+    c.fillStyle = '#e8b830'; c.fillRect(0, h * 0.86, w, 6); for (let x = 0; x < w; x += 9) c.fillRect(x, h * 0.86 + 6, 4, 18);
+    for (const mx of [w * 0.5, w * 0.83]) { c.save(); c.translate(mx, 0); c.scale(-1, 1); c.translate(-mx, 0);   /* (drawn mirrored: the curtain is seen from inside) */
+      c.fillStyle = '#ff6fae'; c.strokeStyle = '#ffd23a'; c.lineWidth = 8; const bw = 600, bh = 120, by = h * 0.4;
+      c.beginPath(); if (c.roundRect) c.roundRect(mx - bw / 2, by, bw, bh, 34); else c.rect(mx - bw / 2, by, bw, bh); c.fill(); c.stroke();
+      c.fillStyle = '#fff8c8'; for (let i = 0; i < 30; i++) { const u = i / 30, px = mx - bw / 2 + 20 + u * (bw - 40); c.beginPath(); c.arc(px, by + 11, 5, 0, 7); c.arc(px, by + bh - 11, 5, 0, 7); c.fill(); }
+      c.font = '400 58px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#fff'; c.strokeStyle = '#2d1328'; c.lineWidth = 9;
+      c.strokeText('PKR’S FASHION SHOW', mx, by + bh / 2 + 3); c.fillText('PKR’S FASHION SHOW', mx, by + bh / 2 + 3);
+      for (const s of [-1, 1]) { c.font = '70px serif'; c.fillText(s < 0 ? '🎀' : '👑', mx + s * (bw / 2 + 60), by + bh / 2); } c.restore(); } });
+  const wall = new THREE.Mesh(new THREE.CylinderGeometry(6.6, 6.6, 5.2, 48, 1, true, -Math.PI / 2 + 0.25, Math.PI - 0.5), new THREE.MeshBasicMaterial({ map: cur, side: THREE.BackSide }));
+  wall.position.y = 2.4; G.add(wall);
+  // the audience: cats on the bleachers (one InstancedMesh, each its own coat)
+  { const A = ckB();
+    A.m(CKG.sph(0.13, 10, 8), 0xffffff, [0, 0.13, 0], null, [1, 1.15, 0.9]); A.m(CKG.sph(0.095, 12, 9), 0xffffff, [0, 0.33, 0.02]);
+    for (const s of [-1, 1]) { A.m(CKG.cone(0.035, 0.07, 6), 0xffffff, [s * 0.055, 0.42, 0.01], [0, 0, -s * 0.3]); A.m(CKG.sph(0.022, 8, 6), 0x1a1a1a, [s * 0.036, 0.345, 0.09]); A.m(CKG.sph(0.007, 5, 4), 0xffffff, [s * 0.036 - 0.006, 0.352, 0.11]); }
+    A.m(CKG.sph(0.012, 6, 5), 0xff8aa8, [0, 0.318, 0.112]);
+    A.m(CKG.box(0.05, 0.08, 0.012), 0x222233, [0.06, 0.22, 0.12], [0.2, -0.3, 0]);                      // her phone, filming
+    const seats = []; for (let i = 0; i < 3; i++) for (let k = 0; k < 7; k++) seats.push([-1.05 - i * 0.5, -0.1 + 0.06 + i * 0.16, 0.95 + k * 0.52, Math.PI / 2]);
+    for (let i = 0; i < 2; i++) for (let k = 0; k < 3; k++) seats.push([1.1 + i * 0.5, -0.1 + 0.06 + i * 0.16, 0.85 + k * 0.5, -Math.PI / 2]);
+    const coats = [0xe8a25a, 0x9a9a9a, 0x3a3a3a, 0xf4efe6, 0x8a6a4a, 0xd9c2a0, 0xc77a3a, 0x6a6a7a];
+    const im = new THREE.InstancedMesh(ckMerge(A.parts.m), M.m, seats.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), c = new THREE.Color();
+    seats.forEach((p, i) => { const s = 0.9 + ((i * 37) % 7) / 30; m4.compose(new THREE.Vector3(p[0], p[1], p[2]), q.setFromEuler(e.set(0, p[3] + ((i * 13) % 5 - 2) * 0.08, 0)), new THREE.Vector3(s, s, s)); im.setMatrixAt(i, m4); im.setColorAt(i, c.setHex(coats[(i * 5 + 3) % coats.length])); });
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); G.add(im); R.aud = { im, seats, m4, q, e }; }
+  // the flashes (phones going off in the crowd) and the chase lights along the catwalk: one Points
+  { const nF = 30, nL = 32, n = nF + nL, P = new Float32Array(n * 3), C = new Float32Array(n * 3);
+    for (let i = 0; i < nL; i++) { const s = i % 2 ? 1 : -1, k = (i >> 1) / (nL / 2 - 1); P[i * 3] = s * 0.53; P[i * 3 + 1] = 0.02; P[i * 3 + 2] = 0.55 + k * 3.7; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3));
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.22, map: ckStarTex(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    pts.frustumCulled = false; pts.renderOrder = 6; G.add(pts); R.fx = { g, P, C, nF, nL, life: new Float32Array(nF) }; }
+  // spotlight beams from the rig above (no lights: soft additive cones) and a pool of light that follows her
+  { const bt = ck7Tex(8, 128, (c, w, h) => { const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(0.7, 'rgba(255,255,255,.22)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h); });
+    R.beams = [0xfff0f7, 0xffd6f0, 0xd6e8ff].map((col, i) => { const geo = new THREE.CylinderGeometry(0.05, 0.62, 4.2, 28, 1, true); geo.translate(0, -2.1, 0);
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: bt, color: col, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      m.position.set((i - 1) * 1.6, 4.1, 2.6 + (i === 1 ? -1.2 : 0.6)); m.renderOrder = 4; G.add(m); return m; });
+    const pt = ck7Tex(128, 128, (c) => { const g = c.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(0.6, 'rgba(255,255,255,.3)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, 128, 128); });
+    R.pool = new THREE.Mesh(new THREE.CircleGeometry(0.62, 32), new THREE.MeshBasicMaterial({ map: pt, color: 0xfff0f8, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false })); R.pool.rotation.x = -Math.PI / 2; R.pool.position.y = 0.006; R.pool.renderOrder = 2; G.add(R.pool); }
+  // the judges: at the table, looking across the catwalk (each with a score card on a stick, face down until it's time)
+  const J = [['aunty', 0.62, 3.1, 0.2], ['porter', 0.4, 3.75, -0.06], ['coon', 0.62, 4.4, 0.2]];
+  for (const [id, sc, z, y] of J) {
+    const jg = new THREE.Group(); jg.position.set(1.95, y, z); jg.rotation.y = -Math.PI / 2; G.add(jg);
+    const mdl = ck7JudgeModel(id); mdl.scale.setScalar(sc); jg.add(mdl);
+    const card = new THREE.Group(); card.position.set(0.12, 0.55, 0.05); jg.add(card);
+    const stick = new THREE.Mesh(CKG.cyl(0.012, 0.012, 0.34, 6), M.s); stick.position.y = 0.1; card.add(stick);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.3), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })); face.position.y = 0.38; card.add(face);
+    card.visible = false; R.judges.push({ id, g: jg, mdl, card, face, k: 0, base: jg.position.clone(), headY: (id === 'porter' ? 0.95 : 0.85) }); }
+  return R;
+}
+function ck7CardTex(j, score) {                                         // a fresh canvas for each card (Safari): white card, a big number, the judge's emoji
+  const c = document.createElement('canvas'); c.width = 256; c.height = 224; const x = c.getContext('2d');
+  x.fillStyle = '#ffffff'; x.fillRect(0, 0, 256, 224); x.strokeStyle = '#2d1328'; x.lineWidth = 12; x.strokeRect(6, 6, 244, 212);
+  x.fillStyle = score >= 9 ? '#e23b7d' : score >= 6 ? '#2d1328' : '#7a6a72'; x.font = '400 150px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(String(score), 128, 122); const t = new THREE.CanvasTexture(c); return t;
+}
+
+/* ---------- the show itself: walk, judge, results ---------- */
+function ck7ShowOutfit() {                                              // what she walks in: the look on the stage, less anything she doesn't own yet (and only colourways she owns)
+  const S = ckState(), out = {}, left = [];
+  for (const s of CK_SLOTS) { const v = CK.prev[s.id]; if (!v) continue; if (v === 'none' || S.owned.has(v)) out[s.id] = v; else if (CK_BY_ID[v]) left.push(CK_BY_ID[v]); }
+  const colOf = id => { const c = ck5bColFor(CK.rig, id) | 0; return c && ck5bColOwned(id, c) ? c : 0; };
+  return { out, left, colOf };
+}
+function ck7ShowStart() {
+  const S = ck7S(); if (!CK.on || S.mode) return;
+  try {
+    const O = ck7ShowOutfit(), th = ck7Theme(), key = ck7Key();
+    if (O.left.length) { CK.prevCol = CK.prevCol || {}; }
+    for (const id of Object.values(O.out)) if (CK.prevCol && CK.prevCol[id] && !ck5bColOwned(id, CK.prevCol[id])) CK.prevCol[id] = 0;
+    CK.prev = Object.assign({}, O.out); closetDress(CK.rig, CK.prev);
+    const res = ck7Score(O.out, O.colOf, th, key);
+    const R = ck7RunBuild(); R.g.visible = true;
+    S.mode = 'show'; S.t = 0; S.show = { res, th, left: O.left, phase: 'intro', judged: 0, paid: null, flashT: 0, pose: ['wave', 'sit', 'tilt'][ck7Hash(res.sig) % 3] };
+    for (const j of R.judges) { j.card.visible = false; j.k = 0; }
+    ck7UIMode('show'); ck7ShowBanner(th); ckSfx('open');
+    if (O.left.length) setTimeout(() => { if (S.mode === 'show') ckCaption('Not mine yet: ' + O.left.map(it => it.ic).join(' ') + ' (left them off)'); }, 400);
+  } catch (e) { console.error(e); ck7End(); }
+}
+function ck7ShowFinish() {                                              // the scores are in: pay (once a day, only the improvement), the streak, trophies, save the day's best
+  const S = ck7S(), sh = S.show; if (!sh || sh.paid) return; const r = sh.res, D = ck7ShowData(), key = r.key, day = D.days[key] || (D.days[key] = { best: 0, paid: 0, sig: '', th: r.th.id });
+  let fish = 0, streak = 0; const first = !day.walked;
+  const owe = Math.max(0, ck7Pay(r.total) - (day.paid || 0)); if (owe > 0) { fish += owe; day.paid = (day.paid || 0) + owe; }
+  if (r.total >= day.best) { day.best = r.total; day.sig = r.sig; } day.th = r.th.id; day.walked = 1;
+  if (first) { const y = ck7KeyN(ck7DayN() - 1); D.streak.n = D.streak.last === y ? D.streak.n + 1 : D.streak.last === key ? D.streak.n : 1; D.streak.last = key; streak = ck7StreakBonus(D.streak.n); fish += streak; }
+  if (D.themes.indexOf(r.th.id) < 0) D.themes.push(r.th.id); D.n++;
+  if (fish > 0) ckSetWallet(ckWallet() + fish);
+  ck7ShowSave(); sh.paid = { fish, owe, streak, n: D.streak.n, best: day.best, first };
+  try { unlock('showFirst'); if (r.total >= 30) unlock('showPerfect'); if (D.streak.n >= 7) unlock('showStreak'); if (ck7Themes().every(t => D.themes.indexOf(t.id) >= 0)) unlock('showAll'); } catch (e) {}
+  try { ckDot(); } catch (e) {}
+}
+function ck7ShowStep(dt) {                                              // the timeline (seconds): intro 0-1.6, strut to the middle, pause, a turn, strut to the end, pose; judges; results
+  const S = ck7S(), sh = S.show, R = S.run; S.t += dt; const t = S.t;
+  const T = ck7ShowStep.T || (ck7ShowStep.T = { walk0: 1.6, mid: 4.2, pause: 4.7, turn: 5.6, end: 7.6, pose: 9.0, judge: 9.6, each: 1.5 });
+  sh.phase = t < T.walk0 ? 'intro' : t < T.end ? 'walk' : t < T.judge ? 'pose' : t < T.judge + T.each * 3 + 0.5 ? 'judge' : 'results';
+  // the judges hold up their cards, one by one
+  if (sh.phase === 'judge' || sh.phase === 'results') { const k = Math.min(3, Math.floor((t - T.judge) / T.each) + 1);
+    while (sh.judged < k) { const j = R.judges[sh.judged], jr = sh.res.judges[sh.judged]; if (j.face.material.map) j.face.material.map.dispose(); j.face.material.map = ck7CardTex(jr, jr.score); j.face.material.needsUpdate = true; j.card.visible = true; j.k = 0.001; ck7Say(sh.judged, jr); ckSfx(jr.score >= 8 ? 'buy' : jr.score >= 5 ? 'wear' : 'off'); sh.judged++; } }
+  if (sh.phase === 'results' && !sh.shown) { sh.shown = true; ck7ShowFinish(); ck7Results(); }
+  // the crowd: heads bob, phones flash (more when she poses), the chase lights run
+  const A = R.aud; for (let i = 0; i < A.seats.length; i++) { const p = A.seats[i], b = Math.abs(Math.sin(t * 3.2 + i * 1.7)) * 0.025 * (sh.phase === 'pose' || sh.phase === 'judge' ? 2 : 1); A.m4.compose(ck7V(p[0], p[1] + b, p[2]), A.q.setFromEuler(A.e.set(0, p[3] + Math.sin(t * 0.9 + i) * 0.12, 0)), ck7V2(0.9 + ((i * 37) % 7) / 30)); A.im.setMatrixAt(i, A.m4); }
+  A.im.instanceMatrix.needsUpdate = true;
+  const F = R.fx, rate = sh.phase === 'pose' ? 26 : sh.phase === 'walk' ? 9 : sh.phase === 'judge' ? 6 : 3;
+  for (let i = 0; i < F.nF; i++) { F.life[i] -= dt * 5; if (F.life[i] <= 0 && Math.random() < rate * dt / F.nF * 6) { F.life[i] = 1; const s = A.seats[(Math.random() * A.seats.length) | 0]; F.P[(F.nL + i) * 3] = s[0] + (s[3] > 0 ? 0.08 : -0.08); F.P[(F.nL + i) * 3 + 1] = s[1] + 0.25; F.P[(F.nL + i) * 3 + 2] = s[2] + 0.1; }
+    const k = Math.max(0, F.life[i]), j = (F.nL + i) * 3; F.C[j] = F.C[j + 1] = F.C[j + 2] = k * k * 1.6; }
+  for (let i = 0; i < F.nL; i++) { const k = 0.35 + 0.65 * Math.max(0, Math.sin(t * 6 - (i >> 1) * 0.7)), j = i * 3; F.C[j] = 1 * k; F.C[j + 1] = 0.82 * k; F.C[j + 2] = 0.55 * k; }
+  F.g.attributes.position.needsUpdate = true; F.g.attributes.color.needsUpdate = true;
+  R.beams.forEach((b, i) => { b.rotation.z = Math.sin(t * (0.7 + i * 0.23) + i * 2) * 0.32; b.rotation.x = Math.cos(t * (0.55 + i * 0.17) + i) * 0.22; b.material.opacity = sh.phase === 'intro' ? 0.1 + 0.08 * Math.sin(t * 9 + i) : 0.17; });
+  // the judges: a little bob; a card goes up with a pop
+  R.judges.forEach((j, i) => { j.g.position.y = j.base.y + Math.abs(Math.sin(t * 2 + i * 1.3)) * 0.012; if (j.k > 0) { j.k = Math.min(1, j.k + dt * 3); const e = 1 - Math.pow(1 - j.k, 3); j.card.position.y = 0.3 + e * 0.5 + Math.sin(t * 3 + i) * 0.015; j.card.rotation.z = Math.sin(e * Math.PI) * 0.25; j.card.scale.setScalar(0.6 + 0.4 * e + Math.sin(Math.min(1, j.k * 2) * Math.PI) * 0.12); } });
+}
+function ck7V(x, y, z) { const v = ck7V.v || (ck7V.v = new THREE.Vector3()); return v.set(x, y, z); }
+function ck7V2(s) { const v = ck7V2.v || (ck7V2.v = new THREE.Vector3()); return v.set(s, s, s); }
+function ck7Ease(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+function ck7ShowPose(dt) {                                              // her on the catwalk: a strut (paws crossing, hips swinging, chin up), a pause and a turn, a pose at the end, then she faces the judges
+  const S = ck7S(), sh = S.show, R = CK.rig, t = S.t, T = ck7ShowStep.T, A = CK.anim; if (!T) return;
+  let z = 0, yaw = 0, walking = false, ph = 0;
+  if (t < T.walk0) { z = 0; yaw = 0; }
+  else if (t < T.mid) { const k = (t - T.walk0) / (T.mid - T.walk0); z = 0.15 + k * 1.75; walking = true; ph = (t - T.walk0) * 7.5; }
+  else if (t < T.pause) { z = 1.9; }
+  else if (t < T.turn) { z = 1.9; yaw = ck7Ease((t - T.pause) / (T.turn - T.pause)) * Math.PI * 2; }
+  else if (t < T.end) { const k = (t - T.turn) / (T.end - T.turn); z = 1.9 + k * 1.6; walking = true; ph = (t - T.turn) * 7.5; }
+  else if (t < T.judge) { z = 3.5; yaw = 0; }
+  else if (sh.phase !== 'results') { z = 3.5; yaw = ck7Ease((t - T.judge) / 0.6) * Math.PI / 2 * 0.85; }
+  else { z = 3.5; sh.rt = (sh.rt || 0) + dt; yaw = (1 - ck7Ease(sh.rt / 0.6)) * Math.PI / 2 * 0.85; }
+  R.g.position.set(0, 0, z); R.g.rotation.set(0, yaw, 0);
+  const sw = Math.sin(ph);
+  R.body.position.y = walking ? Math.abs(sw) * 0.025 : 0; R.body.rotation.set(0, 0, walking ? sw * 0.07 : 0); R.body.scale.set(1, 1 + Math.sin(t * 2.1) * 0.01, 1);
+  for (let i = 0; i < 4; i++) { R.legs[i].rotation.set(0, 0, 0); }
+  if (walking) { R.legs[0].rotation.x = R.legs[3].rotation.x = sw * 0.6; R.legs[1].rotation.x = R.legs[2].rotation.x = -sw * 0.6;
+    R.legs[0].rotation.z = 0.12 * Math.max(0, sw); R.legs[1].rotation.z = -0.12 * Math.max(0, -sw); }   /* (a catwalk: each front paw crosses over) */
+  R.head.rotation.set(walking ? -0.12 : -0.05, walking ? -sw * 0.08 : 0, 0);
+  if (t >= T.end && t < T.judge) {                                      // the pose at the end
+    const k = ck7Ease((t - T.end) / 0.35);
+    if (sh.pose === 'wave') { R.legs[1].rotation.x = -k * (1.2 + Math.sin(t * 14) * 0.25); R.head.rotation.z = 0.25 * k; }
+    else if (sh.pose === 'sit') { R.body.rotation.x = -0.45 * k; R.body.position.y = -0.06 * k; R.legs[2].rotation.x = R.legs[3].rotation.x = -1.1 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = 0.45 * k; R.head.rotation.x = 0.25 * k; R.head.rotation.z = -0.2 * k; }
+    else { R.body.rotation.z = 0.12 * k; R.head.rotation.z = 0.35 * k; R.head.rotation.y = 0.3 * k; R.legs[0].rotation.x = -0.5 * k; }
+    if (!sh.posed) { sh.posed = true; ckCaption(pickOf(['✨ Serve!', 'Strike a pose! 💖', 'Work it, Princess!', 'Ta-da! 👑'])); ckSfx('try'); ckPuffAt(R.g.localToWorld(CK.v.set(0, 0.6, 0.1)), 40, true); }
+  }
+  if (sh.phase === 'results') { const happy = sh.res.total >= 18, k = ck7Ease((sh.rt || 0) / 0.5);
+    if (happy) { const hop = Math.max(0, Math.sin((sh.rt || 0) * 5.5)) * 0.09 * k; R.g.position.y = hop; R.legs[1].rotation.x = -k * (1.1 + Math.sin(t * 13) * 0.3); R.head.rotation.z = Math.sin(t * 3) * 0.15; if (hop > 0.01) { R.legs[0].rotation.x = -0.5; R.legs[2].rotation.x = R.legs[3].rotation.x = 0.5; } }
+    else { R.body.position.y = -0.2 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = -1.3 * k; R.legs[2].rotation.x = R.legs[3].rotation.x = 1.3 * k; R.head.rotation.x = 0.45 * k; R.head.rotation.z = 0.2 * k; } }
+  else if (t >= T.judge) { const k = ck7Ease((t - T.judge - 0.4) / 0.5); R.body.rotation.x = -0.4 * k; R.body.position.y = -0.05 * k; R.legs[2].rotation.x = R.legs[3].rotation.x = -1.05 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = 0.4 * k; R.head.rotation.x = 0.2 * k; }
+  for (let i = 0; i < R.tail.length; i++) { const sg = R.tail[i]; sg.rotation.x = (i ? 0.16 : 0.62) + (walking ? -0.05 : 0); sg.rotation.y = Math.sin(t * (walking ? 4.5 : 2.2) - i * 0.55) * (0.12 + i * 0.035); }
+  A.blinkT -= dt; const shut = A.blinkT < 0.13; if (A.blinkT <= 0) A.blinkT = 2.2 + Math.random() * 3.2;
+  if (R.lids[0].visible !== shut) { R.peepers.forEach(e => { e.visible = !shut; }); R.lids.forEach(l => { l.visible = shut; }); }
+  ckWear(R.ck, dt, walking ? 0.55 : 0.12, false, t);
+  CK.shadow.position.set(R.g.position.x, 0.004, R.g.position.z); CK.shadow.rotation.z = yaw; CK.shadow.scale.set(0.8, 1.35, 1); CK.shadow.material.opacity = 0.3;
+  const Rn = S.run; Rn.pool.position.set(R.g.position.x, 0.006, R.g.position.z);
+  const tr = ck5bCkFrame.T; if (tr && tr.pts) tr.pts.position.set(R.g.position.x, 0, R.g.position.z);   /* (her trail drifts round her, wherever she is on the catwalk) */
+}
+function ck7ShowCam(snap) {                                             // the camera: a wide shot, then tracking her down the catwalk, close on the pose, over her shoulder to the judges, a slow orbit for the results
+  const S = ck7S(), sh = S.show, t = S.t, T = ck7ShowStep.T, cam = CK.cam, R = CK.rig; if (!T) return;
+  const p = R.g.position, want = ck7ShowCam.W || (ck7ShowCam.W = new THREE.Vector3()), look = ck7ShowCam.L || (ck7ShowCam.L = new THREE.Vector3()), at = ck7ShowCam.A || (ck7ShowCam.A = new THREE.Vector3());
+  let fov = 32, k = snap ? 1 : 1 - Math.exp(-CK.dt * 2.6);
+  const asp = CK.rect.w / Math.max(1, CK.rect.h), narrow = asp < 1 ? 1 / asp : 1;   /* (a tall phone: pull back so the catwalk still fits) */
+  if (t < T.walk0) { const u = t / T.walk0; want.set(-0.3 + u * 0.3, 1.75 - u * 0.4, 7.4 - u * 0.6); at.set(0, 0.45, 1.2); fov = 34 + 6 * (narrow - 1); k = 1; }
+  else if (t < T.end) { want.set(p.x + 0.75, 0.85 + 0.15 * (narrow - 1), p.z + 3.5 * Math.min(1.3, narrow)); at.set(p.x, 0.4 + 0.1 * (narrow - 1), p.z - 0.3); fov = 32 + 9 * (narrow - 1); }
+  else if (t < T.judge) { want.set(p.x - 0.45, 0.6, p.z + 2.3 * Math.min(1.5, narrow)); at.set(p.x, 0.42, p.z); fov = 30; }
+  else if (sh.phase === 'judge') { want.set(-1.6 - 0.9 * (narrow - 1), 1.65, 4.3 + 0.5 * (narrow - 1)); at.set(1.55, asp > 1.7 ? 0.78 : 0.6, 3.75); fov = 36 + 8 * (narrow - 1); if (t < T.judge + 0.1) k = 1; }
+  else { const a = Math.sin((t - T.judge) * 0.22) * 0.45, tf = sh.topF; fov = 34 + 10 * (narrow - 1);
+    if (tf && tf < 0.6) { const hh = 0.95 / (1.5 * Math.max(0.12, tf)), D = hh / Math.tan(fov * Math.PI / 360);   /* (the card's along the bottom: she fits in the space above it) */
+      want.set(p.x + Math.sin(a) * D, 0.42 + D * 0.08, p.z + Math.cos(a) * D); at.set(p.x, 0.42 - (sh.topC || 0) * hh, p.z); }
+    else { want.set(p.x + Math.sin(a) * 2.7, 0.8, p.z + Math.cos(a) * 2.7); at.set(p.x, 0.45, p.z); } }   /* (a tall phone: she's up top, the card's below her) */
+  if (snap) k = 1; cam.position.lerp(want, k); look.lerp(at, k); if (snap) look.copy(at);
+  if (Math.abs(cam.fov - fov) > 0.01) { cam.fov += (fov - cam.fov) * Math.max(k, 0.2); }
+  if (Math.abs(cam.aspect - asp) > 1e-4 || true) { cam.aspect = asp; cam.updateProjectionMatrix(); }
+  cam.lookAt(look);
+}
+
+/* ---------- the page: CSS ---------- */
+function ck7Css() {
+  if (ck7Css.done) return; ck7Css.done = true;
+  const st = document.createElement('style'); st.id = 'ck7Css'; st.textContent = `
+#closet .ck7-sb{position:absolute;top:10px;right:10px;z-index:3;display:grid;gap:8px;justify-items:end}
+#closet .ck7-sbb{position:relative;display:flex;align-items:center;gap:5px;height:44px;min-width:44px;padding:0 12px 0 10px;border-radius:999px;border:3px solid var(--ink);background:#fff;box-shadow:0 3px 0 var(--ink);color:var(--ink);font:800 14px/1 var(--body)!important;cursor:pointer;white-space:nowrap}
+#closet .ck7-sbb b{font:400 19px/1 var(--body)}
+#closet .ck7-sbb.show{background:linear-gradient(#ff8fc0,#ff6fae);color:#fff;text-shadow:0 1px 0 rgba(45,19,40,.55)}
+#closet .ck7-sbb.cam{padding:0;width:44px;justify-content:center}
+#closet .ck7-sbb:active{transform:translateY(3px);box-shadow:0 0 0 var(--ink)}
+#closet .ck7-sbb i{position:absolute;top:-8px;right:-6px;min-width:20px;height:20px;padding:0 4px;display:grid;place-items:center;border-radius:999px;background:#fff;border:2px solid var(--ink);font:400 12px/1 var(--body);font-style:normal}
+#closet .ck7-sbb i[hidden]{display:none}
+#closet .ck-sn{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+#closet .ck-sn::-webkit-scrollbar{display:none}
+#closet .ck-sn.ck7-more{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 30px),rgba(0,0,0,.2));mask-image:linear-gradient(90deg,#000 calc(100% - 30px),rgba(0,0,0,.2))}
+#closet .ck-sn-day{flex:1 0 auto;min-width:min(240px,62vw)}
+#closet .ck7-chip{flex:0 0 auto;max-width:158px}
+#closet .ck7-chip .e{background:#ffe1ee;display:none}
+#closet .ck7-chip.req .e{background:#e3f0ff}
+#closet .ck7-chip.done{opacity:.7}
+#closet .ck7-chip[hidden]{display:none}
+#closet .ck7-sheet{position:absolute;inset:0;z-index:8;display:grid;align-items:end;justify-items:center;background:rgba(45,19,40,.45)}
+#closet .ck7-sheet[hidden]{display:none}
+#closet .ck7-card{box-sizing:border-box;width:min(460px,100%);max-height:92%;overflow-y:auto;background:var(--paper);border:3px solid var(--ink);border-bottom:0;border-radius:22px 22px 0 0;padding:12px max(14px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 14px) max(14px,env(safe-area-inset-left,0px));display:grid;gap:10px;box-shadow:0 -6px 0 rgba(45,19,40,.18)}
+#closet .ck7-ct{display:flex;align-items:center;gap:10px}#closet .ck7-ct b{flex:1;font:400 22px/1.1 var(--display);color:var(--cheese-deep)}
+#closet .ck7-x{flex:none;width:44px;height:44px;border-radius:50%;border:3px solid var(--ink);background:#fff;font:800 18px/1 var(--body)!important;cursor:pointer;color:var(--ink);padding:0}
+#closet .ck7-th{display:flex;align-items:center;gap:12px;padding:10px 12px;border:2.5px solid var(--ink);border-radius:16px;background:var(--bg,#ffe1ee);box-shadow:0 3px 0 var(--ink)}
+#closet .ck7-th>i{font:400 40px/1 var(--body);font-style:normal}
+#closet .ck7-th small{display:block;font:800 11.5px/1.2 var(--body);color:#8a5a7a;text-transform:uppercase;letter-spacing:.06em}
+#closet .ck7-th b{display:block;font:400 25px/1.1 var(--display);color:var(--ink)}
+#closet .ck7-th span{display:block;font:600 13px/1.35 var(--body);color:#5a3a52}
+#closet .ck7-ln{font:700 13px/1.4 var(--body);color:#6e3a5c}
+#closet .ck7-ln.dim{color:#8a7a84;font-weight:600}
+#closet .ck7-jdg{display:flex;justify-content:center;gap:14px;font:800 12.5px/1.2 var(--body);color:#6e3a5c}
+#closet .ck7-btns{display:grid;gap:6px;justify-items:center}
+#closet .ck7-go{width:100%;font-size:20px!important;padding:12px 14px;background:linear-gradient(#ff8fc0,#ff6fae);color:#fff;text-shadow:0 1px 0 rgba(45,19,40,.5)}
+#closet .ck7-btns .link-btn{font:800 14px var(--body);color:#7a3fb8;padding:8px}
+#closet .ck7-rq{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:center;padding:10px 12px;border:2px solid var(--ink);border-radius:14px;background:#fff}
+#closet .ck7-rq>i{grid-row:span 3;font:400 30px/1 var(--body);font-style:normal}
+#closet .ck7-rq b{font:800 14px/1.3 var(--body);color:var(--ink)}
+#closet .ck7-rq span{font:600 12.5px/1.3 var(--body);color:#7a5a6a}
+#closet .ck7-rq em{font:800 12.5px/1.3 var(--body);font-style:normal;color:#2f8a3a}
+#closet .ck7-rq em.no{color:#b0467e}
+#closet .ck7-rq.done{background:#eefbea}
+#closet.ck7-full{grid-template-columns:100%!important;grid-template-rows:0 minmax(0,1fr) 0!important;grid-template-areas:"top" "stage" "panel"!important}
+#closet.ck7-full .ck-top,#closet.ck7-full .ck-panel{visibility:hidden;overflow:hidden;min-height:0;height:0;padding:0;border:0}
+#closet.ck7-full .ck-top::after{display:none}
+#closet.ck7-full #ckStage>*:not(.ck7-ov):not(.ck-cap){display:none!important}
+#closet.ck7-full .ck-cap{top:calc(env(safe-area-inset-top,0px) + 62px)}
+#closet .ck7-ov{position:absolute;inset:0;z-index:5;pointer-events:none}
+#closet .ck7-ov[hidden]{display:none}
+#closet .ck7-ban{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100% - 120px);padding:7px 14px 6px;border-radius:999px;background:rgba(45,19,40,.78);color:#fff;font:800 14px/1.1 var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:2px solid #ffd23a}
+#closet .ck7-ban b{font:400 17px/1 var(--display);color:#ffd23a}
+#closet .ck7-skip{position:absolute;right:max(10px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 8px);pointer-events:auto;height:44px;padding:0 14px;border-radius:999px;border:2.5px solid #fff;background:rgba(45,19,40,.6);color:#fff;font:800 14px/1 var(--body)!important;cursor:pointer}
+#closet .ck7-skip[hidden]{display:none}
+#closet .ck7-quit{position:absolute;left:max(10px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 8px);pointer-events:auto;width:44px;height:44px;border-radius:50%;border:2.5px solid #fff;background:rgba(45,19,40,.6);color:#fff;font:800 17px/1 var(--body)!important;cursor:pointer;padding:0}
+#closet .ck7-say{box-sizing:border-box;position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);width:max-content;max-width:min(520px,calc(100% - 24px));display:flex;align-items:center;gap:10px;padding:9px 14px 9px 10px;border:3px solid var(--ink);border-radius:18px;background:#fff;color:var(--ink);font:700 14px/1.3 var(--body);box-shadow:3px 4px 0 var(--ink);transform:translateX(-50%);animation:ck7Say .4s cubic-bezier(.2,1.5,.4,1)}
+@keyframes ck7Say{0%{transform:translateX(-50%) translateY(20px) scale(.6);opacity:0}100%{transform:translateX(-50%) scale(1);opacity:1}}
+#closet .ck7-say>i{flex:none;display:grid;place-items:center;width:52px;height:52px;border-radius:14px;background:#fff1c9;border:2.5px solid var(--ink);font:400 22px/1 var(--body);font-style:normal;text-align:center}
+#closet .ck7-say>i u{display:block;text-decoration:none;font:400 20px/1 var(--display);color:var(--cheese-deep)}
+#closet .ck7-say b{display:block;font:400 15px/1.1 var(--display);color:var(--cheese-deep);margin-bottom:2px}
+#closet .ck7-res{box-sizing:border-box;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(430px,calc(100% - 20px));max-height:calc(100% - 20px);overflow-y:auto;pointer-events:auto;display:grid;gap:8px;padding:12px 14px 14px;border:3px solid var(--ink);border-radius:22px;background:var(--paper);box-shadow:0 6px 0 rgba(45,19,40,.35);animation:ck7Pop .45s cubic-bezier(.2,1.5,.4,1)}
+#closet .ck7-res[hidden]{display:none}
+@keyframes ck7Pop{0%{transform:translate(-50%,-50%) scale(.5);opacity:0}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+#closet .ck7-rh{display:flex;align-items:center;gap:10px}
+#closet .ck7-rh span{flex:1;min-width:0;font:800 13px/1.2 var(--body);color:#8a5a7a}
+#closet .ck7-rh span b{display:block;font:400 21px/1.1 var(--display);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#closet .ck7-tot{font:400 44px/1 var(--display);color:var(--cheese-deep)}#closet .ck7-tot small{font-size:18px;color:#8a7a84}
+#closet .ck7-rj{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+#closet .ck7-rj div{display:grid;justify-items:center;gap:2px;padding:6px 4px;border:2px solid var(--ink);border-radius:12px;background:#fff;text-align:center}
+#closet .ck7-rj i{font:400 20px/1 var(--body);font-style:normal}#closet .ck7-rj b{font:400 24px/1 var(--display);color:var(--cheese-deep)}
+#closet .ck7-rj span{font:600 10.5px/1.25 var(--body);color:#6a5a64;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
+#closet .ck7-rl{margin:0;padding:0;list-style:none;display:grid;gap:2px;font:700 12.5px/1.3 var(--body)}
+#closet .ck7-rl li.p{color:#2f7a3a}#closet .ck7-rl li.m{color:#b0365e}#closet .ck7-rl li.z{color:#6a5a64}
+#closet .ck7-rf{padding:8px 10px;border-radius:12px;background:#fff1c9;border:2px dashed #e0a92a;font:800 13px/1.35 var(--body);color:#6e3a5c;text-align:center}
+#closet .ck7-rb{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+#closet .ck7-rb button{font-size:14px!important;padding:10px 4px}
+#closet .ck7-rb .ck7-done{background:#8fdc8a}
+@media (orientation:landscape) and (max-height:520px){#closet .ck7-res{width:min(680px,calc(100% - 20px));grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);grid-template-areas:"h l" "j l" "j f" "b b";align-items:start;gap:6px 12px;padding:10px 12px}#closet .ck7-rh{grid-area:h}#closet .ck7-rj{grid-area:j}#closet .ck7-rl{grid-area:l;max-height:8.2em;overflow-y:auto;font-size:11.5px}#closet .ck7-rf{grid-area:f;padding:5px 8px;font-size:12px}#closet .ck7-rb{grid-area:b}#closet .ck7-rb button{padding:7px 4px}#closet .ck7-tot{font-size:34px}#closet .ck7-rj span{-webkit-line-clamp:3}}
+@media (orientation:portrait) and (max-height:700px){#closet .ck7-res{gap:6px;padding:10px 12px 12px}#closet .ck7-tot{font-size:36px}#closet .ck7-rj span{-webkit-line-clamp:3;font-size:10px}#closet .ck7-rl{font-size:11.5px;max-height:7.6em;overflow-y:auto}#closet .ck7-rf{padding:6px 8px;font-size:12px}#closet .ck7-rb button{padding:8px 4px}}
+@media (orientation:portrait) and (max-aspect-ratio:10/13){#closet .ck7-res{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);transform:translateX(-50%);max-height:calc(100% - 200px);animation:ck7PopB .45s cubic-bezier(.2,1.5,.4,1)}}
+@keyframes ck7PopB{0%{transform:translateX(-50%) translateY(40px) scale(.6);opacity:0}100%{transform:translateX(-50%) scale(1);opacity:1}}
+@media (orientation:portrait) and (max-width:539px){#closet .ck7-ban{top:calc(env(safe-area-inset-top,0px) + 60px);max-width:calc(100% - 24px)}#closet.ck7-full .ck-cap{top:calc(env(safe-area-inset-top,0px) + 104px)}#closet .ck7-chip .e{display:none}#closet .ck7-chip{max-width:118px;padding-left:8px}#closet .ck-sn-day{min-width:min(230px,64vw)}#closet .ck7-sb{top:8px;right:8px;gap:6px}#closet .ck7-sbb{height:40px;font-size:13px!important;padding:0 10px 0 8px}#closet .ck7-sbb.cam{width:40px}#closet .ck7-say{font-size:12px;max-width:62%}}
+@media (orientation:portrait) and (max-width:539px) and (max-height:700px){#closet .ck7-sbb{height:36px}#closet .ck7-sbb.cam{width:36px}#closet .ck7-sb{gap:5px}}`;
+  document.head.appendChild(st);
+}
+
+/* ---------- the page: built once (ckBuildUI, last) ---------- */
+function ck7UI() {
+  try {
+    ck7Css(); const u = CK.ui, X = u.ck7 = {}, S = ck7S();
+    const sb = document.createElement('div'); sb.className = 'ck7-sb';
+    sb.innerHTML = '<button class="ck7-sbb show" aria-label="Fashion Show"><b>🎀</b><span>Show</span><i></i></button><button class="ck7-sbb cam" aria-label="Photo booth"><b>📸</b></button>';
+    u.Stage.appendChild(sb); X.sb = sb; X.bShow = sb.children[0]; X.bCam = sb.children[1]; X.bShowI = X.bShow.querySelector('i');
+    for (const b of [X.bShow, X.bCam]) b.addEventListener('pointerdown', e => e.stopPropagation());
+    X.bShow.addEventListener('click', e => { e.stopPropagation(); ck7SheetShow(); });
+    X.bCam.addEventListener('click', e => { e.stopPropagation(); ck7BoothOpen(); });
+    if (u.sn) {                                                         // the strip: 🎀 today's theme, 📬 the requests
+      const mk = cls => { const c = document.createElement('button'); c.className = 'ck-sn-chip ck7-chip ' + cls; c.innerHTML = '<span class="e"></span><span class="x"><em></em><small></small></span>'; return c; };
+      X.cShow = mk('show'); X.cReq = mk('req'); u.sn.el.prepend(X.cShow, X.cReq);
+      X.cShow.addEventListener('click', ck7SheetShow); X.cReq.addEventListener('click', ck7SheetReq);
+      const more = () => { const el = u.sn.el; el.classList.toggle('ck7-more', el.scrollLeft + el.clientWidth < el.scrollWidth - 4); };
+      u.sn.el.addEventListener('scroll', more, { passive: true }); X.more = more;
+    }
+    const sh = document.createElement('div'); sh.className = 'ck7-sheet'; sh.hidden = true; sh.innerHTML = '<div class="ck7-card"></div>'; u.root.appendChild(sh); X.sheet = sh; X.card = sh.firstChild;
+    sh.addEventListener('click', e => { if (e.target === sh) ck7SheetClose(); });
+    const ov = document.createElement('div'); ov.className = 'ck7-ov'; ov.hidden = true;
+    ov.innerHTML = '<div class="ck7-ban"></div><button class="ck7-quit" aria-label="Leave the show">✕</button><button class="ck7-skip">Skip ⏭</button><div class="ck7-says"></div><div class="ck7-res" hidden></div>';
+    u.Stage.appendChild(ov); X.ov = ov; X.ban = ov.querySelector('.ck7-ban'); X.skip = ov.querySelector('.ck7-skip'); X.quit = ov.querySelector('.ck7-quit'); X.says = ov.querySelector('.ck7-says'); X.res = ov.querySelector('.ck7-res');
+    for (const b of [X.skip, X.quit, X.res]) b.addEventListener('pointerdown', e => e.stopPropagation());
+    X.skip.addEventListener('click', e => { e.stopPropagation(); ck7Skip(); });
+    X.quit.addEventListener('click', e => { e.stopPropagation(); ck7End(); });
+    X.res.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; e.stopPropagation();
+      if (b.dataset.k === 'cam') { ck7End(); ck7BoothOpen(); } else if (b.dataset.k === 'again') { ck7End(); ck7ShowStart(); } else ck7End(); });
+  } catch (e) { console.error(e); }
+}
+function ck7UIMode(mode) {                                              // the Closet's page for a mode: full-screen for the show, the booth's own panel, or back to normal
+  const u = CK.ui, X = u && u.ck7; if (!X) return; const root = u.root;
+  root.classList.toggle('ck7-full', mode === 'show'); root.classList.toggle('ck7-booth', mode === 'booth');
+  X.ov.hidden = mode !== 'show'; X.res.hidden = true; X.res.innerHTML = ''; X.says.innerHTML = ''; X.skip.hidden = mode !== 'show';
+  X.sb.hidden = !!mode; ck7SheetClose(); if (mode) { u.Cap.classList.remove('show'); u.Hint.classList.add('off'); }
+  CK.rectDirty = true;
+}
+function ck7ShowBanner(th) { const X = CK.ui.ck7; X.ban.innerHTML = ''; const b = document.createElement('b'); b.textContent = '🎀 Fashion Show'; X.ban.append(b, ' ' + th.ic + ' ' + th.name); }
+function ck7Say(i, jr) {                                                // a judge's line, in a card along the bottom (one at a time)
+  const X = CK.ui.ck7; X.says.innerHTML = ''; const el = document.createElement('div'); el.className = 'ck7-say'; el.dataset.j = i;
+  const ic = document.createElement('i'), u = document.createElement('u'), tx = document.createElement('span'), b = document.createElement('b');
+  ic.append(jr.ic, u); u.textContent = jr.score; b.textContent = jr.name + ' says:'; tx.append(b, jr.line); el.append(ic, tx); X.says.appendChild(el);
+}
+function ck7SayPlace() {                                                // (every frame in the show) the judges' line card goes once the results are up
+  const S = ck7S(), X = CK.ui.ck7; if (S.show && S.show.phase === 'results' && X.says.children.length) X.says.innerHTML = '';
+}
+function ck7Skip() {                                                    // straight to the scores
+  const S = ck7S(); if (S.mode !== 'show' || !S.show) return; const T = ck7ShowStep.T || { judge: 9.6, each: 1.5 };
+  if (S.t < T.judge) S.t = T.judge + 0.01; else S.t = T.judge + T.each * 3 + 0.6;
+}
+function ck7Results() {                                                 // the card that says why
+  const S = ck7S(), sh = S.show, r = sh.res, X = CK.ui.ck7, P = sh.paid || { fish: 0 }, esc = ckbEsc;
+  const pos = r.lines.filter(l => l.v > 0), neg = r.lines.filter(l => l.v < 0), zero = r.lines.filter(l => l.v === 0);
+  const li = (l, c, s) => '<li class="' + c + '">' + s + ' ' + esc(l.t) + '</li>';
+  let fishLine = '';
+  if (P.owe > 0) fishLine += '🐟 +' + P.owe + (P.first ? ' for today’s show' : ' (a new best today!)'); else fishLine += r.total < (P.best || 0) ? '🐟 Today’s best is still ' + P.best + '/30: beat it for more fish' : '🐟 Already paid for this score today';
+  if (P.streak > 0) fishLine += '<br>🔥 ' + P.n + ' days in a row: +' + P.streak + ' 🐟'; else if (P.first && P.n === 1) fishLine += '<br>🔥 Come back tomorrow for a streak bonus';
+  X.res.innerHTML = '<div class="ck7-rh"><span>' + esc(r.th.ic + ' ' + r.th.name) + '<b>' + (r.total >= 30 ? 'PERFECT! 💯' : r.total >= 24 ? 'Supermodel! ✨' : r.total >= 17 ? 'Looking good! 💖' : r.total >= 10 ? 'Not bad...' : 'Back to the closet!') + '</b></span><div class="ck7-tot">' + r.total + '<small>/30</small></div></div>'
+    + '<div class="ck7-rj">' + r.judges.map(j => '<div><i>' + j.ic + '</i><b>' + j.score + '</b><span>' + esc(j.line) + '</span></div>').join('') + '</div>'
+    + '<ul class="ck7-rl">' + pos.map(l => li(l, 'p', '+')).join('') + zero.map(l => li(l, 'z', '•')).join('') + neg.map(l => li(l, 'm', '−')).join('') + '</ul>'
+    + '<div class="ck7-rf">' + fishLine + '</div>'
+    + '<div class="ck7-rb"><button class="btn" data-k="cam">📸 Photo</button><button class="btn" data-k="again">↻ Again</button><button class="btn ck7-done" data-k="done">✓ Done</button></div>';
+  X.res.hidden = false; X.skip.hidden = true;
+  try { const st = CK.ui.Stage.getBoundingClientRect(), rr = X.res.getBoundingClientRect(), bb = X.ban.getBoundingClientRect().bottom - st.top + 4, ct = rr.top - st.top - 4;   /* (the room left between the banner and the card, for the camera) */
+    sh.topF = rr.top > st.top + st.height * 0.25 ? Math.max(0, (ct - bb) / st.height) : 0; sh.topC = 1 - (bb + ct) / st.height; } catch (e) { sh.topF = 0; }
+  if (P.owe > 0 || P.streak > 0) { ckSfx('buy'); CK.fishTo = ckWallet(); }
+  ckCaption(r.total >= 24 ? pickOf(['I’m a supermodel! 💖', 'Nailed it! ✨', 'Did you see that?!']) : r.total >= 15 ? pickOf(['Not bad at all!', 'I’ll take it!']) : pickOf(['Tough crowd...', 'Next time! 😤']));
+}
+
+/* ---------- the sheets: today's show, the requests ---------- */
+function ck7SheetClose() { const X = CK.ui && CK.ui.ck7; if (X && X.sheet) X.sheet.hidden = true; }
+function ck7SheetShow() {
+  const X = CK.ui.ck7, th = ck7Theme(), D = ck7ShowData(), day = D.days[ck7Key()], esc = ckbEsc; ckSfx('tab');
+  const O = ck7ShowOutfit(), P = ck7Pieces(O.out, O.colOf); let on = 0; { const r = ck7Score(O.out, O.colOf, th); on = r.P.filter(p => p.w > 0).length; }
+  const streak = D.streak.last === ck7Key() || D.streak.last === ck7KeyN(ck7DayN() - 1) ? D.streak.n : 0;
+  X.card.innerHTML = '<div class="ck7-ct"><b>🎀 Fashion Show</b><button class="ck7-x" aria-label="Close">✕</button></div>'
+    + '<div class="ck7-th" style="--bg:' + th.bg + '"><i>' + th.ic + '</i><div><small>Today’s theme</small><b>' + esc(th.name) + '</b><span>' + esc(th.blurb) + '</span></div></div>'
+    + '<div class="ck7-ln">🎯 The judges want: ' + esc(ck7ThemeHint(th)) + '</div>'
+    + '<div class="ck7-ln">' + (P.length ? '👗 This look: ' + on + ' of ' + P.length + ' piece' + (P.length === 1 ? '' : 's') + ' on theme' + (O.left.length ? ' (' + O.left.length + ' not yours yet: left off)' : '') : '👗 She’s wearing nothing yet!') + '</div>'
+    + '<div class="ck7-ln dim">' + (day && day.walked ? '🏆 Best today: ' + day.best + '/30 · ' : '') + '🐟 Up to ' + ck7Pay(30) + ' fish a day' + (streak ? ' · 🔥 ' + streak + '-day streak' : '') + '</div>'
+    + '<div class="ck7-jdg"><span>👵 Aunty-ji</span><span>🐕 Porter</span><span>🦝 The raccoon</span></div>'
+    + '<div class="ck7-btns"><button class="btn ck7-go">🎀 Walk the runway!</button><button class="link-btn ck7-dress">👗 Dress up first</button></div>';
+  X.card.querySelector('.ck7-x').onclick = ck7SheetClose; X.card.querySelector('.ck7-dress').onclick = ck7SheetClose;
+  X.card.querySelector('.ck7-go').onclick = () => { ck7SheetClose(); ck7ShowStart(); };
+  X.sheet.hidden = false;
+}
+function ck7SheetReq() {
+  const X = CK.ui.ck7, L = ck7Reqs(), esc = ckbEsc, S = ckState(); ckSfx('tab');
+  const mine = { out: S.outfit, colOf: id => ck5bCols().on[id] || 0 };
+  X.card.innerHTML = '<div class="ck7-ct"><b>📬 Neighbour requests</b><button class="ck7-x" aria-label="Close">✕</button></div>'
+    + (L.length ? L.map(q => { const ok = ck7ReqMatch(q, mine.out, mine.colOf);
+      return '<div class="ck7-rq' + (q.done ? ' done' : '') + '"><i>' + q.who.ic + '</i><b>' + esc(q.text) + '</b><span>📍 ' + esc(q.who.where) + ' · 🐟 +' + q.fish + '</span>'
+        + (q.done ? '<em>✓ Done! ' + esc(q.who.name) + ' loved it</em>' : ok ? '<em>✓ What she’s wearing matches: go and see ' + esc(q.who.name) + '!</em>' : '<em class="no">✗ Her outfit doesn’t match yet</em>') + '</div>'; }).join('')
+      : '<div class="ck7-ln">No requests today. Check back tomorrow!</div>')
+    + '<div class="ck7-ln dim">Wear a match (save the look), then walk up to them in Free roam. New requests every day.</div>';
+  X.card.querySelector('.ck7-x').onclick = ck7SheetClose; X.sheet.hidden = false;
+}
+function ck7Refresh() {                                                 // (ckRefresh, last) the strip's chips, the stage button's badge
+  try {
+    const u = CK.ui, X = u && u.ck7; if (!X) return; const th = ck7Theme(), D = ck7ShowData(), day = D.days[ck7Key()];
+    X.bShowI.textContent = th.ic;
+    if (X.cShow) { X.cShow.querySelector('.e').textContent = th.ic; X.cShow.querySelector('em').textContent = th.ic + ' ' + th.name; X.cShow.querySelector('small').textContent = day && day.walked ? '🎀 Best ' + day.best + '/30' : '🎀 Fashion Show';
+      X.cShow.setAttribute('aria-label', 'Fashion Show. Today: ' + th.name);
+      const L = ck7Reqs(), open = L.filter(q => !q.done).length; X.cReq.hidden = !L.length;
+      if (L.length) { X.cReq.querySelector('.e').textContent = '📬'; X.cReq.querySelector('em').textContent = '📬 ' + (open ? open + ' request' + (open === 1 ? '' : 's') : 'All done!'); X.cReq.querySelector('small').textContent = L.map(q => q.who.ic).join(' '); X.cReq.classList.toggle('done', !open); X.cReq.setAttribute('aria-label', 'Neighbour requests: ' + open + ' open'); }
+      if (X.more) X.more(); }
+  } catch (e) { if (!ck7Refresh.err) { ck7Refresh.err = 1; console.error(e); } }
+}
+
+/* ---------- 📸 the photo booth: poses, backdrops (painted once each, only the one she's using is kept), frames ---------- */
+function ck7Poses() { return [['sit', '🐱', 'Sit'], ['wave', '👋', 'Wave'], ['jump', '🦘', 'Jump'], ['curl', '😴', 'Sleepy'], ['hero', '🦸', 'Hero'], ['curtsy', '👸', 'Curtsy'], ['loaf', '🍞', 'Loaf']]; }
+function ck7Backdrops() { return [['closet', '👗', 'Closet'], ['yard', '🌳', 'Back yard'], ['yardNight', '🌙', 'Yard at night'], ['street', '🏠', 'Out front'], ['pumpkins', '🎃', 'Pumpkin patch'], ['snow', '⛄', 'Snowy bank'], ['skyline', '🏙️', 'Toronto'], ['stars', '🌌', 'Starry sky'], ['pastel', '🎨', 'Pastel']]; }
+function ck7Frames() { return [['polaroid', '🖼️', 'Polaroid'], ['paws', '🐾', 'Paw prints'], ['royal', '👑', 'Royal'], ['film', '🎞️', 'Film'], ['hearts', '💕', 'Hearts'], ['clean', '⬜', 'No frame']]; }
+function ck7Sfx(n) {
+  try { if (typeof sndFx === 'function' && sndFx('ck', n)) return; } catch (e) {}
+  if (!actx) return;
+  try { if (n === 'snap') { noise(0.05, 0.05, 6500); tone(2100, 900, 0.05, 'square', 0.012, 0.03); noise(0.08, 0.035, 3000); } } catch (e) {}
+}
+function ck7BoothBuild() {
+  const S = ck7S(); if (S.bth) return S.bth;
+  const G = new THREE.Group(); G.visible = false; CK.scene.add(G);
+  const wall = new THREE.Mesh(new THREE.CylinderGeometry(2.45, 2.45, 3.3, 64, 1, true, Math.PI - 1.62, 3.24), new THREE.MeshBasicMaterial({ side: THREE.BackSide, color: 0xffffff }));
+  wall.position.y = 1.6; G.add(wall);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(2.46, 64), new THREE.MeshBasicMaterial({ color: 0xffffff }));   /* (unlit, like the painted set behind: they meet without a seam) */ floor.rotation.x = -Math.PI / 2; floor.position.y = -0.002; G.add(floor);
+  return (S.bth = { g: G, wall, floor, id: null });
+}
+function ck7SetBackdrop(id) {                                           // the closet itself, or a painted set: the closet's own things are hidden (none of them hold a light)
+  const S = ck7S(), B = ck7BoothBuild(), sc = CK.scene;
+  if (!S.hid) { S.hid = []; sc.children.forEach(o => { if (o.isLight || o === CK.rig.g || o === CK.shadow || o === B.g || (S.run && o === S.run.g) || (o.isPoints && !(CK.tw && o.geometry === CK.tw.g))) return; S.hid.push(o); }); }   /* (the fairy lights and their dust go too; her sparkles and trail stay) */
+  const closet = id === 'closet'; for (const o of S.hid) o.visible = closet; B.g.visible = !closet;
+  if (!closet && B.id !== id) {
+    const lo = devTier() === 'low', W = lo ? 1024 : 2048, H = W / 2;
+    if (B.wall.material.map) B.wall.material.map.dispose(); if (B.floor.material.map) B.floor.material.map.dispose();
+    const wt = canvasTex(W, H, (c, w, h) => ck7PaintWall(id, c, w, h), 1, 1); wt.wrapS = wt.wrapT = THREE.ClampToEdgeWrapping; wt.anisotropy = 4; B.wall.material.map = wt; B.wall.material.needsUpdate = true;
+    const ft = canvasTex(512, 512, (c, w, h) => ck7PaintFloor(id, c, w, h), 3, 3); B.floor.material.map = ft; B.floor.material.needsUpdate = true; B.id = id;
+  }
+  S.booth.bd = id;
+}
+function ck7BoothUnhide() { const S = ck7S(); if (S.hid) for (const o of S.hid) o.visible = true; if (S.bth) S.bth.g.visible = false; }
+
+/* ---------- painting the sets (each a canvas: the horizon about a fifth of the way up, sky above) ---------- */
+function ck7Grad(c, x0, y0, x1, y1, stops) { const g = c.createLinearGradient(x0, y0, x1, y1); stops.forEach(([o, col]) => g.addColorStop(o, col)); return g; }
+function ck7Blob(c, x, y, r, col) { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); }
+function ck7Cloud(c, x, y, s) { c.fillStyle = 'rgba(255,255,255,.95)'; for (const [dx, dy, r] of [[0, 0, 1], [0.9, -0.3, 0.8], [1.8, 0.05, 0.85], [-0.9, 0.1, 0.7], [0.5, 0.35, 0.9], [1.3, 0.35, 0.8]]) { c.beginPath(); c.arc(x + dx * s, y + dy * s, r * s, 0, 7); c.fill(); } }
+function ck7Stars(c, w, h, n, y1, r) { for (let i = 0; i < n; i++) { const x = r() * w, y = r() * y1, s = r() < 0.08 ? 2.4 : r() < 0.4 ? 1.4 : 0.8; c.fillStyle = `rgba(255,255,${220 + r() * 35 | 0},${0.5 + r() * 0.5})`; c.beginPath(); c.arc(x, y, s * w / 2048, 0, 7); c.fill(); if (s > 2) { c.fillRect(x - 6 * w / 2048, y - 0.5, 12 * w / 2048, 1); c.fillRect(x - 0.5, y - 6 * w / 2048, 1, 12 * w / 2048); } } }
+function ck7Tree(c, x, y, s, col, trunk) { c.fillStyle = trunk || '#6a4a2a'; c.fillRect(x - s * 0.08, y - s * 0.9, s * 0.16, s * 0.9); for (const [dx, dy, r] of [[0, -1.25, 0.55], [-0.38, -1.0, 0.42], [0.4, -1.02, 0.44], [0, -0.85, 0.45], [-0.15, -1.55, 0.35], [0.22, -1.45, 0.36]]) ck7Blob(c, x + dx * s, y + dy * s, r * s, col); }
+function ck7Pine(c, x, y, s, snow) { c.fillStyle = '#4a3a2a'; c.fillRect(x - s * 0.05, y - s * 0.25, s * 0.1, s * 0.25); for (let i = 0; i < 4; i++) { const yy = y - s * 0.2 - i * s * 0.32, ww = s * (0.55 - i * 0.11);
+  c.fillStyle = '#2f6a4a'; c.beginPath(); c.moveTo(x - ww, yy); c.lineTo(x + ww, yy); c.lineTo(x, yy - s * 0.5); c.fill(); if (snow) { c.fillStyle = '#ffffff'; c.beginPath(); c.moveTo(x - ww * 0.55, yy - s * 0.22); c.quadraticCurveTo(x, yy - s * 0.3, x + ww * 0.55, yy - s * 0.22); c.lineTo(x, yy - s * 0.5); c.fill(); } } }
+function ck7Pumpkin(c, x, y, s) { for (let k = -2; k <= 2; k++) { c.fillStyle = k % 2 ? '#f28a1e' : '#ff9a2e'; c.beginPath(); c.ellipse(x + k * s * 0.22, y, s * 0.36, s * 0.55, 0, 0, 7); c.fill(); }
+  c.fillStyle = 'rgba(120,50,0,.25)'; c.beginPath(); c.ellipse(x, y + s * 0.3, s * 0.9, s * 0.25, 0, 0, 7); c.fill(); c.fillStyle = '#4a6a2a'; c.fillRect(x - s * 0.06, y - s * 0.75, s * 0.12, s * 0.28); }
+function ck7PaintWall(id, c, w, h) {
+  const r = ck7Rand(ck7Hash(id)), hz = h * 0.8, u = w / 2048;
+  if (id === 'yard' || id === 'yardNight') { const n = id === 'yardNight';
+    c.fillStyle = n ? ck7Grad(c, 0, 0, 0, hz, [[0, '#0b0f33'], [0.6, '#2a2160'], [1, '#5a3a7a']]) : ck7Grad(c, 0, 0, 0, hz, [[0, '#5fb8ff'], [0.7, '#bfe6ff'], [1, '#e8f7ff']]); c.fillRect(0, 0, w, h);
+    if (n) { ck7Stars(c, w, h, 520, hz * 0.85, r); const mg = c.createRadialGradient(w * 0.68, h * 0.2, 10 * u, w * 0.68, h * 0.2, 120 * u); mg.addColorStop(0, 'rgba(255,250,220,.6)'); mg.addColorStop(1, 'rgba(255,250,220,0)'); c.fillStyle = mg; c.fillRect(w * 0.6, h * 0.08, 240 * u, 240 * u); ck7Blob(c, w * 0.68, h * 0.2, 44 * u, '#fff8dc'); ck7Blob(c, w * 0.68 + 16 * u, h * 0.2 - 8 * u, 40 * u, '#2a2160'); }
+    else { ck7Blob(c, w * 0.78, h * 0.16, 60 * u, '#fff6c0'); for (let i = 0; i < 6; i++) ck7Cloud(c, r() * w, h * (0.1 + r() * 0.3), (40 + r() * 40) * u); }
+    for (let i = 0; i < 14; i++) ck7Tree(c, r() * w, hz - h * 0.2, (90 + r() * 70) * u, n ? '#1a2a3a' : ['#3f8a4a', '#4f9a3a', '#e07a2a', '#d9a02a'][(r() * 4) | 0], n ? '#141c28' : null);
+    const fy = hz - h * 0.2; c.fillStyle = n ? '#3a2a3a' : '#c99a6a'; c.fillRect(0, fy, w, h * 0.2);   // the fence
+    for (let x = 0; x < w; x += 46 * u) { c.fillStyle = n ? '#2a1e2e' : (r() < 0.5 ? '#b88a5a' : '#d4a878'); c.fillRect(x, fy - 12 * u, 42 * u, h * 0.2 + 12 * u); c.beginPath(); c.moveTo(x, fy - 12 * u); c.lineTo(x + 21 * u, fy - 30 * u); c.lineTo(x + 42 * u, fy - 12 * u); c.fill(); }
+    c.fillStyle = n ? 'rgba(0,0,0,.25)' : 'rgba(90,50,20,.18)'; c.fillRect(0, fy + h * 0.06, w, 8 * u); c.fillRect(0, fy + h * 0.15, w, 8 * u);
+    c.fillStyle = n ? ck7Grad(c, 0, hz, 0, h, [[0, '#1e3a2e'], [1, '#14281f']]) : ck7Grad(c, 0, hz, 0, h, [[0, '#7ccf5a'], [1, '#4fa83a']]); c.fillRect(0, hz, w, h - hz);
+    for (let i = 0; i < 120; i++) { const x = r() * w, y = hz - 4 * u + r() * 20 * u; c.fillStyle = n ? 'rgba(255,170,220,.5)' : ['#ff6fae', '#ffd23a', '#ffffff', '#b98cff', '#ff8a4a'][(r() * 5) | 0]; ck7Blob(c, x, y, (5 + r() * 5) * u, c.fillStyle); }   // flowers along the fence
+    if (n) { for (let i = 0; i < 46; i++) { const x = r() * w, y = h * (0.45 + r() * 0.45), g = c.createRadialGradient(x, y, 0, x, y, 16 * u); g.addColorStop(0, 'rgba(255,240,140,.95)'); g.addColorStop(1, 'rgba(255,240,140,0)'); c.fillStyle = g; c.fillRect(x - 16 * u, y - 16 * u, 32 * u, 32 * u); }
+      c.strokeStyle = '#1a1424'; c.lineWidth = 3 * u; c.beginPath(); for (let x = 0; x <= w; x += 8) c.lineTo(x, h * 0.12 + Math.sin(x / w * Math.PI * 6) * h * 0.04 + h * 0.04); c.stroke();
+      for (let x = 30 * u; x < w; x += 62 * u) { const y = h * 0.12 + Math.sin(x / w * Math.PI * 6) * h * 0.04 + h * 0.04 + 8 * u, g = c.createRadialGradient(x, y, 0, x, y, 22 * u); g.addColorStop(0, 'rgba(255,214,140,1)'); g.addColorStop(0.3, 'rgba(255,190,110,.6)'); g.addColorStop(1, 'rgba(255,190,110,0)'); c.fillStyle = g; c.fillRect(x - 22 * u, y - 22 * u, 44 * u, 44 * u); } }
+    return; }
+  if (id === 'street') {
+    c.fillStyle = ck7Grad(c, 0, 0, 0, hz, [[0, '#8fcaff'], [1, '#e4f3ff']]); c.fillRect(0, 0, w, h); for (let i = 0; i < 5; i++) ck7Cloud(c, r() * w, h * (0.08 + r() * 0.18), (34 + r() * 30) * u);
+    let x = -40 * u; const base = hz - h * 0.03;
+    while (x < w) { const hw = (230 + r() * 70) * u, hh = (h * 0.42) + r() * h * 0.08, brick = ['#a8553a', '#8f4a36', '#b8693e', '#c9a27a', '#9a6a5a'][(r() * 5) | 0];   // Toronto semis: brick, a gable, a porch
+      c.fillStyle = brick; c.fillRect(x, base - hh, hw, hh); c.fillStyle = '#4a3a3a'; c.beginPath(); c.moveTo(x - 10 * u, base - hh); c.lineTo(x + hw / 2, base - hh - hw * 0.42); c.lineTo(x + hw + 10 * u, base - hh); c.fill();
+      c.fillStyle = '#f4efe6'; c.beginPath(); c.moveTo(x + hw * 0.3, base - hh - 4 * u); c.lineTo(x + hw / 2, base - hh - hw * 0.3); c.lineTo(x + hw * 0.7, base - hh - 4 * u); c.fill();
+      for (const [fx, fy] of [[0.18, 0.2], [0.58, 0.2], [0.18, 0.55]]) { c.fillStyle = '#f4efe6'; c.fillRect(x + hw * fx - 4 * u, base - hh + hh * fy - 4 * u, hw * 0.26 + 8 * u, hh * 0.22 + 8 * u); c.fillStyle = r() < 0.4 ? '#ffe9a8' : '#5a7a9a'; c.fillRect(x + hw * fx, base - hh + hh * fy, hw * 0.26, hh * 0.22); }
+      c.fillStyle = '#6a2a2a'; c.fillRect(x + hw * 0.62, base - hh * 0.42, hw * 0.18, hh * 0.42); c.fillStyle = '#f4efe6'; c.fillRect(x + hw * 0.5, base - hh * 0.46, hw * 0.46, 10 * u); c.fillRect(x + hw * 0.52, base - hh * 0.46, 8 * u, hh * 0.46); c.fillRect(x + hw * 0.92, base - hh * 0.46, 8 * u, hh * 0.46);
+      x += hw + (16 + r() * 30) * u; }
+    for (let i = 0; i < 7; i++) ck7Tree(c, r() * w, base + 4 * u, (110 + r() * 50) * u, ['#e07a2a', '#d9a02a', '#c4482a', '#5f9a3a'][(r() * 4) | 0]);
+    for (let i = 0; i < 3; i++) { const lx = (0.15 + i * 0.35) * w; c.fillStyle = '#2d2d33'; c.fillRect(lx, base - h * 0.42, 8 * u, h * 0.42); c.fillRect(lx - 2 * u, base - h * 0.42, 40 * u, 7 * u); ck7Blob(c, lx + 38 * u, base - h * 0.41, 9 * u, '#fff3c0'); }
+    c.fillStyle = '#7a7a80'; c.fillRect(0, base, w, h - base); c.fillStyle = '#b8b8bc'; c.fillRect(0, hz, w, h - hz); c.fillStyle = 'rgba(0,0,0,.12)'; for (let x2 = 0; x2 < w; x2 += 120 * u) c.fillRect(x2, hz, 3 * u, h - hz);
+    return; }
+  if (id === 'pumpkins') {
+    c.fillStyle = ck7Grad(c, 0, 0, 0, hz, [[0, '#5a3a8a'], [0.45, '#e86a5a'], [0.8, '#ffb35a'], [1, '#ffd98a']]); c.fillRect(0, 0, w, h); ck7Blob(c, w * 0.3, hz - h * 0.12, 90 * u, '#fff0b0');
+    for (let i = 0; i < 9; i++) ck7Tree(c, r() * w, hz - h * 0.06, (80 + r() * 60) * u, '#5a2a3a', '#2a1a1a');
+    c.fillStyle = '#6a4a2a'; c.fillRect(0, hz - h * 0.08, w, h * 0.1);
+    for (let i = 0; i < 6; i++) { const bx = r() * w, by = hz - h * 0.02; c.fillStyle = '#e8c46a'; c.fillRect(bx, by - 70 * u, 130 * u, 70 * u); c.fillStyle = 'rgba(150,110,40,.5)'; for (let k = 0; k < 6; k++) c.fillRect(bx, by - 70 * u + k * 12 * u, 130 * u, 3 * u); }
+    c.fillStyle = ck7Grad(c, 0, hz, 0, h, [[0, '#8a5a2a'], [1, '#6a4020']]); c.fillRect(0, hz, w, h - hz);
+    for (let i = 0; i < 70; i++) { const y = hz - h * 0.04 + r() * h * 0.22; ck7Pumpkin(c, r() * w, y, (12 + (y - hz) / h * 120 + r() * 10) * u); }
+    for (let i = 0; i < 26; i++) { const x = r() * w, y = h * (0.1 + r() * 0.3); c.fillStyle = '#2a1a2a'; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x - 14 * u, y - 10 * u, x - 26 * u, y - 2 * u); c.quadraticCurveTo(x - 14 * u, y - 2 * u, x, y + 4 * u); c.quadraticCurveTo(x + 14 * u, y - 2 * u, x + 26 * u, y - 2 * u); c.quadraticCurveTo(x + 14 * u, y - 10 * u, x, y); c.fill(); }   // bats
+    return; }
+  if (id === 'snow') {
+    c.fillStyle = ck7Grad(c, 0, 0, 0, hz, [[0, '#9ec8ee'], [1, '#e8f4ff']]); c.fillRect(0, 0, w, h);
+    c.fillStyle = '#f2f8ff'; c.beginPath(); c.moveTo(0, hz - h * 0.18); for (let x = 0; x <= w; x += 16) c.lineTo(x, hz - h * 0.22 + Math.sin(x / w * 7) * h * 0.05 + Math.sin(x / w * 19) * h * 0.015); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+    for (let i = 0; i < 22; i++) ck7Pine(c, r() * w, hz - h * 0.1 + r() * h * 0.08, (90 + r() * 90) * u, true);
+    c.fillStyle = ck7Grad(c, 0, hz, 0, h, [[0, '#f6faff'], [1, '#dbe8f6']]); c.fillRect(0, hz, w, h - hz);
+    c.fillStyle = '#d9283c'; c.save(); c.translate(w * 0.82, hz + h * 0.04); c.rotate(-0.12); c.fillRect(-60 * u, -8 * u, 120 * u, 14 * u); c.fillStyle = '#7a4a2a'; c.fillRect(-56 * u, 6 * u, 8 * u, 16 * u); c.fillRect(48 * u, 6 * u, 8 * u, 16 * u); c.restore();   // a red sled
+    for (let i = 0; i < 260; i++) ck7Blob(c, r() * w, r() * h, (1.5 + r() * 3.5) * u, 'rgba(255,255,255,.9)');
+    return; }
+  if (id === 'skyline') {
+    c.fillStyle = ck7Grad(c, 0, 0, 0, hz, [[0, '#3a2a6a'], [0.5, '#c45a9a'], [0.85, '#ffb07a'], [1, '#ffd9a0']]); c.fillRect(0, 0, w, h); ck7Stars(c, w, h, 90, h * 0.25, r);
+    const sky = hz - h * 0.1, tx = w * 0.56;
+    for (let i = 0; i < 40; i++) { const bw = (40 + r() * 70) * u, bh = (80 + r() * 260) * u, bx = r() * w; c.fillStyle = ['#2a2048', '#33285a', '#251c40'][(r() * 3) | 0]; c.fillRect(bx, sky - bh, bw, bh);
+      c.fillStyle = 'rgba(255,220,140,.7)'; for (let yy = sky - bh + 8 * u; yy < sky - 6 * u; yy += 14 * u) for (let xx = bx + 5 * u; xx < bx + bw - 6 * u; xx += 11 * u) if (r() < 0.35) c.fillRect(xx, yy, 5 * u, 6 * u); }
+    c.fillStyle = '#1e1636'; c.fillRect(tx - 9 * u, sky - h * 0.62, 18 * u, h * 0.62); c.beginPath(); c.moveTo(tx - 26 * u, sky); c.lineTo(tx - 9 * u, sky - h * 0.4); c.lineTo(tx + 9 * u, sky - h * 0.4); c.lineTo(tx + 26 * u, sky); c.fill();   // the tower (generic)
+    c.beginPath(); c.ellipse(tx, sky - h * 0.42, 34 * u, 16 * u, 0, 0, 7); c.fill(); c.fillRect(tx - 3 * u, sky - h * 0.74, 6 * u, h * 0.14); ck7Blob(c, tx, sky - h * 0.742, 5 * u, '#ff4a5a');
+    c.fillStyle = 'rgba(255,220,160,.8)'; c.fillRect(tx - 30 * u, sky - h * 0.425, 60 * u, 4 * u);
+    c.fillStyle = ck7Grad(c, 0, sky, 0, hz, [[0, '#4a3a7a'], [1, '#7a5a9a']]); c.fillRect(0, sky, w, hz - sky); c.fillStyle = 'rgba(255,200,150,.35)'; for (let i = 0; i < 60; i++) c.fillRect(r() * w, sky + r() * (hz - sky), (20 + r() * 60) * u, 2 * u);   // the lake
+    c.fillStyle = '#a07a5a'; c.fillRect(0, hz, w, h - hz); c.fillStyle = 'rgba(60,40,20,.35)'; for (let y = hz; y < h; y += 18 * u) c.fillRect(0, y, w, 3 * u); c.fillStyle = '#6a4a3a'; c.fillRect(0, hz - 6 * u, w, 10 * u);
+    return; }
+  if (id === 'stars') {
+    c.fillStyle = ck7Grad(c, 0, 0, 0, h, [[0, '#07061a'], [0.6, '#1a0f3a'], [1, '#3a1a5a']]); c.fillRect(0, 0, w, h);
+    for (const [x, y, rr, col] of [[0.25, 0.3, 380, 'rgba(255,90,190,.22)'], [0.7, 0.45, 460, 'rgba(90,140,255,.2)'], [0.5, 0.15, 300, 'rgba(180,90,255,.2)']]) { const g = c.createRadialGradient(x * w, y * h, 0, x * w, y * h, rr * u); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h); }
+    ck7Stars(c, w, h, 900, h, r);
+    const px = w * 0.3, py = h * 0.28; ck7Blob(c, px, py, 70 * u, '#f2a65a'); c.fillStyle = 'rgba(160,80,40,.35)'; for (let k = -2; k <= 2; k++) c.fillRect(px - 66 * u, py + k * 22 * u, 132 * u, 8 * u); c.strokeStyle = '#ffd9a0'; c.lineWidth = 7 * u; c.beginPath(); c.ellipse(px, py, 130 * u, 28 * u, -0.25, 0, 7); c.stroke();
+    ck7Blob(c, w * 0.74, h * 0.2, 50 * u, '#fff6d6'); ck7Blob(c, w * 0.74 + 20 * u, h * 0.2 - 10 * u, 46 * u, '#130c2e');
+    return; }
+  if (id === 'pastel') { const r2 = ck7S().booth && ck7S().booth.pastel || 0, P = [['#ffd6e8', '#e7d6ff'], ['#d6f5ea', '#d6e8ff'], ['#fff1c9', '#ffd6d6']][r2 % 3];
+    c.fillStyle = ck7Grad(c, 0, 0, 0, h, [[0, P[1]], [0.75, P[0]], [1, P[0]]]); c.fillRect(0, 0, w, h); return; }
+}
+function ck7PaintFloor(id, c, w, h) {
+  const r = ck7Rand(ck7Hash(id + 'f')), fill = col => { c.fillStyle = col; c.fillRect(0, 0, w, h); };
+  if (id === 'yard' || id === 'yardNight') { const n = id === 'yardNight'; fill(n ? '#1e3a2e' : '#5fbf48'); for (let i = 0; i < 2600; i++) { c.fillStyle = n ? (r() < 0.5 ? '#16301f' : '#26483a') : (r() < 0.5 ? '#4fa83a' : '#7ccf5a'); c.fillRect(r() * w, r() * h, 2, 6 + r() * 6); } }
+  else if (id === 'street') { fill('#b8b8bc'); c.fillStyle = 'rgba(0,0,0,.14)'; for (let x = 0; x < w; x += 128) c.fillRect(x, 0, 3, h); for (let y = 0; y < h; y += 128) c.fillRect(0, y, w, 3); for (let i = 0; i < 900; i++) { c.fillStyle = r() < 0.5 ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.08)'; c.fillRect(r() * w, r() * h, 2, 2); } }
+  else if (id === 'pumpkins') { fill('#7a4e26'); for (let i = 0; i < 700; i++) { c.strokeStyle = r() < 0.5 ? '#e8c46a' : '#c9a24a'; c.lineWidth = 2; c.beginPath(); const x = r() * w, y = r() * h, a = r() * 6.3; c.moveTo(x, y); c.lineTo(x + Math.cos(a) * 18, y + Math.sin(a) * 18); c.stroke(); } }
+  else if (id === 'snow') { fill('#f4f9ff'); for (let i = 0; i < 500; i++) { c.fillStyle = r() < 0.5 ? 'rgba(170,200,235,.25)' : 'rgba(255,255,255,.9)'; c.beginPath(); c.arc(r() * w, r() * h, 3 + r() * 10, 0, 7); c.fill(); } }
+  else if (id === 'skyline') { fill('#a07a5a'); c.fillStyle = 'rgba(60,40,20,.35)'; for (let y = 0; y < h; y += 42) c.fillRect(0, y, w, 4); for (let i = 0; i < 300; i++) { c.fillStyle = 'rgba(80,50,30,.2)'; c.fillRect(r() * w, r() * h, 30, 1); } }
+  else if (id === 'stars') { fill('#241040'); for (let i = 0; i < 300; i++) { c.fillStyle = `rgba(255,255,255,${0.2 + r() * 0.6})`; c.fillRect(r() * w, r() * h, 2, 2); } }
+  else if (id === 'pastel') { const r2 = ck7S().booth && ck7S().booth.pastel || 0; fill(['#ffd6e8', '#d6f5ea', '#fff1c9'][r2 % 3]); }
+  else fill('#ffffff');
+}
+
+/* ---------- her poses (ckAnim's place while the booth is open; drag still spins her) ---------- */
+function ck7BoothPose(dt) {
+  const S = ck7S(), B = S.booth, R = CK.rig, A = CK.anim, t = CK.t, pose = B.pose, W = R.ck || {};
+  if (!CK.drag) { CK.spin += CK.spinV * dt; CK.spinV *= Math.exp(-dt * 3.5); }
+  B.k = Math.min(1, (B.k || 0) + dt * 3.2); const k = ck7Ease(B.k);
+  R.g.position.set(0, 0, 0); R.g.rotation.set(0, 0.42 + CK.spin, 0);
+  R.body.position.set(0, 0, 0); R.body.rotation.set(0, 0, 0); R.body.scale.set(1, 1 + Math.sin(t * 2.1) * 0.008, 1);
+  for (let i = 0; i < 4; i++) R.legs[i].rotation.set(0, 0, 0); R.head.rotation.set(0, 0, 0);
+  let lift = 0, closed = false, amt = 0.08, tx = 0.2, ty = 0.75;
+  if (pose === 'sit') { R.body.rotation.x = -0.62 * k; R.body.position.y = -0.07 * k; R.legs[2].rotation.x = R.legs[3].rotation.x = -1.2 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = 0.62 * k; R.head.rotation.set(0.42 * k, 0, -0.12 * k); tx = 0.3; ty = 0.62; }
+  else if (pose === 'wave') { R.legs[1].rotation.x = -(1.3 + Math.sin(t * 13) * 0.28) * k; R.legs[1].rotation.z = -0.2 * k; R.head.rotation.set(-0.05, 0.12, 0.28 * k); }
+  else if (pose === 'jump') { lift = 0.34 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = -1.0 * k; R.legs[2].rotation.x = R.legs[3].rotation.x = 1.0 * k; R.body.rotation.x = -0.22 * k; R.head.rotation.x = -0.15 * k; amt = 0.9; tx = 0.12; ty = 0.95; }
+  else if (pose === 'curl') { R.body.position.y = -0.24 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = -1.35 * k; R.legs[2].rotation.x = R.legs[3].rotation.x = 1.35 * k; R.head.rotation.set(0.5 * k, 0.25 * k, 0.2 * k); closed = k > 0.5; R.body.scale.y *= 1 + Math.sin(t * 1.6) * 0.025; tx = 0.4; ty = 0.5; }
+  else if (pose === 'hero') { if (W.cape) { lift = 0.42 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = -1.5 * k; R.legs[2].rotation.x = R.legs[3].rotation.x = 1.4 * k; R.body.rotation.x = -0.14 * k; R.head.rotation.x = -0.28 * k; amt = 1; tx = 0.05; ty = 1.0; }
+    else { R.body.rotation.x = -0.32 * k; R.legs[1].rotation.x = -2.2 * k; R.legs[1].rotation.z = -0.15 * k; R.legs[2].rotation.x = R.legs[3].rotation.x = -0.25 * k; R.head.rotation.set(-0.22 * k, 0.15, 0); } }
+  else if (pose === 'curtsy') { R.body.rotation.x = 0.2 * k; R.body.position.y = -0.03 * k; R.legs[0].rotation.x = -0.55 * k; R.legs[1].rotation.x = 0.38 * k; R.legs[1].rotation.z = 0.12 * k; R.legs[2].rotation.x = 0.25 * k; R.head.rotation.set(0.12 * k, -0.1, 0.32 * k); }
+  else if (pose === 'loaf') { R.body.position.y = -0.22 * k; R.legs[0].rotation.x = R.legs[1].rotation.x = -1.35 * k; R.legs[2].rotation.x = R.legs[3].rotation.x = 1.35 * k; R.head.rotation.set(-0.06, 0.18 * k, 0.08); tx = 0.4; ty = 0.5; }
+  R.g.position.y = lift;
+  for (let i = 0; i < R.tail.length; i++) { const sg = R.tail[i]; sg.rotation.x = (i ? tx : ty) + (pose === 'curl' || pose === 'loaf' ? 0.25 * k * (i ? 0 : 1) : 0); sg.rotation.y = (pose === 'curl' || pose === 'loaf' ? 0.42 * k : 0) + Math.sin(t * 2.2 - i * 0.55) * (0.08 + i * 0.03); }
+  if (!closed) { A.blinkT -= dt; if (A.blinkT <= 0) A.blinkT = 2.6 + Math.random() * 3; } const shut = closed || A.blinkT < 0.12;
+  if (R.lids[0].visible !== shut) { R.peepers.forEach(e => { e.visible = !shut; }); R.lids.forEach(l => { l.visible = shut; }); }
+  ckWear(R.ck, dt, amt, false, t);
+  const ss = 1 - lift * 1.3; CK.shadow.position.set(0, 0.004, 0); CK.shadow.rotation.z = R.g.rotation.y; CK.shadow.scale.set(0.8 * ss, 1.35 * ss, 1); CK.shadow.material.opacity = 0.3 * ss;
+  B.lift = lift;
+}
+function ck7BoothCam(snap) {                                            // the camera: her, whole, in a 4:5 frame (the viewfinder is the only part of the stage drawn)
+  const S = ck7S(), B = S.booth, cam = CK.cam, r = CK.ui.Stage.getBoundingClientRect(); renderer.getSize(CK.sz);
+  const pad = 10, rb = r.height > 420 ? 80 : 0, rr0 = !rb && r.width - (r.height - pad * 2) * 0.8 > 110 ? 92 : 0;   /* (room for the shutter: under the picture, or beside it) */
+  const vh = Math.max(40, Math.min(r.height - pad * 2 - rb, (r.width - pad * 2 - rr0) / 0.8)), vw = vh * 0.8, left = r.left + (r.width - rr0 - vw) / 2, top = r.top + (r.height - rb - vh) / 2;
+  CK.rect.x = Math.max(0, left); CK.rect.w = vw; CK.rect.y = Math.max(0, CK.sz.y - (top + vh)); CK.rect.h = vh;
+  const X = CK.ui.ck7, vf = X.vf; if (vf && (vf.w !== vw || vf.h !== vh || vf.l !== left - r.left)) { vf.w = vw; vf.h = vh; vf.l = left - r.left; Object.assign(vf.el.style, { left: (left - r.left) + 'px', top: (top - r.top) + 'px', width: vw + 'px', height: vh + 'px' }); ck7VfDraw();
+    const sb = X.snapB.style; if (rb) Object.assign(sb, { left: '50%', right: 'auto', top: 'auto', bottom: ((rb - 66) / 2 + 2) + 'px', transform: 'translateX(-50%)' });
+    else if (rr0) Object.assign(sb, { left: 'auto', right: ((rr0 - 66) / 2 + 4) + 'px', top: '50%', bottom: 'auto', transform: 'translateY(-50%)' });
+    else Object.assign(sb, { left: '50%', right: 'auto', top: 'auto', bottom: '16px', transform: 'translateX(-50%)' }); }
+  const lift = B.lift || 0, low = B.pose === 'curl' || B.pose === 'loaf', ty = (low ? 0.3 : 0.42) + lift * 0.55, rr = (low ? 0.6 : 0.7) + lift * 0.3;
+  cam.fov = 32; cam.aspect = 0.8; cam.updateProjectionMatrix();
+  const vf2 = cam.fov * Math.PI / 180, hf = 2 * Math.atan(Math.tan(vf2 / 2) * 0.8), d = rr / Math.sin(Math.min(vf2, hf) / 2), el = 0.12;
+  const want = (ck7BoothCam.W || (ck7BoothCam.W = new THREE.Vector3())).set(0, ty + Math.sin(el) * d, Math.cos(el) * d), at = (ck7BoothCam.A || (ck7BoothCam.A = new THREE.Vector3())).set(0, ty, 0), k = snap ? 1 : 1 - Math.exp(-(CK.dt || 0.016) * 4);
+  const L = ck7BoothCam.L || (ck7BoothCam.L = new THREE.Vector3(0, ty, 0)); if (snap) { cam.position.copy(want); L.copy(at); } else { cam.position.lerp(want, k); L.lerp(at, k); } cam.lookAt(L);
+}
+
+/* ---------- the booth's page: the viewfinder over the stage, the panel in place of the catalogue, the preview ---------- */
+function ck7BoothCss() {
+  if (ck7BoothCss.done) return; ck7BoothCss.done = true;
+  const st = document.createElement('style'); st.id = 'ck7BoothCss'; st.textContent = `
+#closet .ck7-bp,#closet .ck7-vf{display:none}
+#closet.ck7-booth .ck-panel>*:not(.ck7-bp){display:none!important}
+#closet.ck7-booth .ck7-bp{display:grid;grid-template-rows:auto auto auto auto;align-content:start;gap:8px;min-height:0;height:100%;overflow-y:auto}
+#closet.ck7-booth #ckStage>*:not(.ck7-vf):not(.ck-cap):not(.ck7-shut){display:none!important}
+#closet .ck7-shut{display:none}
+#closet.ck7-booth .ck7-shut{display:grid;place-items:center;position:absolute;left:50%;bottom:16px;z-index:4;transform:translateX(-50%);width:66px;height:66px;padding:0;border-radius:50%;border:4px solid #fff;background:radial-gradient(circle,#ff8fc0 0 54%,#ff6fae 56%);box-shadow:0 0 0 3px var(--ink),0 5px 0 3px rgba(45,19,40,.5);font:400 28px/1 var(--body)!important;cursor:pointer}
+#closet.ck7-booth .ck7-shut:active{filter:brightness(.9)}
+#closet.ck7-booth .ck7-shut:disabled{opacity:.6}
+#closet.ck7-booth #ckStage{cursor:grab}
+#closet.ck7-booth .ck7-vf{display:block;position:absolute;z-index:2;pointer-events:none;box-shadow:0 0 0 200vmax #3a1a33;border-radius:4px}
+#closet .ck7-vf canvas{position:absolute;inset:0;width:100%;height:100%}
+#closet .ck7-vf .fl{position:absolute;inset:0;background:#fff;opacity:0}
+#closet .ck7-vf .fl.go{animation:ck7Fl .5s ease-out}
+@keyframes ck7Fl{0%{opacity:1}100%{opacity:0}}
+#closet .ck7-bh{display:flex;align-items:center;gap:8px}
+#closet .ck7-bh b{flex:1;min-width:0;font:400 20px/1.1 var(--display);color:var(--cheese-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#closet .ck7-gal{flex:none;height:44px;padding:0 12px;border-radius:999px;border:2.5px solid var(--ink);background:#fff;font:800 14px/1 var(--body)!important;color:var(--ink);box-shadow:0 2px 0 var(--ink);cursor:pointer}
+#closet .ck7-row{display:grid;gap:4px;min-width:0}
+#closet .ck7-row>span{font:800 11.5px/1 var(--body);color:#8a5a7a;text-transform:uppercase;letter-spacing:.06em}
+#closet .ck7-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 4px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+#closet .ck7-chips::-webkit-scrollbar{display:none}
+#closet .ck7-c{flex:0 0 auto;display:flex;align-items:center;gap:5px;min-height:44px;padding:0 11px 0 8px;border:2px solid var(--ink);border-radius:13px;background:#fff;color:var(--ink);font:800 12.5px/1.1 var(--body)!important;box-shadow:0 2px 0 rgba(45,19,40,.3);cursor:pointer;white-space:nowrap}
+#closet .ck7-c b{font:400 19px/1 var(--body)}
+#closet .ck7-c.on{background:var(--cheese);color:#fff;text-shadow:0 1px 0 rgba(45,19,40,.5);transform:translateY(1px);box-shadow:0 1px 0 var(--ink)}
+#closet .ck7-snap{align-self:end;width:100%;font-size:21px!important;padding:12px 14px;background:linear-gradient(#ff8fc0,#ff6fae);color:#fff;text-shadow:0 1px 0 rgba(45,19,40,.5)}
+#closet .ck7-snap:disabled{opacity:.6}
+#closet .ck7-pv{box-sizing:border-box;position:absolute;inset:0;z-index:9;display:grid;place-items:center;background:rgba(45,19,40,.72);padding:12px}
+#closet .ck7-pv[hidden]{display:none}
+#closet .ck7-pvc{box-sizing:border-box;width:min(420px,100%);max-height:100%;overflow-y:auto;display:grid;gap:9px;padding:12px;border:3px solid var(--ink);border-radius:22px;background:var(--paper)}
+#closet .ck7-pimg{display:block;width:100%;max-height:min(56vh,520px);object-fit:contain;border-radius:10px;background:#eee;border:2px solid var(--ink)}
+#closet .ck7-pb{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px}
+#closet .ck7-pb button{font-size:17px!important;padding:11px 8px}
+#closet .ck7-pb [hidden]{display:none}
+#closet .ck7-gl{display:flex;gap:6px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none}
+#closet .ck7-gl::-webkit-scrollbar{display:none}
+#closet .ck7-gl button{flex:0 0 auto;width:56px;height:70px;padding:0;border:2px solid var(--ink);border-radius:8px;overflow:hidden;background:#eee;cursor:pointer}
+#closet .ck7-gl button.on{outline:3px solid var(--cheese);outline-offset:1px}
+#closet .ck7-gl img{width:100%;height:100%;object-fit:cover;display:block}
+#closet .ck7-tip{font:600 12px/1.3 var(--body);color:#8a6a7a;text-align:center}
+@media (orientation:landscape) and (max-height:520px){#closet.ck7-booth .ck7-bp{gap:5px}#closet .ck7-c{min-height:38px}#closet .ck7-snap{padding:8px 12px;font-size:18px!important}#closet .ck7-pimg{max-height:52vh}#closet .ck7-pvc{width:min(640px,100%);grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}#closet .ck7-pvc .ck7-ct{grid-column:1/-1}#closet .ck7-pimg{grid-row:span 3}}
+@media (orientation:portrait){#closet.ck7-booth{grid-template-rows:auto minmax(0,1.5fr) minmax(0,1fr)!important}}
+@media (orientation:portrait) and (max-width:539px) and (max-height:700px){#closet.ck7-booth{grid-template-rows:auto minmax(0,1.25fr) minmax(0,1fr)!important}#closet.ck7-booth .ck7-bp{gap:5px}#closet .ck7-c{min-height:40px;padding:0 9px 0 7px}#closet .ck7-snap{padding:9px 12px;font-size:18px!important}#closet .ck7-row>span{display:none}}`;
+  document.head.appendChild(st);
+}
+function ck7BoothUI() {
+  const u = CK.ui, X = u.ck7; if (X.bp) return; ck7BoothCss();
+  const bp = document.createElement('div'); bp.className = 'ck7-bp';
+  const row = (k, name, L) => '<div class="ck7-row"><span>' + name + '</span><div class="ck7-chips" data-k="' + k + '">' + L.map(([id, ic, nm]) => '<button class="ck7-c" data-id="' + id + '"><b>' + ic + '</b>' + nm + '</button>').join('') + '</div></div>';
+  bp.innerHTML = '<div class="ck7-bh"><button class="ck7-x" aria-label="Back to the Closet">‹</button><b>📸 Photo Booth</b><button class="ck7-gal" aria-label="My photos">🖼️ <span>0</span></button></div>'
+    + row('pose', 'Pose', ck7Poses()) + row('bd', 'Backdrop', ck7Backdrops()) + row('fr', 'Frame', ck7Frames());
+  u.Main.closest('.ck-panel').appendChild(bp); X.bp = bp; X.snapB = document.createElement('button'); X.snapB.className = 'ck7-shut'; X.snapB.setAttribute('aria-label', 'Take the picture'); X.snapB.textContent = '📸'; u.Stage.appendChild(X.snapB); X.snapB.addEventListener('pointerdown', e => e.stopPropagation()); X.galB = bp.querySelector('.ck7-gal'); X.galN = X.galB.querySelector('span');
+  bp.querySelector('.ck7-x').addEventListener('click', ck7End);
+  bp.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.ck7-c'); if (!b) return; const k = b.parentElement.dataset.k, id = b.dataset.id, B = ck7S().booth; if (!B) return;
+    if (k === 'pose') { if (B.pose !== id) B.k = 0; B.pose = id; ckSfx('try'); CK.anim.hop = 0; }
+    else if (k === 'bd') { if (id === 'pastel' && B.bd === 'pastel') { B.pastel = (B.pastel || 0) + 1; ck7BoothBuild().id = null; } ck7SetBackdrop(id); ckSfx('tab'); }
+    else if (k === 'fr') { B.fr = id; ck7VfDraw(); ckSfx('tab'); }
+    ck7BoothSync(); });
+  X.snapB.addEventListener('click', e => { e.stopPropagation(); ck7Snap(); }); X.galB.addEventListener('click', () => ck7Preview(null));
+  const vf = document.createElement('div'); vf.className = 'ck7-vf'; vf.innerHTML = '<canvas></canvas><div class="fl"></div>'; u.Stage.appendChild(vf); X.vf = { el: vf, cv: vf.querySelector('canvas'), fl: vf.querySelector('.fl'), w: 0, h: 0 };
+  const pv = document.createElement('div'); pv.className = 'ck7-pv'; pv.hidden = true;
+  pv.innerHTML = '<div class="ck7-pvc"><div class="ck7-ct"><b>📸 Purr-fect!</b><button class="ck7-x" aria-label="Close">✕</button></div><img class="ck7-pimg" alt="PKR’s photo"><div class="ck7-pb"><button class="btn ck7-save">💾 Save</button><button class="btn ck7-share" hidden>📤 Share</button></div><div class="ck7-gl"></div><div class="ck7-tip"></div></div>';
+  u.root.appendChild(pv); X.pv = pv; X.pimg = pv.querySelector('.ck7-pimg'); X.save = pv.querySelector('.ck7-save'); X.share = pv.querySelector('.ck7-share'); X.gl = pv.querySelector('.ck7-gl'); X.tip = pv.querySelector('.ck7-tip');
+  pv.querySelector('.ck7-x').addEventListener('click', ck7PreviewClose); pv.addEventListener('click', e => { if (e.target === pv) ck7PreviewClose(); });
+  X.save.addEventListener('click', () => ck7SaveRec(ck7S().pvRec)); X.share.addEventListener('click', () => ck7ShareRec(ck7S().pvRec));
+  X.gl.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return; const rec = (ck7S().gal || []).find(r => String(r.id) === b.dataset.id); if (rec) ck7Preview(rec); });
+}
+function ck7BoothSync() { const X = CK.ui.ck7, B = ck7S().booth; if (!X.bp || !B) return; X.bp.querySelectorAll('.ck7-chips').forEach(row => { const k = row.dataset.k; row.querySelectorAll('.ck7-c').forEach(b => b.classList.toggle('on', b.dataset.id === B[k])); }); }
+function ck7BoothOpen() {
+  const S = ck7S(); if (!CK.on) return; if (S.mode === 'show') ck7End(); if (S.mode === 'booth') return;
+  try {
+    ck7BoothUI(); ck7BoothBuild(); S.booth = S.booth || { pose: 'sit', bd: 'closet', fr: 'polaroid', pastel: 0 }; S.booth.k = 0;
+    S.mode = 'booth'; ck7UIMode('booth'); ck7SetBackdrop(S.booth.bd); ck7BoothSync(); CK.spin = 0; CK.spinV = 0; CK.ui.ck7.vf.w = 0;
+    ck7GalLoad(); ckSfx('open'); setTimeout(() => { if (S.mode === 'booth') ckCaption(pickOf(['Say cheese! 📸', 'Get my good side!', 'Ready for my close-up!'])); }, 300);
+  } catch (e) { console.error(e); ck7End(); }
+}
+
+/* ---------- frames: drawn on a 2D canvas (the viewfinder's overlay, and on top of the photo) ---------- */
+function ck7DateStr(d) { d = d || new Date(); try { return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return ck7Key(d); } }
+function ck7Paw(c, x, y, s, a, col) { c.save(); c.translate(x, y); c.rotate(a || 0); c.fillStyle = col; c.beginPath(); c.ellipse(0, s * 0.35, s * 0.5, s * 0.42, 0, 0, 7); c.fill();
+  for (const [dx, dy] of [[-0.55, -0.2], [-0.2, -0.55], [0.2, -0.55], [0.55, -0.2]]) { c.beginPath(); c.ellipse(dx * s, dy * s, s * 0.17, s * 0.22, dx * 0.4, 0, 7); c.fill(); } c.restore(); }
+function ck7Heart(c, x, y, s, col) { c.save(); c.translate(x, y); c.scale(s / 16, s / 16); c.fillStyle = col; c.beginPath(); c.moveTo(0, 5); c.bezierCurveTo(-14, -6, -6, -16, 0, -8); c.bezierCurveTo(6, -16, 14, -6, 0, 5); c.fill(); c.restore(); }
+function ck7Sticker(c, txt, x, y, size, rot, fill) { c.save(); c.translate(x, y); c.rotate(rot); c.font = '400 ' + size + 'px "Bagel Fat One", "Arial Rounded MT Bold", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.lineJoin = 'round'; c.strokeStyle = '#2d1328'; c.lineWidth = size * 0.3; c.strokeText(txt, 0, 0); c.strokeStyle = '#ffffff'; c.lineWidth = size * 0.17; c.strokeText(txt, 0, 0); c.fillStyle = fill; c.fillText(txt, 0, 0); c.restore(); }
+function ck7DrawFrame(c, W, H, id, date) {                              // (W, H: the picture's size; everything scales off 1080 wide)
+  const k = W / 1080, ds = ck7DateStr(date);
+  if (id === 'polaroid') { c.fillStyle = '#fffdf8'; c.fillRect(0, 0, W, 54 * k); c.fillRect(0, 0, 54 * k, H); c.fillRect(W - 54 * k, 0, 54 * k, H); c.fillRect(0, H - 230 * k, W, 230 * k);
+    c.strokeStyle = 'rgba(0,0,0,.12)'; c.lineWidth = 3 * k; c.strokeRect(54 * k, 54 * k, W - 108 * k, H - 284 * k);
+    c.fillStyle = '#3a2440'; c.font = '400 ' + 88 * k + 'px Pacifico, cursive'; c.textBaseline = 'middle'; c.textAlign = 'left'; c.fillText('PKR 💖', 90 * k, H - 118 * k);
+    c.font = '400 ' + 40 * k + 'px "Permanent Marker", cursive'; c.textAlign = 'right'; c.fillStyle = '#6a5a74'; c.fillText(ds, W - 90 * k, H - 112 * k); return; }
+  if (id === 'paws') { const bw = 46 * k; c.fillStyle = '#ffb8d6'; c.fillRect(0, 0, W, bw); c.fillRect(0, H - bw, W, bw); c.fillRect(0, 0, bw, H); c.fillRect(W - bw, 0, bw, H);
+    c.strokeStyle = '#ff6fae'; c.lineWidth = 6 * k; c.strokeRect(bw, bw, W - 2 * bw, H - 2 * bw);
+    for (let i = 0; i < 9; i++) { ck7Paw(c, 40 * k + i * 125 * k, 23 * k, 15 * k, 0.3 * (i % 2 ? 1 : -1), '#ffffff'); ck7Paw(c, 80 * k + i * 125 * k, H - 23 * k, 15 * k, Math.PI + 0.3 * (i % 2 ? 1 : -1), '#ffffff'); }
+    for (let i = 0; i < 11; i++) { ck7Paw(c, 23 * k, 110 * k + i * 118 * k, 15 * k, -Math.PI / 2, '#ffffff'); ck7Paw(c, W - 23 * k, 70 * k + i * 118 * k, 15 * k, Math.PI / 2, '#ffffff'); }
+    ck7Sticker(c, 'PKR', 190 * k, 150 * k, 120 * k, -0.14, '#ff6fae'); ck7Paw(c, W - 170 * k, H - 170 * k, 60 * k, 0.4, 'rgba(255,111,174,.85)');
+    c.font = '400 ' + 38 * k + 'px "Permanent Marker", cursive'; c.textAlign = 'right'; c.textBaseline = 'middle'; c.lineWidth = 8 * k; c.strokeStyle = '#ffffff'; c.strokeText(ds, W - 80 * k, 100 * k); c.fillStyle = '#b0467e'; c.fillText(ds, W - 80 * k, 100 * k); return; }
+  if (id === 'royal') { const g = c.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#fff2a8'); g.addColorStop(0.3, '#e8b830'); g.addColorStop(0.55, '#fff6c8'); g.addColorStop(0.8, '#c9921a'); g.addColorStop(1, '#ffe27a');
+    const bw = 44 * k; c.fillStyle = g; c.fillRect(0, 0, W, bw); c.fillRect(0, H - bw, W, bw); c.fillRect(0, 0, bw, H); c.fillRect(W - bw, 0, bw, H);
+    c.strokeStyle = '#8a5a10'; c.lineWidth = 4 * k; c.strokeRect(bw + 10 * k, bw + 10 * k, W - 2 * bw - 20 * k, H - 2 * bw - 20 * k); c.strokeStyle = g; c.lineWidth = 6 * k; c.strokeRect(bw + 18 * k, bw + 18 * k, W - 2 * bw - 36 * k, H - 2 * bw - 36 * k);
+    for (const [x, y] of [[bw, bw], [W - bw, bw], [bw, H - bw], [W - bw, H - bw]]) { c.fillStyle = g; c.beginPath(); c.arc(x, y, 46 * k, 0, 7); c.fill(); c.fillStyle = '#c2185b'; c.beginPath(); c.arc(x, y, 18 * k, 0, 7); c.fill(); c.fillStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.arc(x - 6 * k, y - 6 * k, 6 * k, 0, 7); c.fill(); }
+    c.font = 110 * k + 'px serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('👑', W / 2, 92 * k);
+    const ry = H - 150 * k; c.fillStyle = '#c2185b'; c.beginPath(); c.moveTo(150 * k, ry - 58 * k); c.lineTo(W - 150 * k, ry - 58 * k); c.lineTo(W - 105 * k, ry); c.lineTo(W - 150 * k, ry + 58 * k); c.lineTo(150 * k, ry + 58 * k); c.lineTo(105 * k, ry); c.closePath(); c.fill();
+    c.strokeStyle = g; c.lineWidth = 5 * k; c.stroke(); c.fillStyle = '#fff6d6'; c.font = '400 ' + 46 * k + 'px "Bagel Fat One", sans-serif'; c.fillText('Princess Kitty Rehab', W / 2, ry - 14 * k);
+    c.font = '400 ' + 26 * k + 'px "Permanent Marker", cursive'; c.fillStyle = '#ffd9ea'; c.fillText(ds, W / 2, ry + 30 * k); return; }
+  if (id === 'film') { const bw = 92 * k; c.fillStyle = '#141216'; c.fillRect(0, 0, bw, H); c.fillRect(W - bw, 0, bw, H); c.fillRect(0, 0, W, 26 * k); c.fillRect(0, H - 26 * k, W, 26 * k);
+    c.fillStyle = '#f4efe6'; for (let y = 30 * k; y < H - 40 * k; y += 86 * k) { for (const x of [26 * k, W - 66 * k]) { c.beginPath(); c.roundRect ? c.roundRect(x, y, 40 * k, 52 * k, 8 * k) : c.rect(x, y, 40 * k, 52 * k); c.fill(); } }
+    c.save(); c.translate(W - 30 * k, H / 2); c.rotate(Math.PI / 2); c.fillStyle = '#e8a23a'; c.font = '800 ' + 24 * k + 'px system-ui, sans-serif'; c.textAlign = 'center'; c.fillText('PKR 35  ▸  KITTY FILM 400  ▸  ' + ck7Key(date).replace(/-/g, '·'), 0, 0); c.restore();
+    const d = date || new Date(), ts = "'" + String(d.getFullYear()).slice(2) + ' ' + String(d.getMonth() + 1).padStart(2, ' ') + ' ' + String(d.getDate()).padStart(2, '0');
+    c.font = '700 ' + 52 * k + 'px "Courier New", monospace'; c.textAlign = 'right'; c.textBaseline = 'alphabetic'; c.shadowColor = 'rgba(255,120,30,.9)'; c.shadowBlur = 14 * k; c.fillStyle = '#ff9a3a'; c.fillText(ts, W - bw - 30 * k, H - 60 * k); c.shadowBlur = 0; return; }
+  if (id === 'hearts') { const r = ck7Rand(7); for (let i = 0; i < 26; i++) { const e = r() < 0.5, x = e ? r() * W : (r() < 0.5 ? r() * 170 * k : W - r() * 170 * k), y = e ? (r() < 0.5 ? r() * 170 * k : H - r() * 220 * k) : r() * H;
+      ck7Heart(c, x, y, (22 + r() * 40) * k, ['#ff6fae', '#ff9ccb', '#ffffff', '#e23b7d'][(r() * 4) | 0]); }
+    for (let i = 0; i < 14; i++) { const x = r() * W, y = r() < 0.5 ? r() * 200 * k : H - r() * 200 * k; c.fillStyle = '#fff6c0'; c.save(); c.translate(x, y); c.rotate(r()); const s = (8 + r() * 12) * k; c.beginPath(); c.moveTo(0, -s * 2); c.quadraticCurveTo(s * 0.3, -s * 0.3, s * 2, 0); c.quadraticCurveTo(s * 0.3, s * 0.3, 0, s * 2); c.quadraticCurveTo(-s * 0.3, s * 0.3, -s * 2, 0); c.quadraticCurveTo(-s * 0.3, -s * 0.3, 0, -s * 2); c.fill(); c.restore(); }
+    ck7Sticker(c, 'PKR', W / 2, H - 120 * k, 130 * k, 0.04, '#ff6fae'); ck7Heart(c, W - 150 * k, 150 * k, 120 * k, '#ff6fae');
+    c.fillStyle = '#ffffff'; c.font = '400 ' + 26 * k + 'px "Permanent Marker", cursive'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(ds.replace(/, \d{4}/, ''), W - 150 * k, 140 * k); return; }
+  /* clean: just a tiny date in the corner */
+  c.font = '400 ' + 30 * k + 'px "Permanent Marker", cursive'; c.textAlign = 'right'; c.textBaseline = 'alphabetic'; c.lineWidth = 6 * k; c.strokeStyle = 'rgba(45,19,40,.55)'; c.strokeText('PKR · ' + ds, W - 30 * k, H - 30 * k); c.fillStyle = '#ffffff'; c.fillText('PKR · ' + ds, W - 30 * k, H - 30 * k);
+}
+function ck7VfDraw() {                                                  // the frame over the viewfinder (a fresh canvas size each time; drawn when it changes, not every frame)
+  const X = CK.ui && CK.ui.ck7, vf = X && X.vf, B = ck7S().booth; if (!vf || !B || !vf.w) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1), cw = Math.round(vf.w * dpr), ch = Math.round(vf.h * dpr), cv = vf.cv; cv.width = cw; cv.height = ch;
+  const c = cv.getContext('2d'); c.clearRect(0, 0, cw, ch); ck7DrawFrame(c, cw, ch, B.fr, ck7Now());
+  if (!ck7VfDraw.f) { ck7VfDraw.f = 1; ck7Fonts().then(() => { if (ck7S().mode === 'booth') ck7VfDraw(); }); }
+}
+function ck7Fonts() {
+  if (ck7Fonts.p) return ck7Fonts.p;
+  const f = document.fonts; if (!f || !f.load) return (ck7Fonts.p = Promise.resolve());
+  const all = Promise.all(['400 60px "Bagel Fat One"', '400 60px Pacifico', '400 60px "Permanent Marker"'].map(s => f.load(s).catch(() => null)));
+  return (ck7Fonts.p = Promise.race([all, new Promise(r => setTimeout(r, 1500))]));
+}
+
+/* ---------- a snap: rendered off screen at 1080x1350 (supersampled), the frame on top, a PNG ---------- */
+function ck7Render(W, H) {                                              // → a fresh canvas W x H with the stage's picture (the camera as it is now)
+  const ss = devTier() === 'low' ? 1 : 1.5, w = Math.round(W * ss), h = Math.round(H * ss), cam = CK.cam.clone(); cam.aspect = W / H; cam.updateProjectionMatrix();
+  const rt = new THREE.WebGLRenderTarget(w, h), buf = new Uint8Array(w * h * 4); let ok = false;
+  try { renderer.setScissorTest(false); renderer.setRenderTarget(rt); renderer.clear(); renderer.render(CK.scene, cam); renderer.readRenderTargetPixels(rt, 0, 0, w, h, buf); ok = true; }
+  finally { renderer.setRenderTarget(null); rt.dispose(); renderer.getSize(CK.sz); renderer.setViewport(0, 0, CK.sz.x, CK.sz.y); }
+  if (!ok) return null;
+  const img = new ImageData(w, h), D = img.data, row = w * 4; for (let y = 0; y < h; y++) D.set(buf.subarray((h - 1 - y) * row, (h - y) * row), y * row);
+  for (let i = 3; i < D.length; i += 4) D[i] = 255;
+  const a = document.createElement('canvas'); a.width = w; a.height = h; a.getContext('2d').putImageData(img, 0, 0);
+  const b = document.createElement('canvas'); b.width = W; b.height = H; const x = b.getContext('2d'); x.imageSmoothingEnabled = true; try { x.imageSmoothingQuality = 'high'; } catch (e) {} x.drawImage(a, 0, 0, W, H);
+  a.width = a.height = 1; return b;
+}
+function ck7Snap() {
+  const S = ck7S(), B = S.booth, X = CK.ui.ck7; if (S.mode !== 'booth' || S.snapping) return; S.snapping = true; X.snapB.disabled = true;
+  X.vf.fl.classList.remove('go'); void X.vf.fl.offsetWidth; X.vf.fl.classList.add('go'); ck7Sfx('snap');
+  const done = () => { S.snapping = false; X.snapB.disabled = false; };
+  ck7Fonts().then(() => {
+    try {
+      const W = 1080, H = 1350, cv = ck7Render(W, H); if (!cv) throw new Error('no picture');
+      ck7DrawFrame(cv.getContext('2d'), W, H, B.fr, ck7Now());
+      const fin = blob => { done(); if (!blob) { camToast('The camera jammed... try again', 2200); return; }
+        const rec = { id: Date.now(), blob, w: W, h: H, day: ck7Key(), pose: B.pose, bd: B.bd, fr: B.fr }; S.lastRec = rec; cv.width = cv.height = 1;
+        ck7GalAdd(rec); const D = ck7ShowData(); D.photos = (D.photos || 0) + 1; ck7ShowSave(); try { unlock('photoFirst'); } catch (e) {}
+        ck7Preview(rec); ckCaption(pickOf(['Gorgeous! 💖', 'Frame that!', 'Cover model!'])); };
+      if (cv.toBlob) cv.toBlob(fin, 'image/png'); else { const u = cv.toDataURL('image/png'), bin = atob(u.split(',')[1]), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); fin(new Blob([arr], { type: 'image/png' })); }
+    } catch (e) { console.error(e); done(); camToast('The camera jammed... try again', 2200); }
+  });
+}
+
+/* ---------- the gallery: the last 8 photos, in IndexedDB (or just in memory, if there's none) ---------- */
+function ck7Db(cb) {
+  if (ck7Db.db !== undefined) { cb(ck7Db.db); return; }
+  try { if (!window.indexedDB) { ck7Db.db = null; cb(null); return; } const rq = indexedDB.open('catguard-photos', 1);
+    rq.onupgradeneeded = () => { try { rq.result.createObjectStore('p', { keyPath: 'id' }); } catch (e) {} };
+    rq.onsuccess = () => { ck7Db.db = rq.result; cb(ck7Db.db); }; rq.onerror = rq.onblocked = () => { ck7Db.db = null; cb(null); };
+  } catch (e) { ck7Db.db = null; cb(null); }
+}
+function ck7GalLoad(then) {
+  const S = ck7S(); S.gal = S.gal || [];
+  ck7Db(db => { if (!db) { ck7GalSync(); if (then) then(); return; }
+    try { const rq = db.transaction('p', 'readonly').objectStore('p').getAll(); rq.onsuccess = () => { const L = (rq.result || []).filter(r => r && r.blob).sort((a, b) => b.id - a.id); const ids = new Set(S.gal.map(r => r.id)); for (const r of L) if (!ids.has(r.id)) S.gal.push(r); S.gal.sort((a, b) => b.id - a.id); S.gal.length = Math.min(S.gal.length, 8); ck7GalSync(); if (then) then(); };
+      rq.onerror = () => { ck7GalSync(); if (then) then(); }; } catch (e) { ck7GalSync(); if (then) then(); } });
+}
+function ck7GalAdd(rec) {
+  const S = ck7S(); S.gal = S.gal || []; S.gal.unshift(rec); const drop = S.gal.splice(8); drop.forEach(r => { if (r.url) URL.revokeObjectURL(r.url); });
+  ck7Db(db => { if (!db) return; try { const tx = db.transaction('p', 'readwrite'), st = tx.objectStore('p'); st.put(rec);
+    const rq = st.getAllKeys(); rq.onsuccess = () => { const k = (rq.result || []).sort((a, b) => b - a); for (const id of k.slice(8)) st.delete(id); }; } catch (e) {} });
+  ck7GalSync();
+}
+function ck7GalSync() { const X = CK.ui && CK.ui.ck7; if (X && X.galN) X.galN.textContent = String((ck7S().gal || []).length); }
+function ck7Url(rec) { if (!rec.url) rec.url = URL.createObjectURL(rec.blob); return rec.url; }
+function ck7Preview(rec) {                                              // the picture, Save and Share, and the others to pick from
+  const S = ck7S(), X = CK.ui.ck7, G = S.gal || []; rec = rec || G[0] || null;
+  if (!rec) { ckCaption('No photos yet: snap one! 📸'); return; }
+  S.pvRec = rec; X.pimg.src = ck7Url(rec);
+  let canShare = false; try { canShare = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File([rec.blob], 'pkr.png', { type: 'image/png' })] })); } catch (e) { canShare = false; }
+  X.share.hidden = !canShare; S.canShare = canShare;
+  X.gl.innerHTML = G.length > 1 ? G.map(r => '<button data-id="' + r.id + '" class="' + (r === rec ? 'on' : '') + '" aria-label="Photo from ' + ckbEsc(r.day) + '"><img src="' + ck7Url(r) + '" alt=""></button>').join('') : '';
+  X.tip.textContent = G.length > 1 ? 'Your last ' + G.length + ' photos are kept here. Tap one to save it again.' : 'Saved photos go to your downloads (or Photos).';
+  X.pv.hidden = false;
+}
+function ck7PreviewClose() { const X = CK.ui && CK.ui.ck7; if (X && X.pv) X.pv.hidden = true; }
+function ck7FileName(rec) { return 'PKR-' + rec.day + '-' + String(rec.id).slice(-5) + '.png'; }
+function ck7SaveRec(rec) {
+  if (!rec) return; try { const a = document.createElement('a'); a.href = ck7Url(rec); a.download = ck7FileName(rec); a.rel = 'noopener'; document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 100); ckSfx('wear'); camToast('💾 Saved!', 1600); } catch (e) { camToast('Couldn’t save: try a long-press on the picture', 2600); }
+}
+function ck7ShareRec(rec) {
+  if (!rec || !navigator.share) return; try { const f = new File([rec.blob], ck7FileName(rec), { type: 'image/png' });
+    navigator.share({ files: [f], title: 'PKR', text: 'PKR’s new look 💖' }).catch(() => {}); } catch (e) {}
+}
+
+/* ---------- 📬 the neighbours' requests: 1-2 a day, by tag, colour or a thing; granted by walking up to them in a match ---------- */
+function ck7ReqWho() {
+  return ck7ReqWho.W || (ck7ReqWho.W = {
+    aunty: { id: 'aunty', name: 'Aunty-ji', ic: '👵', where: 'Upstairs: knock on the front door' },
+    porter: { id: 'porter', name: 'Porter', ic: '🐕', where: 'At the fence in the back yard' },
+    coon: { id: 'coon', name: 'The raccoon', ic: '🦝', where: 'On the roof, or at the slider' } });
+}
+function ck7ReqPool() {                                                 // { id, who, ic, text, tag | col | items, fish, yes: the line when it's granted, no: a nudge when it isn't }
+  return ck7ReqPool.L || (ck7ReqPool.L = [
+    { id: 'aPurple', who: 'aunty', ic: '💜', text: 'Aunty-ji wants to see you in something purple', col: 'purple', fish: 25, yes: 'Wah! Purple! The colour of royalty, and of my wedding saree. Beautiful, beta!', no: 'Beta, I said PURPLE. Go, go, change!' },
+    { id: 'aGold', who: 'aunty', ic: '💛', text: 'Aunty-ji says a princess needs something gold', col: 'gold', fish: 25, yes: 'Sona! Gold suits you. Not too much, not too little. Perfect.', no: 'Where is the gold, beta? A princess without gold? Chhee.' },
+    { id: 'aFestive', who: 'aunty', ic: '🪔', text: 'Aunty-ji wants something festive for the puja', tag: 'festive', fish: 30, yes: 'So festive! Come, come, take some ladoo. Just one. Okay, two.', no: 'Something festive, beta! It’s a puja, not a funeral.' },
+    { id: 'aPink', who: 'aunty', ic: '🩷', text: 'Aunty-ji wants to see you in pink', col: 'pink', fish: 20, yes: 'Pink! Like a rose! Like a gulab jamun! Lovely.', no: 'Pink, beta, PINK. Did you forget already?' },
+    { id: 'aRoyal', who: 'aunty', ic: '👑', text: 'Aunty-ji wants you dressed like a real queen', tag: 'royal', fish: 30, yes: 'Maharani! I am bowing. Okay, my knees... I am nodding.', no: 'A queen, I said! This is not queen, this is... Tuesday.' },
+    { id: 'aCozy', who: 'aunty', ic: '🧣', text: 'Aunty-ji says it’s cold out: wear something cozy!', tag: 'cozy', fish: 20, yes: 'Good girl! Warm and cosy. Now no sniffles, okay?', no: 'You will catch cold! Something warm, beta. Now.' },
+    { id: 'aJhumka', who: 'aunty', ic: '💛', text: 'Aunty-ji wants to see you wearing her jhumkas', items: ['jhumkas'], own: true, fish: 35, yes: 'My jhumkas! They look better on you. Don’t tell my sister.', no: 'My jhumkas, beta! The gold ones I gave you!' },
+    { id: 'pJersey', who: 'porter', ic: '🏒', text: 'Porter would love to see the hockey jersey', items: ['jersey'], fish: 30, yes: '🐕 Porter goes WILD for the jersey! He shoots, he scores, he licks the fence!', no: '🐕 Porter looks for the hockey jersey... and whines.' },
+    { id: 'pSporty', who: 'porter', ic: '⚽', text: 'Porter wants a sporty look: it’s game night!', tag: 'sporty', fish: 25, yes: '🐕 Porter does zoomies along the fence! Game on!', no: '🐕 Porter drops his ball at the fence. Something sporty, please!' },
+    { id: 'pBlue', who: 'porter', ic: '💙', text: 'Porter wants to see something blue', col: 'blue', fish: 20, yes: '🐕 Blue! Porter barks his approval and spins in a circle!', no: '🐕 Porter tilts his head. That’s not blue...' },
+    { id: 'pFood', who: 'porter', ic: '🍕', text: 'Porter smells snacks: wear something tasty!', tag: 'food', fish: 25, yes: '🐕 Porter sniffs and sniffs and SNIFFS. Best. Outfit. Ever.', no: '🐕 Porter sniffs. No snacks on you? Sad dog.' },
+    { id: 'pSilly', who: 'porter', ic: '🤪', text: 'Porter wants something silly', tag: 'funny', fish: 20, yes: '🐕 Porter play-bows and barks with laughter! So silly!', no: '🐕 Porter waits for something silly... and waits...' },
+    { id: 'pGame', who: 'porter', ic: '🧢', text: 'Porter wants game-day gear: a ball cap or a foam finger', items: ['ballCap', 'foamFinger', 'fanScarf'], fish: 30, yes: '🐕 Porter howls along: LET’S GO BLUE! AROOO!', no: '🐕 Porter wants the game-day gear! A cap, a scarf, a big foam finger!' },
+    { id: 'pCollar', who: 'porter', ic: '🦴', text: 'Porter wants to see you in his spare collar', items: ['porterCollar'], own: true, fish: 35, yes: '🐕 His collar! Porter wags so hard his whole back end wags!', no: '🐕 Porter nudges his bone tag through the fence. His collar, please!' },
+    { id: 'cShiny', who: 'coon', ic: '✨', text: 'The raccoon wants something shiny', tag: 'sparkly', fish: 25, yes: 'Ooooh. Shiny. I’m not gonna take it. ...Probably. Nice one, roomie.', no: 'That’s not shiny, roomie. I know shiny. Shiny is my LIFE.' },
+    { id: 'cSpooky', who: 'coon', ic: '🦇', text: 'The raccoon wants something spooky', tag: 'spooky', fish: 25, yes: 'AAH! ...Oh, it’s you. Spooky! I love it. My heart, though.', no: 'Spooky, I said! That wouldn’t scare a squirrel.' },
+    { id: 'cBlack', who: 'coon', ic: '🖤', text: 'The raccoon wants you in black, like his mask', col: 'black', fish: 20, yes: 'Black! Twinsies! Now we just need a heist.', no: 'Black, roomie. Like my mask. Like the night. Like my coffee.' },
+    { id: 'cCool', who: 'coon', ic: '😎', text: 'The raccoon wants to see something cool', tag: 'cool', fish: 20, yes: 'Okay that’s actually cool. Don’t tell anyone I said that.', no: 'Not cool, roomie. Lukewarm at best.' },
+    { id: 'cSnack', who: 'coon', ic: '🍓', text: 'The raccoon is hungry: wear a snack', tag: 'food', fish: 25, yes: 'Is that... food? On you? Can I... no? Fine. Looks great.', no: 'I see no snacks on you. This is a snack-free outfit. Tragic.' },
+    { id: 'cBandit', who: 'coon', ic: '🦝', text: 'The raccoon wants to see you in the bandit mask', items: ['banditMask'], own: true, fish: 35, yes: 'THE MASK! Partners in crime! I’m tearing up a little.', no: 'Where’s the bandit mask, partner?' },
+  ]);
+}
+function ck7Reqs() {                                                    // today's requests (picked once a day, kept in catguard.req): [{ ...pool entry, who: {..}, done }]
+  const key = ck7Key(), S = ck7S(); if (S.req && S.req.day === key) return S.req.list;
+  let o = ck7Get('catguard.req', {}); const P = ck7ReqPool(), W = ck7ReqWho();
+  if (!o || o.day !== key || !Array.isArray(o.ids)) {
+    const r = ck7Rand(ck7Hash('pkr-req-' + key)), owned = ckState().owned, ok = q => !q.own || q.items.some(id => owned.has(id));
+    const n = r() < 0.6 ? 2 : 1, ids = [], who = new Set(), pool = P.filter(ok);
+    for (let tries = 0; ids.length < n && tries < 40; tries++) { const q = pool[(r() * pool.length) | 0]; if (!q || who.has(q.who)) continue; who.add(q.who); ids.push(q.id); }
+    o = { day: key, ids, done: [] }; ck7Put('catguard.req', o);
+  }
+  const done = new Set(Array.isArray(o.done) ? o.done : []);
+  const list = o.ids.map(id => P.find(q => q.id === id)).filter(Boolean).map(q => Object.assign({}, q, { who: W[q.who], done: done.has(q.id) }));
+  S.req = { day: key, list, raw: o }; return list;
+}
+function ck7ReqMatch(q, outfit, colOf) {                                // does this outfit grant it? (her everyday crown doesn't count)
+  const P = ck7Pieces(outfit, colOf).filter(p => p.it.id !== 'crown');
+  if (q.tag) return P.some(p => (p.it.tags || []).indexOf(q.tag) >= 0);
+  if (q.col) return P.some(p => p.fam === q.col);
+  if (q.items) return P.some(p => q.items.indexOf(p.it.id) >= 0);
+  return false;
+}
+function ck7ReqGrant(q, at) {                                           // granted: the fish, a burst of hearts over them, saved for the day, a trophy at five
+  const S = ck7S(), R = S.req; if (!R || q.done) return; q.done = true; const o = R.raw; o.done = Array.isArray(o.done) ? o.done : []; if (o.done.indexOf(q.id) < 0) o.done.push(q.id); ck7Put('catguard.req', o);
+  const L = R.list.find(x => x.id === q.id); if (L) L.done = true;
+  ckSetWallet(ckWallet() + q.fish); const D = ck7ShowData(); D.reqN = (D.reqN || 0) + 1; ck7ShowSave(); try { if (D.reqN >= 5) unlock('reqFive'); } catch (e) {}
+  setTimeout(() => camToast('📬 Request granted! +' + q.fish + ' 🐟', 2600), 900); try { ckDot(); } catch (e) {}
+  if (at) ck7Burst(at);
+  try { if (typeof sfx !== 'undefined' && sfx.meow) sfx.meow(); } catch (e) {}
+}
+function ck7ShowDataReq() { return ck7ShowData().reqN || 0; }
+
+/* ---------- Free roam: a bubble over whoever's asking, and walking up to them ---------- */
+function ck7BubTex(q) {                                                 // a speech bubble: 📬 and what they want (a fresh canvas each)
+  const c = document.createElement('canvas'); c.width = 160; c.height = 128; const x = c.getContext('2d');
+  x.fillStyle = '#ffffff'; x.strokeStyle = '#2d1328'; x.lineWidth = 7; x.beginPath(); if (x.roundRect) x.roundRect(8, 8, 144, 88, 30); else x.rect(8, 8, 144, 88); x.fill(); x.stroke();
+  x.beginPath(); x.moveTo(66, 92); x.lineTo(80, 120); x.lineTo(94, 92); x.closePath(); x.fill(); x.stroke(); x.fillStyle = '#ffffff'; x.fillRect(64, 86, 32, 9);
+  x.font = '44px serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('📬', 52, 54); x.fillText(q.ic, 110, 54);
+  const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; return t;
+}
+function ck7Bubbles() { const S = ck7S(); return S.bub || (S.bub = {}); }
+function ck7NpcAt(who, out) {                                           // where that neighbour is in Free roam right now (their head), or null if they're not about
+  try {
+    if (who === 'aunty') { const A = typeof UPPER !== 'undefined' && UPPER.aunty; if (!A || !A.g || !UPPER.root || !UPPER.root.visible) return null; A.g.getWorldPosition(out); out.y += 1.7; return out; }
+    if (who === 'porter') { if (typeof dog === 'undefined' || !dog.rig || !dog.rig.g.visible || dog.state !== 'yard') return null; dog.rig.g.getWorldPosition(out); out.y += 2.6 * (dog.rig.g.scale.y || 1); return out; }
+    if (who === 'coon') { const R = typeof RF !== 'undefined' ? RF : null;
+      if (R && R.built && R.on && R.coon && R.coon.g && R.coon.g.visible) { R.coon.g.getWorldPosition(out); out.y += 1.5; out.k = 'roof'; return out; }
+      if (typeof coon !== 'undefined' && coon.rig && coon.rig.g.visible && coon.state !== 'hidden') { coon.rig.g.getWorldPosition(out); out.y += 1.5; out.k = 'slider'; return out; } }
+  } catch (e) {}
+  return null;
+}
+function ck7RoamTick(dt) {                                              // (ck7Tick, in Free roam) the bubbles bob over them; close enough in a match: granted
+  const S = ck7S(), on = typeof gameMode !== 'undefined' && gameMode === 'walk' && walk.on && state === 'playing' && !mirrorWorld && !CK.on;
+  const B = ck7Bubbles(); let L = [];
+  if (on) { try { L = ck7Reqs(); } catch (e) { L = []; } }
+  const v = ck7RoamTick.v || (ck7RoamTick.v = new THREE.Vector3()), p = walk.pos, Sx = ckState(), cols = ck5bCols();
+  for (const who of ['aunty', 'porter', 'coon']) {
+    const q = on ? L.find(x => x.who.id === who && !x.done) : null; let b = B[who];
+    const at = q ? ck7NpcAt(who, v) : null;
+    if (!q || !at) { if (b) b.sp.visible = false; continue; }
+    if (!b || b.id !== q.id) { if (b) { b.sp.parent && b.sp.parent.remove(b.sp); b.sp.material.map.dispose(); b.sp.material.dispose(); }
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: ck7BubTex(q), transparent: true, depthWrite: false, fog: false })); sp.scale.set(0.9, 0.72, 1); sp.renderOrder = 8; scene.add(sp); b = B[who] = { sp, id: q.id, near: 0, nudged: false }; }
+    const d = Math.hypot(at.x - p.x, at.z - p.z), dy = Math.abs(at.y - 1.5 - p.y);
+    b.sp.visible = d < 40; b.sp.position.set(at.x, at.y + 0.25 + Math.sin(clock * 2.4) * 0.08, at.z); const sc = 1.1 + Math.min(1, d / 18) * 1.1; b.sp.scale.set(sc, sc * 0.8, 1);
+    const close = (who === 'aunty' ? d < 2.6 && upstairsView(p) : who === 'porter' ? ck7AtFence() : d < 3.4 && dy < 3);
+    b.near = close ? b.near + dt : 0; if (!close) { if (d > 8) b.nudged = false; continue; }
+    if (b.near < 0.6) continue;
+    const ok = ck7ReqMatch(q, Sx.outfit, id => cols.on[id] || 0);
+    if (ok) { if (ck7ReqSay(q, true)) { ck7ReqGrant(q, at.clone()); b.sp.visible = false; try { const V = rxS().v; if (who === 'coon') V.roof.done = V.slider.done = true; else V[who].done = true; } catch (e) {} } }   /* (their outfit remark can wait: this was the moment) */
+    else if (!b.nudged) { if (ck7ReqSay(q, false)) b.nudged = true; }
+  }
+  ck7BurstStep(dt);
+}
+function ck7AtFence() {                                                 // (like Porter's own outfit remarks: right at the fence with him)
+  try { const p = walk.pos, dd = Math.hypot(dog.rig.g.position.x - p.x, dog.rig.g.position.z - p.z);
+    return !(typeof ZN !== 'undefined' && ZN && ZN.on) && dog.rig.g.visible && dog.state === 'yard' && !dogWet() && p.z > SLIDER.VD + 0.6 && p.y < 1.5 && p.x > YARD.XR - 3.2 && dd < 6; } catch (e) { return false; }
+}
+function ck7ReqSay(q, yes) {                                            // their line, through their own channel (never over a story or a quest): true if it was said
+  const line = yes ? q.yes : q.no;
+  try {
+    if (q.who.id === 'aunty') { const A = UPPER.aunty; const busyQ = typeof AQ !== 'undefined' && (AQ.talk || AQ.giving || (AQ.st && AQ.st.cur && AQ.st.cur.carry));
+      if (!A || A.say || A.queue.length || A.first !== 2 || busyQ || A.mode === 'hop') return false; auntySay([['a', line]], 'ck7'); return true; }
+    if (q.who.id === 'porter') { showWalkName(line); bark(yes ? 3 : 1); rxS().dogFx = { a: yes ? 'wag' : 'tilt', t: 0 }; return true; }
+    if (q.who.id === 'coon') { const R = typeof RF !== 'undefined' ? RF : null;
+      if (R && R.built && R.on && R.coon && R.coon.g.visible) { if (R.talk) return false; if (yes) roofSet(R, 'wave'); roofLine('c', line); return true; }
+      coonSay(line); return true; }
+  } catch (e) { console.error(e); }
+  return false;
+}
+function ck7HeartTex() { return ck7HeartTex.t || (ck7HeartTex.t = canvasTex(64, 64, (c) => { c.clearRect(0, 0, 64, 64); ck7Heart(c, 32, 34, 52, '#ffffff'); }, 1, 1)); }
+function ck7Burst(at) {                                                 // a burst of hearts over them (one Points, gone in a second and a half)
+  const S = ck7S(), n = 28, P = new Float32Array(n * 3), C = new Float32Array(n * 3), V = [], col = new THREE.Color();
+  for (let i = 0; i < n; i++) { P[i * 3] = at.x; P[i * 3 + 1] = at.y; P[i * 3 + 2] = at.z; const a = Math.random() * 6.28, s = 0.8 + Math.random() * 1.4; V.push([Math.cos(a) * s, 1.2 + Math.random() * 1.8, Math.sin(a) * s]);
+    col.setHex([0xff6fae, 0xff9ccb, 0xffd23a, 0xe23b7d][i % 4]); C[i * 3] = col.r; C[i * 3 + 1] = col.g; C[i * 3 + 2] = col.b; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.42, map: ck7HeartTex(), vertexColors: true, transparent: true, depthWrite: false, fog: false })); pts.frustumCulled = false; pts.renderOrder = 9; scene.add(pts);
+  (S.bursts || (S.bursts = [])).push({ pts, g, P, V, t: 0 });
+}
+function ck7BurstStep(dt) {
+  const S = ck7S(); if (!S.bursts || !S.bursts.length) return;
+  for (let k = S.bursts.length - 1; k >= 0; k--) { const b = S.bursts[k]; b.t += dt;
+    for (let i = 0; i < b.V.length; i++) { const v = b.V[i]; v[1] -= dt * 2.2; b.P[i * 3] += v[0] * dt; b.P[i * 3 + 1] += v[1] * dt; b.P[i * 3 + 2] += v[2] * dt; }
+    b.g.attributes.position.needsUpdate = true; b.pts.material.opacity = Math.max(0, 1 - b.t / 1.6);
+    if (b.t > 1.6) { scene.remove(b.pts); b.g.dispose(); b.pts.material.dispose(); S.bursts.splice(k, 1); } }
+}
+
+/* ---------- the hooks ---------- */
+function ck7Anim(dt) {                                                  // (ckAnim, first) true: the runway or the booth has her this frame
+  const S = ck7S(); if (!S.mode) return false;
+  try { if (S.mode === 'show') { ck7ShowStep(dt); ck7ShowPose(dt); } else if (S.mode === 'booth') ck7BoothPose(dt); return true; }
+  catch (e) { if (!ck7Anim.err) { ck7Anim.err = 1; console.error(e); } ck7End(); return false; }
+}
+function ck7Aim(snap) {                                                 // (ckAim, first)
+  const S = ck7S(); if (!S.mode) return false;
+  try { if (S.mode === 'show') { ck7ShowCam(snap); ck7SayPlace(); } else ck7BoothCam(snap); return true; }
+  catch (e) { if (!ck7Aim.err) { ck7Aim.err = 1; console.error(e); } ck7End(); return false; }
+}
+function ck7Tick(dt) {                                                  // (closetTick) Free roam: the requests
+  try { ck7RoamTick(dt); } catch (e) { if (!ck7Tick.err) { ck7Tick.err = 1; console.error(e); } }
+}
+function ck7End() {                                                     // off the runway / out of the booth: everything back as it was
+  const S = ck7S(); if (!S.mode) { ck7SheetClose(); return; }
+  S.mode = null; S.show = null;
+  try {
+    if (S.run) S.run.g.visible = false; ck7BoothUnhide(); ck7PreviewClose();
+    const R = CK.rig; R.g.position.set(0, 0, 0); R.body.position.set(0, 0, 0); R.body.rotation.set(0, 0, 0); R.head.rotation.set(0, 0, 0);
+    for (let i = 0; i < 4; i++) R.legs[i].rotation.set(0, 0, 0); R.peepers.forEach(e => { e.visible = true; }); R.lids.forEach(l => { l.visible = false; });
+    CK.shadow.position.set(0, 0.004, 0); const tr = ck5bCkFrame.T; if (tr && tr.pts) tr.pts.position.set(0, 0, 0);
+    CK.cam.fov = 32; CK.cam.updateProjectionMatrix(); CK.spin = 0; CK.spinV = 0; CK.view = 'full'; CK.idleT = 9; CK.sel = null;
+    ck7UIMode(null); CK.rectDirty = true; ckMeasure(); ckAim(true); CK.fishTo = ckWallet(); ckRefresh();
+  } catch (e) { console.error(e); }
+}
+function ck7Close() { try { ck7End(); ck7SheetClose(); } catch (e) {} }   // (closetClose, first)
+function ck7Esc() {                                                     // (ckKey: Escape) the preview, a sheet, the show or the booth, before the Closet itself
+  const S = ck7S(), X = CK.ui && CK.ui.ck7; if (!X) return false;
+  if (X.pv && !X.pv.hidden) { ck7PreviewClose(); return true; }
+  if (X.sheet && !X.sheet.hidden) { ck7SheetClose(); return true; }
+  if (S.mode) { ck7End(); return true; }
+  return false;
+}
+/* (end of CK7_V1) */
+
+/* CHARM_V1 */
+/* =====================================================================
+   CHARM_V1 (2026-10-12): 🍄 Mushroom buddy charm (tail slot). A little blocky toy figure (generic, no brand) in a big red
+   spotted mushroom cap, a yellow face and body, hanging from a short silver bead chain on a ring round her tail. It hangs
+   with real gravity: wherever her tail points, it swings back to straight down like a pendulum (a spring on its direction,
+   driven by the tail's own motion), with a gentle twist. Colourways: red cap (the original), pink, brown, golden.
+   Function declarations only (hoisted): nothing here runs at load.
+   ===================================================================== */
+function charmCols(v) { return [0xd9232f, 0xff7fb0, 0x8a5631, 0xf2c14a][v] || 0xd9232f; }   // the cap: red, pink, brown, golden
+function charmBuddy(B, v) {                                              // (a tail segment's space: her tail runs along -z) the ring, the bead chain, the buddy
+  const silver = 0xd4d9e1, yel = 0xf7cf2e, yel2 = 0xeab71c, cream = 0xf6efe2, ink = 0x2a2226, cap = charmCols(v), cnt = () => B.parts.s.reduce((n, [g]) => n + g.attributes.position.count, 0);
+  B.s(CKG.tor(0.046, 0.0062, 6, 24), silver, [0, 0, -0.03]);                                                       // round her tail
+  B.s(CKG.tor(0.0072, 0.0024, 6, 12), silver, [0, -0.054, -0.03], [0, Math.PI / 2, 0]);                           // the jump ring
+  const a = cnt();
+  for (let i = 0; i < 4; i++) B.s(CKG.sph(0.0042, 8, 6), silver, [0, -0.0655 - i * 0.0088, -0.03]);                  // the bead chain
+  for (let i = 0; i < 4; i++) B.s(CKG.cyl(0.0011, 0.0011, 0.0062, 5), silver, [0, -0.061 - i * 0.0088, -0.03]);
+  B.frame([0, -0.094, -0.03], [0, Math.PI, 0], 1.0);                                                               // the buddy (built facing +z: turned to look back along her tail)
+  B.s(CKG.tor(0.0034, 0.0013, 5, 10), silver, [0, 0.0015, 0], [0, Math.PI / 2, 0]);                                // its eye-loop on top of the cap
+  B.s(new THREE.SphereGeometry(1, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2), cap, [0, -0.027, 0], null, [0.037, 0.027, 0.037]);   // the big mushroom cap
+  for (const [th, ph] of [[0.25, 0.4], [0.75, 0.2], [0.85, 1.5], [0.8, 2.7], [0.95, 3.9], [0.7, 5.1], [1.2, 0.9], [1.25, 2.2], [1.2, 4.6], [1.3, 5.8]]) {   // its white spots
+    const x = Math.sin(th) * Math.sin(ph), y = Math.cos(th), z = Math.sin(th) * Math.cos(ph);
+    B.s(CKG.sph(0.0058, 8, 6), 0xffffff, [x * 0.0345, -0.027 + y * 0.0248, z * 0.0345], null, [1, 1, 1]); }
+  B.s(CKG.cyl(0.0355, 0.03, 0.004, 20), (x, y, z) => (Math.floor((Math.atan2(x, z) + Math.PI) * 6) % 2 ? cream : 0xe9dcc2), [0, -0.029, 0]);   // its gills underneath
+  B.s(CKG.cyl(0.0138, 0.0138, 0.019, 18), yel, [0, -0.04, 0]);                                                     // the head
+  for (const sx of [-1, 1]) B.s(CKG.sph(0.0019, 6, 5), ink, [sx * 0.0052, -0.037, 0.0133]);                         // eyes
+  B.s(new THREE.TorusGeometry(0.0047, 0.001, 4, 12, Math.PI), ink, [0, -0.0415, 0.0134], [0, 0, Math.PI]);          // a smile
+  B.s(CKG.cyl(0.0085, 0.0085, 0.004, 12), yel2, [0, -0.0515, 0]);                                                   // neck
+  { const g = CKG.box(0.026, 0.024, 0.0145), P = g.attributes.position; for (let i = 0; i < P.count; i++) if (P.getY(i) < 0) P.setX(i, P.getX(i) * 1.28); g.computeVertexNormals();
+    B.s(g, yel, [0, -0.0655, 0]); }                                                                                  // the body (wider at the hips)
+  B.s(ckFlat([[-0.006, 0], [-0.0055, 0.003], [-0.003, 0.0055], [0, 0.0062], [0.003, 0.0055], [0.0055, 0.003], [0.006, 0]], 0.0012), cap, [0, -0.0645, 0.0077]);   // a tiny mushroom on its chest
+  B.s(CKG.box(0.003, 0.004, 0.0012), cream, [0, -0.0665, 0.0077]);
+  for (const sx of [-1, 1]) { B.s(CKG.cyl(0.005, 0.0055, 0.019, 10), yel, [sx * 0.0178, -0.065, 0.001], [0.15, 0, sx * 0.28]);   // arms
+    B.s(new THREE.TorusGeometry(0.0034, 0.0015, 5, 10, Math.PI * 1.4), yel2, [sx * 0.0215, -0.0765, 0.004], [Math.PI / 2, 0, 0]); }   // C-shaped hands
+  B.s(CKG.box(0.0318, 0.0055, 0.0145), cream, [0, -0.0805, 0]);                                                   // hips
+  for (const sx of [-1, 1]) { B.s(CKG.box(0.0148, 0.022, 0.0145), cream, [sx * 0.0081, -0.094, 0]); B.s(CKG.box(0.0148, 0.0055, 0.0185), cream, [sx * 0.0081, -0.1055, 0.002]); }   // legs, feet
+  B.frame();
+  B.fx = { sway: { k: 's', groups: [{ c: [0, -0.054, -0.03], a, b: cnt(), sx: 1, ph: 0.7, ch: 1 }] } };
+}
+function charmSway(f, q, t, amt) {                                     // (ckSwayStep) it hangs straight down wherever her tail points: a spring on which way is down, a gentle twist
+  const S = charmSway, r0 = S.r0 || (S.r0 = new THREE.Vector3(0, -1, 0)), d = S.d || (S.d = new THREE.Vector3()), w = S.w || (S.w = new THREE.Vector3()), qw = S.qw || (S.qw = new THREE.Quaternion()),
+    qa = S.qa || (S.qa = new THREE.Quaternion()), qb = S.qb || (S.qb = new THREE.Quaternion()), m = S.m || (S.m = new THREE.Matrix4());
+  const dt = Math.min(0.05, Math.max(0, t - (f.chT == null ? t : f.chT))); f.chT = t;
+  if (f.chMesh && f.chMesh.parent) { f.chMesh.getWorldQuaternion(qw); d.set(0, -1, 0).applyQuaternion(qw.invert()); } else d.copy(r0);
+  d.x += 0.12 * amt * Math.sin(t * 6.1 + q.ph); d.normalize();                                                     /* (a jiggle as she runs) */
+  if (!f.chD) { f.chD = d.clone(); f.chV = new THREE.Vector3(); }
+  f.chV.addScaledVector(w.subVectors(d, f.chD), 60 * dt).multiplyScalar(Math.max(0, 1 - 2.6 * dt)); f.chD.addScaledVector(f.chV, dt).normalize();
+  const ang = f.chD.angleTo(r0); if (ang > 1.3) { w.crossVectors(r0, f.chD).normalize(); f.chD.copy(r0).applyAxisAngle(w, 1.3); f.chV.multiplyScalar(0.5); }   /* (never up into her tail) */
+  qa.setFromUnitVectors(r0, f.chD); qb.setFromAxisAngle(r0, 0.3 * Math.sin(t * 1.3 + q.ph)); qa.multiply(qb); m.makeRotationFromQuaternion(qa);
+  const e = m.elements, P = f.geo.attributes.position.array, N = f.geo.attributes.normal.array, c = q.c;
+  for (let i = q.a * 3; i < q.b * 3; i += 3) {
+    const x = f.P0[i] - c[0], y = f.P0[i + 1] - c[1], z = f.P0[i + 2] - c[2], nx = f.N0[i], ny = f.N0[i + 1], nz = f.N0[i + 2];
+    P[i] = e[0] * x + e[4] * y + e[8] * z + c[0]; P[i + 1] = e[1] * x + e[5] * y + e[9] * z + c[1]; P[i + 2] = e[2] * x + e[6] * y + e[10] * z + c[2];
+    N[i] = e[0] * nx + e[4] * ny + e[8] * nz; N[i + 1] = e[1] * nx + e[5] * ny + e[9] * nz; N[i + 2] = e[2] * nx + e[6] * ny + e[10] * nz;
+  }
+  if (f.geo.boundingSphere && !f.chBS) { f.chBS = 1; f.geo.boundingSphere.radius += 0.12; }                     /* (it swings out: don't let it be culled) */
+}
+function charmDressEnd(R) {                                            // (closetDress, last) the charm knows its own mesh, so it can tell which way is down
+  try { const w = R.ck && R.ck.tail; if (!w || !w.sway || !w.it || w.it.id !== 'mushCharm') return;
+    w.sway.chMesh = w.obj.children.find(o => o.geometry === w.sway.geo) || null; } catch (e) {}
+}
+function charmVars(it) {                                                 // its colourways: real cap colours, not dyed
+  it.ck5bVs = [{ n: 'Red cap', hex: 0xd9232f }, { n: 'Pink cap', hex: 0xff7fb0 }, { n: 'Brown cap', hex: 0x8a5631 }, { n: 'Golden cap', hex: 0xf2c14a }];
+  const cache = {}, get = v => () => { if (cache[v]) return cache[v]; ck5bBase(it); const B = ckB(); charmBuddy(B, v); const G = {}; for (const k of ['m', 's', 'g', 'l', 'f']) G[k] = ckMerge(B.parts[k]); return (cache[v] = G); };
+  it.ck5bV = {}; for (const v of [1, 2, 3]) Object.defineProperty(it.ck5bV, v, { get: get(v), enumerable: true });
+}
+function charmThumb(it) {                                                // (ckThumbStep reads it.thumb after baking) framed on the buddy and its chain
+  if (it.chTh) return it.chTh; const g = it.geo && it.geo.s; if (!g) return null;
+  const b = new THREE.Box3(), v = new THREE.Vector3(), P = g.attributes.position; for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); if (v.y < -0.05) b.expandByPoint(v); }
+  if (b.isEmpty()) return null; const c = b.getCenter(new THREE.Vector3()); return (it.chTh = [c.x, c.y, c.z, b.getSize(v).length() * 0.55]);
+}
+function charmReg() {                                                    // (from ckState, after ears2Reg) the item, its colourways, its card, what the neighbours say
+  if (charmReg.done) return; charmReg.done = true;
+  try {
+    const I = CK_BY_ID; if (I.mushCharm) return;
+    const it = { id: 'mushCharm', slot: 'tail', name: 'Mushroom buddy charm', price: 150, ic: '🍄', seg: 2, tags: ['mushroom', 'cute', 'nature'], thumbDir: [0.45, 0.3, -1],
+      blurb: 'A little blocky toy buddy in a big red spotted mushroom cap, swinging from a silver bead chain on her tail. Every royal needs a tiny bodyguard.',
+      say: 'My mushroom buddy!', build: B => charmBuddy(B, 0) };
+    Object.defineProperty(it, 'thumb', { get() { return charmThumb(this); }, configurable: true });
+    CK_ITEMS.push(it); I[it.id] = it; charmVars(it);
+    const shop = x => !ckIsEx(x) && !x.season, slot = x => CK_SLOTS.findIndex(s => s.id === x.slot);   /* (each tab cheapest first, as ck6Reg sorts them) */
+    const regs = CK_ITEMS.filter(shop).sort((a, b) => slot(a) - slot(b) || a.price - b.price), rest = CK_ITEMS.filter(x => !shop(x));
+    CK_ITEMS.length = 0; regs.concat(rest).forEach(x => CK_ITEMS.push(x));
+    const L = rxLines(), say = (who, lines) => { const D = L[who]; if (D && D.item && !D.item.mushCharm) D.item.mushCharm = lines; };
+    say('aunty', ["A little man in a mushroom hat! So cute. He looks like my nephew in his helmet.", [['a', "Who is your little friend?"], ['k', "My mushroom buddy, Aunty-ji."], ['a', "Tell him to guard my tulsi plant also."]]]);
+    say('roof', ["Is that a tiny guy in a mushroom hat? On your TAIL? That's the best thing I've ever seen.", "Your little buddy keeps waving at me. I'm waving back. We're friends now."]);
+    say('slider', ["You've got a bodyguard now? He's three centimetres tall! Nyah!"]);
+    say('porter', [["🐕 Porter tries to boop the little swinging buddy on your tail!", 'wag']]);
+  } catch (e) { console.error(e); }
+}
+/* (end of CHARM_V1) */
 
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
