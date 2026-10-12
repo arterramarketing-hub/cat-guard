@@ -10741,7 +10741,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-12 14:20';                                              // stamped when the site is published
+const BUILD = '2026-10-12 15:02';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -25589,15 +25589,23 @@ function crossyTod() {                                                   // the 
 function crossyFlat(g) { const n = g.index ? g.toNonIndexed() : g; if (n !== g) g.dispose(); n.computeVertexNormals(); return n; }   // (faceted: the low-poly look)
 function crossyParts() { const P = []; P.add = (g, c, x, y, z, sx, sy, sz, rx, ry, rz, uv) => { P.push([g, c, x || 0, y || 0, z || 0, sx || 1, sy || 1, sz || 1, rx || 0, ry || 0, rz || 0, uv]); return P; }; return P; }
 function crossyLump(seed, k, r) { return crossyFlat(chimLump(seed, k, 0)); }
-function crossyTruckGeo(cab, box, stripe, plate) {                       // a transport truck: a cab with its stacks, a long box trailer with a stripe (4.6 long, nose at +z)
-  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(), L = 4.6, glass = 0x2b3d5e, dark = 0x26262c, chrome = 0xdadde2, lite = new THREE.Color(cab).lerp(new THREE.Color(0xffffff), 0.3).getHex();
-  P.add(B(0.86, 0.6, 1.0, 0.12), cab, 0, 0.54, L / 2 - 0.52); P.add(B(0.84, 0.24, 0.42, 0.06), glass, 0, 0.74, L / 2 - 0.32, 1, 1, 1, -0.12); P.add(B(0.78, 0.22, 0.7, 0.08), lite, 0, 0.95, L / 2 - 0.66);
-  P.add(B(0.6, 0.22, 0.05, 0.02), chrome, 0, 0.36, L / 2 - 0.01);
-  for (const sx of [-1, 1]) { P.add(new THREE.CylinderGeometry(0.04, 0.04, 0.75, 6), chrome, sx * 0.4, 0.9, L / 2 - 1.04); P.add(B(0.14, 0.08, 0.05, 0.02), 0xfff3c0, sx * 0.3, 0.42, L / 2 + 0.01); P.add(B(0.12, 0.08, 0.05, 0.02), 0xe0303a, sx * 0.34, 0.36, -L / 2 - 0.01); }
-  P.add(B(0.94, 0.96, 3.3, 0.06), box, 0, 0.8, -0.6); P.add(B(0.95, 0.16, 3.0, 0.03), stripe, 0, 0.66, -0.6); P.add(B(0.95, 0.08, 3.0, 0.02), stripe, 0, 1.06, -0.6);
-  P.add(B(0.62, 0.12, 4.3, 0.03), dark, 0, 0.24, 0);
-  for (const z of [L / 2 - 0.42, -1.45, -1.9]) for (const sx of [-1, 1]) { P.add(new THREE.CylinderGeometry(0.17, 0.17, 0.14, 9), dark, sx * 0.38, 0.17, z, 1, 1, 1, 0, 0, Math.PI / 2); P.add(new THREE.CylinderGeometry(0.08, 0.08, 0.15, 6), chrome, sx * 0.38, 0.17, z, 1, 1, 1, 0, 0, Math.PI / 2); }
-  P.add(new THREE.PlaneGeometry(0.34, 0.11), 0xffffff, 0, 0.3, -L / 2 - 0.02, 1, 1, 1, 0, Math.PI, 0, lotPlateUV(plate));
+function crossyTruckGeo(cab, box, stripe, plate) {                       // (CROSSY3_V1) a transport truck, 3.2 long like Crossy Road's (it was 4.6), nose at +z: a short-nosed cab (hood,
+  // grille, a sleeper roof, twin stacks, fuel tanks), the fifth-wheel gap, then a box trailer with its stripe; four axles (steer, drive, the trailer's tandem)
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(), L = 3.2, F = L / 2, glass = 0x2b3d5e, dark = 0x26262c, chrome = 0xdadde2, lite = new THREE.Color(cab).lerp(new THREE.Color(0xffffff), 0.3).getHex();
+  const Cy = (r, h, n) => new THREE.CylinderGeometry(r, r, h, n);
+  P.add(B(0.84, 0.12, 0.08, 0.04), chrome, 0, 0.3, F - 0.06);                                                   // bumper
+  P.add(B(0.8, 0.34, 0.44, 0.1), cab, 0, 0.5, F - 0.3); P.add(B(0.48, 0.22, 0.04, 0.02), chrome, 0, 0.5, F - 0.08);   // the hood, its grille
+  P.add(B(0.86, 0.66, 0.6, 0.12), cab, 0, 0.72, F - 0.82);                                                      // the cab
+  P.add(B(0.78, 0.25, 0.08, 0.04), glass, 0, 0.87, F - 0.52, 1, 1, 1, -0.14); P.add(B(0.88, 0.22, 0.32, 0.05), glass, 0, 0.87, F - 0.76);   // windscreen, side windows
+  P.add(B(0.8, 0.18, 0.5, 0.08), lite, 0, 1.12, F - 0.86, 1, 1, 1, 0.12);                                       // the sleeper roof / air deflector, up toward the trailer
+  for (const sx of [-1, 1]) { P.add(Cy(0.04, 0.84, 6), chrome, sx * 0.42, 0.96, F - 1.13); P.add(Cy(0.1, 0.3, 8), chrome, sx * 0.4, 0.3, F - 0.84, 1, 1, 1, Math.PI / 2);   // stacks, fuel tanks
+    P.add(B(0.13, 0.08, 0.04, 0.02), 0xfff3c0, sx * 0.31, 0.53, F - 0.06); P.add(B(0.12, 0.08, 0.05, 0.02), 0xe0303a, sx * 0.34, 0.42, -F - 0.01);   // headlights, tail lights
+    P.add(B(0.05, 0.2, 0.03, 0.01), dark, sx * 0.37, 0.2, -F + 0.04); }                                       // mud flaps
+  P.add(B(0.94, 0.92, 1.98, 0.06), box, 0, 0.84, -F + 1.01); P.add(B(0.95, 0.14, 1.8, 0.03), stripe, 0, 0.7, -F + 1.01); P.add(B(0.95, 0.07, 1.8, 0.02), stripe, 0, 1.12, -F + 1.01);   // the trailer, its stripes
+  P.add(B(0.02, 0.8, 0.02, 0.01), 0xb8bcc2, 0, 0.84, -F - 0.005);                                               // (its rear doors' seam)
+  P.add(B(0.62, 0.12, L - 0.3, 0.03), dark, 0, 0.24, 0);                                                        // the chassis
+  for (const z of [F - 0.38, F - 1.38, -F + 0.6, -F + 0.24]) for (const sx of [-1, 1]) { P.add(Cy(0.17, 0.14, 9), dark, sx * 0.38, 0.17, z, 1, 1, 1, 0, 0, Math.PI / 2); P.add(Cy(0.08, 0.15, 6), chrome, sx * 0.38, 0.17, z, 1, 1, 1, 0, 0, Math.PI / 2); }
+  P.add(new THREE.PlaneGeometry(0.34, 0.11), 0xffffff, 0, 0.3, -F - 0.02, 1, 1, 1, 0, Math.PI, 0, lotPlateUV(plate));
   return lotMerge(P);
 }
 function crossyMotoGeo(col, lid) {                                       // a motorcycle and its rider (1.1 long)
@@ -25611,10 +25619,10 @@ function crossyMotoGeo(col, lid) {                                       // a mo
 }
 function crossyCarGeo(kind, i) {                                         // (the Meow Lot toys, with their cat plates)
   const C = [0xe8424a, 0x3a8cff, 0xffc93a, 0x5cc46a, 0xf2f0ea, 0x9a6bff, 0xff7ab8, 0x2fb8b0];
-  if (kind === 'c') return lotVehGeo('c', C[i], i * 4 + 1, 2);
-  if (kind === 'v') return lotVehGeo('v', [0xf2f0ea, 0x2fb8b0][i], i * 5 + 3, 2.4);
-  if (kind === 'p') return lotVehGeo('t', [0xff8a3a, 0x4a5a8a][i], i * 6 + 2, 2.4);
-  return lotVehGeo('b', 0x2e8a4e, 35, 3.6);                              // (a GO bus: green, a white roof)
+  if (kind === 'c') return lotVehGeo('c', C[i], i * 4 + 1, 1.7);   /* (CROSSY3_V1: Crossy Road's lengths: car 1.7 (was 2), van and pickup 2 (2.4), GO bus 3 (3.6)) */
+  if (kind === 'v') return lotVehGeo('v', [0xf2f0ea, 0x2fb8b0][i], i * 5 + 3, 2);
+  if (kind === 'p') return lotVehGeo('t', [0xff8a3a, 0x4a5a8a][i], i * 6 + 2, 2);
+  return lotVehGeo('b', 0x2e8a4e, 35, 3);                              // (a GO bus: green, a white roof)
 }
 function crossyTrainGeo(eng) {                                           // a GO train: the locomotive, or a white-and-green bi-level coach (5 long, nose at +z)
   const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(), green = 0x2e7d4f, glass = 0x24324a, dark = 0x26262c, L = 4.85;
@@ -26003,18 +26011,18 @@ function crossyMake(sp, r) {                                             // a ro
   const old = S.rows[slot]; S.rows[slot] = row; S.decDirty = true; if (S.ground) crossyGroundSlot(row);
   return old;
 }
-function crossyLen(kind) { return { c: 2, v: 2.4, p: 2.4, b: 3.6, t: 4.6, m: 1.1, bike: 1.0, jog: 0.55 }[kind] || 2; }
+function crossyLen(kind) { return { c: 1.7, v: 2, p: 2, b: 3, t: 3.2, m: 1.1, bike: 1.0, jog: 0.55 }[kind] || 1.7; }   /* (CROSSY3_V1: matched to Crossy Road; was c 2, v/p 2.4, b 3.6, t 4.6. The hit test is len / 2 + 0.2 either side, so hitboxes follow) */
 function crossyLaneFill(row, mix, k) {                                   // a lane's loop: what drives along it, every gap wide enough at its speed (and a little wider early on)
-  const S = CROSSY, LW = S.LW, v = Math.abs(row.v), small = row.t === 'trail', gmin = (small ? 1.6 : 2.1) + v * (small ? 0.36 : 0.42) + (1 - k) * 0.6, spread = (small ? 5 : 7.5) - 4.2 * k;
+  const S = CROSSY, LW = S.LW, v = Math.abs(row.v), small = row.t === 'trail', gmin = (small ? 1.6 : 2.1) + v * (small ? 0.36 : 0.42) + (1 - k) * 0.6, spread = small ? 5 - 4.2 * k : 5.6 - 4.4 * k;   /* (CROSSY3_V1: shorter vehicles, so a little less random space between them (it was 7.5 - 4.2k): lanes stay about as busy as they were, and gmin, the smallest gap, is unchanged) */
   let x = crossyRnd() * 3; const mv = [];
   for (let n = 0; n < 40; n++) {
     const kind = crossyPickW(mix), len = crossyLen(kind); if (x + len + gmin > LW) break;
     const m = { x: x + len / 2 - LW / 2, len, kind, model: '', sp: v };
     m.model = kind === 'c' ? 'c' + ((crossyRnd() * 8) | 0) : kind === 'v' ? 'v' + ((crossyRnd() * 2) | 0) : kind === 'p' ? 'p' + ((crossyRnd() * 2) | 0) : kind === 't' ? 't' + ((crossyRnd() * 2) | 0) : kind === 'b' ? 'bus' : kind === 'm' ? 'moto' + ((crossyRnd() * 2) | 0) : kind === 'bike' ? 'bike' + ((crossyRnd() * 3) | 0) : 'jog' + ((crossyRnd() * 3) | 0);
-    if (kind === 'm' && v < 5) { m.kind = 'c'; m.len = 2; m.model = 'c0'; }   /* (motorcycles only where it's fast) */
+    if (kind === 'm' && v < 5) { m.kind = 'c'; m.len = crossyLen('c'); m.model = 'c0'; }   /* (motorcycles only where it's fast) */
     mv.push(m); x += m.len + gmin + crossyRnd() * spread;
   }
-  if (!mv.length) mv.push({ x: 0, len: 2, kind: 'c', model: 'c1', sp: v });
+  if (!mv.length) mv.push({ x: 0, len: crossyLen('c'), kind: 'c', model: 'c1', sp: v });
   row.mv = mv;
 }
 function crossyWaterFill(row, k) {                                       // logs (long and close early on), lily pads (fixed, in reach), goose rafts (some dive now and then)
@@ -26097,11 +26105,11 @@ function crossyBuild() {
   S.look = 'summer';
   S.vv = { e: new THREE.Euler(), q: new THREE.Quaternion(), p: new THREE.Vector3(), s: new THREE.Vector3(), m: new THREE.Matrix4(), cd: new THREE.Vector3(), cf: new THREE.Vector3(), a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Color() };
   S.mods = {}; S.dyn = []; S.stat = [];
-  for (let i = 0; i < 8; i++) crossyMod('c' + i, crossyCarGeo('c', i), 24, null, true);
-  for (let i = 0; i < 2; i++) { crossyMod('v' + i, crossyCarGeo('v', i), 16, null, true); crossyMod('p' + i, crossyCarGeo('p', i), 16, null, true); }
-  crossyMod('bus', crossyCarGeo('b', 0), 10, null, true);
-  crossyMod('t0', crossyTruckGeo(0xd8332a, 0xf4f4f0, 0x2a6fdb, 9), 16, null, true); crossyMod('t1', crossyTruckGeo(0x2a6fdb, 0xd8dade, 0xff8a1f, 14), 16, null, true);
-  crossyMod('moto0', crossyMotoGeo(0xe8303a, 0xffffff), 10, null, true); crossyMod('moto1', crossyMotoGeo(0x2a2a30, 0xffc93a), 10, null, true);
+  for (let i = 0; i < 8; i++) crossyMod('c' + i, crossyCarGeo('c', i), 32, null, true);   /* (CROSSY3_V1: shorter vehicles, more of them in a lane, and an upright phone shows ~36 rows: room in every pool (an instance past its pool's cap isn't drawn but still hits)) */
+  for (let i = 0; i < 2; i++) { crossyMod('v' + i, crossyCarGeo('v', i), 22, null, true); crossyMod('p' + i, crossyCarGeo('p', i), 22, null, true); }
+  crossyMod('bus', crossyCarGeo('b', 0), 16, null, true);
+  crossyMod('t0', crossyTruckGeo(0xd8332a, 0xf4f4f0, 0x2a6fdb, 9), 36, null, true); crossyMod('t1', crossyTruckGeo(0x2a6fdb, 0xd8dade, 0xff8a1f, 14), 36, null, true);
+  crossyMod('moto0', crossyMotoGeo(0xe8303a, 0xffffff), 16, null, true); crossyMod('moto1', crossyMotoGeo(0x2a2a30, 0xffc93a), 16, null, true);
   crossyMod('eng', crossyTrainGeo(true), 6, null, true); crossyMod('coach', crossyTrainGeo(false), 36, null, true);
   for (const n of [2, 3, 4]) crossyMod('log' + n, crossyLogGeo(n), 24, null, true);
   crossyMod('pad', crossyPadGeo(false), 40, null, true); crossyMod('padF', crossyPadGeo(true), 24, null, true); crossyMod('goose', crossyGooseGeo(), 160, null, true);
@@ -26111,7 +26119,7 @@ function crossyBuild() {
   { const g = new THREE.TorusGeometry(0.5, 0.05, 3, 24); g.rotateX(Math.PI / 2); S.M.ring = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });   /* (rings on the water where geese go down and come up) */
     const D = crossyMod('gring', g, 80, S.M.ring, true); D.m.renderOrder = 2; D.m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(80 * 3), 3); D.m.instanceColor.setUsage(THREE.DynamicDrawUsage); }
   crossyMod('fish', crossyFishGeo(), 16, null, true); crossyMod('mush', crossyMushGeo(), 4, null, true); crossyMod('star', crossyStarGeo(), 6, null, true);
-  { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); crossyMod('shad', g, 160, S.M.shad, true).m.renderOrder = 1; crossyMod('glow', g.clone(), 120, S.M.glow, true).m.renderOrder = 2; crossyMod('lglow', g.clone(), 24, S.M.glow, false).m.renderOrder = 2; }
+  { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); crossyMod('shad', g, 240, S.M.shad, true).m.renderOrder = 1; crossyMod('glow', g.clone(), 180, S.M.glow, true).m.renderOrder = 2;   /* (CROSSY3_V1: was 160 and 120) */ crossyMod('lglow', g.clone(), 24, S.M.glow, false).m.renderOrder = 2; }
   { const D = crossyMod('bulb', new THREE.SphereGeometry(0.08, 8, 6), 48, S.M.bulb, true); D.m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(48 * 3), 3); D.m.instanceColor.setUsage(THREE.DynamicDrawUsage); for (let i = 0; i < 48; i++) D.m.setColorAt(i, S.vv.c.setHex(0x441010)); }   /* (its colour buffer made full size: setColorAt sizes it by count, which starts at 0) */
   for (const [n, k] of [['tA', 'A'], ['tB', 'B'], ['tP', 'P']]) crossyMod(n, crossyTreeGeo(k, 'summer'), 220);
   crossyMod('bush', crossyBushGeo('summer'), 200); crossyMod('rock', crossyRockGeo(), 120); crossyMod('barrel', crossyBarrelGeo(), 60); crossyMod('lamp', crossyLampGeo(), 24); crossyMod('signal', crossySignalGeo(), 24);
