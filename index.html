@@ -9611,7 +9611,7 @@ function updateZombies(dt) {
 }
 function updateYardLife(dt) {                                         // the sky rides with the camera; clouds drift; butterflies flit; birds circle; birdsong outside
   if (!skyRig || !povEndWall || !povEndWall.visible) return;
-  skyRig.position.copy(camera.position); cloudDome.rotation.y += dt * 0.006; updateTOD(dt);
+  skyRig.position.copy(camera.position); cloudDome.rotation.y += dt * 0.006; updateTOD(dt); w3Sky(dt);   /* (WORLD3_V1: the far plane, the sky, the haze) */
   for (const w of yardWeeds) if (w.pull > 0) {                         // a pulled weed: up out of the lawn with a twirl, and gone
     w.pull += dt; const k = Math.min(1, w.pull / 0.55); w.g.position.y = Math.sin(k * Math.PI) * 0.9 + k * 0.4; w.g.rotation.z = k * 4; w.g.scale.setScalar(Math.max(0.01, 1 - k * k));
     if (k >= 1) { w.g.visible = false; w.pull = 0; }
@@ -10741,7 +10741,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-12 16:43';                                              // stamped when the site is published
+const BUILD = '2026-10-12 17:48';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -13930,7 +13930,7 @@ function cullBegin() {                                                // left ou
     if (U.props) for (const q of U.props) { const o = q.g.position; if ((o.x - c.x) ** 2 + (o.z - c.z) ** 2 > (110 * q.r + 6) ** 2) hide(q.g); } }   /* (little dishes far down the flat: specks) */
   else if (!inHouse && SLIDER && Math.hypot(c.x - SLIDER.DX, c.z - SLIDER.VD) > 6) C.downSmall.forEach(hide);          // out in the yard, well back: the little things through the slider
   if (!inHouse && U.props) for (const q of U.props) hide(q.g);                                                         // outdoors: the upstairs dishes are specks through the windows
-  if (c.z > U.zB + 0.5) C.front.forEach(hide); roofCull(c, hide);                                                                           // out back: the front door, the garage and the bike are round the other side
+  if (c.z > U.zB + 0.5) C.front.forEach(hide); roofCull(c, hide); w3Cull(c, hide);   /* (WORLD3_V1) */                                                                           // out back: the front door, the garage and the bike are round the other side
   return hid;
 }
 function cullEnd(hid) { if (hid) for (let i = 0; i < hid.length; i++) hid[i].visible = true; }
@@ -15083,7 +15083,7 @@ const CK_LINES = ['Ooh la la!', 'Très chic!', 'Purrfect!', 'Meow-velous!', 'So 
 function ckGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function ckPut(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 function ckState() {
-  if (ckState.S) return ckState.S; roofCkReg(); ckSnReg(); ck4Reg(); ck5Reg(); ck5bReg();
+  if (ckState.S) return ckState.S; roofCkReg(); ckSnReg(); ck4Reg(); ck5Reg(); ck5bReg(); ck6Reg();
   const S = ckState.S = { owned: new Set(['crown']), outfit: {}, spent: 0, memFish: null };
   try { const a = JSON.parse(ckGet('catguard.closet') || '[]'); if (Array.isArray(a)) for (const id of a) if (typeof id === 'string' && CK_BY_ID[id]) S.owned.add(id); } catch (e) {}
   try { ckExLoad(S); } catch (e) { console.error(e); }
@@ -16086,7 +16086,7 @@ function closetDress(R, outfit) {
   }
   if (R.crown) R.crown.visible = !outfit.hat || outfit.hat === 'crown';   // her own gold crown, unless another hat's on (or she's gone bare-headed)
   if (W.cape && W.cape.clasp) W.cape.clasp.visible = !W.collar;          // (a collar covers the cape's chain)
-  if (R === walk.rig) closetTodSync(R); ck5bDressEnd(R);   /* (CK5B_V1: worn together, fitted round each other) */
+  if (R === walk.rig) closetTodSync(R); ck5bDressEnd(R);   /* (CK5B_V1: worn together, fitted round each other) */ ck6DressEnd(R);   /* (CK6_V1: a cape over a sash) */
 }
 function closetTodSync(R) {                                            // outdoors at night her fur is tinted to the sky: her new things too (todActors keeps the list)
   if (!R.todMats || !R.todF || !R.ck) return;
@@ -16119,7 +16119,7 @@ function closetTick(dt) {
       else if (walk.on) ckWear(W, dt, Math.min(1, Math.hypot(walk.vel.x, walk.vel.z) / 6 + (walk.grounded ? 0 : 0.4)), !walk.grounded && !walk.climb && walk.vy > -3, clock);
     }
     ckSetRoam(dt);
-    ckCardHat(false); ck5bRoam(dt);
+    ckCardHat(false); ck5bRoam(dt); ck6Tick(dt);
     if (state === 'hop' && HOP.ui && !HOP.ui.ckLink) ckHopLink();
   } catch (e) { if (!closetTick.err) { closetTick.err = 1; console.error(e); } }
 }
@@ -16481,7 +16481,7 @@ function ckBuildUI() {
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) st.addEventListener(t, up);
   st.addEventListener('contextmenu', e => e.preventDefault());
   if (window.ResizeObserver) try { new ResizeObserver(() => { CK.rectDirty = true; }).observe(st); } catch (e) {}
-  CK.thumbQ = CK_ITEMS.map(it => it.id); ckExUI(); ckSnUI(); ck5UI(); ck5bUI();
+  CK.thumbQ = CK_ITEMS.map(it => it.id); ckExUI(); ckSnUI(); ck5UI(); ck5bUI(); ck6UI();
 }
 function ckBuild() { ckBuildUI(); ckBuildScene(); CK.built = true; }
 
@@ -21685,6 +21685,7 @@ function ckBookRender() {
 <div><h4 class="ckb-h">Categories</h4><div class="ckb-rows">${st.rows.map(row).join('')}${st.sea ? row(st.sea) : ''}</div></div>
 <div><h4 class="ckb-h">Rewards</h4><div class="ckb-miles">${miles}</div></div></div>
 <div class="ckb-col"><div><h4 class="ckb-h">Outfit sets <small>wear all of one!</small></h4><div class="ckb-sets">${sets}</div></div></div>`;
+  ck6Book(u.bkBody);   /* (CK6_V1: the collections get their own pages) */
 }
 function ckBookClaim(at) {
   const m = ckBookMiles().find(q => q.at === at), B = ckBookLoad(); if (!m || B.claimed.includes(at) || ckBookStats().pct < at) return;
@@ -22635,7 +22636,7 @@ function flyAir(dt) {                                                  // (updat
     S.flown = true; S.thrT += dt;
     if (indoor) walk.vy += 14 * dt;                                    // (indoors: a floaty jump, no more)
     else { if (walk.vy < 7.5) walk.vy = Math.min(7.5, walk.vy + (walk.vy < 0 ? 62 : 40) * dt); walk.launchH = Math.max(walk.launchH || 0, 1); }   /* (and high enough to clear the chain-link) */
-  } else if (S.flown && walk.vy < 0) {                                 // let go: she hovers, then sinks gently (a little faster the longer she glides)
+  } else if (S.flown && walk.vy < 0 && w3Glide()) {                                 // let go: she hovers, then sinks gently (a little faster the longer she glides)
     const sink = (indoor ? 3.6 : 1.3) + Math.min(2.4, (clock - S.relT) * 0.55);   /* (indoors: a short float) */
     walk.vy += WALK.grav * nipK().grav * dt * (indoor ? 0.5 : 0.9);
     if (walk.vy < -sink) walk.vy += (-sink - walk.vy) * Math.min(1, dt * 8);
@@ -22726,7 +22727,7 @@ function skyCloudFx() {                                                // tinted
   if (cloudDome) im.material.color.copy(cloudDome.material.color);
   const c = camera.position, M = S.M, Q = S.Q.identity(), V = S.V, Sc = S.Sc; let dirty = false;
   for (const C of skyClouds()) {
-    const d = Math.hypot(c.x - C.x, c.y - C.y, c.z - C.z) - C.R * 0.6, f = Math.round(THREE.MathUtils.clamp((79 - d) / 14, 0, 1) * 50) / 50;
+    const d = Math.hypot(c.x - C.x, c.y - C.y, c.z - C.z) - C.R * 0.6 - w3CloudReach(), f = Math.round(THREE.MathUtils.clamp((79 - d) / 14, 0, 1) * 50) / 50;
     if (f === C.f) continue; C.f = f; dirty = true; const s = Math.max(1e-3, f);
     C.puffs.forEach((q, j) => { M.compose(V.set(C.x + (q[0] - C.x) * s, C.y + (q[1] - C.y) * s, C.z + (q[2] - C.z) * s), Q, Sc.set(q[3] * s, q[5] * s, q[4] * s)); im.setMatrixAt(C.i0 + j, M); });
   }
@@ -24980,7 +24981,7 @@ function lotRigSet() {                                                   // PKR:
   const R = { g, body: map.get(W.body), head: map.get(W.head), legs: W.legs.map(l => map.get(l)), tail: W.tail.map(t => map.get(t)).filter(Boolean) };
   const crown = map.get(W.crown); if (crown) crown.visible = false;
   if (W.ck && W.ck.hat && W.ck.hat.obj) { const h = map.get(W.ck.hat.obj); if (h) h.visible = false; }
-  const cap = new THREE.Mesh(S.capGeo, S.M.veh); cap.position.set(0, 0.125, -0.01); cap.rotation.x = -0.12; if (R.head) R.head.add(cap); R.cap = cap;
+  const cap = new THREE.Mesh(S.capGeo, S.M.veh); cap.position.set(0, 0.125, -0.01); cap.rotation.x = -0.12; if (R.head) R.head.add(cap); R.cap = cap; ck6LotCap(R, W);   /* (CK6_V1: up on the ghost sheet's hood) */
   g.visible = true; g.scale.setScalar(1.1); g.position.set(S.home.x, 0, S.home.z); R.base = 2.2; g.rotation.set(0, R.base, 0); S.scene.add(g); S.rig = R; R.cheer = 0; R.look = 0; R.jump = 0; R.jv = 0;
 }
 function lotRigStep(dt) {                                                // she watches the car that's moving, bobs, swishes her tail; a cheer and a hop when the lot's clear
@@ -28820,6 +28821,7 @@ function ck5bTrailDef(id) {
     pumpkinTrail: { cells: [6, 6, 7], life: 1.4, size: [0.15, 0.21], vy: 0.35, g: -0.05, spread: 0.16, sway: 0.7, spin: 0.4, rate: 13, names: ['Classic', 'Ghostly', 'Toxic', 'Midnight'],
       cols: [[0xffffff], [0xd8e6ff], [0xb8ff8a], [0xc0a0ff]] },
   });
+  if (!D[id]) { const d6 = ck6TrailDef(id); if (d6) return d6; }   /* (CK6_V1: the new trails) */
   return D[id] || D.sparkles;
 }
 function ck5bSprite(c, i) {                                           // one atlas cell, drawn round (0, 0), about 28 px out (white where the trail's colour tints it)
@@ -28847,12 +28849,12 @@ function ck5bSprite(c, i) {                                           // one atl
     c.beginPath(); c.moveTo(-4, -8); c.lineTo(-6, -15); c.lineTo(-1, -9); c.moveTo(4, -8); c.lineTo(6, -15); c.lineTo(1, -9); c.fill(); c.fillStyle = '#ffd23a'; for (const s of [-1, 1]) { c.beginPath(); c.arc(s * 2.6, -4, 1.4, 0, 6.3); c.fill(); } }
 }
 function ck5bAtlas() {
-  if (ck5bAtlas.t) return ck5bAtlas.t;
+  if (ck5bAtlas.t) return ck5bAtlas.t; { const t6 = ck6Atlas(); if (t6) return (ck5bAtlas.t = t6); }   /* (CK6_V1: 16 cells) */
   const t = ck5bAtlas.t = canvasTex(512, 64, c => { for (let i = 0; i < 8; i++) { c.save(); c.translate(i * 64 + 32, 32); c.scale(0.98, 0.98); ck5bSprite(c, i); c.restore(); } }, 1, 1);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.repeat.set(1, 1); t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; t.anisotropy = 1; return t;
 }
 function ck5bTrailMat(add) {
-  const C = ck5bTrailMat.C || (ck5bTrailMat.C = {}), K = add ? 'a' : 'n'; if (C[K]) return C[K];
+  const C = ck5bTrailMat.C || (ck5bTrailMat.C = {}), K = add ? 'a' : 'n'; if (C[K]) return C[K]; { const m6 = ck6TrailMat(add); if (m6) return (C[K] = m6); }   /* (CK6_V1: reads the 16-cell atlas) */
   return (C[K] = new THREE.ShaderMaterial({ uniforms: { map: { value: ck5bAtlas() }, scale: { value: 400 } },
     vertexShader: 'attribute vec3 tc; attribute vec4 tq; uniform float scale; varying vec3 vC; varying vec3 vQ;\nvoid main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = tq.y * scale / max(0.05, -mv.z); vC = tc; vQ = vec3(tq.x, tq.z, tq.w); }',
     fragmentShader: 'uniform sampler2D map; varying vec3 vC; varying vec3 vQ;\nvoid main() { if (vQ.x < 0.01) discard; vec2 p = gl_PointCoord - 0.5; float c = cos(vQ.y), s = sin(vQ.y); p = vec2(c * p.x - s * p.y, s * p.x + c * p.y) * 1.08 + 0.5;\n  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) discard; vec4 t = texture2D(map, vec2((vQ.z + 0.02 + p.x * 0.96) / 8.0, 1.0 - p.y)); float a = t.a * vQ.x; if (a < 0.02) discard; gl_FragColor = vec4(t.rgb * vC, a); }',
@@ -29139,6 +29141,844 @@ function ck5bRoamWear(i) {
   try { if (typeof tone === 'function' && SET.sfx !== false) [988, 1319, 1568].forEach((f, k) => tone(f, f * 1.01, 0.12, 'triangle', 0.022, k * 0.06)); } catch (e) {}
 }
 
+/* CK6_V1 */
+/* =====================================================================
+   PKR'S CLOSET, PHASE 2 (2026-10-12): fixed booties and glass slippers, five themed collections, and things won in the mini-games.
+   - 🧦 Fluffy booties: one soft rounded piece (a lathe shaped into a toe) with a thick, smooth fur cuff and a pom-pom tie.
+     👠 Glass slippers: a clear pale-blue shoe over her toes (open at the back), a frosted rim, a heel, a bow, a twinkle.
+   - Five collections (5-6 pieces each, across the slots, a bonus of about 17.5% of the set, paid once; each its own page in
+     the 📖 book: a colour, a line about it, its tags, how many pieces she owns):
+     🍄 Mushroom Royalty (toadstool crown, toadstool cape, mushroom parasol, moss booties, toadstool earrings, spore-sparkle
+     trail), 🍁 Cozy Autumn (harvest toque, chunky scarf, cinnamon cardigan, acorn earrings, tartan tail ribbon, autumn
+     leaves), ❄️ Snow Day (parka, earmuffs, mitten boots, sled-bell collar, snowflake trail), 👑 True Princess (gown, glass
+     slippers, royal sash, jewelled tiara, midnight ball cape, sparkle trail), 🏒 Toronto Fan (jersey, ball cap, bar scarf,
+     foam finger, a big coffee charm on her tail: generic blue and white, no logos). There is no mouth slot: the coffee is a
+     tail charm and the foam finger rides on her back.
+   - 🏆 Won by playing (exclusives in the Secrets tab, via the trophies): Sky Ace flying helmet + victory scarf (Sky Paws: beat
+     the Rat King, jetCastle), crash helmet (Sled Rush 3,000 m: a new trophy, sled3k, from catguard.sledBest), the valet cap
+     she wears in Meow Lot (lotAll), crossing-guard vest (crossy500), leather jacket (bikeNight), leafy wings (Treetop Hop,
+     hopCombo), mushroom-guard badge (Defender, score5k), ember trail (Chimney Drop, sardineSweep).
+   - Clash rules: parka x cape (its hood), earmuffs / flying helmet / crash helmet x earrings. A sash under a cape: the cape
+     is eased out over it. Meow Lot's valet cap sits up on the ghost sheet's hood.
+   - Trails: two new ones; the sprite atlas has 16 cells now (8+ drawn by ck6Sprite).
+   Hooks: ckState (ck6Reg), ck5bTrailDef (ck6TrailDef), ck5bAtlas (ck6Atlas), ck5bTrailMat (ck6TrailMat), closetTick (ck6Tick),
+   closetDress (ck6DressEnd), lotRigSet (ck6LotCap), ckBookRender (ck6Book), ckBuildUI (ck6UI). Hoisted functions only (no TDZ).
+   ===================================================================== */
+
+/* ---------- paws (a leg's own space, like ck5bSocks: the leg runs down from y 0 to her paw at y -0.38, toes toward +z) ---------- */
+function ck6Smooth(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+function ck6Boot(top, o) {                                              // one smooth piece: a shaft from top down to a rounded foot, its toe pushed forward (a lathe, then shaped)
+  o = o || {}; const P = [], n = 22, foot = o.foot || 1, bot = -0.424;
+  for (let i = 0; i <= n; i++) { const t = i / n, y = top + (bot - top) * t;
+    const leg = ck5bLegR(Math.max(-0.36, y)) + (o.room || 0.013), ball = 0.064 * foot * Math.sqrt(Math.max(0, 1 - Math.pow((y + 0.372) / (0.047 * foot), 2)));
+    let r = y > -0.33 ? leg : Math.max(leg * (y > -0.372 ? 1 : 0), ball, y < -0.408 ? 0 : leg * 0.6);
+    if (t === 1) r = 0; P.push(new THREE.Vector2(Math.max(0.0005, r), y)); }
+  for (let pass = 0; pass < 2; pass++) for (let i = 1; i < n; i++) P[i].x = (P[i - 1].x + 2 * P[i].x + P[i + 1].x) / 4;   /* (no kinks: one soft shape) */
+  if (o.flare) P[0].x += o.flare;
+  P.reverse(); const g = new THREE.LatheGeometry(P, o.seg || 24), a = g.attributes.position;   /* (bottom to top: faces out) */
+  for (let i = 0; i < a.count; i++) { const y = a.getY(i), z = a.getZ(i), s = ck6Smooth(-0.33, -0.395, y);
+    a.setZ(i, (z > 0 ? z * (1 + 0.34 * s * foot) : z * (1 + 0.06 * s)) + 0.02 * s); a.setY(i, y < -0.416 ? -0.416 - (y + 0.416) * 0.6 : y); }   /* (a toe out front, a flat-ish sole) */
+  g.computeVertexNormals(); return g;
+}
+function ck6Booties(B) {                                                // fluffy booties: soft pink suede, one rounded piece, a thick fur cuff, a pom-pom tie, a pale sole
+  const pink = new THREE.Color(0xf6b3c9), deep = new THREE.Color(0xe892b0), c = new THREE.Color(), top = -0.235;
+  B.m(ck6Boot(top, { room: 0.015, foot: 1.05, flare: 0.004 }), (x, y) => y < -0.404 ? 0xe07fa2 : c.copy(deep).lerp(pink, Math.min(1, (y + 0.4) / 0.14)).getHex());
+  const cr = ck5bLegR(top) + 0.02;
+  B.m(ckFluff(CKG.tor(cr, 0.021, 14, 36), 0.06, 4), (x, y, z) => 0.5 + 0.5 * Math.sin(Math.atan2(z, x) * 11) > 0.85 ? 0xfff0f5 : 0xfffafc, [0, top - 0.004, 0], [Math.PI / 2, 0, 0], [1, 1, 1.15]);
+  B.m(ckFluff(CKG.tor(cr - 0.006, 0.014, 10, 30), 0.05, 7), 0xfff4f8, [0, top - 0.026, 0], [Math.PI / 2, 0, 0]);
+  const fz = ck5bLegR(top - 0.03) + 0.03;
+  for (const sx of [-1, 1]) { B.m(ckTaper([[sx * 0.004, top - 0.03, fz - 0.006], [sx * 0.012, top - 0.05, fz + 0.002], [sx * 0.014, top - 0.068, fz]], 0.0026, 0.0022, 8, 5), 0xfff4f8);
+    B.m(ckFluff(CKG.sph(0.0125, 12, 9), 0.12, sx + 3), 0xfffafc, [sx * 0.014, top - 0.074, fz + 0.002]); }
+}
+function ck6Slippers(B) {                                               // glass slippers: a clear pale-blue shoe over her toes (open at the back for her ankle), a frosted rim, a little heel, a bow and a sparkle
+  const ice = 0x9fd6ff, ice2 = 0x7cc0f2, rim = 0xeef9ff, SX = 0.075, SY = 0.053, SZ = 0.106, Y0 = -0.372, Z0 = 0.028;
+  const open = (y, z) => (y - 0.22) / 0.9 + (0.12 - z) * 0.6;                                                  // > 0: the opening (a sloped top, from her ankle forward to the vamp)
+  const shape = (x, y, z) => [x * (1 - 0.18 * Math.max(0, z) * Math.max(0, z)), y + (z < 0 ? 0.3 * -z * Math.max(0, y + 0.4) : 0), z * (1 + 0.1 * Math.max(0, z))];
+  const g = new THREE.SphereGeometry(1, 32, 20), a = g.attributes.position, keep = [], ix = g.index.array, ok = [];
+  for (let i = 0; i < a.count; i++) ok.push(open(a.getY(i), a.getZ(i)) < 0);
+  for (let k = 0; k < ix.length; k += 3) if (ok[ix[k]] && ok[ix[k + 1]] && ok[ix[k + 2]]) keep.push(ix[k], ix[k + 1], ix[k + 2]);
+  const rimPts = []; for (let k = 0; k < 64; k++) { const t = k / 64 * Math.PI * 2; let lo = 0, hi = Math.PI;                    // the rim: where each meridian meets the opening
+    for (let it = 0; it < 24; it++) { const m = (lo + hi) / 2, y = Math.cos(m), z = Math.sin(m) * Math.cos(t); if (open(y, z) > 0) lo = m; else hi = m; }
+    const q = shape(Math.sin(hi) * Math.sin(t), Math.cos(hi), Math.sin(hi) * Math.cos(t)); rimPts.push(new THREE.Vector3(q[0] * SX, Y0 + q[1] * SY, Z0 + q[2] * SZ)); }
+  for (let i = 0; i < a.count; i++) { const q = shape(a.getX(i), a.getY(i), a.getZ(i)); a.setXYZ(i, q[0], q[1], q[2]); }
+  g.setIndex(keep); g.computeVertexNormals();
+  B.l(ckTwoSided(g), (x, y, z, i) => Math.abs(x * 0.8 + y * 0.5 - 0.42) < 0.06 || ck5bHash(i, 3) > 0.94 ? 0xf2fbff : y < -0.82 ? ice2 : ice, [0, Y0, Z0], null, [SX, SY, SZ]);   /* (a bright streak: the glass catching the light) */
+  B.s(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rimPts, true), 80, 0.0042, 6, true), rim);
+  B.l(CKG.cyl(0.012, 0.007, 0.036, 10), ice2, [0, -0.41, -0.06], [0.15, 0, 0]);                                    // the little heel
+  B.l(CKG.cyl(0.013, 0.013, 0.004, 12), ice, [0, -0.428, -0.063]);
+  let fr = rimPts[0]; for (const p of rimPts) if (p.z > fr.z) fr = p;                                             // the bow and its jewel, at the front of the opening
+  for (const sx of [-1, 1]) B.s(CKG.sph(0.016, 12, 9), 0xdff3ff, [sx * 0.017, fr.y + 0.003, fr.z + 0.002], [0.6, 0, sx * 0.5], [1.25, 0.75, 0.45]);
+  B.s(CKG.sph(0.0075, 10, 8), 0xffffff, [0, fr.y + 0.004, fr.z + 0.005]);
+  B.g(new THREE.OctahedronGeometry(1, 0), 0xffffff, [0.024, fr.y - 0.012, fr.z + 0.012], null, [0.0045, 0.015, 0.0045]);   // a twinkle
+  B.g(new THREE.OctahedronGeometry(1, 0), 0xffffff, [0.024, fr.y - 0.012, fr.z + 0.012], null, [0.015, 0.0045, 0.0045]);
+}
+
+/* ---------- 🍄 Mushroom Royalty ---------- */
+function ck6Dome(B, k, r, h, col, under, spots, p, seed) {             // a toadstool's cap: a dome (white spots on it), its gills underneath; p: where its rim's middle is (in the current frame)
+  p = p || [0, 0, 0];
+  B[k](new THREE.SphereGeometry(1, 30, 12, 0, Math.PI * 2, 0, Math.PI / 2), col, p, null, [r, h, r]);
+  B.m(CKG.cyl(r * 0.985, r * 0.32, h * 0.22, 30, false), (x, y, z) => Math.sin(Math.atan2(z, x) * 28) > 0.6 ? 0xe8d6bd : under, [p[0], p[1] - h * 0.1, p[2]]);
+  const n = spots || 0, v = new THREE.Vector3(), nn = new THREE.Vector3();
+  for (let i = 0; i < n; i++) { const a = i * 2.39996 + (seed || 0), el = 0.25 + 0.95 * ((i * 0.618 + 0.13) % 1); if (el > 1.25) continue;
+    const sx = Math.sin(el) * Math.cos(a), sy = Math.cos(el), sz = Math.sin(el) * Math.sin(a), s = 0.55 + 0.45 * ((i * 0.37) % 1);
+    v.set(p[0] + sx * r * 1.01, p[1] + sy * h * 1.01, p[2] + sz * r * 1.01); nn.set(sx / r, sy / h, sz / r).normalize();
+    ck5bOn(B, 'm', ckFlat(ckSnDisc(r * 0.14 * s, r * 0.14 * s, 12), r * 0.03), 0xfffaf0, v, nn, 0); }
+}
+function ck6ToadCrown(B) {                                              // a red toadstool cap on her head, white spots, a gold crown circlet round its rim: points, a ruby, pearls
+  B.frame([0, 0.1, -0.012], [-0.16, 0, 0]);
+  ck6Dome(B, 's', 0.135, 0.125, 0xd9232f, 0xf4e6cf, 17, [0, 0.03, 0], 0.4);
+  const gold = 0xf2c14a, R = 0.137;
+  B.s(CKG.tor(R, 0.0075, 7, 48), gold, [0, 0.032, 0], [Math.PI / 2, 0, 0]);
+  for (let i = 0; i < 7; i++) { const a = Math.PI / 2 + (i - 3) * 0.42, x = Math.cos(a) * (R + 0.003), z = Math.sin(a) * (R + 0.003), h = i === 3 ? 0.05 : 0.038;
+    B.s(ckFlat([[-0.016, 0], [0.016, 0], [0, h]], 0.004), gold, [x, 0.034, z], [0, Math.PI / 2 - a, 0]);
+    B.s(CKG.sph(i === 3 ? 0.0062 : 0.005, 8, 6), 0xfff6ee, [x * 1.02, 0.036 + h, z * 1.02]); }
+  B.s(CKG.sph(0.011, 12, 9), 0xc8102e, [0, 0.046, R + 0.008], null, [1, 1.2, 0.6]);                               // the ruby in front
+  for (const sx of [-1, 1]) B.s(CKG.sph(0.0065, 8, 6), 0x5fd0ff, [Math.cos(Math.PI / 2 + sx * 0.84) * (R + 0.006), 0.042, Math.sin(Math.PI / 2 + sx * 0.84) * (R + 0.006)]);
+  B.frame();
+}
+function ck6ToadCape(B) {                                               // a toadstool cape: deep red, white spots, a scalloped cream hem like a mushroom's edge, a little mushroom brooch
+  B.cape = { col: (u, v) => v > 0.9 || Math.abs(u) > 0.94 ? 0xf6ead6 : v > 0.84 ? 0xa3141f : 0xc01d29, shape: 'scallop' };
+  const gold = 0xf2c14a, L = [new THREE.Vector3(-0.19, 0.49, 0.2), new THREE.Vector3(-0.13, 0.46, 0.34), new THREE.Vector3(0, 0.45, 0.4), new THREE.Vector3(0.13, 0.46, 0.34), new THREE.Vector3(0.19, 0.49, 0.2)];
+  B.s(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(L), 24, 0.005, 5, false), gold);
+  B.frame([0, 0.446, 0.408], [-0.35 + Math.PI / 2, 0, 0]);             // the brooch: a little toadstool (its cap toward her chin)
+  B.s(CKG.cyl(0.009, 0.011, 0.02, 10), 0xfff4e0, [0, -0.012, 0]);
+  B.s(new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0xd9232f, [0, 0, 0], null, [0.024, 0.017, 0.024]);
+  for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; B.s(CKG.sph(0.004, 6, 5), 0xffffff, [Math.cos(a) * 0.015, 0.011, Math.sin(a) * 0.015]); }
+  B.frame();
+  B.hideClasp = true;
+  B.post = G => { G.g = ckSnSheetDeco(G.cape, blob => {
+    for (let i = 0; i < 17; i++) { const u = ((i * 0.618034 + 0.2) % 1) * 1.6 - 0.8, v = 0.1 + ((i * 0.381966 + 0.05) % 1) * 0.68, r = 0.016 + 0.012 * ((i * 0.7) % 1);
+      blob(u, v, ckSnDisc(r, r * 0.92, 14), 0.003, 0xfffaf0, 0xf2e6d6); }
+  }); };
+}
+function ck6Parasol(B) {                                                // a mushroom parasol: a cream stalk from a little harness, a big spotted red cap held up over her back, gills underneath
+  const cream = 0xf4ead8, X = 0, Y = 0.64, Z = -0.12;
+  B.m(ck4RBox(0.07, 0.03, 0.08, 0.012, 3), 0x8a5a36, [X, Y, Z]);                                                  // the holder, on her back
+  B.m(ckTaper([[X, Y, Z], [X, Y + 0.1, Z - 0.03], [X, Y + 0.21, Z - 0.07]], 0.016, 0.012, 12, 8), cream);       // the stalk, leaning back a little
+  B.m(CKG.tor(0.017, 0.006, 6, 16), 0xf2c14a, [X, Y + 0.05, Z - 0.012], [Math.PI / 2 - 0.25, 0, 0]);
+  B.m(new THREE.SphereGeometry(1, 16, 8), (x, y) => y < 0 ? 0xe6dcc8 : cream, [X, Y + 0.15, Z - 0.05], [0.25, 0, 0], [0.032, 0.012, 0.032]);   // a ring (annulus) part way up
+  B.frame([X, Y + 0.215, Z - 0.072], [-0.28, 0, 0]);
+  ck6Dome(B, 's', 0.21, 0.12, 0xd9232f, 0xf2e2c8, 20, [0, 0, 0], 1.1);
+  for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; B.s(CKG.sph(0.016, 8, 6), 0xd9232f, [Math.cos(a) * 0.205, -0.004, Math.sin(a) * 0.205], null, [1.4, 0.7, 1.4]); }   /* (a soft scalloped edge) */
+  B.s(CKG.sph(0.012, 8, 6), 0xf2c14a, [0, 0.122, 0]);                                                            // a gold knob on top
+  B.frame(); ckStraps(B, 0x8a5a36);
+}
+function ck6MossBooties(B) {                                            // moss booties: soft green felt, a mossy cuff, a tiny red toadstool growing on each
+  const g0 = new THREE.Color(0x3f6a2a), g1 = new THREE.Color(0x6f9a46), c = new THREE.Color(), top = -0.25;
+  B.m(ck6Boot(top, { room: 0.014, foot: 1.02 }), (x, y, z, i) => y < -0.404 ? 0x4a6e2c : c.copy(g0).lerp(g1, Math.min(1, (y + 0.4) / 0.15) * 0.7 + 0.3 * ck5bHash(i, 1)).getHex());
+  const cr = ck5bLegR(top) + 0.018;
+  B.m(ckFluff(CKG.tor(cr, 0.019, 12, 32), 0.22, 9), (x, y, z, i) => ck5bHash(i, 5) > 0.75 ? 0x9cc46a : ck5bHash(i, 6) > 0.5 ? 0x5f8f3a : 0x4c7a30, [0, top - 0.004, 0], [Math.PI / 2, 0, 0]);
+  const sx = 1, px = sx * (ck5bLegR(-0.3) + 0.016);                     // a little toadstool on the outside of the shaft
+  B.m(CKG.cyl(0.0055, 0.007, 0.022, 8), 0xfff4e0, [px, -0.3, 0.008]);
+  B.s(new THREE.SphereGeometry(1, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2), 0xd9232f, [px, -0.29, 0.008], null, [0.019, 0.014, 0.019]);
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + 0.4; B.s(CKG.sph(0.0034, 6, 5), 0xffffff, [px + Math.cos(a) * 0.011, -0.282, 0.008 + Math.sin(a) * 0.011]); }
+}
+function ck6Earring(B, charm, tilt) {                                   // (head space, like ck4Earrings) a stud on each ear, a gold hook out beside it, charm(B) hanging from it (it swings)
+  const gold = 0xf2c14a, cnt = () => B.parts.s.reduce((n, [g]) => n + g.attributes.position.count, 0), groups = [];
+  for (const [sx, H, n] of [[1, [0.1237, 0.1145, -0.0015], [0.9967, 0.066, -0.0473]], [-1, [-0.1237, 0.1135, -0.0137], [-0.9967, 0.0727, 0.0361]]]) {
+    B.frame(H, [0, Math.atan2(n[0], n[2]), 0]); B.s(CKG.sph(0.0055, 8, 6), gold, [0, 0, 0.001], null, [1, 1, 0.6]); B.frame();
+    const Pv = [sx * 0.188, 0.096, H[2]];
+    B.s(ckTaper([[H[0] + sx * 0.003, H[1] - 0.002, H[2]], [H[0] + sx * 0.026, H[1] + 0.01, H[2]], [sx * 0.174, 0.11, H[2]], [Pv[0], Pv[1] + 0.003, Pv[2]]], 0.0019, 0.0019, 14, 5), gold);
+    const a = cnt(); B.frame(Pv, [0, sx * (tilt == null ? 0.75 : tilt), 0]); charm(B, sx); B.frame();
+    groups.push({ c: Pv, a, b: cnt(), sx, ph: sx > 0 ? 0.3 : 2.0 });
+  }
+  B.fx = { sway: { k: 's', groups } };
+}
+function ck6ToadStuds(B) {                                              // toadstool earrings: a tiny spotted red mushroom swinging from each ear
+  ck6Earring(B, b => { b.M.multiply(b.mat(null, null, 1.35));
+    b.s(ckTaper([[0, 0, 0], [0, -0.008, 0.001], [0, -0.016, 0]], 0.0012, 0.0012, 6, 4), 0xf2c14a);
+    b.s(CKG.cyl(0.0055, 0.0075, 0.017, 10), 0xfff4e0, [0, -0.036, 0]);
+    b.s(new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0xd9232f, [0, -0.03, 0], null, [0.016, 0.014, 0.016]);
+    b.s(CKG.cyl(0.0155, 0.006, 0.003, 12), 0xf2e2c8, [0, -0.0305, 0]);
+    for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2 + 0.3; b.s(CKG.sph(0.0028, 6, 5), 0xffffff, [Math.cos(a) * 0.0095, -0.022, Math.sin(a) * 0.0095]); }
+    b.s(CKG.sph(0.0028, 6, 5), 0xffffff, [0, -0.0165, 0]);
+  }, 0.6);
+}
+
+
+/* ---------- 🍁 Cozy Autumn ---------- */
+function ck6HarvestToque(B) {                                           // a mustard cable-knit toque, a rust ribbed brim, a big two-tone pom-pom, a little maple leaf
+  const mus = 0xe2a62a, mus2 = 0xc98d1c, rust = 0xb5461c, cream = 0xfff1dc;
+  B.frame([0, 0.004, -0.008], [-0.24, 0, 0], [1.05, 0.98, 1]);
+  B.m(new THREE.SphereGeometry(0.17, 32, 18, 0, Math.PI * 2, 0, 1.1), (x, y, z) => { const a = Math.atan2(x, z), c = Math.sin(a * 9 + Math.sin(y * 90) * 0.9); return c > 0.55 ? 0xf0bd48 : c < -0.6 ? mus2 : mus; });   /* (cables twisting up) */
+  B.m(CKG.tor(0.151, 0.02, 8, 44), (x, y) => Math.sin(Math.atan2(y, x) * 40) > 0 ? rust : 0x9c3a16, [0, 0.077, 0], [Math.PI / 2, 0, 0]);
+  B.m(ckFluff(CKG.sph(0.05, 16, 12), 0.22, 11), (x, y, z, i) => ck5bHash(i, 2) > 0.5 ? rust : ck5bHash(i, 4) > 0.4 ? cream : 0xe2a62a, [0, 0.182, 0]);
+  B.m(ckFlat(ckMaplePts(0.026), 0.006), 0xd9381e, [0.07, 0.085, 0.15], [-0.08, 0.45, 0.2]);
+  B.frame();
+}
+function ck6Scarf(B, o) {                                               // a chunky knit scarf wound round her neck, two ends down her chest with fringe (o: the colours and stripes)
+  const N = ckNeck(0.032, 0.035), rs = 10, A = o.a, Bc = o.b;
+  B.m(new THREE.TubeGeometry(N.curve, 72, o.r || 0.026, rs, true), (x, y, z, i) => { const seg = Math.floor(i / (rs + 1)); return o.ring(seg, i % (rs + 1)); });
+  const ch = CK_BODY[1], f = ckFrontOf(N, 0.7);
+  B.m(ckFluff(CKG.sph(0.031, 12, 9), 0.12, 2), A, [f.p.x + 0.004, f.p.y - 0.006, f.p.z + 0.018], null, [1.2, 1, 0.8]);   // the knot
+  [[-1, 0.0, 0.18], [1, 0.04, 0.14]].forEach(([sd, dx, len]) => {
+    const pts = []; for (let k = 0; k <= 8; k++) { const t = k / 8, y = f.p.y - 0.014 - t * len, x = f.p.x + dx + sd * 0.012 * t; const zz = ch[2] + Math.sqrt(Math.max(0, (ch[3] + 0.034) ** 2 - x * x - (y - ch[1]) ** 2)) + 0.004; pts.push(new THREE.Vector3(x, y, Math.max(zz, f.p.z + 0.004 - t * 0.05))); }
+    const cu = new THREE.CatmullRomCurve3(pts), g = ckStrip(cu, new THREE.Vector3(1, 0, -0.15), o.w || 0.054, 0.012, 24);
+    B.m(g, (x, y) => o.end((f.p.y - y) / len));
+    const e = pts[8]; for (let k = 0; k < 6; k++) B.m(CKG.cyl(0.0034, 0.0024, 0.03, 5), k % 2 ? A : Bc, [e.x - 0.022 + k * 0.0088, e.y - 0.014, e.z + 0.001]);
+  });
+}
+function ck6ChunkyScarf(B) {                                            // rust and mustard, cream flecks
+  const rust = 0xb84a22, mus = 0xe2a62a, cr = 0xfff1dc;
+  ck6Scarf(B, { a: rust, b: mus, r: 0.028, ring: (s, j) => (s % 12 < 2 ? mus : (s + j) % 7 === 0 ? cr : rust), end: t => (Math.floor(t * 8) % 3 === 2 ? mus : rust) });
+}
+function ck6Cardigan(B) {                                               // a cinnamon cardigan: ribbed hem and neck, a cream button placket down her chest, two patch pockets, a leaf on the back
+  const cin = 0xb8612e, cin2 = 0xa45426, rib = 0x8f4620, cream = 0xf6e7cc;
+  const sh = ck5bShell({ m: 0.02, nd: 0.03, zb: -0.31, zbB: -0.17, cols: 56, rows: 26, bump: (u, f, k, j) => 0.0014 * Math.sin(k * 2.3) * Math.sin(j * 2.9),
+    col: (u, f, k, j) => { if (j >= 23) return k % 2 ? rib : cin2; if (Math.abs(Math.abs(f) - Math.PI) < 0.09) return cream; return (k + j) % 2 ? cin : cin2; } });
+  B.m(sh.g, sh.c);
+  B.m(ck5bHem(sh.front, true, 0.017, 0.004), (x, y, z, i) => (i >> 2) % 2 ? rib : cin2); B.m(ck5bHem(sh.back, true, 0.008, 0.002), rib);
+  for (const u of [0.06, 0.15, 0.24, 0.33]) { const p = sh.at(u, Math.PI, 0.006); B.s(CKG.cyl(0.008, 0.008, 0.005, 12), 0x6a3a1a, [p.x, p.y, p.z], [0, 0, 0]); }
+  for (const sx of [-1, 1]) { const f = sx * 2.0, p = sh.at(0.62, f, 0.004), n = new THREE.Vector3(Math.sin(f), Math.cos(f), 0); ck5bOn(B, 'm', ck4RBox(0.06, 0.05, 0.006, 0.01, 3), cin2, p, n, sx * Math.PI / 2); }
+  const p = sh.at(0.5, 0, 0.004); ck5bOn(B, 'm', ckFlat(ckMaplePts(0.035), 0.004), 0xe2a62a, p, new THREE.Vector3(0, 1, 0), Math.PI);
+}
+function ck6AcornEars(B) {                                              // acorn earrings: a little acorn and an oak leaf swinging from each ear
+  ck6Earring(B, b => { b.M.multiply(b.mat(null, null, 1.3));
+    b.s(ckTaper([[0, 0, 0], [0, -0.008, 0.001], [0, -0.016, 0]], 0.0012, 0.0012, 6, 4), 0xf2c14a);
+    b.s(CKG.sph(1, 14, 10), 0xc68a45, [0, -0.034, 0], null, [0.0105, 0.0135, 0.0105]);                           // the nut
+    b.s(CKG.cone(0.003, 0.006, 6), 0x7a4a22, [0, -0.0485, 0], [Math.PI, 0, 0]);
+    b.s(new THREE.SphereGeometry(1, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2), (x, y, z) => Math.sin(x * 900) * Math.sin(z * 900) > 0 ? 0x6a4122 : 0x845331, [0, -0.028, 0], null, [0.0125, 0.0095, 0.0125]);   // the cap (a little cross-hatch)
+    b.s(CKG.cyl(0.0016, 0.0016, 0.007, 5), 0x5a3418, [0, -0.0165, 0]);
+    b.s(ckFlat([[0, 0], [0.006, 0.005], [0.012, 0.004], [0.017, 0.008], [0.021, 0.002], [0.016, -0.004], [0.008, -0.004]], 0.0018), 0xd06a22, [0.002, -0.02, 0.002], [0, 0, -0.5]);
+  }, 0.7);
+}
+function ck6PlaidRibbon(B) {                                            // a tartan ribbon bow on her tail (rust, mustard and forest green), two tails fluttering down
+  const plaid = (x, y) => { const a = Math.floor((x + 1) * 160) % 4, b = Math.floor((y + 1) * 160) % 4; return a === 0 && b === 0 ? 0xf2c14a : a === 0 || b === 0 ? 0x2f5a35 : (a + b) % 2 ? 0xb8452a : 0x9c3420; };
+  B.m(CKG.tor(0.045, 0.0075, 6, 24), 0xb8452a, [0, 0, -0.03]);
+  B.frame([0, 0.064, -0.03], [0, 0, 0], 2.6);
+  for (const sx of [-1, 1]) { B.m(CKG.sph(0.021, 14, 10), plaid, [sx * 0.027, 0.006, 0], [0, 0, sx * 0.38], [1.45, 0.85, 0.5]);
+    B.m(ckFlat([[-0.006, 0], [0.006, 0], [0.008, -0.05], [0, -0.042], [-0.008, -0.05]], 0.003), plaid, [sx * 0.012, -0.012, 0.002], [0, 0, sx * 0.35]); }
+  B.m(CKG.sph(0.011, 10, 8), 0x2f5a35);
+  B.frame();
+}
+
+/* ---------- ❄️ Snow Day ---------- */
+function ck6Parka(B) {                                                  // a puffy cherry-red parka: quilted channels, a white fur-trimmed hood down on her shoulders, a zip and toggles
+  const red = 0xd42f3c, red2 = 0xb82532, seam = 0x9a1c28, fur = 0xfffaf2;
+  const sh = ck5bShell({ m: 0.026, nd: 0.025, zb: -0.33, zbB: -0.19, cols: 56, rows: 28, bump: (u, f, k, j) => 0.006 * Math.abs(Math.sin(j / 28 * Math.PI * 5.5)),
+    col: (u, f, k, j) => { const q = j / 28 * 5.5 % 1; if (q < 0.07 || q > 0.93) return seam; if (j >= 26) return red2; if (Math.abs(Math.abs(f) - Math.PI) < 0.05) return 0x3a3a42; return (k % 7) ? red : red2; } });
+  B.s(sh.g, sh.c);
+  B.s(ck5bHem(sh.back, true, 0.012, 0.003), red2);
+  const top = sh.at(0, 0, 0);                                           // the hood, down on her shoulders, and its fur trim
+  B.s(ckFluff(CKG.sph(1, 22, 14), 0.04, 3), (x, y, z) => y > 0.5 ? seam : red, [0, top.y + 0.01, top.z - 0.06], [-0.1, 0, 0], [0.17, 0.06, 0.11]);
+  B.m(ckFluff(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(sh.front.slice(0, -1).map(p => p.clone().multiplyScalar(1).add(new THREE.Vector3(0, 0.006, 0))), true, 'centripetal'), 96, 0.024, 8, true), 0.02, 5), (x, y, z, i) => ck5bHash(i, 8) > 0.8 ? 0xf0e8dc : fur);
+  for (const u of [0.1, 0.22]) { const p = sh.at(u, Math.PI, 0.012); B.s(CKG.cyl(0.006, 0.006, 0.032, 8), 0xe8e8ee, [p.x, p.y, p.z], [0, 0, Math.PI / 2]); }   // toggles
+}
+function ck6Earmuffs(B) {                                               // fluffy white earmuffs over her ears on a sky-blue band, a snowflake on each
+  const band = 0x7fc4f2, fluff = 0xfffcff;
+  const pts = [[-0.13, 0.15, -0.02], [-0.1, 0.205, -0.03], [-0.04, 0.232, -0.035], [0.04, 0.232, -0.035], [0.1, 0.205, -0.03], [0.13, 0.15, -0.02]].map(p => new THREE.Vector3(p[0], p[1], p[2]));
+  B.s(ckStrip(new THREE.CatmullRomCurve3(pts), new THREE.Vector3(0, 0, 1), 0.028, 0.009, 32), band);
+  for (const sx of [-1, 1]) {
+    B.m(ckFluff(CKG.sph(1, 20, 14), 0.08, sx + 5), (x, y, z, i) => ck5bHash(i, 9) > 0.85 ? 0xeef4ff : fluff, [sx * 0.142, 0.15, -0.012], [0, 0, sx * 0.25], [0.04, 0.056, 0.056]);
+    B.s(ckFlat(ckStarPts(0.02, 0.35), 0.003), 0x9fd6ff, [sx * 0.183, 0.155, -0.012], [0, sx * Math.PI / 2, 0]); }
+}
+function ck6MittenBoots(B) {                                            // knit mitten-boots: cream with sky-blue stripes, a ribbed cuff, a thumb, a little pom-pom
+  const cream = 0xfaf4ea, blue = 0x5fa8e0, top = -0.25;
+  B.m(ck6Boot(top, { room: 0.016, foot: 1.08 }), (x, y, z, i) => { const b = Math.floor((y + 0.42) / 0.018); if (y < -0.405) return 0xd9cfc0; if (b === 4 || b === 6) return blue; return (i % 3) ? cream : 0xf0e8dc; });
+  B.m(CKG.tor(ck5bLegR(top) + 0.017, 0.012, 8, 28), (x, y) => Math.sin(Math.atan2(y, x) * 18) > 0 ? blue : 0x4f97d0, [0, top, 0], [Math.PI / 2, 0, 0]);
+  B.m(CKG.sph(1, 12, 9), cream, [-0.05, -0.37, 0.05], [0, 0, 0.3], [0.02, 0.026, 0.024]);                        // the thumb
+  B.m(ckFluff(CKG.sph(0.014, 12, 9), 0.18, 3), 0xffffff, [0, top - 0.02, ck5bLegR(top) + 0.028]);
+}
+function ck6SledBell(B) {                                               // a red leather sled-bell collar: silver studs, three gold sleigh bells across the front
+  const N = ckNeckBand(B, B.m, 0xb3202c, 0.026, 0.013, 0.012);
+  for (let i = 0; i < 14; i++) { const u = i / 14; if (Math.abs(u - 0.75) < 0.1) continue; const f = ckFrontOf(N, u); B.s(CKG.sph(0.0045, 6, 5), 0xdfe6ee, [f.p.x + f.out.x * 0.007, f.p.y + f.out.y * 0.007, f.p.z + f.out.z * 0.007]); }
+  for (const u of [0.69, 0.75, 0.81]) { const f = ckFrontOf(N, u, -0.006), c = f.p.clone().addScaledVector(f.out, 0.022).add(new THREE.Vector3(0, -0.014, 0)), big = u === 0.75 ? 1.15 : 0.9;
+    B.s(CKG.sph(0.02 * big, 14, 10), (x, y) => Math.abs(y) < 0.0035 ? 0x8a6418 : 0xf5c542, [c.x, c.y, c.z]);
+    B.m(CKG.box(0.016 * big, 0.003, 0.005), 0x3a2a10, [c.x, c.y - 0.008 * big, c.z + 0.016 * big]); }
+}
+
+/* ---------- 👑 True Princess ---------- */
+function ck6Loop(C, n, m) {                                             // a closed loop round her body, in the plane through C with normal n (for a sash): { curve, n }
+  const N = new THREE.Vector3().fromArray(n).normalize(), e1 = new THREE.Vector3(0, 1, 0).addScaledVector(N, -N.y).normalize(), e2 = new THREE.Vector3().crossVectors(N, e1), pts = [], K = 48;
+  for (let i = 0; i < K; i++) { const a = i / K * Math.PI * 2, d = e1.clone().multiplyScalar(Math.cos(a)).addScaledVector(e2, Math.sin(a)), r = ckReach(C, [d.x, d.y, d.z], CK_BODY, m, 0.5) || 0.2;
+    pts.push(new THREE.Vector3(C[0] + d.x * r, C[1] + d.y * r, C[2] + d.z * r)); }
+  for (let pass = 0; pass < 3; pass++) { const s = pts.map(p => p.clone()); for (let i = 0; i < K; i++) pts[i].copy(s[(i + K - 1) % K]).add(s[i]).add(s[(i + 1) % K]).multiplyScalar(1 / 3); }
+  return { curve: new THREE.CatmullRomCurve3(pts, true, 'centripetal'), n: N };
+}
+function ck6Sash(B) {                                                   // a royal sash: sky-blue satin edged in gold, from her shoulder across her chest and round under her, a gold star medal on a ribbon
+  const L = ck6Loop([0, 0.47, 0.1], [0.6, -0.42, 0.68], 0.02), L2 = ck6Loop([0, 0.47, 0.1], [0.6, -0.42, 0.68], 0.026);
+  B.s(ckBand(L.curve, L.n, 0.058, 0.004, 96), 0xf2c14a); B.s(ckBand(L2.curve, L2.n, 0.044, 0.004, 96), 0x4f98ea);   /* (gold edging under sky-blue satin) */
+  let fr = null; for (let i = 0; i < 64; i++) { const p = L2.curve.getPointAt(i / 64); if (p.y > 0.4 && p.y < 0.56 && (!fr || p.z > fr.z)) fr = p; }   // the medal, on her chest
+  if (fr) { const o = new THREE.Vector3(fr.x, 0, fr.z - 0.2).normalize(), c = fr.clone().addScaledVector(o, 0.012);
+    B.frame([c.x, c.y, c.z], [0, Math.atan2(o.x, o.z), 0]);
+    B.m(ckFlat([[-0.016, 0.02], [0.016, 0.02], [0.012, -0.018], [0, -0.008], [-0.012, -0.018]], 0.003), 0xe8283c, [0, 0.005, 0]);
+    B.s(ckFlat(ckStarPts(0.024, 0.45), 0.006), 0xf5c542, [0, -0.026, 0.004]); B.s(CKG.sph(0.007, 10, 8), 0xe8283c, [0, -0.026, 0.009], null, [1, 1, 0.5]);
+    B.frame(); }
+}
+function ck6JewelTiara(B) {                                             // a tall gold tiara: five pointed arches, a big oval ruby in the middle, sapphires and emeralds, pearls on every point
+  const base = () => B.mat([0, 0.004, 0.052], [0.36, 0, 0]), gold = 0xf2c14a, R = 0.14, sx = 1.19, sy = 0.955;
+  B.M = base(); B.s(CKG.tor(R, 0.012, 7, 48, 2.1), gold, [0, 0, 0], [0, 0, Math.PI / 2 - 1.05], [sx, sy, 1]);
+  const at = a => [Math.sin(a) * R * sx, Math.cos(a) * R * sy];
+  for (let k = -8; k <= 8; k++) { const a = k / 8 * 0.98, [x, y] = at(a); B.M = base().multiply(B.mat([x, y, 0.012], [0, 0, -a])); B.s(CKG.sph(0.0055, 8, 6), 0xfff6ee); }
+  const peak = (w, h) => [[-w, 0], [w, 0], [w * 0.7, h * 0.45], [0, h], [-w * 0.7, h * 0.45]];
+  const gems = [[0, 0.13, 0.038, 0xd0103a], [0.36, 0.095, 0.03, 0x2f6fe0], [-0.36, 0.095, 0.03, 0x2f6fe0], [0.7, 0.062, 0.024, 0x1fae6a], [-0.7, 0.062, 0.024, 0x1fae6a]];
+  for (const [a, h, w, gc] of gems) {
+    const [x, y] = at(a); B.M = base().multiply(B.mat([x, y, 0], [0, 0, -a]));
+    B.s(ckFlat(peak(w, h), 0.007, [peak(w * 0.55, h * 0.6).map(([px, py]) => [px, py + h * 0.2])]), gold);
+    B.s(CKG.sph(a ? 0.0075 : 0.0095, 10, 8), 0xfff6ee, [0, h + 0.006, 0]);
+    B.s(new THREE.OctahedronGeometry(1, 1), gc, [0, h * 0.42, 0.008], null, [w * 0.42, w * 0.62, 0.01]);           // the gem in each arch
+    B.s(CKG.sph(0.004, 6, 5), 0xffffff, [-w * 0.12, h * 0.5, 0.017]);
+  }
+  B.frame();
+}
+function ck6BallCape(B) {                                               // a midnight-ball cape: periwinkle silk to lilac at the hem, a long train, silver edging, twinkles all over, a sapphire brooch
+  const c = new THREE.Color(), a = new THREE.Color(0x6f8cf0), b = new THREE.Color(0xa77ff0);
+  B.cape = { col: (u, v) => v > 0.93 || Math.abs(u) > 0.95 ? 0xe8eef8 : c.copy(a).lerp(b, v).getHex(), shape: 'regal' };
+  const L = [new THREE.Vector3(-0.19, 0.49, 0.2), new THREE.Vector3(-0.13, 0.46, 0.34), new THREE.Vector3(0, 0.45, 0.4), new THREE.Vector3(0.13, 0.46, 0.34), new THREE.Vector3(0.19, 0.49, 0.2)];
+  B.s(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(L), 24, 0.005, 5, false), 0xe8eef8);
+  B.s(new THREE.OctahedronGeometry(1, 1), 0x2f6fe0, [0, 0.45, 0.41], [-0.35, 0, 0], [0.018, 0.024, 0.01]);
+  B.s(CKG.tor(0.024, 0.004, 6, 20), 0xe8eef8, [0, 0.45, 0.405], [-0.35, 0, 0], [0.85, 1.1, 1]);
+  B.hideClasp = true; B.fx = { silk: 1 };
+  B.post = G => { G.g = ck4SparkleDeco(G.cape); };
+}
+
+/* ---------- 🏒 Toronto Fan (generic: blue and white, no logos) ---------- */
+function ck6BallCap(B) {                                                // a blue ball cap: white panel seams, a white peak, a button on top, a little white star
+  const blue = 0x1d4fa8, white = 0xf4f6fb;
+  B.frame([0, 0.012, -0.012], [-0.2, 0, 0]);
+  B.m(new THREE.SphereGeometry(0.166, 32, 14, 0, Math.PI * 2, 0, 1.08), (x, y, z) => { const a = Math.atan2(x, z); return Math.abs(Math.sin(a * 3)) < 0.06 && y > 0.09 ? white : blue; });
+  B.m(CKG.tor(0.146, 0.008, 6, 40), white, [0, 0.078, 0], [Math.PI / 2, 0, 0]);
+  B.m(CKG.sph(0.014, 10, 8), white, [0, 0.168, 0], null, [1, 0.5, 1]);
+  B.m(new THREE.CylinderGeometry(0.15, 0.15, 0.012, 28, 1, false, -1.1, 2.2), (x, y, z) => y < 0 ? white : blue, [0, 0.074, 0.075], [0.22, 0, 0], [1, 1, 1.1]);   // the peak (blue on top, white under)
+  B.m(ckFlat(ckStarPts(0.03, 0.42), 0.005), white, [0, 0.13, 0.12], [-0.75, 0, 0]);
+  B.frame();
+}
+function ck6FanScarf(B) {                                               // a blue-and-white bar scarf, fringe on the ends
+  const blue = 0x1d4fa8, white = 0xf4f6fb;
+  ck6Scarf(B, { a: blue, b: white, r: 0.025, ring: s => (s % 12 < 3 ? white : blue), end: t => (Math.floor(t * 9) % 3 === 1 ? white : blue) });
+}
+function ck6FoamFinger(B) {                                             // a giant foam finger on her back: blue, pointing up, a white star on the palm, on a little harness
+  const blue = 0x2a5fc4, white = 0xf4f6fb;
+  B.frame([0, 0.69, -0.08], [-0.28, 0, 0]);
+  B.m(ck4RBox(0.12, 0.1, 0.05, 0.022, 3), blue, [0, 0.05, 0]);                                                   // the hand
+  for (let i = 0; i < 3; i++) B.m(ck4RBox(0.032, 0.04, 0.05, 0.014, 3), blue, [-0.04 + i * 0.036 + 0.012, 0.1, 0.006], [-0.3, 0, 0]);   // three curled fingers
+  B.m(ck4RBox(0.036, 0.14, 0.046, 0.017, 3), blue, [-0.042, 0.16, 0]);                                           // the pointing finger
+  B.m(ck4RBox(0.03, 0.06, 0.04, 0.013, 3), blue, [0.072, 0.05, 0.004], [0, 0, -0.6]);                            // the thumb
+  B.m(ckFlat(ckStarPts(0.03, 0.45), 0.006), white, [0.012, 0.045, 0.027]);
+  B.m(ck4RBox(0.13, 0.02, 0.055, 0.008, 2), white, [0, -0.005, 0]);                                              // a white cuff
+  B.frame(); ckStraps(B, 0x16408a);
+}
+function ck6CoffeeCharm(B) {                                            // a big double-cupped coffee hanging from her tail: two plain cups one in the other, a brown sleeve, a white lid
+  B.s(CKG.tor(0.046, 0.0062, 6, 24), 0xc9ccd4, [0, 0, -0.03]);
+  B.s(CKG.tor(0.007, 0.0026, 5, 10), 0xc9ccd4, [0, -0.054, -0.03]);
+  B.frame([0, -0.125, -0.03], [0, 0, 0], 1.75);
+  B.m(CKG.cyl(0.026, 0.019, 0.06, 18), 0xf6f2ea, [0, 0, 0]);                                                     // the outer cup
+  B.m(CKG.cyl(0.0265, 0.0262, 0.008, 18), 0xe9e2d6, [0, 0.026, 0]);                                              // the inner cup's rim, peeking out
+  B.m(CKG.cyl(0.0255, 0.022, 0.026, 18), 0x9a6a3c, [0, -0.002, 0]);                                              // the sleeve
+  B.s(CKG.cyl(0.028, 0.027, 0.008, 18), 0xffffff, [0, 0.034, 0]); B.s(CKG.cyl(0.02, 0.026, 0.006, 18), 0xffffff, [0, 0.041, 0]);   // the lid
+  B.m(CKG.box(0.008, 0.002, 0.004), 0x3a2a1a, [0, 0.0445, 0.016]);
+  B.frame();
+}
+
+/* ---------- 🏆 earned in the mini-games (exclusives: never sold) ---------- */
+function ck6AceHelmet(B) {                                              // Sky Paws: a brown leather flying helmet, stitched seams, ear flaps with buckles, green-lensed goggles pushed up on top
+  const lea = 0x7a4a2a, lea2 = 0x5e3820, stitch = 0xe8d2a8, brass = 0xcf9f45;
+  B.frame([0, 0.0, -0.01], [-0.2, 0, 0], [1.04, 1, 1.02]);
+  B.m(new THREE.SphereGeometry(0.172, 32, 18, 0, Math.PI * 2, 0, 1.2), (x, y, z) => Math.abs(x) < 0.004 ? stitch : Math.abs(x) < 0.012 ? lea2 : lea);
+  B.m(CKG.tor(0.159, 0.011, 6, 44), lea2, [0, 0.062, 0], [Math.PI / 2, 0, 0]);
+  for (const sx of [-1, 1]) {                                          // the flaps, down over her cheeks, a strap and a buckle
+    B.m(ck4RBox(0.016, 0.09, 0.07, 0.008, 3), lea, [sx * 0.158, 0.02, 0.0], [0, 0, sx * 0.12]);
+    B.m(CKG.box(0.004, 0.06, 0.012), lea2, [sx * 0.165, -0.035, 0.012], [0, 0, sx * 0.25]);
+    B.s(CKG.tor(0.007, 0.0022, 4, 10), brass, [sx * 0.168, 0.0, 0.014], [0, Math.PI / 2, 0]); }
+  B.frame();
+  for (const sx of [-1, 1]) { B.frame([sx * 0.05, 0.142, 0.1], [-0.95, sx * 0.18, 0]);   // goggles up on the brow
+    B.s(ckTwoSided(CKG.cyl(0.032, 0.034, 0.02, 18, true)), lea2, [0, 0, 0], [Math.PI / 2, 0, 0]);
+    B.s(CKG.tor(0.032, 0.005, 8, 24), brass, [0, 0, 0.01]); B.l(new THREE.CircleGeometry(0.029, 22), 0x7fe0a8, [0, 0, 0.008]); }
+  B.frame(); B.s(CKG.box(0.03, 0.008, 0.008), brass, [0, 0.15, 0.122], [-0.95, 0, 0]);
+}
+function ck6AceScarf(B) {                                               // Sky Paws: the Rat King's vanquisher's scarf: crimson silk, gold edges, rolled round her neck, its long end streaming
+  const silk = (x, y, z, i) => i % 9 < 3 ? 0xa8122a : 0xc8193a;
+  for (const [m, dr, r] of [[0.018, 0.02, 0.016], [0.03, 0.055, 0.013]]) { const N = ckNeck(m, dr); B.s(new THREE.TubeGeometry(N.curve, 72, r, 9, true), silk); }
+  const k = ckOnCurve(ckNeck(0.024, 0.03).curve, 0.47);
+  B.s(ckFluff(CKG.sph(0.024, 12, 9), 0.2, 3), 0xc8193a, [k.x - 0.016, k.y - 0.004, k.z - 0.002], null, [0.8, 1, 1.15]);
+  B.s(ckFluff(CKG.sph(0.018, 10, 8), 0.2, 5), 0xa8122a, [k.x - 0.02, k.y - 0.03, k.z + 0.012], [0, 0, 0.4], [0.7, 1.1, 1]);
+  B.post = G => { const g = G.cape = ckScarfGeo(), C = g.attributes.color, U = g.userData.ck.uv, c = new THREE.Color();
+    for (let i = 0; i < C.count; i++) { const u = U[i * 2], v = U[i * 2 + 1]; c.set(v > 0.93 ? (i % 2 ? 0xffd86a : 0xf2b632) : Math.abs(u) > 0.8 ? 0xf2c14a : Math.abs(u) > 0.55 ? 0xb3142e : 0xd01d3d); C.setXYZ(i, c.r, c.g, c.b); } };
+  B.fx = { silk: 1 };
+}
+function ck6CrashHelmet(B) {                                            // Sled Rush: a glossy cherry-red crash helmet, a white racing stripe, snowflake decals, a padded rim and a chin strap
+  const red = 0xd8202e, white = 0xf6f8fc;
+  B.frame([0, 0.004, -0.012], [-0.2, 0, 0], [1.06, 1, 1.04]);
+  B.s(new THREE.SphereGeometry(0.182, 34, 18, 0, Math.PI * 2, 0, 1.22), (x, y, z) => Math.abs(x) < 0.026 ? (Math.abs(x) < 0.008 ? red : white) : red);
+  B.m(CKG.tor(0.165, 0.014, 8, 48), 0x2a2a30, [0, 0.058, 0], [Math.PI / 2, 0, 0]);
+  for (const sx of [-1, 1]) { B.s(ckFlat(ckStarPts(0.03, 0.3), 0.004), white, [sx * 0.15, 0.13, 0.03], [0, sx * 1.15, 0]);
+    B.m(ckTaper([[sx * 0.15, 0.05, 0.03], [sx * 0.135, -0.04, 0.06], [sx * 0.09, -0.11, 0.09]], 0.004, 0.004, 8, 4), 0x2a2a30); }
+  for (let i = 0; i < 3; i++) B.m(CKG.box(0.03, 0.006, 0.012), 0x2a2a30, [0, 0.168, -0.06 + i * 0.022], [0.2, 0, 0]);   // vents
+  B.frame();
+}
+function ck6ValetCap(B) {                                               // Meow Lot: the very same red valet cap she wears on the job (lotCapGeo), where the Lot puts it
+  const g = lotCapGeo(), C = g.attributes.color, cols = []; const c = new THREE.Color();
+  for (let i = 0; i < C.count; i++) { c.setRGB(C.getX(i), C.getY(i), C.getZ(i)); cols.push(c.getHex()); }
+  g.deleteAttribute('uv'); B.s(g, (x, y, z, i) => cols[i], [0, 0.125, -0.01], [-0.12, 0, 0]);
+  B.s(ckFlat([[-0.007, -0.009], [-0.007, 0.009], [0.004, 0.009], [0.008, 0.005], [0.008, 0.001], [0.004, -0.002], [-0.003, -0.002], [-0.003, -0.009]], 0.003), 0xffffff, [0, 0.17, 0.077], [-0.12, 0, 0]);   /* (the P on its badge) */
+}
+function ck6GuardVest(B) {                                              // Crossy Kitty: a hi-vis crossing-guard vest: neon yellow, orange edges, two silver reflective bands, a stop sign on the back
+  const neon = 0xd6f53a, neon2 = 0xc4e52a, org = 0xff7a1a, silver = 0xe2e8f0;
+  const sh = ck5bShell({ m: 0.02, nd: 0.035, zb: -0.2, zbB: -0.1, cols: 52, rows: 20, col: (u, f, k, j) => j === 7 || j === 8 || j === 14 || j === 15 ? silver : j >= 19 ? org : (k + j) % 2 ? neon : neon2 });
+  B.m(sh.g, sh.c);
+  B.m(ck5bHem(sh.front, true, 0.011, 0.003), org); B.m(ck5bHem(sh.back, true, 0.009, 0.002), org);
+  const p = sh.at(0.4, 0, 0.005), n = new THREE.Vector3(0, 1, 0.1), oct = [], wh = [];
+  for (let i = 0; i < 8; i++) { const a = (i + 0.5) / 8 * Math.PI * 2; oct.push([Math.cos(a) * 0.045, Math.sin(a) * 0.045]); wh.push([Math.cos(a) * 0.051, Math.sin(a) * 0.051]); }
+  ck5bOn(B, 'm', ckFlat(wh, 0.004), 0xffffff, p, n, 0); ck5bOn(B, 'm', ckFlat(oct, 0.004), 0xd8202e, p.clone().addScaledVector(n, 0.002), n, 0);
+  ck5bOn(B, 'm', ck4RBox(0.06, 0.014, 0.004, 0.004, 2), 0xffffff, p.clone().addScaledVector(n, 0.004), n, 0);
+}
+function ck6Jacket(B) {                                                 // the motorcycle: a black leather jacket: a wide collar, a silver zip, studs down her back, a pink winged-heart patch
+  const blk = 0x1e1b22, blk2 = 0x2a2630, silver = 0xd8dde6;
+  const sh = ck5bShell({ m: 0.019, nd: 0.03, zb: -0.3, zbB: -0.17, cols: 56, rows: 26, col: (u, f, k, j) => { if (j >= 24) return 0x141218; if (Math.abs(f - Math.PI * 0.82) < 0.04 && u < 0.6) return silver; return (k * 7 + j * 3) % 11 ? blk : blk2; } });
+  B.s(sh.g, sh.c);
+  B.s(ck5bHem(sh.front, true, 0.02, 0.008), (x, y, z, i) => (i >> 2) % 3 ? blk : blk2);                        // the big collar
+  B.s(ck5bHem(sh.back, true, 0.009, 0.002), 0x141218);
+  for (let i = 0; i < 7; i++) { const q = sh.at(0.08 + i * 0.12, 0, 0.004); B.s(CKG.cone(0.006, 0.01, 6), silver, [q.x, q.y + 0.002, q.z]); }
+  const p = sh.at(0.5, 0, 0.004), n = new THREE.Vector3(0, 1, 0);       // the patch: a pink heart with little white wings
+  ck5bOn(B, 'm', ckFlat(ckHeartPts(0.032), 0.004), 0xff5fa2, p.clone().add(new THREE.Vector3(0, 0.002, 0)), n, Math.PI);
+  for (const sx of [-1, 1]) ck5bOn(B, 'm', ckFlat([[0, 0], [sx * 0.05, 0.022], [sx * 0.058, 0.004], [sx * 0.046, -0.006], [sx * 0.03, -0.012]], 0.004), 0xf4f6fb, p.clone().add(new THREE.Vector3(sx * 0.03, 0, -0.004)), n, Math.PI);
+  const z = sh.at(0.1, Math.PI * 0.82, 0.008); B.s(CKG.box(0.008, 0.014, 0.003), silver, [z.x, z.y, z.z]);
+}
+function ck6LeafWing(B, sx) {                                           // Treetop Hop: one wing, two big leaves and a little one, veined, flapping from her shoulders
+  const root = [sx * 0.04, 0.615, 0.04], a = ckSnCount(B, 'm');
+  const leaf = (L, W) => { const p = []; for (let i = 0; i < 24; i++) { const t = i / 24 * Math.PI * 2, x = L * (1 - Math.cos(t)) / 2; p.push([x, W * Math.sin(t) * Math.pow(Math.sin(Math.PI * x / L), 0.6) * (1 + 0.08 * Math.sin(t * 9))]); } return p; };
+  B.frame(root, [0.15, -sx * 0.35, sx * 0.4], [sx * 1.35, 1.35, 1.2]);
+  [[0.25, 0.07, 0.25, 0x4f9a3a, 0x8acb5a], [0.2, 0.06, -0.25, 0x3f8a32, 0x7fbf4f], [0.12, 0.04, 0.75, 0x6fb84a, 0xa8dc6a]].forEach(([L, W, ang, c0, c1], k) => {
+    const rot = B.mat([0, 0, -0.004 * k], [0, 0, ang]), g = ckFlat(leaf(L, W), 0.008);
+    B.parts.m.push([g, (x, y) => Math.abs(y) < 0.0035 || (Math.abs(Math.abs(y) - (x % 0.045) * 0.5) < 0.0022 && Math.abs(y) < W * 0.6) ? c1 : c0, B.M.clone().multiply(rot)]); });
+  B.frame();
+  return { a, b: ckSnCount(B, 'm'), c: root, ax: [0, Math.sin(-0.1), Math.cos(-0.1)], sx };
+}
+function ck6LeafWings(B) {
+  const groups = [ck6LeafWing(B, 1), ck6LeafWing(B, -1)];
+  B.frame([0, 0.632, 0.05], [0.2, 0, 0]);                              // an acorn where they meet
+  B.m(CKG.sph(1, 14, 10), 0xc68a45, [0, -0.006, 0], null, [0.022, 0.026, 0.022]);
+  B.m(new THREE.SphereGeometry(1, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2), 0x6a4122, [0, 0.006, 0], null, [0.025, 0.018, 0.025]);
+  B.m(CKG.cyl(0.003, 0.003, 0.012, 5), 0x5a3418, [0, 0.026, 0]);
+  B.frame(); ckStraps(B, 0x5a7a3a);
+  B.fx = { snFlap: { k: 'm', groups } };
+}
+function ck6GuardBadge(B) {                                             // Defender: a navy collar and a gold mushroom-guard badge: a shield, a red-and-white mushroom on it, a star on top
+  const N = ckNeckBand(B, B.m, 0x1f2f6a, 0.026, 0.012, 0.012), f = ckFrontOf(N, 0.75, -0.008), c = f.p.clone().addScaledVector(f.out, 0.016).add(new THREE.Vector3(0, -0.03, 0));
+  B.frame([c.x, c.y - 0.008, c.z + 0.006], [Math.atan2(-f.out.y, f.out.z) - 0.1, 0, 0], 1.45);
+  const shield = [[-0.032, 0.03], [0.032, 0.03], [0.032, -0.004], [0.018, -0.026], [0, -0.038], [-0.018, -0.026], [-0.032, -0.004]];
+  B.s(ckFlat(shield, 0.008), 0xf2c14a); B.s(ckFlat(shield.map(([x, y]) => [x * 0.8, y * 0.8 + 0.001]), 0.004), 0x1f2f6a, [0, 0, 0.004]);
+  B.s(new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0xd9232f, [0, 0.0, 0.008], [Math.PI / 2, 0, 0], [0.018, 0.012, 0.004]);   // the mushroom, flat on the shield
+  B.s(ck4RBox(0.01, 0.018, 0.004, 0.003, 2), 0xfff4e0, [0, -0.01, 0.008]);
+  for (const [x, y] of [[-0.008, 0.006], [0.007, 0.009], [0, 0.013]]) B.s(CKG.sph(0.0028, 6, 5), 0xffffff, [x, y, 0.011]);
+  B.s(ckFlat(ckStarPts(0.012, 0.45), 0.005), 0xf2c14a, [0, 0.04, 0.002]);
+  B.frame();
+}
+
+/* ---------- trails: the new ones (ck5bTrailDef asks ck6TrailDef for any it doesn't know) and their sprites (atlas cells 8+) ---------- */
+function ck6TrailDef(id) {
+  const D = ck6TrailDef.D || (ck6TrailDef.D = {
+    sporeSparkle: { cells: [8, 0, 8, 0, 9], life: 1.5, size: [0.12, 0.19], vy: 0.32, g: -0.05, spread: 0.18, sway: 0.8, spin: 0.8, rate: 18, names: ['Royal', 'Fairy', 'Golden', 'Moonlit'],
+      cols: [[0xffffff, 0xffe680, 0xffd0ec], [0xffd6f5, 0xd8b8ff, 0xffffff], [0xfff0a0, 0xffd23a, 0xffffff], [0xd8e4ff, 0xb8c8ff, 0xffffff]] },
+    embers: { cells: [5, 5, 10, 5], life: 1.3, size: [0.08, 0.16], vy: 0.5, g: 0.1, spread: 0.18, sway: 0.9, spin: 0.5, rate: 22, names: ['Hearth', 'Blue flame', 'Pink fire', 'Gold'],
+      cols: [[0xffb04a, 0xff6a1a, 0xffe08a], [0x7fc8ff, 0x4f8aff, 0xc8e8ff], [0xff7fc8, 0xff4f9a, 0xffc0e0], [0xffe27a, 0xffc23a, 0xfff2b8]] },
+  });
+  return D[id] || null;
+}
+function ck6Sprite(c, i) {                                              // (ck5bAtlas, cells 8+) drawn round (0, 0), about 28 px out
+  c.lineCap = c.lineJoin = 'round';
+  if (i === 8) {                                                        // a little red toadstool with white spots (white-ish tints keep it red)
+    c.fillStyle = '#fff6e6'; c.strokeStyle = 'rgba(90,40,20,.45)'; c.lineWidth = 2; c.beginPath(); c.moveTo(-7, 2); c.quadraticCurveTo(-9, 22, -11, 25); c.lineTo(11, 25); c.quadraticCurveTo(9, 22, 7, 2); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#e8303a'; c.strokeStyle = '#8a1a20'; c.beginPath(); c.moveTo(-26, 6); c.bezierCurveTo(-26, -24, 26, -24, 26, 6); c.quadraticCurveTo(0, 0, -26, 6); c.fill(); c.stroke();
+    c.fillStyle = '#ffffff'; for (const [x, y, r] of [[-12, -6, 4.5], [2, -12, 5], [14, -3, 4], [-2, 0, 3], [-20, 1, 2.5]]) { c.beginPath(); c.arc(x, y, r, 0, 6.3); c.fill(); }
+  } else if (i === 9) {                                                 // a tiny gold crown
+    c.fillStyle = '#ffe27a'; c.strokeStyle = 'rgba(120,80,0,.6)'; c.lineWidth = 2; c.beginPath(); c.moveTo(-22, 14); c.lineTo(-24, -10); c.lineTo(-12, 2); c.lineTo(0, -18); c.lineTo(12, 2); c.lineTo(24, -10); c.lineTo(22, 14); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#ff4f7a'; c.beginPath(); c.arc(0, 6, 4, 0, 6.3); c.fill(); c.fillStyle = '#fff'; for (const x of [-24, 0, 24]) { c.beginPath(); c.arc(x, x ? -11 : -19, 3, 0, 6.3); c.fill(); }
+  } else if (i === 10) {                                                // a bright spark: a four-point twinkle
+    c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, -26); c.quadraticCurveTo(3, -3, 26, 0); c.quadraticCurveTo(3, 3, 0, 26); c.quadraticCurveTo(-3, 3, -26, 0); c.quadraticCurveTo(-3, -3, 0, -26); c.fill();
+    const g = c.createRadialGradient(0, 0, 0, 0, 0, 14); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.beginPath(); c.arc(0, 0, 14, 0, 6.3); c.fill();
+  }
+}
+
+/* ---------- the catalogue: registered from ckState (after ck5bReg), before anything is baked, priced or read ---------- */
+function ck6Items() {
+  const T = (it, tags) => Object.assign(it, { tags }), X = (it, ach, hint, how) => Object.assign(it, { price: Infinity, ach, hint, blurb: it.blurb + ' 🏆 Earn it: ' + how + '.' });
+  const P = { thumbDir: [0.85, 0.45, 1] }, O = { thumbDir: [0.75, 0.55, 0.9] }, E = { thumb: [0.19, 0.08, 0, 0.075] };
+  return [
+    /* 🍄 Mushroom Royalty */
+    T({ id: 'toadCrown', slot: 'hat', name: 'Toadstool crown', price: 520, ic: '🍄', blurb: 'A red toadstool cap with snow-white spots, ringed by a gold crown with a ruby in front. She guards the mushrooms, so she wears the biggest one.', say: 'Long live the mushrooms!', build: B => ck6ToadCrown(B), cardLift: 0.04 }, ['royal', 'nature', 'magic']),
+    T({ id: 'toadCape', slot: 'cape', name: 'Toadstool cape', price: 640, ic: '🔴', blurb: 'Deep toadstool red, white spots all over and a scalloped cream hem, fastened with a tiny mushroom brooch.', say: 'Spotty and proud!', build: B => ck6ToadCape(B) }, ['royal', 'nature']),
+    T({ id: 'parasol', slot: 'pack', name: 'Mushroom parasol', price: 460, ic: '☂️', blurb: 'A great spotted mushroom held up over her back like a parasol. Shade for a princess, gills and all.', say: 'Rain? Shine? Mushroom!', build: B => ck6Parasol(B) }, ['nature', 'funny', 'magic']),
+    T(Object.assign({ id: 'mossBooties', slot: 'paws', name: 'Moss booties', price: 220, ic: '🌿', blurb: 'Soft green felt booties with mossy cuffs, and a tiny red toadstool sprouting on each one.', say: 'Squishy and green!', build: B => ck6MossBooties(B) }, P), ['nature', 'cozy']),
+    T(Object.assign({ id: 'toadStuds', slot: 'ears', name: 'Toadstool earrings', price: 150, ic: '🍄', blurb: 'A tiny spotted toadstool swinging from each ear on a gold hook. Mushroom royalty, down to the details.', say: 'Fun-gi!', build: B => ck6ToadStuds(B) }, E), ['nature', 'cute']),
+    T({ id: 'sporeSparkle', slot: 'trail', name: 'Spore-sparkle trail', price: 300, ic: '🌟', blurb: 'Little toadstools, gold sparkles and the odd tiny crown drift up behind her. The royal mushroom procession.', say: 'Make way for the queen!', build: () => {}, trail: 'sporeSparkle' }, ['magic', 'royal', 'sparkly']),
+    /* 🍁 Cozy Autumn */
+    T({ id: 'harvestToque', slot: 'hat', name: 'Harvest toque', price: 160, ic: '🧡', blurb: 'Mustard cable knit with a rust ribbed brim, a big two-tone pom-pom and a little maple leaf.', say: 'Sweater weather!', build: B => ck6HarvestToque(B), cardLift: 0.07 }, ['cozy', 'canadian']),
+    T({ id: 'chunkyScarf', slot: 'collar', name: 'Chunky knit scarf', price: 140, ic: '🧣', blurb: 'A big rust-and-mustard scarf, wound round twice, with fringe on the ends. Maximum snug.', say: 'So snug!', build: B => ck6ChunkyScarf(B) }, ['cozy']),
+    T(Object.assign({ id: 'cardigan', slot: 'outfit', name: 'Cinnamon cardigan', price: 260, ic: '🤎', blurb: 'Warm cinnamon knit, cream buttons down her chest, two patch pockets and a mustard maple leaf on the back.', say: 'Pumpkin spice and everything nice!', build: B => ck6Cardigan(B), k5: 'shell' }, O), ['cozy', 'canadian']),
+    T(Object.assign({ id: 'acornEars', slot: 'ears', name: 'Acorn earrings', price: 110, ic: '🌰', blurb: 'A shiny little acorn and a red oak leaf on each ear. The squirrels are SO jealous.', say: 'Nuts about these!', build: B => ck6AcornEars(B) }, E), ['nature', 'cute']),
+    T({ id: 'plaidRibbon', slot: 'tail', name: 'Tartan tail ribbon', price: 70, ic: '🎗️', blurb: 'A rust, mustard and forest-green tartan bow tied on her tail, two little tails of its own.', say: 'Tartan-tastic!', build: B => ck6PlaidRibbon(B), seg: 3 }, ['cozy', 'cute']),
+    /* ❄️ Snow Day */
+    T(Object.assign({ id: 'parka', slot: 'outfit', name: 'Snow-day parka', price: 340, ic: '🏔️', blurb: 'A puffy cherry-red parka with quilted channels and a fur-trimmed hood down on her shoulders. Snow days only. (And July.)', say: 'Snow day!', build: B => ck6Parka(B), k5: 'parka' }, O), ['cozy', 'sporty']),
+    T({ id: 'earmuffs', slot: 'hat', name: 'Fluffy earmuffs', price: 150, ic: '🎧', blurb: 'Two cloud-white puffs over her ears on a sky-blue band, a snowflake on each. What did you say?', say: 'Pardon? Can’t hear you!', build: B => ck6Earmuffs(B) }, ['cozy', 'cute']),
+    T(Object.assign({ id: 'mittenBoots', slot: 'paws', name: 'Mitten boots', price: 180, ic: '🧤', blurb: 'Cream knit mittens for all four paws: sky-blue stripes, ribbed cuffs, a thumb and a pom-pom each.', say: 'Toasty paws!', build: B => ck6MittenBoots(B) }, P), ['cozy', 'cute']),
+    T({ id: 'sledBell', slot: 'collar', name: 'Sled-bell collar', price: 120, ic: '🛷', blurb: 'Red leather with silver studs and three gold sleigh bells. Everyone knows when she’s coming.', say: 'Jingle all the way!', build: B => ck6SledBell(B), thumb: [0, 0.5, 0.4, 0.14], thumbDir: [0.35, 0.3, 1] }, ['festive', 'sporty']),
+    /* 👑 True Princess */
+    T({ id: 'sash', slot: 'collar', name: 'Royal sash', price: 260, ic: '🎖️', blurb: 'Sky-blue satin edged in gold, worn from the shoulder, with a gold star medal. For services to cuteness.', say: 'By royal decree!', build: B => ck6Sash(B) }, ['royal', 'fancy']),
+    T({ id: 'jewelTiara', slot: 'hat', name: 'Jewelled tiara', price: 560, ic: '💍', blurb: 'Tall gold arches set with a big oval ruby, sapphires and emeralds, a pearl on every point.', say: 'Fit for a coronation!', build: B => ck6JewelTiara(B), fit: 0.46, cardLift: 0.02 }, ['royal', 'sparkly']),
+    T({ id: 'ballCape', slot: 'cape', name: 'Midnight ball cape', price: 900, ic: '🌙', blurb: 'Periwinkle silk melting into lilac, a long train, silver edging, a sapphire clasp, and twinkles that catch the light.', say: 'Home by midnight!', build: B => ck6BallCape(B) }, ['royal', 'fancy', 'sparkly']),
+    /* 🏒 Toronto Fan */
+    T({ id: 'ballCap', slot: 'hat', name: 'Game-day ball cap', price: 130, ic: '🧢', blurb: 'Blue and white with a little white star. No team, no logo: just big home-crowd energy.', say: 'Let’s go blue!', build: B => ck6BallCap(B), cardLift: 0.05 }, ['sporty', 'canadian']),
+    T({ id: 'fanScarf', slot: 'collar', name: 'Bar scarf', price: 120, ic: '💙', blurb: 'Blue-and-white stripes, knitted for waving in the stands, fringe on both ends.', say: 'Go, go, go!', build: B => ck6FanScarf(B) }, ['sporty', 'canadian', 'cozy']),
+    T({ id: 'foamFinger', slot: 'pack', name: 'Foam finger', price: 190, ic: '☝️', blurb: 'A giant blue foam finger riding on her back, pointing up. We’re number one! (She is.)', say: 'Number one!', build: B => ck6FoamFinger(B), thumbDir: [0.35, 0.35, 1] }, ['sporty', 'funny']),
+    T({ id: 'coffeeCharm', slot: 'tail', name: 'Big coffee charm', price: 90, ic: '☕', blurb: 'A double-cupped coffee hanging from her tail: two plain cups one in the other, a brown sleeve and a white lid. Fuel for the third period.', say: 'Double-double, please!', build: B => ck6CoffeeCharm(B), seg: 2, thumb: [0, -0.13, -0.03, 0.075], thumbDir: [1, 0.35, 0.4] }, ['funny', 'canadian', 'food']),
+    /* 🏆 won by playing */
+    T(X({ id: 'aceHelmet', slot: 'hat', name: 'Sky Ace flying helmet', ic: '🛩️', blurb: 'Brown leather, stitched seams, ear flaps with buckles and green-lensed goggles pushed up on top. Casa Loma’s new owner.', say: 'Chocks away!', build: B => ck6AceHelmet(B) }, 'jetCastle', 'Beat the Rat King himself in Sky Paws', 'in Sky Paws, storm Casa Loma and beat the Rat King'), ['sporty', 'cool']),
+    T(X({ id: 'aceScarf', slot: 'collar', name: 'Sky Ace victory scarf', ic: '🏅', blurb: 'Crimson silk with gold edges, wound twice and streaming out behind her as she runs. Only for the pilot who took down the Rat King.', say: 'Victory roll!', build: B => ck6AceScarf(B), thumb: [0, 0.6, 0.1, 0.3], thumbDir: [-0.8, 0.5, 0.7] }, 'jetCastle', 'Beat the Rat King himself in Sky Paws', 'in Sky Paws, storm Casa Loma and beat the Rat King'), ['sporty', 'fancy']),
+    T(X({ id: 'crashHelmet', slot: 'hat', name: 'Sled Rush crash helmet', ic: '⛑️', blurb: 'Glossy cherry red, a white racing stripe, snowflake decals and a padded rim. Scuffed in all the right places.', say: 'Full send!', build: B => ck6CrashHelmet(B) }, 'sled3k', 'Slide 3,000 m in one Sled Rush run', 'slide 3,000 m in one Sled Rush run'), ['sporty', 'cool']),
+    T(X({ id: 'valetCap', slot: 'hat', name: 'Meow Lot valet cap', ic: '🅿️', blurb: 'The very same red cap she wears at the valet stand: a gold band, a black peak and the little P badge.', say: 'Keys, please!', build: B => ck6ValetCap(B) }, 'lotAll', 'Clear all 40 lots in Meow Lot', 'clear all 40 Meow Lot lots, all the way to the Big Cat Show'), ['sporty', 'funny']),
+    T(X(Object.assign({ id: 'guardVest', slot: 'outfit', name: 'Crossing-guard vest', ic: '🦺', blurb: 'Neon yellow, orange edges, two reflective bands and a stop sign on the back. Traffic stops for HER now.', say: 'Stop! Kitty crossing!', build: B => ck6GuardVest(B), k5: 'shell' }, O), 'crossy500', 'Hop 500 rows in one Crossy Kitty run', 'hop 500 rows in one Crossy Kitty run'), ['sporty', 'funny']),
+    T(X(Object.assign({ id: 'jacket', slot: 'outfit', name: 'Leather biker jacket', ic: '🏍️', blurb: 'Black leather, a big collar, a silver zip, studs down her spine and a pink winged heart on the back.', say: 'Born to ride!', build: B => ck6Jacket(B), k5: 'shell' }, O), 'bikeNight', 'Ride the motorcycle through the night, until dawn', 'ride the motorcycle right through the night, until dawn'), ['cool', 'rock']),
+    T(X({ id: 'leafWings', slot: 'pack', name: 'Leafy wings', ic: '🍃', blurb: 'Two pairs of fresh green leaves that flap as she runs, an acorn where they meet. The canopy’s own wings.', say: 'Light as a leaf!', build: B => ck6LeafWings(B), thumbDir: [0.25, 0.7, -1] }, 'hopCombo', 'Land 5 Perfects in a row in Treetop Hop', 'land 5 Perfects in a row in Treetop Hop'), ['nature', 'magic']),
+    T(X({ id: 'guardBadge', slot: 'collar', name: 'Mushroom-guard badge', ic: '🛡️', blurb: 'A navy collar and a gold shield with a red mushroom on it. Official Defender of the Mushrooms, first class.', say: 'On duty!', build: B => ck6GuardBadge(B), thumb: [0, 0.49, 0.43, 0.1], thumbDir: [0.3, 0.2, 1] }, 'score5k', 'Score 5,000 in one Classic game', 'score 5,000 in one Classic game'), ['hero', 'cool']),
+    T(X({ id: 'embers', slot: 'trail', name: 'Ember trail', ic: '🔥', blurb: 'Warm glowing embers and bright little sparks float up behind her, like she just came down the chimney. Which she did.', say: 'Hot stuff!', build: () => {}, trail: 'embers' }, 'sardineSweep', 'Catch every fish in one Chimney Drop', 'in Chimney Drop, catch every fish on the way down'), ['magic', 'festive']),
+  ];
+}
+function ck6Sets() {                                                    // the five collections (one piece per slot; none of them clash)
+  return [
+    { id: 'mushroomRoyal', name: 'Mushroom Royalty', ic: '🍄', items: ['toadCrown', 'toadCape', 'parasol', 'mossBooties', 'toadStuds', 'sporeSparkle'], tags: ['royal', 'nature', 'magic'], ck6: { a: '#ffe3e3', b: '#fff6e8', blurb: 'PKR’s signature look. She guards the mushrooms, so she dresses like their queen.' } },
+    { id: 'cozyAutumn', name: 'Cozy Autumn', ic: '🍁', items: ['harvestToque', 'chunkyScarf', 'cardigan', 'acornEars', 'plaidRibbon', 'leaves'], tags: ['cozy', 'nature', 'canadian'], ck6: { a: '#ffe8cc', b: '#fff5e0', blurb: 'Knits, cinnamon and crunchy leaves: October in Toronto, but make it fashion.' } },
+    { id: 'snowDay', name: 'Snow Day', ic: '❄️', items: ['parka', 'earmuffs', 'mittenBoots', 'sledBell', 'snow'], tags: ['cozy', 'sporty'], ck6: { a: '#e3f1ff', b: '#f6fbff', blurb: 'Puffy, fluffy and toasty: dressed for the first snow day of the year.' } },
+    { id: 'truePrincess', name: 'True Princess', ic: '👑', items: ['gown', 'slippers', 'sash', 'jewelTiara', 'ballCape', 'sparkles'], tags: ['royal', 'fancy', 'sparkly'], ck6: { a: '#f1e6ff', b: '#ffeaf4', blurb: 'The whole fairy tale: ball gown, glass slippers, a sash, jewels and a midnight cape.' } },
+    { id: 'torontoFan', name: 'Toronto Fan', ic: '🏒', items: ['jersey', 'ballCap', 'fanScarf', 'foamFinger', 'coffeeCharm'], tags: ['sporty', 'canadian'], ck6: { a: '#e0ebff', b: '#f6f9ff', blurb: 'Blue and white from her ears to her tail. Game night is a whole personality.' } },
+  ];
+}
+function ck6Rules() {
+  return [
+    { a: 'outfit:parka', b: 'cape', why: 'the parka’s fur hood would poke through the cape' },
+    { a: 'earmuffs', b: 'ears', why: 'the earmuffs cover her ears' },
+    { a: 'aceHelmet', b: 'ears', why: 'the helmet’s ear flaps cover her ears' },
+    { a: 'crashHelmet', b: 'ears', why: 'a crash helmet covers her ears' },
+  ];
+}
+function ck6Ach() {                                                     // a new trophy for the crash helmet (the Sled Rush section); safe to call early (the list may not exist yet)
+  try { if (ACH_BY_ID.sled3k) return true; const sec = ACHIEVEMENTS.find(s => s[0] === 'Sled Rush'); if (!sec) return false;
+    const row = ['sled3k', '🪖', 'Helmet hair', 'In Sled Rush, slide 3,000 m in one run']; const i = sec[1].findIndex(r => r[0] === 'sledKm'); sec[1].splice(i < 0 ? sec[1].length : i + 1, 0, row); ACH_BY_ID.sled3k = row;
+    try { updateAchCount(); } catch (e) {} return true; } catch (e) { return false; }
+}
+function ck6Reg() {                                                     // (from ckState, after ck5bReg)
+  if (ck6Reg.done) return; ck6Reg.done = true;
+  try {
+    ck6Ach();
+    const I = CK_BY_ID;
+    if (I.booties) I.booties.build = B => ck6Booties(B);
+    if (I.slippers) Object.assign(I.slippers, { build: B => ck6Slippers(B), blurb: 'Four clear glass slippers with little heels, a bow and a twinkle on each toe. Home by midnight, princess.' });
+    for (const it of ck6Items()) if (!I[it.id]) { CK_ITEMS.push(it); I[it.id] = it; }
+    const shop = it => !ckIsEx(it) && !it.season, slot = it => CK_SLOTS.findIndex(s => s.id === it.slot);   /* (each tab cheapest first, the new things in among the old) */
+    const regs = CK_ITEMS.filter(shop).sort((a, b) => slot(a) - slot(b) || a.price - b.price), rest = CK_ITEMS.filter(it => !shop(it));
+    CK_ITEMS.length = 0; regs.concat(rest).forEach(it => CK_ITEMS.push(it));
+    const L = ckSetBase();
+    for (const s of ck6Sets()) if (!L.some(q => q.id === s.id)) { s.fish = ck5Nice(s.items.reduce((a, id) => a + ((I[id] && isFinite(I[id].price) && I[id].price) || 0), 0) * 0.175); L.push(s); }
+    const R = ck5bRules(); for (const r of ck6Rules()) R.push(r);
+    ck6Rx();
+  } catch (e) { console.error(e); }
+}
+try { ck6Ach(); } catch (e) {}
+
+/* ---------- what the neighbours say ---------- */
+function ck6Rx() {
+  try {
+    const L = rxLines(), item = (who, id, lines) => { const D = L[who]; if (D && D.item && !D.item[id]) D.item[id] = lines; };
+    item('aunty', 'toadCrown', ["A mushroom on your head? Beta, we EAT those. ...Okay, okay, it's very pretty.", [['a', "What is this, a mushroom crown?"], ['k', "I'm the Mushroom Queen, Aunty-ji."], ['a', "Then the Queen can help me make mushroom matar tonight!"]]]);
+    item('aunty', 'parasol', ["Very smart! An umbrella that is also a mushroom. Two in one, like a good deal at the shop."]);
+    item('aunty', 'cardigan', ["A cardigan! Finally someone in this house dresses for the weather.", "So cosy! I have the exact same one. Mine is from 1998."]);
+    item('aunty', 'parka', ["Hai, a proper jacket! Good. It's minus twenty in my heart when you go out without one."]);
+    item('aunty', 'earmuffs', ["Earmuffs! Now you can't hear me telling you to eat. Very clever, beta."]);
+    item('aunty', 'jewelTiara', ["Real rubies? Don't tell me. Let me dream.", "Wah! Like a queen! Even my wedding set was not this much."]);
+    item('aunty', 'sash', ["A sash! Miss Universe! Who are you thanking in your speech? Aunty-ji, I hope."]);
+    item('aunty', 'coffeeCharm', ["Coffee on your tail? In my day we drank chai. From a cup. With hands."]);
+    item('aunty', 'jacket', ["Leather jacket?! Arre, a hero from a Shah Rukh film! Just don't ride on my flowerbed."]);
+    item('aunty', 'guardVest', ["Very good! Now help me cross the road to the No Frills."]);
+    item('aunty', 'valetCap', ["A valet! Can you park Sharma-ji's car? Badly? For me?"]);
+    item('roof', 'toadCrown', ["A MUSHROOM CROWN? You're not gonna... guard me, are you?", "That's the fanciest mushroom I've ever seen. And I've seen the compost bin."]);
+    item('roof', 'parasol', ["A mushroom umbrella? Up here? Genius. Can I get under it?"]);
+    item('roof', 'foamFinger', ["NUMBER ONE! Wait, what are we cheering for? ...Snacks? I'll cheer for snacks!"]);
+    item('roof', 'leafWings', ["Leaf wings! Can you actually fly? Asking for a raccoon who fell off a lot of things."]);
+    item('roof', 'crashHelmet', ["A helmet! Smart. I should get one. I bonk my head on the chimney like, daily."]);
+    item('roof', 'embers', ["Whoa, sparks! Did you come down the chimney? Did you see my snack stash in there?"]);
+    item('slider', 'earmuffs', ["Earmuffs? Hah! Now you can't hear me making fun of you! Nyah!"]);
+    item('slider', 'ballCap', ["A ball cap? I'm more of a raccoon-mask guy. Classic look. Timeless."]);
+    item('slider', 'guardVest', ["Crossing guard? You can't even cross THIS glass! Nyah!"]);
+    item('porter', 'foamFinger', [["🐕 Porter barks at the giant blue finger! Is it a toy? It's a toy!", 'bark']]);
+    item('porter', 'sledBell', [["🐕 Porter howls along with your sleigh bells!", 'bark']]);
+    item('porter', 'parasol', [["🐕 Porter tilts his head at the walking mushroom...", 'tilt']]);
+    item('porter', 'guardBadge', [["🐕 Porter sits up straight for the officer. Good boy!", 'wag']]);
+  } catch (e) {}
+}
+
+/* ---------- worn together: a sash under a cape, the Lot's cap on a hood ---------- */
+function ck6DressEnd(R) {                                               // (closetDress, after ck5bDressEnd) a cape over the sash is eased out round it, like over a garment
+  try { const W = R.ck; if (!W || !W.cape || !W.cape.fit || !W.collar || W.collar.it.id !== 'sash') return;
+    const s = Math.max(W.cape.fit.scale.x, 1.05), C = [0, 0.43, -0.02]; W.cape.fit.scale.setScalar(s); W.cape.fit.position.set(C[0] * (1 - s), C[1] * (1 - s), C[2] * (1 - s)); } catch (e) {}
+}
+function ck6LotCap(R, W) {                                              // (lotRigSet) her valet cap sits up on the ghost sheet's hood, like any hat does
+  try { const o = W && W.ck && W.ck.outfit; if (o && o.it && o.it.head && R.cap) R.cap.position.y += 0.036; } catch (e) {}
+}
+
+/* ---------- every frame: the 3,000 m trophy (Sled Rush keeps her best in catguard.sledBest) ---------- */
+function ck6Tick(dt) {
+  const F = ck6Tick; F.t = (F.t == null ? 3 : F.t) - dt; if (F.t > 0) return; F.t = 2;
+  try { if (achDone.sled3k || !ck6Ach()) return; if ((+ckGet('catguard.sledBest') || 0) >= 3000) unlock('sled3k'); } catch (e) {}
+}
+
+/* ---------- trails: a 16-cell sprite atlas (cells 8+ are ck6Sprite's), and its material ---------- */
+function ck6Atlas() {
+  const t = canvasTex(1024, 64, c => { for (let i = 0; i < 16; i++) { c.save(); c.translate(i * 64 + 32, 32); c.scale(0.98, 0.98); if (i < 8) ck5bSprite(c, i); else ck6Sprite(c, i); c.restore(); } }, 1, 1);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.repeat.set(1, 1); t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; t.anisotropy = 1; return t;
+}
+function ck6TrailMat(add) {                                             // (ck5bTrailMat) the same little shader, reading a 16-cell atlas
+  return new THREE.ShaderMaterial({ uniforms: { map: { value: ck5bAtlas() }, scale: { value: 400 } },
+    vertexShader: 'attribute vec3 tc; attribute vec4 tq; uniform float scale; varying vec3 vC; varying vec3 vQ;\nvoid main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = tq.y * scale / max(0.05, -mv.z); vC = tc; vQ = vec3(tq.x, tq.z, tq.w); }',
+    fragmentShader: 'uniform sampler2D map; varying vec3 vC; varying vec3 vQ;\nvoid main() { if (vQ.x < 0.01) discard; vec2 p = gl_PointCoord - 0.5; float c = cos(vQ.y), s = sin(vQ.y); p = vec2(c * p.x - s * p.y, s * p.x + c * p.y) * 1.08 + 0.5;\n  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) discard; vec4 t = texture2D(map, vec2((vQ.z + 0.02 + p.x * 0.96) / 16.0, 1.0 - p.y)); float a = t.a * vQ.x; if (a < 0.02) discard; gl_FragColor = vec4(t.rgb * vC, a); }',
+    transparent: true, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending });
+}
+
+/* ---------- the 📖 book: each collection its own page (ckBookRender, after it's drawn) ---------- */
+function ck6Book(body) {
+  try {
+    ck6Css(); const L = ckSetList(), cards = body.querySelectorAll('.ckb-set'); if (cards.length !== L.length) return;
+    const S = ckState(), box = document.createElement('div'), list = document.createElement('div'); box.className = 'ck6-cols'; list.className = 'ckb-sets';
+    box.innerHTML = '<h4 class="ckb-h">✨ Collections <small>5–6 pieces · a big bonus</small></h4>'; box.appendChild(list);
+    L.forEach((s, i) => { if (!s.ck6) return; const el = cards[i], st = el.querySelector('.ckb-st'); if (!st) return;
+      const own = s.items.filter(id => S.owned.has(id)).length, n = s.items.length;
+      el.classList.add('ck6-col'); el.style.setProperty('--ck6a', s.ck6.a); el.style.setProperty('--ck6b', s.ck6.b);
+      const info = document.createElement('div'); info.className = 'ck6-info';
+      info.innerHTML = '<span class="ck6-bl">' + ckbEsc(s.ck6.blurb) + '</span><span class="ck6-pr"><s><u style="width:' + (own / n * 100) + '%"></u></s><b>' + own + '/' + n + ' owned</b></span><span class="ck6-tags">' + (s.tags || []).map(t => '#' + ckbEsc(t)).join(' ') + '</span>';
+      st.after(info); list.appendChild(el); });
+    if (!list.children.length) return;
+    const sets = body.querySelector('.ckb-sets'), wrap = sets && sets.parentElement; if (wrap && wrap.parentElement) wrap.parentElement.insertBefore(box, wrap);
+  } catch (e) { if (!ck6Book.err) { ck6Book.err = 1; console.error(e); } }
+}
+function ck6UI() { ck6Css(); }
+function ck6Css() {
+  if (ck6Css.done) return; ck6Css.done = true;
+  const st = document.createElement('style'); st.id = 'ck6Css'; st.textContent = `
+#closet .ck6-cols{display:grid;gap:0}
+#closet .ckb-set.ck6-col{background:linear-gradient(135deg,var(--ck6a),var(--ck6b));border-width:3px;padding:10px 11px 11px;box-shadow:0 3px 0 rgba(45,19,40,.85)}
+#closet .ckb-set.ck6-col.done{background:linear-gradient(135deg,#fff3c4,var(--ck6b))}
+#closet .ck6-col .ckb-st>i{font-size:26px}
+#closet .ck6-col .ckb-st>b{font-size:19px}
+#closet .ck6-info{display:grid;gap:5px}
+#closet .ck6-bl{font:600 12.5px/1.35 var(--body);color:#5a3a52}
+#closet .ck6-pr{display:flex;align-items:center;gap:7px}
+#closet .ck6-pr s{flex:1;height:8px;border-radius:99px;background:rgba(255,255,255,.75);border:1.5px solid rgba(45,19,40,.35);overflow:hidden;text-decoration:none}
+#closet .ck6-pr u{display:block;height:100%;background:linear-gradient(90deg,#ff6fae,#ffb84a)}
+#closet .ck6-pr b{font:800 11.5px/1 var(--body);color:#6e3a5c;white-space:nowrap}
+#closet .ck6-tags{font:700 11.5px/1.2 var(--body);color:#8a6a80;letter-spacing:.02em}`;
+  document.head.appendChild(st);
+}
+/* (end of CK6_V1) */
+
+/* =====================================================================
+   WORLD3_V1 (2026-10-12): Free roam sees further, Super Kitty falls like a cat, and PKR does air tricks.
+   - Draw distance: the far plane goes from 80 to 300 (230 on an older phone), so the street, the houses across
+     it and the off-ramp no longer get sliced off as she walks. Far things fade into a horizon haze that follows
+     the time of day and the weather, instead of popping. Three helpers make that seamless: the sky rides at
+     ~4.6x its size (still 'at infinity', now behind everything), a soft haze band hides the painted ground
+     under the horizon, and a big flat 'far fields' ring under the world carries the grass out into the haze.
+   - Flight: let go of Jump and she falls with ordinary gravity (no more slow float), capped at a cat's
+     terminal speed; a big drop lands with a thump and a puff of dust.
+   - Air tricks: press Jump again in the air (after a jump, a fall or a flight hop) and she flips: front flip,
+     backflip, spin, barrel roll, in turn (press again mid-trick to chain one more). Land it clean: a sparkle and
+     +1 fish a trick (8 a minute at most). Land mid-trick: she snaps upright with a comic stumble, no harm done.
+     Super Kitty: a hold is still the jetpack; a quick tap in the air is a trick, and while flying it's a
+     loop-de-loop.
+   Hooks: updateYardLife (w3Sky, after updateTOD), flyAir (w3Glide), skyCloudFx (w3CloudReach), updateWalk (w3Tick).
+   All hoisted functions (no TDZ); state lives on w3S().
+   ===================================================================== */
+function w3S() {
+  return w3S.s || (w3S.s = { built: false, mats: null, cfg: null, fogC: new THREE.Color(), c1: new THREE.Color(), c2: new THREE.Color(),
+    tr: null, q: 0, k: 0, chain: 0, clean: 0, stumT: 0, pay: [], listen: false, ptr: null, pressT: -9, vyPrev: 0, wasG: true,
+    eul: new THREE.Euler(0, 0, 0, 'YXZ'), v: new THREE.Vector3(), skirt: null, band: null });
+}
+function w3Cfg() {                                                    // how far to draw, where the haze starts and ends, how big the sky rides (by device)
+  const S = w3S(), lo = devTier() === 'low' || (typeof SET !== 'undefined' && SET && SET.gfx === 'low');
+  if (S.cfg && S.cfg.lo === lo) return S.cfg;
+  return (S.cfg = lo ? { lo, far: 230, near: 45, fogF: 200, sky: 3.6 } : { lo, far: 300, near: 70, fogF: 255, sky: 4.6 });
+}
+function w3FogTable() {                                               // the horizon haze for each painted sky (the band just above the hills, mixed with the hills)
+  return w3FogTable.t || (w3FogTable.t = { day: [177, 204, 201], morning: [202, 198, 178], golden: [194, 154, 112], dusk: [134, 90, 103], night: [26, 35, 60], overcast: [139, 149, 148] });
+}
+function w3Build() {                                                  // (once) the far fields and the haze band
+  const S = w3S(); S.built = true;
+  try {
+    // the far fields: one flat ring of grass round the world (a hole where the yard and the street already have ground), sunk just under it
+    const lawn = povEndWall.children.find(o => o.userData.name === 'Backyard lawn'), L = 1400, hy = z => hillY(Math.min(z, 131)) - 0.3;
+    const VD = ROOM.visDepth, XW = 320, P = [], U = [], quad = (x0, x1, z0, z1, nz) => { for (let i = 0; i < nz; i++) { const za = z0 + (z1 - z0) * i / nz, zb = z0 + (z1 - z0) * (i + 1) / nz;
+      for (const [x, z] of [[x0, za], [x0, zb], [x1, zb], [x0, za], [x1, zb], [x1, za]]) { P.push(x, hy(z), z); U.push(x / 144 + 0.5, -(z - VD) / 144 + 0.5); } } };   /* (lined up with the backyard lawn's mowing) */
+    quad(-L, L, -L, -127, 1); quad(-L, L, 131, L, 1); quad(-L, -95, -127, 23, 1); quad(95, L, -127, 23, 1); quad(-L, L, 23, 59, 1); quad(-L, -XW, 59, 131, 24); quad(XW, L, 59, 131, 24);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: lawn && lawn.material && lawn.material.map || null, color: lawn && lawn.material && lawn.material.map ? 0xffffff : 0x5c9c3c, fog: true }));
+    m.userData.name = 'Far fields'; m.userData.noWalk = true; m.raycast = () => {}; m.renderOrder = 1; povEndWall.add(m); S.skirt = m;   /* (drawn after the real ground: no work under it) */
+    // the long straight things run on into the haze instead of stopping dead: the street and its sidewalks, the bank, the sound wall, the off-ramp
+    povEndWall.traverse(o => { if (!o.isMesh || !o.geometry || o.geometry.type !== 'PlaneGeometry') return; const n = o.userData.name, pn = o.parent && o.parent.userData.name;
+      if (n === 'Chipwood Crescent' || n === 'Sidewalk' || n === 'Sound wall' || n === 'The bank up to the off-ramp' || pn === 'Off-ramp') w3Widen(o, XW); });
+    { const Y = YARD, RY = 8.5, z0 = Y.FZ + 22, z1 = Y.FZ + 31, q = [], c = [], box = (x0, x1, y0, y1, za, zb, col) => {   /* the barrier's rail and the ramp's edge lines, past the ends (one draw) */
+        const k = new THREE.Color(col), V = [[x0, y1, za], [x1, y1, za], [x1, y1, zb], [x0, y1, zb], [x0, y0, za], [x1, y0, za], [x1, y0, zb], [x0, y0, zb]];
+        for (const [a, b2, d, sh] of [[0, 1, 2, 1], [0, 2, 3, 1], [4, 5, 1, 0.8], [4, 1, 0, 0.8], [7, 6, 2, 0.7], [7, 2, 3, 0.7]]) for (const i of [a, b2, d]) { q.push(...V[i]); c.push(k.r * sh, k.g * sh, k.b * sh); } };
+      for (const s of [-1, 1]) { const xa = s < 0 ? -XW : 85, xb = s < 0 ? -85 : XW;
+        box(xa, xb, RY + 0.59, RY + 0.91, z1 + 0.54, z1 + 0.66, 0xb8bcc0); box(xa, xb, RY + 0.02, RY + 0.035, z0 + 0.28, z0 + 0.42, 0xf2f2ee); box(xa, xb, RY + 0.02, RY + 0.035, z1 - 0.42, z1 - 0.28, 0xf2f2ee); }
+      const bg2 = new THREE.BufferGeometry(); bg2.setAttribute('position', new THREE.Float32BufferAttribute(q, 3)); bg2.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); bg2.computeBoundingSphere();
+      const bm = new THREE.Mesh(bg2, new THREE.MeshBasicMaterial({ vertexColors: true, fog: true, side: THREE.DoubleSide })); bm.userData.name = 'Off-ramp, far off'; bm.userData.noWalk = true; bm.raycast = () => {}; povEndWall.add(bm); }
+    // the haze band: just inside the sky, from a few degrees over the horizon down; opaque under the horizon (no painted ground showing past the world's edge).
+    // Drawn after the world (depth-tested), so it only colours what's left of the sky behind it, and the far-off haze there already is
+    const at = canvasTex(4, 128, (c, w, h) => { const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#000'); gr.addColorStop(0.05, '#2a2a2a'); gr.addColorStop(0.085, '#b8b8b8'); gr.addColorStop(0.12, '#fff'); gr.addColorStop(1, '#fff'); c.fillStyle = gr; c.fillRect(0, 0, w, h); }, 1, 1);
+    at.wrapS = at.wrapT = THREE.ClampToEdgeWrapping;
+    const bg = new THREE.SphereGeometry(55, 64, 10, 0, Math.PI * 2, Math.PI / 2 - 0.08, 0.83);
+    const b = new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ color: 0xb1ccc9, alphaMap: at, side: THREE.BackSide, fog: false, depthWrite: false, transparent: false,
+      blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor }));
+    b.renderOrder = 5; b.userData.name = 'Sky haze'; b.userData.noWalk = true; b.frustumCulled = false; b.raycast = () => {}; skyRig.add(b); S.band = b;
+  } catch (e) { console.error(e); }
+}
+function w3Widen(o, XW) {                                             // (w3Build) a long flat strip, stretched sideways out to x = +-XW; the part that was there stays exactly as it was (texture and all)
+  const g = o.geometry, w = g.parameters.width, A = g.attributes.position, UV = g.attributes.uv; o.updateMatrixWorld(true);
+  const sx = Math.sign(new THREE.Vector3(1, 0, 0).transformDirection(o.matrixWorld).x) || 1, cx = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld).x;
+  let lo = Infinity, hi = -Infinity; for (let i = 0; i < A.count; i++) { lo = Math.min(lo, A.getX(i)); hi = Math.max(hi, A.getX(i)); }
+  const a = (-XW - cx) * sx, b = (XW - cx) * sx, nlo = Math.min(lo, a, b), nhi = Math.max(hi, a, b), mid = (lo + hi) / 2;
+  for (let i = 0; i < A.count; i++) { const x = A.getX(i) < mid ? nlo : nhi; A.setX(i, x); UV.setX(i, (x - lo) / (hi - lo || w)); }
+  A.needsUpdate = UV.needsUpdate = true; g.computeBoundingSphere(); g.computeBoundingBox();
+}
+function w3FogOn() {                                                  // everything out there takes the haze (it was all fog-free: the old beige room fog never reached it)
+  const S = w3S(); let n = 0;
+  const ok = m => m && m.fog === false && !m.isShaderMaterial && !m.isSpriteMaterial && m.blending !== THREE.AdditiveBlending && !m.userData.w3keep;
+  for (const top of povEndWall.children) { if (top === skyRig) continue;
+    top.traverse(o => { if (!o.isMesh && !o.isLine && !o.isPoints) return; const ms = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of ms) if (ok(m)) { m.fog = true; m.needsUpdate = true; n++; } }); }
+  S.fogged = (S.fogged || 0) + n;
+}
+function w3Sky(dt) {                                                  // (updateYardLife, every frame the yard's shown) the far plane, the sky's size, the haze
+  const T = TOD; if (!T || !skyRig || !scene.fog) return; const S = w3S();
+  if (!S.built) w3Build();
+  const C = w3Cfg();
+  if (camera.far !== C.far) { camera.far = C.far; camera.updateProjectionMatrix(); }
+  if (skyRig.scale.x !== C.sky) skyRig.scale.setScalar(C.sky);
+  if (S.mats !== T.mats) { S.mats = T.mats; w3FogOn(); }
+  // the haze colour: the painted horizon now (blending into the next sky), then the weather's murk over it
+  const P = TOD_P, cur = P[T.i], nxt = P[(T.i + 1) % P.length], f = Math.max(0, (T.t - (cur.d - 14)) / 14), s = f * f * (3 - 2 * f), F = w3FogTable();
+  const a = F[cur.sky] || F.day, b = F[nxt.sky] || F.day, fc = S.fogC;
+  fc.setRGB((a[0] + (b[0] - a[0]) * s) / 255, (a[1] + (b[1] - a[1]) * s) / 255, (a[2] + (b[2] - a[2]) * s) / 255);
+  const mo = T.murk && T.murk.visible ? T.murk.material.opacity : 0;
+  if (mo > 0) { const o = F.overcast, mc = T.murk.material.color; S.c1.setRGB(o[0] / 255 * mc.r, o[1] / 255 * mc.g, o[2] / 255 * mc.b); fc.lerp(S.c1, mo); }
+  scene.fog.color.copy(fc); const wk = 1 - 0.4 * mo;                  // (rain and snow: the haze closes in)
+  scene.fog.near = C.near * wk; scene.fog.far = C.fogF * (1 - 0.3 * mo);
+  if (S.band) S.band.material.color.copy(fc);
+}
+function w3Cull(c, hide) {                                            // (cullBegin, last) what the longer view would add for nothing: lamp glows switched off by day, and the
+  const S = w3S(), U = UPPER, Y = YARD;                               // insides of the house (seen only through its windows) past the old 80 m: still left out, as before
+  if (TOD && TOD.glows) for (const g of TOD.glows) if (g.material.opacity < 0.003) hide(g);
+  if (TOD && TOD.spill) for (const q of TOD.spill) if (q[0] && q[0].material && q[0].material.opacity < 0.003) hide(q[0]);
+  if (c.x > Y.HL - 0.3 && c.x < Y.HR + 0.3 && c.z > U.zF - 0.3 && c.z < U.zB + 0.3 && c.y < U.CH + 0.25) return;   /* (in the house: nothing to do) */
+  if (!S.inL || clock - S.inT > 30 || clock < S.inT) w3InsideList();
+  const L = S.inL, v = S.v;
+  for (let i = 0; i < L.length; i++) { const q = L[i], o = q.o; if (!o.visible) continue; v.copy(q.c).applyMatrix4(o.matrixWorld);
+    if (v.distanceTo(c) - q.r > 80) hide(o); }
+  if (c.y > U.CH - 0.5) return;                                       // (up high: she can see over the house)
+  // out round the house, below the eaves: past 80 m, whatever's wholly hidden behind the house from here (the street from the yard, the yard from the street) stays hidden too
+  const F = S.frL, top = U.CH - 0.4, faces = [];
+  if (c.z > U.zB + 0.5) faces.push(0); if (c.z < U.zF - 0.5) faces.push(1); if (c.x < Y.HL - 0.5) faces.push(2); if (c.x > Y.HR + 0.5) faces.push(3);
+  if (!faces.length) return;
+  for (let i = 0; i < F.length; i++) { const q = F[i], o = q.o; if (!o.visible) continue; v.copy(q.c).applyMatrix4(o.matrixWorld); const r = q.r;
+    if (v.distanceTo(c) - r < 80) continue;
+    for (const f of faces) { if (w3Behind(c, v, r, f, Y, U, top)) { hide(o); break; } } }
+}
+function w3Behind(c, v, r, f, Y, U, top) {                            // (w3Cull) is the ball (v, r) wholly behind the house's wall f (0 back, 1 front, 2 left, 3 right) as seen from c?
+  const az = f < 2, P = f === 0 ? U.zB : f === 1 ? U.zF : f === 2 ? Y.HL : Y.HR, s = f === 0 || f === 3 ? -1 : 1;   /* (s: which way is 'into the house' across that wall) */
+  const cn = az ? c.z : c.x, vn = az ? v.z : v.x; if ((vn - s * r - P) * s < 0.3) return false;   /* (it must be all the way past the wall) */
+  const d = (P - cn), tn = d / (vn - s * r - cn), tf = d / (vn + s * r - cn);
+  const ca = az ? c.x : c.z, va = az ? v.x : v.z, lo = (az ? Y.HL : U.zF) + 0.4, hi = (az ? Y.HR : U.zB) - 0.4;   /* (along the wall, and up it) */
+  if (ca + (va - r - ca) * tn < lo || ca + (va + r - ca) * tn > hi) return false;
+  return Math.max(c.y + (v.y + r - c.y) * tn, c.y + (v.y + r - c.y) * tf) < top;
+}
+function w3InsideList() {                                             // (w3Cull, every 30 s) every small thing wholly inside the house: furniture, people, doors, dishes (never a wall, a window or a lamp); and everything else smallish out round it
+  const S = w3S(), U = UPPER, Y = YARD, L = S.inL = [], F = S.frL = []; S.inT = clock; const sp = new THREE.Sphere(), skip = new Set([skyRig, walk.rig && walk.rig.g, flyS().group].filter(Boolean));
+  const lit = o => { let f = false; o.traverse(q => { if (q.isLight) f = true; }); return f; };
+  const walkIn = o => { if (skip.has(o) || o.isLight) return; if ((o.isMesh || o.isSprite) && o.geometry && !o.isInstancedMesh && o.frustumCulled !== false) {   /* (instanced and hand-placed things: their bounds aren't where they are) */
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); sp.copy(o.geometry.boundingSphere).applyMatrix4(o.matrixWorld); const x = sp.center.x, y = sp.center.y, z = sp.center.z, r = sp.radius;
+      if (r < 3 && x - r > Y.HL + 0.25 && x + r < Y.HR - 0.25 && z - r > U.zF + 0.25 && z + r < U.zB - 0.25 && y + r < U.CH + 0.2 && !lit(o)) {
+        L.push({ o, c: o.geometry.boundingSphere.center.clone(), r }); return; }
+      if (r < 15 && !lit(o)) { F.push({ o, c: o.geometry.boundingSphere.center.clone(), r }); return; } }
+    for (const k of o.children) walkIn(k); };
+  scene.updateMatrixWorld(); walkIn(scene);
+}
+function w3CloudReach() { return Math.max(0, camera.far - 80); }    // (skyCloudFx) the far clouds shrink away only near the new far plane
+function w3Glide() {                                                  // (flyAir, let go of Jump and falling) no more slow float: ordinary gravity, up to a cat's terminal speed
+  if (walk.vy < -30) walk.vy = -30;
+  return false;
+}
+function w3Trick(kind) {                                              // start a trick (kind: front, back, spin, roll, loop)
+  const S = w3S(), p = walk.pos, g = WALK.grav * nipK().grav, gy = surfaceTop(p.x, p.z, p.y + 0.02), h = Math.max(0, p.y - gy), vy = walk.vy;
+  const tl = (vy + Math.sqrt(Math.max(0, vy * vy + 2 * g * h))) / g;   /* (how long till she lands, if nothing holds her up) */
+  if (tl < 0.3) return false;                                         // (about to land: that press is a jump for when she does)
+  const base = kind === 'loop' ? 0.85 : kind === 'spin' ? 0.5 : 0.56;
+  S.tr = { kind, t: 0, dur: Math.max(0.3, Math.min(base, tl * 0.95)) }; S.chain++; walk.jumpQ = -1;   /* (that press was a trick, not a jump saved up for the landing) */
+  const names = { front: 'Front flip!', back: 'Backflip!', spin: 'Spin!', roll: 'Barrel roll!', loop: 'Loop-de-loop!' };
+  floatText(S.v.set(p.x, p.y + 1.15, p.z), names[kind] + (S.chain > 1 ? ' x' + S.chain : ''), 'clutch');
+  noise(0.2, 0.035, 1500 + S.chain * 300); tone(420 + S.chain * 60, 760 + S.chain * 80, 0.18, 'triangle', 0.022);
+  burst(S.v.set(p.x, p.y + 0.4, p.z), 0xfff1a8, 4, 1.2, 0.8, 0.12);
+  return true;
+}
+function w3Press(super_) {                                            // Jump pressed (or, Super Kitty, tapped) while she's in the air
+  const S = w3S();
+  if (!walk.on || gameMode !== 'walk' || state !== 'playing' || walk.grounded || walk.climb || walk.frozen || walk.fp || !walk.rig) return;
+  if (S.tr) { S.q = 1; return; }                                      // (mid-trick: one more straight after)
+  const order = ['front', 'back', 'spin', 'roll'];
+  const kind = super_ && flyFlying() && flyS().thrT > 0.4 ? 'loop' : order[S.k % 4];   /* (really flying, not just the tap's own little puff) */
+  if (w3Trick(kind) && kind !== 'loop') S.k++;
+}
+function w3Listen() {                                                 // the Jump button and Space, pressed again in the air
+  const S = w3S(), b = document.getElementById('walkJump'); S.listen = true;
+  const down = id => { S.ptr = id; S.pressT = clock; if (!flyOn()) w3Press(false); };   /* (Super Kitty: wait and see if it's a tap or the jetpack) */
+  const up = id => { if (id !== S.ptr) return; S.ptr = null; if (flyOn() && clock - S.pressT < 0.22) w3Press(true); };
+  if (b) b.addEventListener('pointerdown', e => down(e.pointerId));
+  window.addEventListener('pointerup', e => up(e.pointerId)); window.addEventListener('pointercancel', e => { if (e.pointerId === S.ptr) S.ptr = null; });
+  window.addEventListener('keydown', e => { if (e.key === ' ' && !e.repeat && gameMode === 'walk' && state === 'playing') down('key'); });
+  window.addEventListener('keyup', e => { if (e.key === ' ') up('key'); });
+  window.addEventListener('blur', () => { S.ptr = null; });
+}
+function w3Upright(W) { W.g.rotation.order = 'XYZ'; W.g.rotation.set(0, walk.face, 0); }
+function w3Pay(n) {                                                   // a fish a trick, eight a minute at most
+  const S = w3S(), now = clock; S.pay = S.pay.filter(t => now - t < 60); const k = Math.max(0, Math.min(n, 8 - S.pay.length)); if (!k) return 0;
+  for (let i = 0; i < k; i++) S.pay.push(now);
+  try { ckSetWallet(ckWallet() + k); if (typeof ckDot === 'function') ckDot(); } catch (e) {}
+  return k;
+}
+function w3Tick(dt) {                                                 // (updateWalk, after flyTick) the trick in the air, the landing, the stumble, the big-drop thump
+  const S = w3S(), W = walk.rig, p = walk.pos; if (!W) return;
+  if (!S.listen) w3Listen();
+  const live = walk.on && gameMode === 'walk' && state === 'playing';
+  if (!live) { if (S.tr) { S.tr = null; w3Upright(W); } S.chain = S.clean = S.q = 0; S.wasG = true; return; }
+  const ground = walk.grounded || !!walk.climb, hc = 0.3 * (walk.gScale || 1);
+  if (S.tr && ground) {                                               // down she comes, mid-trick
+    const k = S.tr.t / S.tr.dur; S.tr = null; S.q = 0; w3Upright(W);
+    if (k > 0.82) S.clean++;
+    else { S.stumT = 0.6; walk.squash = 1.3; noise(0.14, 0.06, 420); tone(300, 150, 0.16, 'sine', 0.03); floatText(S.v.set(p.x, p.y + 1, p.z), 'Oof!', 'warn'); }
+  }
+  if (S.tr) {
+    const T = S.tr; T.t += dt; let k = Math.min(1, T.t / T.dur); const e = k * k * (3 - 2 * k), A = e * Math.PI * 2;
+    let px = 0, sy = 0, rz = 0;
+    if (T.kind === 'front') px = A; else if (T.kind === 'back' || T.kind === 'loop') px = -A; else if (T.kind === 'spin') sy = A; else rz = A;
+    W.g.rotation.order = 'YXZ'; W.g.rotation.set(px, walk.face + sy, rz);
+    S.v.set(0, hc, 0).applyQuaternion(W.g.quaternion); W.g.position.x -= S.v.x; W.g.position.y += hc - S.v.y; W.g.position.z -= S.v.z;   /* (round her middle, not her paws) */
+    const tuck = Math.sin(k * Math.PI); W.body.scale.multiplyScalar(1 - 0.12 * tuck);
+    W.legs[0].rotation.x = W.legs[1].rotation.x = -1.2 * tuck + W.legs[0].rotation.x * (1 - tuck); W.legs[2].rotation.x = W.legs[3].rotation.x = 1.2 * tuck + W.legs[2].rotation.x * (1 - tuck);   // (paws tucked in)
+    if (T.kind === 'loop' && Math.random() < dt * 40) burst(S.v.set(p.x, p.y + 0.3, p.z), 0xffe9a0, 1, 0.4, 0.2, 0.1);
+    if (k >= 1) { S.tr = null; S.clean++; w3Upright(W); if (S.q) { S.q = 0; w3Press(T.kind === 'loop'); } }
+  }
+  if (ground && !S.wasG) {                                            // just landed
+    if (S.vyPrev < -21) { burst(S.v.set(p.x, p.y + 0.1, p.z), 0xd9cfbf, 12, 3.2, 1.0, 0.24); noise(0.25, 0.07, 260); walk.squash = 1.5; }   /* (a big drop: whump) */
+    if (S.clean > 0 && S.stumT <= 0) {
+      const got = w3Pay(S.clean); walk.squash = Math.max(walk.squash, 1.2);
+      burst(S.v.set(p.x, p.y + 0.35, p.z), 0xfff1a8, 8 + 2 * S.clean, 1.8, 1.6, 0.16); burst(S.v, 0xffb3d9, 4, 1.4, 1.4, 0.12);
+      tone(880, 1320, 0.12, 'triangle', 0.03); tone(1320, 1760, 0.14, 'sine', 0.022, 0.08);
+      if (got) floatText(S.v.set(p.x, p.y + 1.25, p.z), '+' + got + ' 🐟', 'clutch');
+    }
+    S.chain = S.clean = 0;
+  }
+  if (!ground) S.vyPrev = walk.vy;
+  if (S.stumT > 0) { S.stumT -= dt; const a = Math.max(0, S.stumT) / 0.6, w = Math.sin(clock * 30);   // the stumble: a wobble and a head shake
+    W.body.rotation.z = w * 0.3 * a; W.head.rotation.z = -w * 0.4 * a; W.g.position.y -= 0.04 * a; }
+  S.wasG = ground;
+}
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
@@ -29426,6 +30266,7 @@ function updateWalk(dt) {
   W.shadow.visible = !walk.fp;
   if (walk.free && !walk.farSaid && Math.hypot(p.x - 8, p.z - (ROOM.visDepth - 25)) > 80) { walk.farSaid = true; showWalkName('🐾 Princess has left the level. Byeee!'); }
   flyTick(dt);   /* (Super Kitty: the jetpack, the clouds and their fish) */
+  w3Tick(dt);   /* (WORLD3_V1: air tricks, the landing) */
   fc.focus.set(p.x, p.y + 0.55, p.z);
   updateMirrorWorld(dt);
 }
