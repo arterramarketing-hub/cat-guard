@@ -4154,7 +4154,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const tree = (x, z, h, b) => { b = b || 0; trunks.push([x, z, h, b]); const l0 = leaves.length; for (let k = 0; k < 7; k++) { const r = 2 + rnd() * 1.7; leaves.push([x + (rnd() - 0.5) * 4.6, b + h + (rnd() - 0.3) * 3.2, z + (rnd() - 0.5) * 4.6, r, LEAF[rnd() * LEAF.length | 0]]); } treeReg(x, z, b + h, 0.42, b, leaves.slice(l0).map(([lx, ly, lz, r]) => [lx, ly, lz, r * 0.9, r * 0.85 * (lz < FZ + 2.2 ? 0.93 : 0.8)])); };
       for (let x = -52; x < 52; x += 2.1 + rnd() * 1.3) { const l0 = leaves.length, b0 = YARD_BUSHES.length; bush(x, FZ + 1.0, 1.1 + rnd() * 0.55); if (Math.abs(x - YARD.holeX) < 2.3) { leaves.length = l0; YARD_BUSHES.length = b0; } }   // a hedge of bushes right behind the back fence (with a gap behind the hole, so you can see through)...
       const sledClear = (x, z, pad) => { const ax = YARD.holeX, az = FZ + 1.2, bx = YARD.sledX, bz = YARD.sledZ - 0.8, dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));   /* (the sled's clearing, and the way up to it from the hole) */
-        return Math.hypot(x - YARD.sledX, z - YARD.sledZ) < 2.4 + pad || Math.hypot(x - ax - dx * t, z - az - dz * t) < 1.0 + pad; };
+        return (typeof crossyClear === 'function' && crossyClear(x, z, pad)) || Math.hypot(x - YARD.sledX, z - YARD.sledZ) < 2.4 + pad || Math.hypot(x - ax - dx * t, z - az - dz * t) < 1.0 + pad; };
       for (let z = FZ + 2.6; z < FZ + 15.5; z += 2.3 + rnd()) for (let x = -56; x < 56; x += 2.6 + rnd() * 2) { const l0 = leaves.length, b0 = YARD_BUSHES.length; bush(x, z, 0.9 + rnd() * 0.65, hillY(z) - 0.25, DARK); if (sledClear(x, z, 1.1)) { leaves.length = l0; YARD_BUSHES.length = b0; } }   // ...undergrowth all the way up the bank...
       for (const zo of [3.4, 6.8, 10.4, 14, 18]) for (let x = -56 + rnd() * 4; x < 56; x += 4.6 + rnd() * 3.4) { const z = FZ + zo + (rnd() - 0.5) * 1.6, t0 = trunks.length, l0 = leaves.length, y0 = YARD.trees ? YARD.trees.length : 0; tree(x, z, 7 + rnd() * 5, hillY(z)); if (sledClear(x, z, 0.9)) { trunks.length = t0; leaves.length = l0; if (YARD.trees) YARD.trees.length = y0; } }   // ...and trees crowding the slope
       for (let z = VD - 24; z < FZ - 0.5; z += 2.1 + rnd() * 1.1) { const l0 = leaves.length, b0 = YARD_BUSHES.length; bush(yardXL(z) - 1.15, z, 0.95 + rnd() * 0.5); leaves.length = l0; YARD_BUSHES.length = b0; }   // (no bushes down the north side any more: a clear run from the shed round to the front; the cedars and trees stay)
@@ -10730,10 +10730,17 @@ const ACHIEVEMENTS = [
     ['lotStars', '🌟', 'Purr-fect parking', 'In Meow Lot, earn 3 stars on every lot'],
     ['lotGarage', '🏢', 'Not a scratch', 'In Meow Lot, clear a downtown garage lot in the fewest moves: no bonks, no hisses, no undo, no hints'],
   ]],
+  ['Crossy Kitty', [
+    ['crossyFirst', '🐾', 'Crossy Kitty!', 'Hop through the bent panel in the sound wall at the top of the bank (up past the red sled) and take on the traffic'],
+    ['crossy100', '💯', 'Century hopper', 'In Crossy Kitty, hop 100 rows in one run'],
+    ['crossyGeese', '🌊', 'Goose bridge', 'In Crossy Kitty, cross the whole Don River riding only Canada geese'],
+    ['crossyTrain', '🚆', 'Close call', 'In Crossy Kitty, hop off the GO tracks a split second before the train flies by'],
+    ['crossy500', '🏅', 'Don Valley legend', 'In Crossy Kitty, hop 500 rows in one run'],
+  ]],
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-06 00:30';                                              // stamped when the site is published
+const BUILD = '2026-10-09 19:05';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -13489,6 +13496,7 @@ function syncSecretModes() {                                          // the mot
   { const jb = $('jetBtn'), j = f('jet') && typeof startJetGame === 'function'; if (jb) { jb.hidden = !j; $('jetDot').hidden = !(j && (r || h)); if (j) $('secretModes').hidden = false; } }   /* (Sky Paws: once she's flown the raccoon's jet) */
   if (typeof sledSync === 'function') sledSync();                     /* (Sled Rush: once she's ridden the red sled) */
   if (typeof lotSync === 'function') lotSync();                       /* (Meow Lot: once she's played it at the valet stand) */
+  if (typeof crossySync === 'function') crossySync();                 /* (Crossy Kitty: once she's hopped through the bent panel) */
 }
 function menuOrbit(dt) {                                              // behind the title card: the living room turning slowly (mice still peeking out)
   const M = menuOrbit; if (!M.on) M.t = 0; M.on = true; M.t += dt; const v = M.v || (M.v = new THREE.Vector3()); v.copy(camBase).sub(camTarget);
@@ -24392,11 +24400,12 @@ function warmJobs(tier) {                                                 // wha
     closet: typeof ckBuildScene === 'function' && { built: () => CK.built, steps: [J0 => warmCompileStep(J0, () => warmClosetProxy('room'), warmSt().budget), J0 => warmCompileStep(J0, () => warmClosetProxy('cards'), warmSt().budget)] },
     gaze: typeof gazeMake === 'function' && { built: () => !!GAZE, steps: [() => gazeMake()] },
     lot: typeof lotBuild === 'function' && { built: () => LOT.built, steps: [() => lotBuild(), J0 => warmCompileStep(J0, () => ({ S: LOT.scene, cam: LOT.cam, extra: [warmRigClone()] }), warmSt().budget), () => warmDraw(LOT.scene, LOT.cam), J0 => warmTexStep(J0, () => warmTexAll(LOT.scene), warmSt().budget)] },   /* (Meow Lot: a light world, so weak phones get it too) */
+    crossy: typeof crossyBuild === 'function' && { built: () => CROSSY.built, steps: [() => crossyBuild(), J0 => warmCompileStep(J0, () => ({ S: CROSSY.scene, cam: CROSSY.cam, extra: [warmRigClone()] }), warmSt().budget), () => warmDraw(CROSSY.scene, CROSSY.cam), J0 => warmTexStep(J0, () => warmTexAll(CROSSY.scene), warmSt().budget)] },   /* (Crossy Kitty: instanced and light, so weak phones get it too) */
   };
   const order = [], put = k => { if (worlds[k] && order.indexOf(k) < 0) order.push(k); };
   if (warmFound('ride')) put('bike'); if (warmFound('hop')) put('hop'); if (warmFound('jet')) put('jet'); if (warmFound('sled')) put('sled');   // (the buttons on the title screen)
-  if (warmFound('lot')) put('lot');                                       /* (Meow Lot's title button) */
-  ['bike', 'sled', 'jet', 'hop', 'chim', 'closet', 'gaze'].forEach(put); put('lot');
+  if (warmFound('lot')) put('lot'); if (warmFound('crossy')) put('crossy');                                       /* (Meow Lot's title button) */
+  ['bike', 'sled', 'jet', 'hop', 'chim', 'closet', 'gaze'].forEach(put); put('lot'); put('crossy');
   for (const k of order) J.push(Object.assign({ id: k }, worlds[k]));
   return J;
 }
@@ -25526,6 +25535,1129 @@ function lotDots() {                                                     // (a d
     if (d) d.classList.toggle('ml-lead', !!prev && w.offsetTop > prev.offsetTop + 4); prev = w; }
 }
 /* (end of MEOW LOT) */
+/* CROSSY_V1 */
+/* =====================================================================
+   CROSSY KITTY (2026-10-09): an endless Crossy Road-style hopper over the traffic behind the house. Up at the top of the bank, one
+   panel of the sound wall is bent wide open (its lower half peeled out over the off-ramp's shoulder, a pink paw sprayed on it);
+   standing by it shows the 🐾 button. In its own little world (scene, camera, lights, built the first time, like Sled Rush and
+   Meow Lot), PKR (a clone of her Free roam rig, Closet outfit and all) hops a grid, one cell a hop: tap to hop forward, swipe
+   left, right or back (arrows / WASD, space to hop on a keyboard). Inputs are buffered (up to three), hops take an eighth of a
+   second and always land on a cell (on a log or a goose she lands on one of its slots and rides it). Endless procedural rows:
+   the off-ramp (slow cars that brake for her: the tutorial), the 401 (collector and express lanes split by concrete dividers:
+   cars with the Meow Lot cat plates, vans, pickups, GO buses, transport trucks, motorcycles), GO train tracks (a flashing
+   signal and a bell, then the train), the Don River (logs, lily pads, rafts of Canada geese that now and then hiss and dive),
+   the Lower Don Trail (cyclists and joggers) and the ravine's grass (trees and rocks in the way). Every lane is a loop with
+   gaps that suit its speed; rivers always have a way across; grass always has a way through. Harder the further she goes:
+   faster and busier traffic, wider rivers, more and longer trains, fewer rows of grass between. Dawdle (no new row for 8 s),
+   or fall behind the creeping camera, and a red-tailed hawk swoops down and carries her off. 🐟 along the way go into the
+   piggy bank (ckWallet); a rare 🍄 gives slow motion or a one-hit shield. Best in catguard.crossyBest; "Keep hopping"
+   (25, 50, 100 fish); catguard.found.crossy puts 🐾 Crossy Kitty on the title screen. The ground follows the season (and the
+   yard's time of day, read when a run starts). Everything here is prefixed crossy/CROSSY; the game calls crossyFrame(dt)
+   every frame (true: it drew this one).
+   ===================================================================== */
+const CROSSY = {
+  built: false, active: false, paused: false, phase: 'off', err: 0, t: 0, pt: 0, fade: 0, fadeShown: -1, post: 0, drawn: false,
+  scene: null, cam: null, size: null, aspect: 0, ui: null, pill: null, pillOn: false, goQ: false, spot: null, spotMat: null, saidVisit: null, keysOn: false,
+  HALF: 4, GW: 20, LW: 48, NR: 64, HOP: 0.125, SC: 1.0, WY: -0.32,
+  rows: null, G: null, P: null, q: [], seed: 1, wt: 0, mods: null, decDirty: true, look: '', revives: 0, fishN: 0, bankedN: 0,
+};
+function crossyRnd() { const S = CROSSY; S.seed = (S.seed * 16807) % 2147483647; return (S.seed - 1) / 2147483646; }
+function crossyGet(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+function crossyPut(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+function crossyWallet() { return typeof ckWallet === 'function' ? ckWallet() : Math.max(0, parseInt(crossyGet('catguard.fish', '0'), 10) || 0); }
+function crossySetWallet(n) { if (typeof ckSetWallet === 'function') ckSetWallet(n); else crossyPut('catguard.fish', Math.max(0, Math.round(n))); }
+function crossyK(r) { return Math.max(0, Math.min(1, r / 420)); }                       // how hard it's got (0 at the wall, 1 by row 420)
+function crossyK2(r) { return Math.max(0, Math.min(0.3, (r - 420) / 1500)); }           // (and a little more past that)
+function crossyPick(a) { return a[(crossyRnd() * a.length) | 0]; }
+function crossyPickW(w) { let s = 0; for (const k in w) s += w[k]; let x = crossyRnd() * s; for (const k in w) { x -= w[k]; if (x <= 0) return k; } return Object.keys(w)[0]; }
+function crossyWrapD(d) { const L = CROSSY.LW; return d - Math.round(d / L) * L; }     // (a distance along a lane's loop, the short way)
+function crossySeason() {
+  let d = null; try { d = typeof ckSnNow === 'function' ? ckSnNow() : new Date(); } catch (e) { d = new Date(); }
+  const m = d.getMonth() + 1; return { s: m === 12 || m <= 2 ? 'winter' : m <= 5 ? 'spring' : m <= 8 ? 'summer' : 'autumn', boo: m === 10 };
+}
+function crossyTod() {                                                   // the yard's time of day, as it was when she came through
+  try { if (typeof TOD !== 'undefined' && TOD && typeof TOD_P !== 'undefined' && TOD_P[TOD.i]) { const P = TOD_P[TOD.i]; return { n: P.n, night: Math.max(0, Math.min(1, TOD.nightF || 0)) }; } } catch (e) {}
+  return { n: 'day', night: 0 };
+}
+
+/* ---------- the pieces: chunky toys, each merged into one geometry (and drawn instanced) ---------- */
+function crossyFlat(g) { const n = g.index ? g.toNonIndexed() : g; if (n !== g) g.dispose(); n.computeVertexNormals(); return n; }   // (faceted: the low-poly look)
+function crossyParts() { const P = []; P.add = (g, c, x, y, z, sx, sy, sz, rx, ry, rz, uv) => { P.push([g, c, x || 0, y || 0, z || 0, sx || 1, sy || 1, sz || 1, rx || 0, ry || 0, rz || 0, uv]); return P; }; return P; }
+function crossyLump(seed, k, r) { return crossyFlat(chimLump(seed, k, 0)); }
+function crossyTruckGeo(cab, box, stripe, plate) {                       // a transport truck: a cab with its stacks, a long box trailer with a stripe (4.6 long, nose at +z)
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(), L = 4.6, glass = 0x2b3d5e, dark = 0x26262c, chrome = 0xdadde2, lite = new THREE.Color(cab).lerp(new THREE.Color(0xffffff), 0.3).getHex();
+  P.add(B(0.86, 0.6, 1.0, 0.12), cab, 0, 0.54, L / 2 - 0.52); P.add(B(0.84, 0.24, 0.42, 0.06), glass, 0, 0.74, L / 2 - 0.32, 1, 1, 1, -0.12); P.add(B(0.78, 0.22, 0.7, 0.08), lite, 0, 0.95, L / 2 - 0.66);
+  P.add(B(0.6, 0.22, 0.05, 0.02), chrome, 0, 0.36, L / 2 - 0.01);
+  for (const sx of [-1, 1]) { P.add(new THREE.CylinderGeometry(0.04, 0.04, 0.75, 6), chrome, sx * 0.4, 0.9, L / 2 - 1.04); P.add(B(0.14, 0.08, 0.05, 0.02), 0xfff3c0, sx * 0.3, 0.42, L / 2 + 0.01); P.add(B(0.12, 0.08, 0.05, 0.02), 0xe0303a, sx * 0.34, 0.36, -L / 2 - 0.01); }
+  P.add(B(0.94, 0.96, 3.3, 0.06), box, 0, 0.8, -0.6); P.add(B(0.95, 0.16, 3.0, 0.03), stripe, 0, 0.66, -0.6); P.add(B(0.95, 0.08, 3.0, 0.02), stripe, 0, 1.06, -0.6);
+  P.add(B(0.62, 0.12, 4.3, 0.03), dark, 0, 0.24, 0);
+  for (const z of [L / 2 - 0.42, -1.45, -1.9]) for (const sx of [-1, 1]) { P.add(new THREE.CylinderGeometry(0.17, 0.17, 0.14, 9), dark, sx * 0.38, 0.17, z, 1, 1, 1, 0, 0, Math.PI / 2); P.add(new THREE.CylinderGeometry(0.08, 0.08, 0.15, 6), chrome, sx * 0.38, 0.17, z, 1, 1, 1, 0, 0, Math.PI / 2); }
+  P.add(new THREE.PlaneGeometry(0.34, 0.11), 0xffffff, 0, 0.3, -L / 2 - 0.02, 1, 1, 1, 0, Math.PI, 0, lotPlateUV(plate));
+  return lotMerge(P);
+}
+function crossyMotoGeo(col, lid) {                                       // a motorcycle and its rider (1.1 long)
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(), dark = 0x26262c, chrome = 0xdadde2;
+  for (const z of [0.38, -0.38]) { P.add(new THREE.CylinderGeometry(0.19, 0.19, 0.08, 10), dark, 0, 0.19, z, 1, 1, 1, 0, 0, Math.PI / 2); P.add(new THREE.CylinderGeometry(0.08, 0.08, 0.09, 6), chrome, 0, 0.19, z, 1, 1, 1, 0, 0, Math.PI / 2); }
+  P.add(B(0.18, 0.2, 0.62, 0.06), col, 0, 0.42, 0.02); P.add(B(0.24, 0.16, 0.26, 0.06), col, 0, 0.55, 0.16); P.add(B(0.18, 0.07, 0.3, 0.03), dark, 0, 0.56, -0.16); P.add(B(0.5, 0.04, 0.04, 0.02), chrome, 0, 0.72, 0.3);
+  P.add(B(0.1, 0.07, 0.04, 0.02), 0xfff3c0, 0, 0.6, 0.36); P.add(B(0.08, 0.06, 0.04, 0.02), 0xe0303a, 0, 0.5, -0.36);
+  P.add(B(0.3, 0.38, 0.22, 0.08), 0x2a2a30, 0, 0.84, -0.04, 1, 1, 1, 0.35); P.add(new THREE.SphereGeometry(0.14, 9, 6), lid, 0, 1.06, 0.06); P.add(B(0.2, 0.08, 0.05, 0.02), 0x2b3d5e, 0, 1.06, 0.19);
+  for (const sx of [-1, 1]) { P.add(B(0.08, 0.08, 0.32, 0.03), 0x2a2a30, sx * 0.14, 0.86, 0.14, 1, 1, 1, 0.5); P.add(B(0.09, 0.3, 0.1, 0.03), 0x34343c, sx * 0.13, 0.5, -0.06, 1, 1, 1, -0.3); }
+  return lotMerge(P);
+}
+function crossyCarGeo(kind, i) {                                         // (the Meow Lot toys, with their cat plates)
+  const C = [0xe8424a, 0x3a8cff, 0xffc93a, 0x5cc46a, 0xf2f0ea, 0x9a6bff, 0xff7ab8, 0x2fb8b0];
+  if (kind === 'c') return lotVehGeo('c', C[i], i * 4 + 1, 2);
+  if (kind === 'v') return lotVehGeo('v', [0xf2f0ea, 0x2fb8b0][i], i * 5 + 3, 2.4);
+  if (kind === 'p') return lotVehGeo('t', [0xff8a3a, 0x4a5a8a][i], i * 6 + 2, 2.4);
+  return lotVehGeo('b', 0x2e8a4e, 35, 3.6);                              // (a GO bus: green, a white roof)
+}
+function crossyTrainGeo(eng) {                                           // a GO train: the locomotive, or a white-and-green bi-level coach (5 long, nose at +z)
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(), green = 0x2e7d4f, glass = 0x24324a, dark = 0x26262c, L = 4.85;
+  if (eng) { P.add(B(1.02, 1.2, L, 0.14), green, 0, 0.86, 0); P.add(B(1.04, 0.16, L - 0.2, 0.04), 0xf2f2ea, 0, 0.62, 0); P.add(B(1.04, 0.08, L - 0.2, 0.03), 0xffc93a, 0, 0.5, 0);
+    P.add(B(0.84, 0.3, 0.06, 0.04), glass, 0, 1.18, L / 2); P.add(B(0.9, 0.2, 0.3, 0.05), 0xffc93a, 0, 0.46, L / 2 - 0.1); P.add(B(0.7, 0.18, 2.2, 0.06), 0x7f8b88, 0, 1.52, -0.6);
+    for (const sx of [-1, 1]) P.add(B(0.14, 0.1, 0.05, 0.02), 0xfff3c0, sx * 0.3, 0.8, L / 2 + 0.01); }
+  else { P.add(B(1.02, 1.42, L, 0.12), 0xf2f2ee, 0, 0.98, 0); P.add(B(1.04, 0.34, L - 0.06, 0.05), green, 0, 0.44, 0); P.add(B(1.04, 0.07, L - 0.06, 0.02), green, 0, 0.7, 0);
+    for (const y of [0.9, 1.34]) P.add(B(1.05, 0.2, L - 0.7, 0.05), glass, 0, y, 0); P.add(B(0.86, 0.1, L - 0.2, 0.05), 0xb8bec0, 0, 1.72, 0); }
+  for (const z of [1.7, -1.7]) P.add(B(0.8, 0.26, 1.0, 0.06), dark, 0, 0.18, z);
+  return lotMerge(P);
+}
+function crossyLogGeo(len) {                                             // a floating log (along z), bark and two pale cut ends
+  const P = crossyParts(), l = len - 0.12;
+  P.add(crossyFlat(new THREE.CylinderGeometry(0.34, 0.34, l, 8)), 0x7a5232, 0, 0, 0, 1, 1, 1, Math.PI / 2);
+  for (const s of [-1, 1]) { P.add(crossyFlat(new THREE.CylinderGeometry(0.29, 0.29, 0.03, 8)), 0xd9b27c, 0, 0, s * l / 2, 1, 1, 1, Math.PI / 2); P.add(crossyFlat(new THREE.CylinderGeometry(0.14, 0.14, 0.035, 8)), 0xb88a52, 0, 0, s * l / 2, 1, 1, 1, Math.PI / 2); }
+  for (let i = 0; i < len; i++) P.add(crossyFlat(new THREE.BoxGeometry(0.09, 0.12, 0.16)), 0x5e3e24, (i % 2 ? 0.2 : -0.18), 0.27, -l / 2 + 0.6 + i * 0.95, 1, 1, 1, 0, 0.3, i % 2 ? -0.5 : 0.5);
+  return lotMerge(P);
+}
+function crossyPadGeo(fl, sea) {                                         // a lily pad (a notch cut out), and on some a pink flower; in winter, a floe of ice
+  if (sea === 'winter') { const P = crossyParts(); P.add(crossyFlat(new THREE.CylinderGeometry(0.44, 0.47, 0.09, 7)), 0xdcecf6, 0, 0, 0); P.add(crossyFlat(new THREE.CylinderGeometry(0.34, 0.4, 0.1, 7)), 0xf6fbff, 0.02, 0.01, -0.02); if (fl) P.add(crossyLump(5.5, 0.2), 0xffffff, -0.1, 0.08, 0.08, 0.16, 0.08, 0.14); return lotMerge(P); }
+  const P = crossyParts(), g = new THREE.CylinderGeometry(0.44, 0.44, 0.05, 14, 1, false, 0.35, Math.PI * 2 - 0.7);
+  P.add(crossyFlat(g), 0x4f9a3a, 0, 0, 0); P.add(crossyFlat(new THREE.CylinderGeometry(0.3, 0.3, 0.052, 12, 1, false, 0.35, Math.PI * 2 - 0.7)), 0x5fae44, 0, 0.002, 0);
+  if (fl) { for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; P.add(crossyFlat(new THREE.ConeGeometry(0.06, 0.16, 4)), 0xff8ac0, Math.cos(a) * 0.07 - 0.12, 0.1, Math.sin(a) * 0.07 + 0.1, 1, 1, 1, Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6); } P.add(new THREE.SphereGeometry(0.05, 8, 6), 0xffd23a, -0.12, 0.12, 0.1); }
+  return lotMerge(P);
+}
+function crossyGooseGeo() {                                              // a Canada goose, afloat (along z): brown body, pale front, black neck and head, white chinstrap
+  const P = crossyParts();
+  P.add(crossyFlat(new THREE.IcosahedronGeometry(0.3, 1)), 0x8b7a68, 0, 0.1, -0.02, 0.78, 0.6, 1.15); P.add(crossyFlat(new THREE.IcosahedronGeometry(0.22, 0)), 0xeae4d6, 0, 0.06, 0.12, 0.75, 0.55, 0.9);
+  P.add(crossyFlat(new THREE.IcosahedronGeometry(0.18, 0)), 0x6e6052, 0, 0.2, -0.05, 1.25, 0.45, 1.3); P.add(crossyFlat(new THREE.ConeGeometry(0.1, 0.22, 5)), 0x1c1c20, 0, 0.16, -0.36, 1, 1, 0.6, -Math.PI / 2 - 0.3);
+  P.add(crossyFlat(new THREE.CylinderGeometry(0.05, 0.065, 0.42, 5)), 0x1c1c20, 0, 0.38, 0.26, 1, 1, 1, 0.22); P.add(crossyFlat(new THREE.IcosahedronGeometry(0.085, 0)), 0x1c1c20, 0, 0.6, 0.31, 0.9, 0.9, 1.3);
+  for (const sx of [-1, 1]) P.add(new THREE.SphereGeometry(0.04, 5, 4), 0xffffff, sx * 0.06, 0.58, 0.3, 0.5, 1, 1.3);
+  P.add(crossyFlat(new THREE.ConeGeometry(0.035, 0.12, 5)), 0x2a2a2a, 0, 0.59, 0.43, 1, 1, 1, Math.PI / 2);
+  return lotMerge(P);
+}
+function crossyBikeGeo(col) {                                            // a cyclist on the trail (1 long): helmet, a bright jersey, two thin wheels
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(), dark = 0x26262c;
+  for (const z of [0.36, -0.36]) { P.add(new THREE.TorusGeometry(0.2, 0.03, 4, 12), dark, 0, 0.22, z, 1, 1, 1, 0, Math.PI / 2); P.add(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 6), 0xcfd3d8, 0, 0.22, z, 1, 1, 1, 0, 0, Math.PI / 2); }
+  P.add(B(0.05, 0.05, 0.62, 0.02), col, 0, 0.42, 0, 1, 1, 1, 0.12); P.add(B(0.05, 0.3, 0.05, 0.02), col, 0, 0.32, -0.12); P.add(B(0.4, 0.035, 0.035, 0.015), 0x2a2a2a, 0, 0.6, 0.3);
+  P.add(B(0.26, 0.32, 0.2, 0.08), col, 0, 0.78, -0.02, 1, 1, 1, 0.75); P.add(B(0.22, 0.12, 0.2, 0.05), 0x22242a, 0, 0.6, -0.14);
+  P.add(new THREE.SphereGeometry(0.11, 8, 6), 0xf1c7a0, 0, 0.98, 0.14); P.add(new THREE.SphereGeometry(0.125, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), 0xffffff, 0, 1.0, 0.13, 1, 1, 1.2);
+  for (const sx of [-1, 1]) { P.add(B(0.07, 0.28, 0.07, 0.03), 0x22242a, sx * 0.08, 0.42, -0.04, 1, 1, 1, sx * 0.5); P.add(B(0.06, 0.06, 0.3, 0.03), col, sx * 0.12, 0.76, 0.18, 1, 1, 1, 0.5); }
+  return lotMerge(P);
+}
+function crossyJogGeo(col) {                                             // a jogger: headband, a bright top, running shorts (facing +z)
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts();
+  for (const sx of [-1, 1]) { P.add(B(0.1, 0.42, 0.11, 0.04), 0xf1c7a0, sx * 0.08, 0.24, sx * 0.06, 1, 1, 1, sx * 0.45); P.add(B(0.12, 0.07, 0.18, 0.03), 0xffffff, sx * 0.08, 0.04, sx * 0.1 + 0.03); }
+  P.add(B(0.28, 0.14, 0.18, 0.05), 0x2a2a38, 0, 0.5, 0); P.add(B(0.3, 0.36, 0.2, 0.08), col, 0, 0.74, 0.02, 1, 1, 1, 0.12);
+  for (const sx of [-1, 1]) P.add(B(0.07, 0.26, 0.08, 0.03), 0xf1c7a0, sx * 0.19, 0.72, -sx * 0.04, 1, 1, 1, -sx * 0.6);
+  P.add(new THREE.SphereGeometry(0.12, 8, 6), 0xf1c7a0, 0, 1.03, 0.03); P.add(B(0.26, 0.05, 0.26, 0.02), col, 0, 1.06, 0.03); P.add(new THREE.SphereGeometry(0.07, 8, 6), 0x5a3a22, 0, 1.04, -0.12);
+  return lotMerge(P);
+}
+function crossyTreeGeo(kind, sea) {                                      // a ravine tree in the season's colours: a round one, a pine, or (winter) a bare one
+  const P = crossyParts(), trunk = 0x6b4a30, L = { summer: [0x4f9a3a, 0x5fae44, 0x3f8a34], spring: [0x7fcf5a, 0xf2b0cf, 0x6cc04e], autumn: [0xe0782c, 0xd8452a, 0xe8b13a], winter: [0xffffff, 0xffffff, 0xffffff] }[sea] || [0x4f9a3a, 0x5fae44, 0x3f8a34];
+  if (kind === 'P') { P.add(crossyFlat(new THREE.CylinderGeometry(0.08, 0.11, 0.5, 6)), trunk, 0, 0.25, 0);
+    [[0.62, 0.7, 0.62], [0.5, 0.6, 1.0], [0.36, 0.5, 1.34]].forEach(([r, h, y], i) => { P.add(crossyFlat(new THREE.ConeGeometry(r, h, 7)), [0x2f6a3a, 0x357540, 0x3b7f46][i], 0, y, 0); if (sea === 'winter') P.add(crossyFlat(new THREE.ConeGeometry(r * 0.55, h * 0.45, 7)), 0xf4f8fc, 0, y + h * 0.3, 0); });
+    return lotMerge(P); }
+  if (sea === 'winter') { P.add(crossyFlat(new THREE.CylinderGeometry(0.07, 0.12, 1.3, 6)), trunk, 0, 0.65, 0);
+    for (const [a, y, l] of [[0.6, 0.8, 0.5], [-0.7, 1.0, 0.45], [2.4, 1.15, 0.4], [-2.2, 0.7, 0.4]]) { P.add(crossyFlat(new THREE.CylinderGeometry(0.025, 0.045, l, 5)), trunk, Math.sin(a) * l * 0.4, y, Math.cos(a) * l * 0.4, 1, 1, 1, Math.cos(a) * 0.9, 0, -Math.sin(a) * 0.9); }
+    P.add(crossyLump(3.1, 0.2), 0xf4f8fc, 0, 1.32, 0, 0.16, 0.08, 0.16); return lotMerge(P); }
+  const c = L[kind === 'A' ? 0 : 2], c2 = L[1];
+  P.add(crossyFlat(new THREE.CylinderGeometry(0.08, 0.12, 0.62, 6)), trunk, 0, 0.31, 0);
+  P.add(crossyLump(1.7, 0.18), c, 0, 0.95, 0, 0.56, 0.5, 0.56); P.add(crossyLump(4.2, 0.2), kind === 'A' ? c2 : c, 0.18, 1.3, 0.08, 0.38, 0.34, 0.38); P.add(crossyLump(6.6, 0.2), c, -0.2, 1.18, -0.1, 0.34, 0.3, 0.34);
+  return lotMerge(P);
+}
+function crossyBushGeo(sea) { const P = crossyParts(), c = sea === 'winter' ? 0x6f8a62 : sea === 'autumn' ? 0x8a8a3a : 0x3f8a34;
+  P.add(crossyLump(2.2, 0.2), c, 0, 0.24, 0, 0.42, 0.32, 0.4); P.add(crossyLump(5.1, 0.2), c, 0.22, 0.2, 0.1, 0.28, 0.24, 0.28);
+  if (sea === 'winter') P.add(crossyLump(7.3, 0.2), 0xf4f8fc, 0.04, 0.42, 0, 0.32, 0.14, 0.3); else if (sea === 'autumn') P.add(crossyLump(7.3, 0.2), 0xd8622a, -0.16, 0.3, -0.06, 0.24, 0.2, 0.24);
+  return lotMerge(P); }
+function crossyRockGeo() { const P = crossyParts(); P.add(crossyLump(8.8, 0.3), 0x9a968c, 0, 0.18, 0, 0.42, 0.3, 0.38); P.add(crossyLump(2.6, 0.3), 0x85827a, 0.28, 0.1, 0.12, 0.2, 0.16, 0.2); return lotMerge(P); }
+function crossyBarrelGeo() { const P = crossyParts(); for (let i = 0; i < 4; i++) P.add(crossyFlat(new THREE.CylinderGeometry(0.2 - i * 0.012, 0.21 - i * 0.012, 0.15, 10)), i % 2 ? 0xffffff : 0xff6a1a, 0, 0.08 + i * 0.15, 0); P.add(crossyFlat(new THREE.CylinderGeometry(0.27, 0.27, 0.05, 10)), 0x2a2a2a, 0, 0.02, 0); return lotMerge(P); }
+function crossyLampGeo() { const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(); P.add(new THREE.CylinderGeometry(0.05, 0.07, 2.7, 7), 0x9aa0a6, 0, 1.35, 0); P.add(B(0.07, 0.07, 1.0, 0.03), 0x9aa0a6, 0, 2.66, 0.45); P.add(B(0.2, 0.1, 0.42, 0.04), 0x8a9096, 0, 2.62, 0.95); P.add(B(0.16, 0.03, 0.34, 0.02), 0xfff2c4, 0, 2.56, 0.95); return lotMerge(P); }
+function crossySignalGeo() {                                             // a railway crossing signal: a post, the white X, a black lamp board
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(); P.add(new THREE.CylinderGeometry(0.05, 0.06, 1.75, 7), 0xd8dade, 0, 0.88, 0); P.add(B(0.3, 0.1, 0.3, 0.03), 0x3a3a3a, 0, 0.05, 0);
+  for (const a of [0.75, -0.75]) { P.add(B(0.9, 0.11, 0.03, 0.02), 0xf4f4f0, 0, 1.6, 0.06, 1, 1, 1, 0, 0, a); P.add(B(0.92, 0.03, 0.035, 0.01), 0xd02a2a, 0, 1.6, 0.06, 1, 1, 1, 0, 0, a); }
+  P.add(B(0.62, 0.2, 0.06, 0.04), 0x1c1c20, 0, 1.12, 0.06); for (const sx of [-1, 1]) P.add(new THREE.CylinderGeometry(0.1, 0.1, 0.1, 10), 0x1c1c20, sx * 0.22, 1.12, 0.1, 1, 1, 1, Math.PI / 2);
+  return lotMerge(P);
+}
+function crossyReedGeo(sea) { const P = crossyParts(), g = sea === 'winter' ? 0xb8a87a : sea === 'autumn' ? 0xb0a04a : 0x5f9a3a;
+  for (let i = 0; i < 6; i++) { const a = i * 2.4, r = 0.08 + (i % 3) * 0.07, h = 0.5 + (i % 2) * 0.25; P.add(lotRBox(0.035, h, 0.035, 0.01, 1), g, Math.cos(a) * r, h / 2, Math.sin(a) * r, 1, 1, 1, Math.sin(a) * 0.15, 0, Math.cos(a) * 0.15); if (i % 2) P.add(lotRBox(0.06, 0.16, 0.06, 0.025, 1), 0x6b4428, Math.cos(a) * r, h + 0.04, Math.sin(a) * r); }
+  return lotMerge(P); }
+function crossyPumpkinGeo() { const P = crossyParts(); for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; P.add(new THREE.SphereGeometry(0.16, 10, 8), 0xff8a1f, Math.cos(a) * 0.1, 0.17, Math.sin(a) * 0.1, 0.9, 1, 0.9); } P.add(new THREE.CylinderGeometry(0.03, 0.04, 0.12, 6), 0x4f7a2a, 0, 0.36, 0); return lotMerge(P); }
+function crossyFishGeo() {                                               // a fish to pick up: silver-blue, standing on its belly, a forked tail
+  const P = crossyParts(); P.add(new THREE.SphereGeometry(0.2, 12, 9), 0x6fb2ff, 0, 0, 0, 0.5, 0.95, 1.5); P.add(new THREE.SphereGeometry(0.17, 10, 8), 0xe6f2ff, 0, -0.06, 0.03, 0.45, 0.7, 1.3);
+  P.add(crossyFlat(new THREE.ConeGeometry(0.16, 0.22, 3)), 0x4a90e8, 0, 0, -0.36, 0.35, 1.3, 1, -Math.PI / 2); P.add(crossyFlat(new THREE.ConeGeometry(0.08, 0.16, 3)), 0x4a90e8, 0, 0.18, -0.02, 0.3, 1, 1.6);
+  for (const sx of [-1, 1]) { P.add(new THREE.SphereGeometry(0.04, 8, 6), 0xffffff, sx * 0.085, 0.05, 0.19); P.add(new THREE.SphereGeometry(0.022, 6, 5), 0x111111, sx * 0.1, 0.05, 0.21); }
+  return lotMerge(P);
+}
+function crossyMushGeo() {                                               // a power mushroom: a red cap with white spots
+  const P = crossyParts(); P.add(new THREE.CylinderGeometry(0.11, 0.14, 0.26, 10), 0xf6ecd8, 0, 0.13, 0); P.add(new THREE.SphereGeometry(0.28, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0xe8303a, 0, 0.22, 0, 1, 0.8, 1);
+  for (let k = 0; k < 7; k++) { const a = k * 2.3, r = k ? 0.17 : 0, y = k ? 0.34 : 0.44; P.add(new THREE.SphereGeometry(0.05, 7, 5), 0xffffff, Math.cos(a) * r, y, Math.sin(a) * r, 1, 0.5, 1); }
+  for (const sx of [-1, 1]) P.add(new THREE.SphereGeometry(0.022, 6, 5), 0x2a1a1a, sx * 0.05, 0.16, 0.12);
+  return lotMerge(P);
+}
+function crossyStarGeo() { const sh = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2, r = i % 2 ? 0.05 : 0.12; i ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.04, bevelEnabled: false }); g.translate(0, 0, -0.02); const P = crossyParts(); P.add(g, 0xffd23a); return lotMerge(P); }
+function crossyHawkGeo(part) {                                           // a red-tailed hawk: brown back, pale belly, the rufous tail; the wings apart, to flap
+  const P = crossyParts(), br = 0x6e4a2c, pale = 0xeee0c4;
+  if (part === 'body') { P.add(crossyFlat(new THREE.IcosahedronGeometry(0.3, 1)), br, 0, 0, 0, 0.8, 0.7, 1.5); P.add(crossyFlat(new THREE.IcosahedronGeometry(0.24, 1)), pale, 0, -0.07, 0.06, 0.75, 0.6, 1.2);
+    P.add(crossyFlat(new THREE.IcosahedronGeometry(0.17, 1)), br, 0, 0.1, 0.46); P.add(crossyFlat(new THREE.ConeGeometry(0.06, 0.16, 5)), 0xd8b030, 0, 0.06, 0.62, 1, 1, 1, Math.PI / 2 + 0.6);
+    for (const sx of [-1, 1]) { P.add(new THREE.SphereGeometry(0.035, 6, 5), 0xffd040, sx * 0.09, 0.15, 0.55); P.add(new THREE.SphereGeometry(0.018, 5, 4), 0x111111, sx * 0.1, 0.15, 0.57); }
+    P.add(crossyFlat(new THREE.ConeGeometry(0.22, 0.5, 6)), 0xc0502a, 0, 0.02, -0.56, 1, 0.3, 1, -Math.PI / 2);
+    for (const sx of [-1, 1]) P.add(crossyFlat(new THREE.CylinderGeometry(0.025, 0.02, 0.26, 5)), 0xd8b030, sx * 0.1, -0.24, 0.12, 1, 1, 1, 0.5);
+    return lotMerge(P); }
+  const s = part === 'wl' ? -1 : 1;
+  P.add(crossyFlat(new THREE.BoxGeometry(1.0, 0.05, 0.5)), br, s * 0.5, 0, 0); P.add(crossyFlat(new THREE.BoxGeometry(0.5, 0.045, 0.36)), 0x4a321e, s * 1.15, 0, -0.04, 1, 1, 1, 0, s * 0.25);
+  P.add(crossyFlat(new THREE.BoxGeometry(0.9, 0.055, 0.3)), pale, s * 0.45, -0.02, 0.05);
+  for (let k = 0; k < 4; k++) P.add(crossyFlat(new THREE.BoxGeometry(0.42, 0.03, 0.09)), 0x3a2616, s * (1.48 + k * 0.03), 0, 0.12 - k * 0.11, 1, 1, 1, 0, s * (0.35 - k * 0.22));   /* (the fingered tips of a raptor's wing) */
+  return lotMerge(P);
+}
+function crossyWallGeo() {                                               // (behind the first row) the sound wall she came through: grey panels, and the bent one peeled out at x = 0
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 1), P = crossyParts();
+  for (let x = -20; x < 20; x += 2) { if (x === 0 || x === -2) continue; P.add(B(1.96, 1.5, 0.18, 0.03), 0xa3a39c, x + 1, 0.75, 0.62); P.add(B(0.05, 1.5, 0.2, 0.01), 0x6e6e68, x + 1.98, 0.75, 0.62); for (let k = 0; k < 4; k++) P.add(B(0.02, 1.4, 0.19, 0.005), 0x8c8c86, x + 0.4 + k * 0.4, 0.75, 0.62); }
+  P.add(B(4, 0.62, 0.18, 0.03), 0xa3a39c, 0, 1.19, 0.62);                                      // (the bent panel: its top still in line...)
+  P.add(B(3.9, 0.9, 0.12, 0.03), 0x9a9a93, 0, 0.72, 0.98, 1, 1, 1, -1.05);                        // (...its bottom peeled out behind her, like a flap)
+  P.add(B(1.2, 0.5, 0.1, 0.03), 0x8f8f88, -1.35, 0.45, 1.2, 1, 1, 1, -1.3, 0.2, 0.15);
+  for (let k = 0; k < 3; k++) P.add(B(0.16, 0.12, 0.05, 0.02), 0xff6aa8, -0.3 + k * 0.22, 1.3 + (k === 1 ? 0.05 : 0), 0.52);   // (the pink paw sprayed on it)
+  P.add(B(0.3, 0.24, 0.05, 0.06), 0xff6aa8, -0.08, 1.08, 0.52);
+  return lotMerge(P);
+}
+
+/* ---------- the ground: one mesh for every row (a strip of a painted atlas each), rewritten as rows are recycled ---------- */
+function crossyStrip(t) { return { grassA: 0, grassB: 1, road: 2, roadB: 3, roadT: 4, roadBT: 5, rail: 6, water: 7, trail: 8, median: 9, bank: 10, start: 11, rampA: 12, rampB: 13 }[t]; }
+function crossyGroundTex(sea) {                                          // 16 strips of 64 px, each a row across 40 cells (and seamless left to right); painted for the season
+  const W = 1024, cv = document.createElement('canvas'); cv.width = W; cv.height = 1024; const c = cv.getContext('2d'), PC = W / 40;
+  const pal = { summer: ['#7cc44c', '#72ba45', 'rgba(40,110,30,.35)', 'rgba(175,225,110,.45)'], spring: ['#88d05c', '#7ec755', 'rgba(50,120,40,.3)', 'rgba(255,255,255,.7)'],
+    autumn: ['#8db84c', '#83ae46', 'rgba(90,90,30,.35)', 'rgba(232,120,40,.8)'], winter: ['#eef3f8', '#e3eaf2', 'rgba(150,170,200,.35)', 'rgba(255,255,255,.9)'] }[sea] || ['#7cc44c', '#72ba45', 'rgba(40,110,30,.35)', 'rgba(175,225,110,.45)'];
+  const rect = (x, y, w, h) => { c.fillRect(x, y, w, h); if (x + w > W) c.fillRect(x - W, y, w, h); };   // (wrapping round, so each strip tiles)
+  const speck = (y0, h, n, cols, w, hh) => { for (let i = 0; i < n; i++) { c.fillStyle = cols[(Math.random() * cols.length) | 0]; rect(Math.random() * W, y0 + Math.random() * h, w || 3, hh || 2); } };
+  const strip = (i, f) => { c.save(); c.translate(0, i * 64); c.beginPath(); c.rect(0, 0, W, 64); c.clip(); f(); c.restore(); };
+  const grass = (i, base) => strip(i, () => { c.fillStyle = base; c.fillRect(0, 0, W, 64); speck(0, 64, 1400, [pal[2]], 3, 2); speck(0, 64, sea === 'winter' ? 500 : 260, [pal[3]], sea === 'spring' ? 3 : 2, sea === 'spring' ? 3 : 4);
+    if (sea === 'autumn') speck(0, 64, 160, ['rgba(214,70,40,.75)', 'rgba(240,180,50,.8)'], 4, 3); if (sea === 'spring') speck(0, 64, 60, ['rgba(255,214,60,.85)', 'rgba(255,150,200,.8)'], 3, 3); });
+  grass(0, pal[0]); grass(1, pal[1]);
+  const asph = (i, bot, top, ramp) => strip(i, () => { c.fillStyle = ramp ? '#5a5c62' : '#4c4e54'; c.fillRect(0, 0, W, 64); speck(0, 64, 1600, ['rgba(90,92,98,.7)', 'rgba(60,62,66,.7)'], 2, 2);
+    if (sea === 'winter') speck(0, 6, 160, ['rgba(235,240,248,.8)'], 5, 3), speck(58, 6, 160, ['rgba(235,240,248,.8)'], 5, 3);
+    c.fillStyle = '#f2f2ec'; if (bot) c.fillRect(0, 58, W, 3); if (top === 'solid') c.fillRect(0, 3, W, 3); else if (top === 'dash') for (let x = 0; x < W; x += PC * 2) c.fillRect(x + PC * 0.45, 2, PC * 1.1, 3);
+    if (ramp) { c.fillStyle = 'rgba(242,242,236,.5)'; for (let x = PC * 3; x < W; x += PC * 8) { c.beginPath(); c.moveTo(x, 24); c.lineTo(x + 18, 32); c.lineTo(x, 40); c.lineTo(x + 6, 32); c.closePath(); c.fill(); } } });
+  asph(2, false, 'dash'); asph(3, true, 'dash'); asph(4, false, 'solid'); asph(5, true, 'solid'); asph(12, true, 'dash', true); asph(13, false, 'solid', true);
+  strip(6, () => { c.fillStyle = '#8f877a'; c.fillRect(0, 0, W, 64); speck(0, 64, 2200, ['rgba(120,112,100,.8)', 'rgba(170,162,150,.7)', 'rgba(90,84,76,.6)'], 3, 3);
+    c.fillStyle = '#5e4632'; for (let x = 0; x < W; x += PC * 0.62) rect(x, 9, 8, 46); c.fillStyle = '#3c3c40'; c.fillRect(0, 18, W, 5); c.fillRect(0, 42, W, 5); c.fillStyle = '#c8ccd2'; c.fillRect(0, 17, W, 2); c.fillRect(0, 41, W, 2); });
+  strip(7, () => { const g = c.createLinearGradient(0, 0, 0, 64); g.addColorStop(0, '#2f78bd'); g.addColorStop(0.18, '#3c8fd3'); g.addColorStop(0.82, '#3c8fd3'); g.addColorStop(1, '#2a6fb0'); c.fillStyle = g; c.fillRect(0, 0, W, 64);
+    c.strokeStyle = 'rgba(150,205,245,.75)'; c.lineWidth = 2.5; for (let i = 0; i < 70; i++) { const x = Math.random() * W, y = 8 + Math.random() * 48, w = 10 + Math.random() * 18; for (const ox of [0, -W]) { c.beginPath(); c.moveTo(x + ox, y); c.quadraticCurveTo(x + ox + w / 2, y - 4, x + ox + w, y); c.stroke(); } }
+    speck(0, 64, 120, ['rgba(255,255,255,.35)'], 3, 1); });
+  strip(8, () => { c.fillStyle = pal[0]; c.fillRect(0, 0, W, 64); c.fillStyle = sea === 'winter' ? '#dfe5ea' : '#c4a575'; c.fillRect(0, 9, W, 46); speck(9, 46, 900, sea === 'winter' ? ['rgba(190,200,212,.7)'] : ['rgba(150,124,84,.7)', 'rgba(214,190,150,.7)'], 3, 2);
+    c.fillStyle = sea === 'winter' ? 'rgba(170,180,195,.6)' : 'rgba(130,104,70,.5)'; c.fillRect(0, 22, W, 2); c.fillRect(0, 40, W, 2); speck(0, 9, 200, [pal[2]], 3, 2); speck(55, 9, 200, [pal[2]], 3, 2); });
+  strip(9, () => { c.fillStyle = '#bdbab2'; c.fillRect(0, 0, W, 64); speck(0, 64, 900, ['rgba(150,148,140,.6)', 'rgba(220,218,210,.6)'], 2, 2); c.fillStyle = 'rgba(120,118,112,.7)'; for (let x = 0; x < W; x += PC * 2) c.fillRect(x, 0, 2, 64);
+    c.fillStyle = '#f2c230'; c.fillRect(0, 4, W, 3); c.fillRect(0, 57, W, 3); if (sea === 'winter') speck(0, 10, 300, ['rgba(250,252,255,.9)'], 6, 4); });
+  strip(10, () => { c.fillStyle = pal[1]; c.fillRect(0, 0, W, 64); speck(0, 64, 1100, [pal[2]], 3, 2); c.fillStyle = sea === 'winter' ? '#c9ced2' : '#8a7050'; c.fillRect(0, 0, W, 7); c.fillRect(0, 57, W, 7); speck(0, 12, 300, ['rgba(110,86,56,.7)'], 4, 3); speck(52, 12, 300, ['rgba(110,86,56,.7)'], 4, 3); });
+  strip(11, () => { c.fillStyle = '#a39c8e'; c.fillRect(0, 0, W, 64); speck(0, 64, 2200, ['rgba(130,124,112,.8)', 'rgba(190,184,172,.7)', 'rgba(110,104,96,.6)'], 3, 3); speck(0, 8, 300, [pal[2], pal[0]], 4, 3); });
+  const t = new THREE.CanvasTexture(cv); t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.anisotropy = 4; return t;
+}
+function crossyGroundInit() {
+  const S = CROSSY, nq = S.NR * 6, nv = nq * 4, g = new THREE.BufferGeometry(), idx = new Uint16Array(nq * 6), nrm = new Float32Array(nv * 3);
+  for (let q = 0; q < nq; q++) { const b = q * 4; idx.set([b, b + 2, b + 1, b + 1, b + 2, b + 3], q * 6); const up = q % 6 < 3; for (let k = 0; k < 4; k++) nrm.set(up ? [0, 1, 0] : [0, 0, 1], (b + k) * 3); }
+  g.setIndex(new THREE.BufferAttribute(idx, 1)); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv * 3), 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(nv * 2), 2)); g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
+  for (const k of ['position', 'uv', 'color']) g.attributes[k].setUsage(THREE.DynamicDrawUsage);
+  const m = S.ground = new THREE.Mesh(g, S.M.ground); m.frustumCulled = false; S.scene.add(m);
+}
+function crossyGroundSlot(row) {                                         // row's strip of ground: three top quads (the sides dimmed: out of bounds) and their faces toward the camera
+  const S = CROSSY, g = S.ground.geometry, P = g.attributes.position.array, U = g.attributes.uv.array, C = g.attributes.color.array, s = row.slot;
+  const zF = -row.r - 0.5, zN = -row.r + 0.5, y = row.y, st = row.strip, vT = 1 - (st * 64 + 4) / 1024, vB = 1 - (st * 64 + 60) / 1024, GW = S.GW, X = [-GW, -S.HALF - 0.5, S.HALF + 0.5, GW], uo = row.uo || 0;
+  for (let k = 0; k < 3; k++) {
+    const xa = X[k], xb = X[k + 1], ua = (xa + GW) / (2 * GW) + uo, ub = (xb + GW) / (2 * GW) + uo, c = k === 1 ? 1 : 0.76, q = s * 6 + k, f = s * 6 + 3 + k;
+    P.set([xa, y, zF, xb, y, zF, xa, y, zN, xb, y, zN], q * 12); U.set([ua, vT, ub, vT, ua, vB, ub, vB], q * 8); C.set([c, c, c, c, c, c, c, c, c, c, c, c], q * 12);
+    const c1 = c * 0.66, c2 = c * 0.42; P.set([xa, y, zN, xb, y, zN, xa, -1.6, zN, xb, -1.6, zN], f * 12); U.set([ua, vB, ub, vB, ua, vB, ub, vB], f * 8); C.set([c1, c1, c1, c1, c1, c1, c2, c2, c2, c2, c2, c2], f * 12);
+  }
+  g.attributes.position.needsUpdate = g.attributes.uv.needsUpdate = g.attributes.color.needsUpdate = true;
+}
+function crossyGroundFlow(dt) {                                          // the river's ripples drift the way its row flows
+  const S = CROSSY, g = S.ground.geometry, U = g.attributes.uv.array, GW = S.GW; let any = false;
+  for (const row of S.rows) { if (!row || row.t !== 'water') continue; row.uo = ((row.uo || 0) - row.v * dt / (2 * GW)) % 1; any = true;
+    for (let k = 0; k < 3; k++) { const X = [-GW, -S.HALF - 0.5, S.HALF + 0.5, GW], ua = (X[k] + GW) / (2 * GW) + row.uo, ub = (X[k + 1] + GW) / (2 * GW) + row.uo, q = (row.slot * 6 + k) * 8; U[q] = U[q + 4] = ua; U[q + 2] = U[q + 6] = ub; } }
+  if (any) g.attributes.uv.needsUpdate = true;
+}
+
+/* ---------- the rows: planned a stretch at a time (fair by construction), made as she nears them, recycled behind her ---------- */
+function crossyRowGet(r) { const S = CROSSY, o = S.rows[((r % S.NR) + S.NR) % S.NR]; return o && o.r === r ? o : null; }
+function crossyGenTo(rMax) { const S = CROSSY, G = S.G; while (G.next <= rMax) { if (!G.q.length) crossyPlan(); const sp = G.q.shift(); crossyMake(sp, G.next); G.next++; } }
+function crossyPlan() {                                                  // the next stretch of rows (G.q gets their specs)
+  const S = CROSSY, G = S.G, r = G.next, k = crossyK(r), q = G.q;
+  if (G.stage === 0) { G.stage = 1;                                      // the top of the bank behind her, the wall she came through, the shoulder; the off-ramp (cars that stop for her); a verge
+    for (let i = -9; i <= -2; i++) q.push({ t: 'grass', zone: 'Top of the bank', dense: 2, open: false });
+    q.push({ t: 'wall', zone: 'Top of the bank' }); q.push({ t: 'start', zone: 'The off-ramp' });
+    q.push({ t: 'road', ramp: true, dir: 1, v: 1.9, zone: 'The off-ramp', mix: { c: 1 }, first: true }); q.push({ t: 'road', ramp: true, dir: 1, v: 2.3, zone: 'The off-ramp', mix: { c: 4, v: 1 }, last: true });
+    crossyGrass(q, 2, 0, 'The ravine', false); G.last = 'ramp'; return; }
+  const order = ['hwy', 'rail', 'river', 'trail'];
+  let seg = G.cycle < 4 ? order[G.cycle] : null; G.cycle++;
+  if (!seg) { const w = { hwy: 3, rail: 1.4 + 1.6 * k, river: 2 + k, trail: 1.3 }; delete w[G.last]; seg = crossyPickW(w); }
+  if (seg === 'hwy') crossyHwy(q, k, r); else if (seg === 'rail') crossyRail(q, k); else if (seg === 'river') crossyRiver(q, k); else crossyTrail(q, k);
+  const gap = seg === 'trail' ? 2 + ((crossyRnd() * (k < 0.5 ? 3 : 2)) | 0) : k < 0.25 ? 2 + (crossyRnd() < 0.4 ? 1 : 0) : 1 + (crossyRnd() < 0.55 - k * 0.3 ? 1 : 0);
+  crossyGrass(q, gap, seg === 'trail' ? 3 : k < 0.1 ? 1 : 2, seg === 'trail' ? 'The ravine' : 'The ravine', seg === 'river');
+  G.last = seg;
+}
+function crossyGrass(q, n, most, zone, afterRiver) {                     // n rows of grass with trees and rocks in the way (never more than `most` in a row), always a way through
+  const S = CROSSY, H = S.HALF, w = H * 2 + 1;
+  for (let tries = 0; tries < 30; tries++) {
+    const rows = []; for (let i = 0; i < n; i++) { const b = new Int8Array(w), m = (crossyRnd() * (most + 1)) | 0; for (let j = 0; j < m; j++) b[(crossyRnd() * w) | 0] = 1; rows.push(b); }
+    if (afterRiver) rows[0].fill(0);                                     // (the bank she lands on from the river: nothing in the way)
+    let ok = n === 0; if (n) { let cur = rows[0].map(v => !v);           // (a way through: from the first row's open cells to the last row's)
+      for (let i = 0; i < n; i++) { const o = rows[i]; let reach = i ? Uint8Array.from(o, (v, j) => !v && cur[j]) : Uint8Array.from(o, v => !v);
+        for (let pass = 0; pass < w; pass++) for (let j = 0; j < w; j++) if (!o[j] && !reach[j] && ((j > 0 && reach[j - 1]) || (j < w - 1 && reach[j + 1]))) reach[j] = 1;
+        cur = reach; } ok = cur.some(v => v) && rows[0].filter(v => !v).length >= 3; }
+    if (ok || tries === 29) { rows.forEach((b, i) => { if (!ok) b.fill(0); q.push({ t: 'grass', block: b, zone: afterRiver && i === 0 ? 'Riverbank' : zone, bank: afterRiver && i === 0 }); }); return; }
+  }
+}
+function crossyHwy(q, k, r) {                                            // the 401: each way its lanes (split into collectors and express past the first few), a concrete divider between
+  const ec = k > 0.25 && crossyRnd() < 0.3 + k * 0.5, dA = crossyRnd() < 0.5 ? 1 : -1, base = 2.3 + 5.4 * k + crossyK2(r) * 6;
+  const lane = (dir, ex, first, last) => ({ t: 'road', dir, v: Math.min(10.5, base * (ex ? 1.15 + crossyRnd() * 0.2 : 0.8 + crossyRnd() * 0.3)), zone: ec ? (ex ? '401 express' : '401 collectors') : 'The 401', first, last,
+    mix: ex ? { c: 6, v: 1, p: 1, t: 1 + 2 * k, m: 1.5 } : { c: 5, v: 1.5, p: 1.2, t: 1.5 + 3 * k, b: 0.8 } });
+  const side = (dir, outerFirst) => { const out = [];
+    if (ec) { const nc = 1 + (crossyRnd() < k ? 1 : 0), ne = 2 + (crossyRnd() < k * 0.6 ? 1 : 0), col = [], exp = [];
+      for (let i = 0; i < nc; i++) col.push(lane(dir, false, i === 0, i === nc - 1)); for (let i = 0; i < ne; i++) exp.push(lane(dir, true, i === 0, i === ne - 1));
+      const div = { t: 'median', zone: '401 divider', most: 1 }; return outerFirst ? [...col, div, ...exp] : [...exp, div, ...col]; }
+    const n = Math.min(3, 1 + ((crossyRnd() * (1.5 + k * 2.4)) | 0)); for (let i = 0; i < n; i++) out.push(lane(dir, false, i === 0, i === n - 1)); return out; };
+  const A = side(dA, true), B = side(-dA, false);
+  for (const o of A) q.push(o); q.push({ t: 'median', zone: 'The 401', most: k < 0.2 ? 0 : 1, lamps: true }); for (const o of B) q.push(o);
+}
+function crossyRail(q, k) {                                              // GO tracks: one, or (later on) two side by side; each its own trains
+  const n = k > 0.25 && crossyRnd() < 0.35 + k * 0.4 ? 2 : 1;
+  for (let i = 0; i < n; i++) q.push({ t: 'rail', dir: crossyRnd() < 0.5 ? 1 : -1, v: 24 + 12 * k + crossyRnd() * 4, coaches: 3 + ((crossyRnd() * (2 + 3 * k)) | 0), warn: 1.75 - 0.55 * k, wait: [3.6 - 1.4 * k, 8 - 3.2 * k], zone: 'GO train tracks', first: i === 0, last: i === n - 1 });
+}
+function crossyRiver(q, k) {                                             // the Don River: 2 to 6 rows of logs, lily pads and goose rafts (a pad row never next to another; some rivers all geese)
+  const n = Math.min(6, 2 + ((k * 3 + crossyRnd() * 1.6) | 0)), geese = k > 0.06 && n <= 4 && crossyRnd() < 0.32; let dir = crossyRnd() < 0.5 ? 1 : -1, prevPad = true;
+  for (let i = 0; i < n; i++) {
+    let kind = geese ? 'goose' : !prevPad && i < n - 1 && crossyRnd() < 0.24 ? 'pad' : k > 0.04 && crossyRnd() < 0.22 + 0.2 * k ? 'goose' : 'log';
+    if (i === n - 1 && kind === 'pad') kind = 'log';
+    const v = kind === 'log' ? 0.9 + 1.7 * k + crossyRnd() * 0.5 : 0.8 + 1.2 * k + crossyRnd() * 0.4;
+    q.push({ t: 'water', kind, dir, v: kind === 'pad' ? 0 : v, zone: 'The Don River', allGeese: geese, k }); prevPad = kind === 'pad'; dir = -dir;
+  }
+}
+function crossyTrail(q, k) {                                             // the Lower Don Trail: cyclists one way and the other, joggers
+  const n = 1 + (crossyRnd() < 0.3 + k * 0.5 ? 1 : 0), d = crossyRnd() < 0.5 ? 1 : -1;
+  q.push({ t: 'grass', zone: 'The ravine', most: 1, gen: true });
+  for (let i = 0; i < n; i++) { const bike = n === 1 ? crossyRnd() < 0.6 : i === 0; q.push({ t: 'trail', dir: i ? -d : d, v: bike ? 3.0 + 3.2 * k + crossyRnd() * 0.8 : 1.0 + 0.6 * k, kind: bike ? 'bike' : 'jog', zone: 'Lower Don Trail', first: i === 0, last: i === n - 1 }); }
+}
+function crossyMake(sp, r) {                                             // a row from its spec: its ground, what moves along it, what stands on it
+  const S = CROSSY, H = S.HALF, k = crossyK(r), G = S.G, low = S.low, slot = ((r % S.NR) + S.NR) % S.NR;
+  const row = { r, slot, t: sp.t, zone: sp.zone, y: 0, strip: 0, dir: sp.dir || 1, v: 0, mv: [], dec: [], block: new Int8Array(H * 2 + 1), fish: -99, mush: -99, uo: 0, sp };
+  if (sp.t === 'grass' && sp.gen && !sp.block) { sp.block = new Int8Array(H * 2 + 1); if (crossyRnd() < 0.5) sp.block[(crossyRnd() * (H * 2 + 1)) | 0] = 1; }
+  const deco = (n, list, x0) => { for (let i = 0; i < n; i++) { const s = crossyRnd() < 0.5 ? -1 : 1, x = s * (x0 + crossyRnd() * (13 - x0)); row.dec.push([crossyPick(list), x, crossyRnd() * 6.28, 0.8 + crossyRnd() * 0.45]); } };
+  const trees = S.sea === 'winter' ? ['tA', 'tB', 'tP', 'tP'] : ['tA', 'tB', 'tP', 'tA', 'tB'];
+  if (sp.t === 'grass' || sp.t === 'start' || sp.t === 'wall') {
+    row.y = sp.t === 'start' ? 0.12 : 0.22; row.strip = sp.t === 'start' ? 11 : sp.bank ? 10 : r % 2 ? 1 : 0;
+    if (sp.t === 'wall') { row.block.fill(1); row.strip = 11; }
+    else if (sp.block) { row.block.set(sp.block); for (let j = 0; j < row.block.length; j++) if (row.block[j]) row.dec.push([crossyRnd() < 0.62 ? crossyPick(trees) : crossyRnd() < 0.5 ? 'rock' : S.boo && crossyRnd() < 0.5 ? 'pump' : 'bush', j - H, crossyRnd() * 6.28, 0.85 + crossyRnd() * 0.3]); }
+    if (sp.t !== 'start') { deco(low ? 3 : 5 + (sp.dense || 0) * 2, trees.concat(['bush', 'rock']), H + 1); if (sp.bank) for (let i = 0; i < 4; i++) row.dec.push(['reed', (crossyRnd() < 0.5 ? -1 : 1) * (H + 1 + crossyRnd() * 3), crossyRnd() * 6, 1]); }
+    else { for (const x of [-7, -5.5, 5.5, 7.5, 10]) row.dec.push(['bush', x + crossyRnd(), crossyRnd() * 6, 0.9]); }
+    if (sp.t === 'grass' && r > 2) { const open = []; for (let j = 0; j < row.block.length; j++) if (!row.block[j]) open.push(j - H);
+      if (open.length && r >= G.nextMush) { row.mush = crossyPick(open); G.nextMush = r + 60 + crossyRnd() * 50; }
+      else if (open.length && crossyRnd() < 0.3) row.fish = crossyPick(open); }
+  } else if (sp.t === 'median') {
+    row.y = 0.12; row.strip = 9; if (sp.most && crossyRnd() < 0.6) row.block[(crossyRnd() * (H * 2 + 1)) | 0] = 1;
+    for (let j = 0; j < row.block.length; j++) if (row.block[j]) row.dec.push(['barrel', j - H, 0, 1]);
+    for (const x of [-12, -8, -6, 6, 8, 12]) if (crossyRnd() < 0.55) row.dec.push(['barrel', x + crossyRnd() * 0.6, 0, 1]);
+    if (sp.lamps) for (const x of [-H - 1.5, H + 1.5, -H - 9, H + 9]) row.dec.push(['lamp', x, x < 0 ? Math.PI / 2 : -Math.PI / 2, 1]);
+  } else if (sp.t === 'road') {
+    row.y = 0; row.dir = sp.dir; row.v = sp.v * sp.dir; row.ramp = !!sp.ramp; row.strip = sp.ramp ? (sp.first ? 12 : 13) : sp.first && sp.last ? 5 : sp.first ? 3 : sp.last ? 4 : 2;
+    crossyLaneFill(row, sp.mix, k);
+    if (crossyRnd() < (sp.ramp ? 0.5 : 0.07)) row.fish = ((crossyRnd() * (H * 2 + 1)) | 0) - H;
+  } else if (sp.t === 'rail') {
+    row.y = 0.05; row.strip = 6; row.dir = sp.dir; row.v = sp.v * sp.dir;
+    row.tr = { ph: 'wait', t: 1.2 + crossyRnd() * (sp.wait[1] - 1.2), n: sp.coaches, len: 4.95 * (sp.coaches + 1), warn: sp.warn, sp, next: sp.wait[0] + crossyRnd() * (sp.wait[1] - sp.wait[0]), front: 0, bell: 0, close: -9 };
+    if (sp.first) row.dec.push(['signal', -H - 1.2, 0.5, 1, 0.74]); if (sp.last) row.dec.push(['signal', H + 1.2, -0.5, 1, -0.74]);   /* (beside the track: the train never runs through them) */
+  } else if (sp.t === 'water') {
+    row.y = S.WY; row.strip = 7; row.dir = sp.dir; row.v = sp.v * sp.dir; row.kind = sp.kind; row.allGeese = sp.allGeese; crossyWaterFill(row, k);
+  } else if (sp.t === 'trail') {
+    row.y = 0.16; row.strip = 8; row.dir = sp.dir; row.v = sp.v * sp.dir; row.kind = sp.kind; crossyLaneFill(row, sp.kind === 'bike' ? { bike: 1 } : { jog: 1 }, k);
+    if (crossyRnd() < 0.12) row.fish = ((crossyRnd() * (H * 2 + 1)) | 0) - H;
+    for (const x of [-H - 2, H + 3]) if (crossyRnd() < 0.5) row.dec.push(['bush', x + crossyRnd(), crossyRnd() * 6, 0.9]);
+  }
+  const old = S.rows[slot]; S.rows[slot] = row; S.decDirty = true; if (S.ground) crossyGroundSlot(row);
+  return old;
+}
+function crossyLen(kind) { return { c: 2, v: 2.4, p: 2.4, b: 3.6, t: 4.6, m: 1.1, bike: 1.0, jog: 0.55 }[kind] || 2; }
+function crossyLaneFill(row, mix, k) {                                   // a lane's loop: what drives along it, every gap wide enough at its speed (and a little wider early on)
+  const S = CROSSY, LW = S.LW, v = Math.abs(row.v), small = row.t === 'trail', gmin = (small ? 1.6 : 2.1) + v * (small ? 0.36 : 0.42) + (1 - k) * 0.6, spread = (small ? 5 : 7.5) - 4.2 * k;
+  let x = crossyRnd() * 3; const mv = [];
+  for (let n = 0; n < 40; n++) {
+    const kind = crossyPickW(mix), len = crossyLen(kind); if (x + len + gmin > LW) break;
+    const m = { x: x + len / 2 - LW / 2, len, kind, model: '', sp: v };
+    m.model = kind === 'c' ? 'c' + ((crossyRnd() * 8) | 0) : kind === 'v' ? 'v' + ((crossyRnd() * 2) | 0) : kind === 'p' ? 'p' + ((crossyRnd() * 2) | 0) : kind === 't' ? 't' + ((crossyRnd() * 2) | 0) : kind === 'b' ? 'bus' : kind === 'm' ? 'moto' + ((crossyRnd() * 2) | 0) : kind === 'bike' ? 'bike' + ((crossyRnd() * 3) | 0) : 'jog' + ((crossyRnd() * 3) | 0);
+    if (kind === 'm' && v < 5) { m.kind = 'c'; m.len = 2; m.model = 'c0'; }   /* (motorcycles only where it's fast) */
+    mv.push(m); x += m.len + gmin + crossyRnd() * spread;
+  }
+  if (!mv.length) mv.push({ x: 0, len: 2, kind: 'c', model: 'c1', sp: v });
+  row.mv = mv;
+}
+function crossyWaterFill(row, k) {                                       // logs (long and close early on), lily pads (fixed, in reach), goose rafts (some dive now and then)
+  const S = CROSSY, LW = S.LW, H = S.HALF, mv = [];
+  if (row.kind === 'pad') { const cols = new Set(); for (let j = -H; j <= H; j++) if (crossyRnd() < 0.55) cols.add(j); while (cols.size < 4) cols.add(((crossyRnd() * (H * 2 + 1)) | 0) - H);
+    for (let j = -14; j <= 14; j++) if (Math.abs(j) > H ? crossyRnd() < 0.35 : cols.has(j)) mv.push({ x: j, len: 1, kind: 'pad', model: crossyRnd() < 0.3 ? 'padF' : 'pad' });
+    const inPlay = mv.filter(m => Math.abs(m.x) <= H); if (crossyRnd() < 0.3 && inPlay.length) crossyPick(inPlay).fish = true;
+    row.mv = mv; return; }
+  let x = crossyRnd() * 2;
+  for (let n = 0; n < 40; n++) {
+    if (row.kind === 'log') { const len = k < 0.3 ? 3 + ((crossyRnd() * 2) | 0) : 2 + ((crossyRnd() * (k > 0.7 ? 2 : 3)) | 0); if (x + len > LW - 1.2) break;
+      mv.push({ x: x + len / 2 - LW / 2, len, kind: 'log', model: 'log' + len }); x += len + 1.1 + crossyRnd() * (0.9 + 1.6 * k); }
+    else { const len = row.allGeese ? 2 + ((crossyRnd() * 2) | 0) : 2 + (crossyRnd() < 0.5 - k * 0.3 ? 1 : 0); if (x + len > LW - 1.2) break;
+      mv.push({ x: x + len / 2 - LW / 2, len, kind: 'goose', model: 'goose', dive: k > 0.2 && crossyRnd() < 0.15 + 0.3 * k, ph: crossyRnd() * 7 }); x += len + 1.2 + crossyRnd() * (1.2 + 1.4 * k); }
+  }
+  if (row.kind === 'goose' && mv.length && mv.every(m => m.dive)) mv[0].dive = false;
+  row.mv = mv;
+}
+function crossyGooseUnder(m, t) {                                        // a diving raft: 0 afloat, (0, 1) the hiss and flap before it goes, 1 under
+  if (!m.dive) return 0; const P = 7, f = ((t + m.ph) % P + P) % P;
+  return f < P - 2.3 ? 0 : f < P - 1.3 ? (f - (P - 2.3)) * 0.99 : 1;
+}
+
+/* ---------- built once, the first time she goes through (or ahead of time, by WARM_V1) ---------- */
+function crossyMod(name, geo, cap, mat, dyn) {
+  const S = CROSSY, m = new THREE.InstancedMesh(geo, mat || S.M.veh, cap); m.frustumCulled = false; m.count = 0; m.visible = false; m.userData.name = 'Crossy ' + name;
+  if (dyn) m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); S.scene.add(m); const D = S.mods[name] = { m, n: 0, cap, dyn }; (dyn ? S.dyn : S.stat).push(D); return D;
+}
+function crossyI(name, x, y, z, ry, sx, sy, sz, rx, rz) {                // one more of a thing this frame
+  const S = CROSSY, D = S.mods[name]; if (!D || D.n >= D.cap) return -1; const V = S.vv;
+  V.e.set(rx || 0, ry || 0, rz || 0); V.q.setFromEuler(V.e); V.p.set(x, y, z); V.s.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); V.m.compose(V.p, V.q, V.s); D.m.setMatrixAt(D.n, V.m); return D.n++;
+}
+function crossyIEnd(list) { for (const D of list) { D.m.count = D.n; D.m.visible = D.n > 0; if (D.n) { D.m.instanceMatrix.needsUpdate = true; if (D.m.instanceColor) D.m.instanceColor.needsUpdate = true; } } }
+function crossyBuild() {
+  const S = CROSSY; if (S.built) return;
+  S.low = typeof devTier === 'function' && devTier() === 'low';
+  const sc = S.scene = new THREE.Scene(); sc.background = new THREE.Color(0xa8dcff); sc.fog = new THREE.Fog(0xa8dcff, 40, 80);
+  S.cam = new THREE.PerspectiveCamera(36, 1, 0.5, 160); sc.add(S.cam); S.size = new THREE.Vector2();
+  sc.add(S.hemi = new THREE.HemisphereLight(0xffffff, 0x8a9a7a, 0.95));
+  S.sun = new THREE.DirectionalLight(0xffffff, 0.72); S.sun.position.set(-5, 12, 7); sc.add(S.sun); sc.add(S.sun.target);
+  S.M = { veh: new THREE.MeshLambertMaterial({ vertexColors: true, map: lotAtlas() }), ground: new THREE.MeshLambertMaterial({ vertexColors: true, map: crossyGroundTex('summer') }), bulb: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    glow: new THREE.MeshBasicMaterial({ map: candleGlowTex, color: 0xffe2a8, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }), shad: softShadowMat(0.3, true) };
+  S.look = 'summer';
+  S.vv = { e: new THREE.Euler(), q: new THREE.Quaternion(), p: new THREE.Vector3(), s: new THREE.Vector3(), m: new THREE.Matrix4(), cd: new THREE.Vector3(), cf: new THREE.Vector3(), a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Color() };
+  S.mods = {}; S.dyn = []; S.stat = [];
+  for (let i = 0; i < 8; i++) crossyMod('c' + i, crossyCarGeo('c', i), 24, null, true);
+  for (let i = 0; i < 2; i++) { crossyMod('v' + i, crossyCarGeo('v', i), 16, null, true); crossyMod('p' + i, crossyCarGeo('p', i), 16, null, true); }
+  crossyMod('bus', crossyCarGeo('b', 0), 10, null, true);
+  crossyMod('t0', crossyTruckGeo(0xd8332a, 0xf4f4f0, 0x2a6fdb, 9), 16, null, true); crossyMod('t1', crossyTruckGeo(0x2a6fdb, 0xd8dade, 0xff8a1f, 14), 16, null, true);
+  crossyMod('moto0', crossyMotoGeo(0xe8303a, 0xffffff), 10, null, true); crossyMod('moto1', crossyMotoGeo(0x2a2a30, 0xffc93a), 10, null, true);
+  crossyMod('eng', crossyTrainGeo(true), 6, null, true); crossyMod('coach', crossyTrainGeo(false), 36, null, true);
+  for (const n of [2, 3, 4]) crossyMod('log' + n, crossyLogGeo(n), 24, null, true);
+  crossyMod('pad', crossyPadGeo(false), 40, null, true); crossyMod('padF', crossyPadGeo(true), 24, null, true); crossyMod('goose', crossyGooseGeo(), 160, null, true);
+  [0xff4a6a, 0x3aa8ff, 0xffc93a].forEach((c, i) => { crossyMod('bike' + i, crossyBikeGeo(c), 12, null, true); crossyMod('jog' + i, crossyJogGeo([0x9a6bff, 0x5cc46a, 0xff8a3a][i]), 12, null, true); });
+  crossyMod('fish', crossyFishGeo(), 16, null, true); crossyMod('mush', crossyMushGeo(), 4, null, true); crossyMod('star', crossyStarGeo(), 6, null, true);
+  { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); crossyMod('shad', g, 160, S.M.shad, true).m.renderOrder = 1; crossyMod('glow', g.clone(), 120, S.M.glow, true).m.renderOrder = 2; crossyMod('lglow', g.clone(), 24, S.M.glow, false).m.renderOrder = 2; }
+  { const D = crossyMod('bulb', new THREE.SphereGeometry(0.08, 8, 6), 48, S.M.bulb, true); D.m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(48 * 3), 3); D.m.instanceColor.setUsage(THREE.DynamicDrawUsage); for (let i = 0; i < 48; i++) D.m.setColorAt(i, S.vv.c.setHex(0x441010)); }   /* (its colour buffer made full size: setColorAt sizes it by count, which starts at 0) */
+  for (const [n, k] of [['tA', 'A'], ['tB', 'B'], ['tP', 'P']]) crossyMod(n, crossyTreeGeo(k, 'summer'), 220);
+  crossyMod('bush', crossyBushGeo('summer'), 200); crossyMod('rock', crossyRockGeo(), 120); crossyMod('barrel', crossyBarrelGeo(), 60); crossyMod('lamp', crossyLampGeo(), 24); crossyMod('signal', crossySignalGeo(), 24);
+  crossyMod('reed', crossyReedGeo('summer'), 60); crossyMod('pump', crossyPumpkinGeo(), 30);
+  crossyGroundInit();
+  S.wall = new THREE.Mesh(crossyWallGeo(), S.M.veh); S.wall.userData.name = 'Crossy sound wall'; sc.add(S.wall);
+  S.pk = new THREE.Group(); S.pkS = new THREE.Group(); S.pk.add(S.pkS); sc.add(S.pk);
+  { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); S.pkSh = new THREE.Mesh(g, softShadowMat(0.32)); S.pkSh.renderOrder = 1; sc.add(S.pkSh); }
+  S.bub = new THREE.Mesh(new THREE.SphereGeometry(0.5, 18, 12), new THREE.MeshBasicMaterial({ color: 0x8fdcff, transparent: true, opacity: 0.26, depthWrite: false })); S.bub.position.y = 0.3; S.bub.visible = false; S.pk.add(S.bub);
+  { const hk = S.hk = { g: new THREE.Group(), on: false, ph: 'off', t: 0, a: 0, p: new THREE.Vector3(), p0: new THREE.Vector3(), cry: 0 };
+    hk.body = new THREE.Mesh(crossyHawkGeo('body'), S.M.veh); hk.wl = new THREE.Mesh(crossyHawkGeo('wl'), S.M.veh); hk.wr = new THREE.Mesh(crossyHawkGeo('wr'), S.M.veh);
+    for (const w of [hk.wl, hk.wr]) w.position.set(0, 0.06, 0.05); hk.g.add(hk.body, hk.wl, hk.wr); hk.g.scale.setScalar(1.25); hk.g.visible = false; sc.add(hk.g);
+    const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); hk.sh = new THREE.Mesh(g, softShadowMat(0.3)); hk.sh.renderOrder = 1; hk.sh.visible = false; sc.add(hk.sh); }
+  S.fx = chimFxMake(sc, S.low ? 160 : 320, false); S.gx = chimFxMake(sc, S.low ? 60 : 140, true);
+  S.rows = new Array(S.NR).fill(null);
+  crossyLook(); crossyReset(); crossyFill(); crossyCam(1, true);                              // (a stretch laid out, so the warm-up compiles everything a run uses)
+  S.built = true;
+}
+function crossyLook() {                                                  // the season (the ground, the trees) and the yard's time of day (the sky, the light; headlights after dark)
+  const S = CROSSY, se = crossySeason(), td = crossyTod(), n = td.night;
+  S.sea = se.s; S.boo = se.boo; S.night = n; S.todN = td.n;
+  if (S.look !== se.s) { S.look = se.s; const old = S.M.ground.map; S.M.ground.map = crossyGroundTex(se.s); if (old) old.dispose();
+    for (const [nm, g] of [['tA', crossyTreeGeo('A', se.s)], ['tB', crossyTreeGeo('B', se.s)], ['tP', crossyTreeGeo('P', se.s)], ['bush', crossyBushGeo(se.s)], ['reed', crossyReedGeo(se.s)], ['pad', crossyPadGeo(false, se.s)], ['padF', crossyPadGeo(true, se.s)]]) { const D = S.mods[nm]; D.m.geometry.dispose(); D.m.geometry = g; } }
+  const sky = { morning: 0xbfdcf0, day: 0xa8dcff, golden: 0xf4c49c, dusk: 0x5e537e, night: 0x18213f }[td.n] || 0xa8dcff;
+  S.scene.background.setHex(sky); S.scene.fog.color.setHex(sky);
+  S.hemi.intensity = 0.8 - 0.42 * n; S.hemi.color.setHex(td.n === 'golden' ? 0xffe2c0 : n > 0.5 ? 0xa8b4ff : 0xffffff); S.hemi.groundColor.setHex(n > 0.5 ? 0x3a4060 : 0x8a9a7a);
+  S.sun.intensity = 0.58 - 0.4 * n; S.sun.color.setHex({ morning: 0xfff0dc, golden: 0xffc890, dusk: 0xd8a8ff, night: 0x8a98ff }[td.n] || 0xffffff);
+  S.M.glow.opacity = n > 0.15 && !S.low ? 0.6 * n : 0;
+}
+function crossyRigSet() {                                                // PKR: a clone of her Free roam self (coat, Closet outfit), on the grid
+  const S = CROSSY, W = walk.rig; if (!W || !W.g) return;
+  if (S.rig && S.rig.g.parent) S.rig.g.parent.remove(S.rig.g);
+  W.g.rotation.set(0, 0, 0); W.g.scale.setScalar(1); W.body.scale.set(1, 1, 1); W.body.position.set(0, 0, 0); W.body.rotation.set(0, 0, 0); W.head.rotation.set(0, 0, 0);
+  const g = W.g.clone(true), a = [], b = []; W.g.traverse(o => a.push(o)); g.traverse(o => b.push(o));
+  const map = new Map(); for (let i = 0; i < a.length && i < b.length; i++) map.set(a[i], b[i]);
+  const R = { g, body: map.get(W.body), head: map.get(W.head), legs: W.legs.map(l => map.get(l)), tail: W.tail.map(t => map.get(t)).filter(Boolean) };
+  R.legs0 = R.legs.map(l => l ? l.rotation.x : 0);
+  g.position.set(0, 0, 0); g.rotation.set(0, 0, 0); g.scale.setScalar(S.SC); g.visible = true; S.pkS.add(g); S.rig = R;
+}
+function crossyReset() {                                                 // a fresh run's world: the wall behind her, the bank, the off-ramp ahead...
+  const S = CROSSY; S.seed = S.forceSeed || ((Date.now() % 2147483640) + 1); S.forceSeed = 0;
+  for (let i = 0; i < S.NR; i++) S.rows[i] = null;
+  { const P = S.ground.geometry.attributes.position.array; P.fill(0); for (let i = 1; i < P.length; i += 3) P[i] = -60; S.ground.geometry.attributes.position.needsUpdate = true; }
+  S.G = { next: -9, stage: 0, q: [], cycle: 0, last: '', nextMush: 40 + crossyRnd() * 30 };
+  S.P = { x: 0, row: 0, y: 0.12, yaw: Math.PI, face: Math.PI, hop: null, ride: null, rideOff: 0, maxRow: 0, sq: 0, dead: null };
+  S.q.length = 0; S.wt = 0; S.time = 0; S.idle = 0; S.camRow = 0; S.started = false; S.fishN = 0; S.bankedN = 0; S.revives = 0; S.shield = false; S.slowT = 0; S.inv = 0; S.ts = 1;
+  S.riv = null; S.zones = {}; S.zone = ''; S.hops = 0; S.shake = 0; S.closeT = -9; S.passT = 0;
+  if (S.hk) { S.hk.on = false; S.hk.ph = 'off'; S.hk.g.visible = false; S.hk.sh.visible = false; }
+  crossyGenTo(52); S.decDirty = true;
+}
+function crossyFill() {                                                  // (each frame) everything that moves, as instances; the trees and things only when rows came and went
+  const S = CROSSY, t = S.wt, night = S.M.glow.opacity > 0, P = S.P;
+  const v0 = S.vis0 === undefined ? -1e9 : S.vis0, v1 = S.vis1 === undefined ? 1e9 : S.vis1;   /* (only the rows in view: crossyCam works them out) */
+  if (S.decDirty) { S.decDirty = false; for (const D of S.stat) D.n = 0;
+    for (const row of S.rows) { if (!row || row.r < v0 || row.r > v1) continue; const z = -row.r, y = row.y;
+      for (const d of row.dec) { crossyI(d[0], d[1], y + (d[4] ? 0.17 : 0), z + (d[4] || 0), d[2], d[3]); if (d[0] === 'lamp') crossyI('lglow', d[1], y + 0.03, z + (d[2] === 0 ? 0.95 : -0.95), 0, 2.8, 1, 2.8); } }
+    crossyIEnd(S.stat); if (!night) S.mods.lglow.m.visible = false; }
+  for (const D of S.dyn) D.n = 0;
+  for (const row of S.rows) {
+    if (!row || row.r < v0 || row.r > v1) continue; const z = -row.r, y = row.y, d = row.dir, ry = d > 0 ? Math.PI / 2 : -Math.PI / 2;
+    if (row.t === 'road' || row.t === 'trail') for (const m of row.mv) { if (Math.abs(m.x) > S.GW + 3) continue;
+      const jog = m.kind === 'jog', bob = jog ? Math.abs(Math.sin(t * 9 + m.x)) * 0.07 : m.kind === 'bike' ? 0 : Math.abs(Math.sin(t * 13 + m.x * 3)) * 0.012;
+      crossyI(m.model, m.x, y + bob, z, ry, 1); crossyI('shad', m.x, y + 0.01, z, 0, (m.len + 0.25) / 0.53 * 0.62, 1, (jog ? 0.5 : 0.95) / 0.53 * 0.62);
+      if (night && row.t === 'road') crossyI('glow', m.x + d * (m.len / 2 + 1.0), y + 0.02, z, 0, 2.2, 1, 1.1); }
+    else if (row.t === 'rail') { const T = row.tr;
+      if (T.ph === 'pass') for (let i = 0; i <= T.n; i++) { const x = T.front - d * (2.475 + i * 4.95); if (Math.abs(x) > S.GW + 4) continue; crossyI(i ? 'coach' : 'eng', x, y, z, ry, 1); crossyI('shad', x, y + 0.01, z, 0, 5.2 / 0.53 * 0.62, 1, 1.1 / 0.53 * 0.62);
+        if (!i && night) crossyI('glow', x + d * 3.6, y + 0.02, z, 0, 3, 1, 1.3); }
+      const on = T.ph !== 'wait', fl = ((S.time * 3.2) | 0) % 2;
+      for (const dd of row.dec) if (dd[0] === 'signal') { const a = dd[2], c = Math.cos(a), s = Math.sin(a);
+        for (const sx of [-1, 1]) { const lx = sx * 0.22, lit = on && (sx < 0) === !fl, i = crossyI('bulb', dd[1] + lx * c + 0.17 * s, y + 1.29, z + (dd[4] || 0) - lx * s + 0.17 * c, 0, lit ? 1.7 : 1); if (i >= 0) S.mods.bulb.m.setColorAt(i, S.vv.c.setHex(lit ? 0xff3030 : 0x441010)); } } }
+    else if (row.t === 'water') for (const m of row.mv) { if (Math.abs(m.x) > S.GW + 3) continue; const bob = Math.sin(t * 2.2 + m.x * 1.7) * 0.025;
+      if (m.kind === 'log') crossyI(m.model, m.x, S.WY + 0.04 + bob, z, Math.PI / 2, 1, 1, 1, 0, Math.sin(t * 1.3 + m.x) * 0.03);
+      else if (m.kind === 'pad') { crossyI(m.model, m.x, S.WY + 0.01 + bob * 0.3, z, m.x * 1.7, 1); if (m.fish) crossyI('fish', m.x, S.WY + 0.38 + Math.sin(t * 3 + m.x) * 0.06, z, t * 2.4, 1); }
+      else { const u = crossyGooseUnder(m, t), wob = u > 0 && u < 1 ? Math.sin(t * 40) * 0.15 : 0;
+        if (u < 1) for (let j = 0; j < m.len; j++) crossyI('goose', m.x - m.len / 2 + 0.5 + j, S.WY + 0.02 + bob - u * 0.18 + (u > 0.85 ? -(u - 0.85) * 3 : 0), z, ry + wob, 1, 1, 1, 0, wob * 0.5); } }
+    if (row.fish > -99) crossyI('fish', row.fish, y + 0.36 + Math.sin(t * 3 + row.r) * 0.06, z, t * 2.4, 1);
+    if (row.mush > -99) crossyI('mush', row.mush, y + 0.02 + Math.abs(Math.sin(t * 2.5)) * 0.08, z, t * 0.8, 1.15 + Math.sin(t * 5) * 0.05);
+  }
+  if (P && P.dead && (P.dead.kind === 'car' || P.dead.kind === 'bonk') && S.pk) for (let i = 0; i < 5; i++) { const a = S.time * 3 + i * 1.2566; crossyI('star', S.pk.position.x + Math.cos(a) * 0.32, S.pk.position.y + 0.52 + Math.sin(S.time * 6 + i) * 0.04, S.pk.position.z + Math.sin(a) * 0.32, S.time * 4 + i, 1); }
+  crossyIEnd(S.dyn); if (!night) S.mods.glow.m.visible = false;
+}
+
+/* ---------- the world moving: lanes on their loops (the off-ramp's cars brake for her), trains on their timetables ---------- */
+function crossyWorld(dt) {
+  const S = CROSSY, LW = S.LW, h = LW / 2;
+  for (const row of S.rows) {
+    if (!row) continue;
+    if (row.t === 'road' || row.t === 'trail' || (row.t === 'water' && row.kind !== 'pad')) {
+      if (row.ramp) { crossyRamp(row, dt); continue; }
+      const dx = row.v * dt; for (const m of row.mv) { m.x += dx; if (m.x > h) m.x -= LW; else if (m.x < -h) m.x += LW; }
+      if (row.kind === 'goose' && Math.abs(row.r - S.P.row) <= 3) for (const m of row.mv) if (m.dive) { const u = crossyGooseUnder(m, S.wt); if (u > 0 && u < 1) { if (!m.hissed && Math.abs(m.x) < 7 && S.phase === 'run') { m.hissed = true; crossySfx('hiss'); } } else if (!u) m.hissed = false; }   /* (a raft about to dive hisses first) */
+    } else if (row.t === 'rail') crossyTrain(row, dt);
+  }
+}
+function crossyRamp(row, dt) {                                           // the off-ramp: slow cars that stop for a cat in the road (a honk, then on they go), and keep their distance
+  const S = CROSSY, P = S.P, d = row.dir, cv = Math.abs(row.v), mv = row.mv, h = S.LW / 2;
+  const here = (S.phase === 'run' || S.phase === 'dead') && (P.hop ? P.hop.r1 === row.r || P.hop.r0 === row.r : P.row === row.r);
+  for (const m of mv) {
+    let want = cv;
+    if (here) { const ahead = crossyWrapD(P.x - m.x) * d - m.len / 2; if (ahead > -0.25 && ahead < 2.6) { want = 0; if (!m.honk && ahead > 0.1 && S.phase === 'run') { m.honk = 1; crossySfx('honk'); } } }
+    else m.honk = 0;
+    for (const o of mv) if (o !== m) { const g = crossyWrapD(o.x - m.x) * d - (o.len + m.len) / 2; if (g > -0.5 && g < 0.8) want = Math.min(want, g < 0.35 ? 0 : o.sp); }
+    m.sp = want < m.sp ? Math.max(want, m.sp - 16 * dt) : Math.min(want, m.sp + 2.2 * dt);
+  }
+  for (const m of mv) { m.x += d * m.sp * dt; if (m.x > h) m.x -= S.LW; else if (m.x < -h) m.x += S.LW; }
+}
+function crossyTrain(row, dt) {                                          // wait, then the signal flashes and the bell rings, then the GO train flies through
+  const S = CROSSY, T = row.tr, sp = T.sp, d = row.dir, E = S.GW + 4, near = Math.abs(row.r - S.P.row) < 9 && S.phase !== 'leave';
+  T.t -= dt;
+  if (T.ph === 'wait') { if (T.t <= 0) { T.ph = 'warn'; T.t = T.warn; T.bell = 0; } }
+  else if (T.ph === 'warn') { T.bell -= dt; if (near && T.bell <= 0) { crossySfx('bell'); T.bell = 0.36; } if (T.t <= 0) { T.ph = 'pass'; T.front = -d * E; if (near) crossySfx('horn'); } }
+  else if (T.ph === 'pass') {
+    const f0 = T.front; T.front += row.v * dt;
+    if (T.leftT > S.wt - 1.5 && (f0 - T.leftX) * (T.front - T.leftX) <= 0) { if (S.wt - T.leftT < 0.55 && S.phase === 'run') crossyCloseCall(); T.leftT = -9; }   /* (the train's nose went by where she hopped off, a moment after) */
+    if (d > 0 ? T.front - T.len > E : T.front + T.len < -E) { T.ph = 'wait'; T.t = T.next; T.next = sp.wait[0] + crossyRnd() * (sp.wait[1] - sp.wait[0]); }
+  }
+}
+function crossyCloseCall() { const S = CROSSY; S.closeT = S.time; crossyPop('Close call!', 'gold', 'Whiskers intact!'); crossySfx('close'); if (typeof unlock === 'function') unlock('crossyTrain'); }
+
+/* ---------- her: hops (buffered), landing on cells, riding logs and geese ---------- */
+function crossyInput(d) { const S = CROSSY; if (!S.active || S.paused || S.phase !== 'run' || 'fblr'.indexOf(d) < 0 || d.length !== 1) return; if (S.q.length < 3) S.q.push(d); }
+function crossyWaterAt(row, x) {                                         // what she'd land on in a river row at x (a log's or a raft's slot, a pad), or null: the water
+  const S = CROSSY;
+  for (const m of row.mv) {
+    if (m.kind === 'pad') { if (Math.abs(x - m.x) <= 0.62) return { m, x: m.x, top: S.WY + 0.05 }; continue; }
+    if (m.kind === 'goose' && crossyGooseUnder(m, S.wt) >= 1) continue;
+    const lo = m.x - m.len / 2, dd = x - lo;
+    if (dd > -0.32 && dd < m.len + 0.32) { let k = Math.max(0, Math.min(m.len - 1, Math.floor(dd))); const H = S.HALF;
+      if (Math.abs(lo + k + 0.5) > H + 0.5) { const k2 = k - Math.sign(lo + k + 0.5); if (k2 >= 0 && k2 < m.len && Math.abs(dd - k2 - 0.5) < 1.05) k = k2; }   /* (a slot past the edge: the one next to it, if she's nearly there) */
+      return { m, x: lo + k + 0.5, top: m.kind === 'log' ? S.WY + 0.37 : S.WY + 0.27 }; }
+  }
+  return null;
+}
+function crossyHopGo(d) {
+  const S = CROSSY, P = S.P, H = S.HALF, dr = d === 'f' ? 1 : d === 'b' ? -1 : 0, dx = d === 'l' ? -1 : d === 'r' ? 1 : 0;
+  P.face = d === 'f' ? Math.PI : d === 'b' ? 0 : d === 'l' ? -Math.PI / 2 : Math.PI / 2;
+  const from = crossyRowGet(P.row), to = crossyRowGet(P.row + dr), riding = P.ride && P.ride.kind !== 'pad', vx = riding && from ? from.v : 0, dur = S.HOP;
+  let land = P.x + dx + vx * dur * S.ts, bump = !to || to.t === 'wall' || P.row + dr < 0, x1 = P.x + dx, y1 = P.y;
+  if (!bump && dx && Math.abs(land) > H + 0.45) bump = true;
+  if (!bump && to.t !== 'water') { const c = Math.max(-H, Math.min(H, Math.round(land))); if (to.block[c + H]) bump = true; else { x1 = c; y1 = to.y; } }
+  else if (!bump) { x1 = P.x + dx; const pr = crossyWaterAt(to, land); y1 = pr ? pr.top : S.WY - 0.05; }
+  if (bump) { P.hop = { bump: true, x0: P.x, x1: P.x, vx, w: 0, r0: P.row, r1: P.row, y0: P.y, y1: P.y, t: 0, dur: 0.11, dx, dr }; crossySfx('bump'); return; }
+  const water = to.t === 'water';
+  P.hop = { bump: false, x0: P.x, x1, vx: water ? vx : 0, w: 0, r0: P.row, r1: P.row + dr, y0: P.y, y1, t: 0, dur, dx, dr };
+  if (from && from.t === 'rail' && dr && from.tr.ph !== 'wait') { from.tr.leftT = S.wt; from.tr.leftX = Math.round(P.x); }
+  P.rideLast = P.ride; P.ride = null; S.started = true; S.hops++; crossySfx('hop');
+  if (S.hops >= 4 && S.ui && S.ui.Hint.classList.contains('on')) { S.ui.Hint.classList.remove('on'); crossyPut('catguard.crossyHinted', '1'); }
+}
+function crossyLand() {
+  const S = CROSSY, P = S.P, h = P.hop; P.hop = null;
+  if (h.bump) { P.x = h.x0 + h.vx * h.w; if (P.ride && P.ride.kind !== 'pad') P.x = P.ride.x + P.rideOff; P.sq = 0.5; return; }
+  P.row = h.r1; const row = crossyRowGet(P.row); if (!row) return; P.sq = 1;
+  if (row.t === 'water') {
+    const hit = crossyWaterAt(row, P.x); if (!hit) { crossyDie('water', null, row); return; }
+    P.ride = hit.m; P.x = hit.x; P.rideOff = hit.x - hit.m.x; P.y = hit.top;
+    if (!S.riv) S.riv = { geese: true, rows: new Set() }; S.riv.rows.add(row.r); if (hit.m.kind !== 'goose') S.riv.geese = false;
+    if (hit.m.fish) { hit.m.fish = false; crossyFishGot(); }
+    chimFxBurst(S.fx, P.x, S.WY + 0.05, -P.row, S.low ? 4 : 8, 0xdff2ff, 1.2, 1.2, 0.05, 0.12, 0.35, 0.8, 4, 3);
+  } else {
+    P.ride = null; P.x = Math.max(-S.HALF, Math.min(S.HALF, Math.round(P.x))); P.y = row.y;
+    if (S.riv) { let n = 0; for (let r = P.row - 1; crossyRowGet(r) && crossyRowGet(r).t === 'water'; r--) n++;   /* (across a whole river on geese?) */
+      if (h.dr > 0 && S.riv.geese && n >= 2 && S.riv.rows.size >= n) { crossyPop('Goose bridge!', 'gold', 'HONK HONK!'); crossySfx('honkGoose'); if (typeof unlock === 'function') unlock('crossyGeese'); }
+      S.riv = null; }
+    if (row.fish === P.x) { row.fish = -99; crossyFishGot(); }
+    if (row.mush === P.x) { row.mush = -99; crossyPower(); }
+    if (!S.low) chimFxBurst(S.fx, P.x, row.y + 0.03, -P.row, 5, row.t === 'grass' ? 0xc8d8a0 : 0xc8c4bc, 0.8, 0.5, 0.06, 0.14, 0.3, 0.55, 2, 3);
+  }
+  if (P.row > P.maxRow) { P.maxRow = P.row; S.idle = 0; crossyGenTo(P.maxRow + 52);
+    if (P.maxRow >= 100 && typeof unlock === 'function') unlock('crossy100'); if (P.maxRow >= 500 && typeof unlock === 'function') unlock('crossy500');
+    if (P.maxRow % 100 === 0) { crossyPop(P.maxRow + '!', 'gold', ''); crossySfx('streak'); } }
+  if (row.zone && row.zone !== S.zone) { S.zone = row.zone; const z = row.zone.replace(/ (express|collectors|divider)$/, ''); if (!S.zones[z] && P.row > 0) { S.zones[z] = 1; if (z !== 'The ravine' && z !== 'Riverbank') crossyBanner(crossyZoneWord(z)); } }
+}
+function crossyZoneWord(z) { return { 'The off-ramp': '🚗 The off-ramp', '401': '🛣️ The 401!', 'The 401': '🛣️ The 401!', 'GO train tracks': '🚆 GO tracks', 'The Don River': '🌊 The Don River', 'Lower Don Trail': '🚴 Lower Don Trail' }[z] || z; }
+function crossyFishGot() { const S = CROSSY; S.fishN++; crossySfx('fish', S.fishN); if (S.ui) { S.ui.FishB.classList.remove('bump'); void S.ui.FishB.offsetWidth; S.ui.FishB.classList.add('bump'); }
+  chimFxBurst(S.gx, S.P.x, S.P.y + 0.4, -S.P.row, S.low ? 6 : 12, 0x8fd0ff, 1.6, 1.4, 0.08, 0.02, 0.45, 0.9, 2, 3); }
+function crossyPower() {                                                 // a 🍄: slow motion, or a one-hit shield (whichever she hasn't got)
+  const S = CROSSY, k = S.shield ? 'slow' : S.slowT > 0 ? 'shield' : crossyRnd() < 0.5 ? 'slow' : 'shield';
+  if (k === 'slow') { S.slowT = 5.5; crossyPop('Slow-mo!', 'gold', 'Everything’s in slow motion'); } else { S.shield = true; crossyPop('Shield!', 'gold', 'One bump’s on the house'); }
+  crossySfx('power'); chimFxBurst(S.gx, S.P.x, S.P.y + 0.4, -S.P.row, 22, 0xff5a7a, 2.2, 1.6, 0.1, 0.02, 0.6, 1, 1, 2);
+}
+function crossyHits() {                                                  // what gets her: anything driving through her cell (or a train), the water, being swept off the side, a goose diving
+  const S = CROSSY, P = S.P; if (S.phase !== 'run') return;
+  const h = P.hop, r = h && !h.bump ? (h.t / h.dur < 0.5 ? h.r0 : h.r1) : P.row, row = crossyRowGet(r); if (!row) return;
+  if (!h) { if (P.ride && (Math.abs(P.x) > S.HALF + 1.6 || (Math.abs(P.x) > S.HALF + 0.9 && row.v * P.x > 0))) { crossyDie('swept', null, row); return; }   /* (carried off the side: past the edge and still going) */
+    if (P.ride && P.ride.kind === 'goose' && crossyGooseUnder(P.ride, S.wt) >= 1) { crossyDie('goose', null, row); return; }
+    if (row.t === 'water' && !P.ride) { crossyDie('water', null, row); return; } }
+  if (S.inv > 0) return;
+  const x = P.x, cw = 0.25;
+  if (row.t === 'road' || row.t === 'trail') { for (const m of row.mv) if (Math.abs(crossyWrapD(m.x - x)) < m.len / 2 - 0.05 + cw) { crossyHit(m.kind === 't' || m.kind === 'b' ? 'flat' : m.kind === 'bike' || m.kind === 'jog' ? 'bonk' : 'car', m, row); return; } }
+  else if (row.t === 'rail' && row.tr.ph === 'pass') { const T = row.tr, tail = T.front - row.dir * T.len; if (x > Math.min(T.front, tail) - cw && x < Math.max(T.front, tail) + cw) crossyHit('train', null, row); }
+}
+function crossyHit(kind, m, row) {
+  const S = CROSSY; if (S.shield) { S.shield = false; S.inv = 1.4; crossySfx('shield'); crossyPop('Shield!', 'gold', 'Saved!'); chimFxBurst(S.gx, S.P.x, S.P.y + 0.35, -S.P.row, 26, 0x8fdcff, 2.4, 1.5, 0.1, 0.02, 0.5, 1, 1, 2); return; }
+  crossyDie(kind, m, row);
+}
+function crossyDie(kind, m, row) {
+  const S = CROSSY, P = S.P; if (S.phase !== 'run') return;
+  const h = P.hop, r = row ? row.r : P.row; S.phase = 'dead'; S.pt = 0; S.q.length = 0;
+  P.dead = { kind, m, row, r, t: 0, dir: row ? row.dir : 1, x0: P.x, y0: h ? h.y0 + (h.y1 - h.y0) * Math.min(1, h.t / h.dur) : P.y, z0: h ? -(h.r0 + (h.r1 - h.r0) * Math.min(1, h.t / h.dur)) : -P.row, off: 0, side: crossyRnd() < 0.5 ? 1 : -1 };
+  P.hop = null; P.ride = null; if (S.hk.on && kind !== 'hawk') crossyHawkGo(); if (row && row.zone) S.zone = row.zone;
+  if (kind === 'car' || kind === 'bonk') { crossySfx(kind === 'bonk' ? 'bonk' : 'splat'); S.shake = 0.3; chimFxBurst(S.fx, P.x, 0.4, P.dead.z0, 14, 0xffffff, 2, 1.4, 0.1, 0.22, 0.4, 0.8, 4, 3); }
+  else if (kind === 'flat') { crossySfx('flat'); S.shake = 0.45; chimFxBurst(S.fx, P.x, 0.1, P.dead.z0, 18, 0xb8b0a4, 2.4, 0.6, 0.12, 0.3, 0.5, 0.7, 1, 3); }
+  else if (kind === 'train') { crossySfx('flat'); S.shake = 0.6; }
+  else if (kind === 'water' || kind === 'swept' || kind === 'goose') { crossySfx('splash'); chimFxBurst(S.fx, P.x, S.WY + 0.1, P.dead.z0, S.low ? 14 : 30, 0xe8f6ff, 2.2, 3.2, 0.08, 0.16, 0.6, 0.9, 7, 1.5); if (kind === 'goose') crossySfx('hiss'); }
+}
+function crossyDeadStep(dt) {                                            // how it went: knocked flat with stars round her head, pancaked, stuck to the train's nose, sunk, or carried off
+  const S = CROSSY, P = S.P, D = P.dead; if (!D) return; D.t += dt; const k = D.kind;
+  if ((k === 'car' || k === 'bonk') && D.t < 0.25) D.off += dt * 2.4 * D.dir;
+  const lim = k === 'hawk' ? 2.1 : k === 'train' ? 2.2 : 1.35;
+  if (D.t > lim && S.phase === 'dead') crossyOver();
+}
+
+/* ---------- the hawk: dawdle (no new row for 8 s) or fall behind the camera and it comes for her ---------- */
+function crossyHawkStep(dt) {
+  const S = CROSSY, P = S.P, K = S.hk;
+  if (S.phase === 'run' && S.started && !S.paused) {
+    S.idle += dt; const behind = S.camRow - P.row;
+    if (!K.on && (S.idle > 5.2 || behind > 2.4)) { K.on = true; K.ph = 'warn'; K.t = 0; K.a = 0; K.p.set(P.x + 6, 9, -P.row - 6); K.cry = 0; K.g.visible = true; }
+    if (K.on && K.ph === 'warn' && S.idle < 4 && behind < 1.8) crossyHawkGo();
+    if (K.on && K.ph === 'warn' && (S.idle > 8 || behind > 3.6)) { K.ph = 'dive'; K.t = 0; K.p0.copy(K.p); crossySfx('hawk'); }
+  }
+  if (!K.on) { K.g.visible = false; K.sh.visible = false; return; }
+  K.t += dt; const g = K.g, fl = K.ph === 'dive' ? 0.15 : K.ph === 'carry' ? Math.sin(S.time * 22) * 0.6 : Math.sin(S.time * 7) * 0.45;
+  if (K.ph === 'warn') { K.a += dt * 1.7; const tx = P.x + Math.cos(K.a) * 2.6, tz = -P.row - 1.6 + Math.sin(K.a) * 1.5, ty = 5.2 + Math.sin(S.time * 1.7) * 0.3;
+    K.p.x += (tx - K.p.x) * Math.min(1, dt * 2.2); K.p.y += (ty - K.p.y) * Math.min(1, dt * 2.2); K.p.z += (tz - K.p.z) * Math.min(1, dt * 2.2); g.rotation.set(0.1, K.a + Math.PI, -0.35);
+    K.cry -= dt; if (K.cry <= 0) { crossySfx('hawk'); K.cry = 2.4; } }
+  else if (K.ph === 'dive') { const e = Math.min(1, K.t / 0.42), tx = P.hop ? P.x : P.x, ty = P.y + 0.55, tz = S.pk.position.z;
+    K.p.set(K.p0.x + (tx - K.p0.x) * e * e, K.p0.y + (ty - K.p0.y) * e * e, K.p0.z + (tz - K.p0.z) * e * e); g.rotation.set(0.7 * (1 - e), Math.atan2(tx - K.p0.x, tz - K.p0.z), 0);
+    if (e >= 1) { K.ph = 'carry'; K.t = 0; if (S.phase === 'run') { if (P.hop) crossyLand(); S.inv = 0; S.shield = false; crossyDie('hawk', null, crossyRowGet(P.row)); } chimFxBurst(S.fx, K.p.x, K.p.y, K.p.z, 14, 0x8a6040, 1.6, 1.0, 0.08, 0.14, 0.7, 0.9, 1.5, 2); } }
+  else if (K.ph === 'carry') { K.p.x += dt * 1.6; K.p.y += dt * (2.2 + K.t * 4); K.p.z -= dt * (2.5 + K.t * 3); g.rotation.set(-0.25, Math.PI * 0.85, 0.1); }
+  else if (K.ph === 'leave') { K.p.x += dt * 4; K.p.y += dt * 5; K.p.z -= dt * 5; g.rotation.set(-0.3, Math.PI * 0.8, 0.2); if (K.t > 1.6) { K.on = false; K.ph = 'off'; } }
+  g.position.copy(K.p); K.wl.rotation.z = fl; K.wr.rotation.z = -fl; g.visible = true;
+  const gy = crossyRowGet(Math.round(-K.p.z)); K.sh.visible = K.ph !== 'leave'; K.sh.position.set(K.p.x, (gy ? gy.y : 0) + 0.02, K.p.z); K.sh.scale.setScalar(Math.max(0.6, 2.6 - K.p.y * 0.2));
+  K.sh.material.opacity = Math.max(0.05, 0.32 - K.p.y * 0.03);
+}
+function crossyHawkGo() { const K = CROSSY.hk; if (!K.on || K.ph !== 'warn') return; K.ph = 'leave'; K.t = 0; }
+
+/* ---------- the camera (three-quarters, from behind and to the right, a little ahead of her: it creeps on if she dawdles) ---------- */
+function crossyCam(dt, snap) {
+  const S = CROSSY, P = S.P, cam = S.cam; renderer.getSize(S.size); const a = S.size.x > 0 && S.size.y > 0 ? S.size.x / S.size.y : 0.6;
+  if (Math.abs(a - S.aspect) > 1e-3) { S.aspect = a; cam.aspect = a; cam.updateProjectionMatrix(); S.drawn = false; }
+  if (S.phase === 'run' && S.started && !S.paused) S.camRow += (0.16 + 0.42 * crossyK(P.maxRow)) * dt * S.ts;
+  if (P.row > S.camRow) S.camRow = P.row;
+  const t = Math.tan(cam.fov * Math.PI / 360), dist = Math.max(4.0 / (t * a), 4.9 / t), D = S.vv.cd.set(0.13, 0.8, 0.56).normalize();
+  const rows = 2 * dist * t / D.y, ahead = Math.min(7.5, rows * 0.19), fx = Math.max(-1.4, Math.min(1.4, P.x * 0.45)), fz = -(S.camRow + ahead), F = S.vv.cf;
+  if (snap) F.set(fx, 0, fz); else { F.x += (fx - F.x) * Math.min(1, dt * 3); F.z += (fz - F.z) * Math.min(1, dt * 5); }
+  cam.position.copy(F).addScaledVector(D, dist);
+  if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt); const s = S.shake * 0.35; cam.position.x += (Math.random() - 0.5) * s; cam.position.y += (Math.random() - 0.5) * s; }
+  cam.lookAt(F); S.scene.fog.near = dist + 4; S.scene.fog.far = dist + 26;
+  { const fr = -F.z, a0 = Math.floor(fr - rows * 0.62 - 3), a1 = Math.ceil(fr + rows * 0.7 + 4); if (a0 !== S.vis0 || a1 !== S.vis1) { S.vis0 = a0; S.vis1 = a1; S.decDirty = true; } }
+  S.sun.position.set(F.x - 5, 12, F.z + 7); S.sun.target.position.copy(F);
+  S.wall.visible = P.maxRow < 40;
+}
+
+/* ---------- her on screen: the hop's arc, squash and stretch, legs tucked; and how she ends up ---------- */
+function crossyPose(dt) {
+  const S = CROSSY, P = S.P, R = S.rig, pk = S.pk, ps = S.pkS, D = P.dead; if (!R) return;
+  let x = P.x, y = P.y, z = -P.row, e = 0, sy = 1, sxz = 1;
+  const ang = (a, b) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
+  P.yaw += ang(P.yaw, P.face) * Math.min(1, dt * 28);
+  if (D) {
+    pk.rotation.set(0, P.yaw, 0); ps.rotation.set(0, 0, 0); ps.position.set(0, 0, 0); x = D.x0 + D.off; z = D.z0; y = D.y0;
+    const k = D.kind, u = Math.min(1, D.t / 0.18);
+    if (k === 'car' || k === 'bonk') { y = Math.max(D.row ? D.row.y : 0, D.y0 - D.t * 3); ps.rotation.z = D.dir * 1.45 * u; sy = 1 - 0.22 * u; sxz = 1 + 0.08 * u; ps.position.y = 0.06 * u; }
+    else if (k === 'flat' || k === 'train') { y = (D.row ? D.row.y : 0) + (k === 'train' ? 0.07 : 0.01); pk.rotation.y = D.side * 0.4 + P.yaw; sy = 0.06; sxz = k === 'train' ? 1.5 : 1.35; }   /* (pancaked, paper-thin: the train's version shows once it's gone by) */
+    else if (k === 'water' || k === 'swept' || k === 'goose') { y = S.WY + 0.1 - Math.min(1.2, D.t * 1.1); ps.rotation.z = Math.sin(D.t * 14) * 0.3 * Math.max(0, 1 - D.t); if (D.t < 0.05 && D.kind === 'swept') S.shake = 0.1; }
+    else if (k === 'hawk' && S.hk.on) { const K = S.hk; x = K.p.x; y = K.p.y - 0.62; z = K.p.z + 0.05; pk.rotation.set(0, P.yaw, Math.sin(S.time * 9) * 0.2); }
+    ps.scale.set(sxz, sy, sxz); pk.position.set(x, y, z); crossyPoseLegs(R, 0, D.t, k === 'hawk' || k === 'water' || k === 'swept' || k === 'goose');
+    S.pkSh.visible = k === 'car' || k === 'bonk'; S.pkSh.position.set(x, y + 0.01, z); return;
+  }
+  const h = P.hop;
+  if (h) { e = Math.min(1, h.t / h.dur); const arc = 4 * e * (1 - e);
+    if (h.bump) { const o = Math.sin(Math.PI * e) * 0.22; x = h.x0 + h.vx * h.w + h.dx * o; z = -h.r0 - h.dr * o; y = h.y0 + arc * 0.16; }
+    else { x = P.x; z = -(h.r0 + (h.r1 - h.r0) * e); y = h.y0 + (h.y1 - h.y0) * e + arc * 0.42; sy = 1 + 0.2 * arc; sxz = 1 - 0.08 * arc; } }
+  else if (P.ride) { const m = P.ride; y = m.kind === 'log' ? S.WY + 0.37 + Math.sin(S.wt * 2.2 + m.x * 1.7) * 0.025 : m.kind === 'pad' ? S.WY + 0.05 : S.WY + 0.27 + Math.sin(S.wt * 2.2 + m.x * 1.7) * 0.025 - crossyGooseUnder(m, S.wt) * 0.18; }
+  if (P.sq > 0) { P.sq = Math.max(0, P.sq - dt * 7); sy *= 1 - 0.24 * P.sq; sxz *= 1 + 0.12 * P.sq; }
+  pk.position.set(x, y, z); pk.rotation.set(0, P.yaw, 0); ps.rotation.set(0, 0, 0); ps.position.set(0, 0, 0); ps.scale.set(sxz, sy, sxz);
+  ps.visible = !(S.inv > 0 && ((S.time * 14) | 0) % 2);
+  S.bub.visible = S.shield; if (S.shield) S.bub.scale.setScalar(1 + Math.sin(S.time * 6) * 0.04);
+  const gr = h && !h.bump ? crossyRowGet(e < 0.5 ? h.r0 : h.r1) : crossyRowGet(P.row), gy = gr ? (gr.t === 'water' ? (h ? Math.max(S.WY, Math.min(h.y0, h.y1)) : y) : gr.y) : 0;
+  S.pkSh.visible = true; S.pkSh.position.set(x, gy + 0.012, z); S.pkSh.scale.setScalar(0.62 * (1 - Math.min(0.4, (y - gy) * 0.6)));
+  crossyPoseLegs(R, h && !h.bump ? Math.sin(Math.PI * e) : 0, S.time, false);
+}
+function crossyPoseLegs(R, k, t, flail) {
+  R.legs.forEach((l, i) => { if (!l) return; const b = R.legs0[i] || 0, front = i < 2; l.rotation.x = b + (flail ? Math.sin(t * 18 + i * 1.7) * 0.7 : (front ? -0.9 : 0.9) * k); });
+  R.tail.forEach((s, i) => { s.rotation.z = Math.sin(t * (flail ? 14 : 2.6) - i * 0.5) * (flail ? 0.4 : 0.14); });
+  if (R.head) R.head.rotation.x = flail ? Math.sin(t * 10) * 0.2 : -0.12 * k;
+}
+
+/* ---------- each frame of a run ---------- */
+function crossyPlayer(dt, wdt) {
+  const S = CROSSY, P = S.P;
+  if (!P.hop && S.q.length) crossyHopGo(S.q.shift());
+  if (P.hop) { const h = P.hop; h.t += dt; h.w += wdt; const e = Math.min(1, h.t / h.dur);
+    if (!h.bump) P.x = h.x0 + (h.x1 - h.x0) * e + h.vx * h.w;
+    else if (P.ride && P.ride.kind !== 'pad') P.x = P.ride.x + P.rideOff;
+    if (e >= 1) { crossyLand(); if (S.phase === 'run' && !P.hop && S.q.length) crossyHopGo(S.q.shift()); } }
+  else if (P.ride && P.ride.kind !== 'pad') P.x = P.ride.x + P.rideOff;
+  crossyHits();
+}
+function crossyStep(dt) {
+  const S = CROSSY, P = S.P;
+  if (S.slowT > 0) { S.slowT -= dt; S.ts = S.slowT > 0.6 ? 0.45 : 0.45 + (0.6 - Math.max(0, S.slowT)) / 0.6 * 0.55; } else S.ts = 1;
+  const wdt = dt * S.ts; S.wt += wdt; if (S.inv > 0) S.inv -= dt;
+  crossyWorld(wdt);
+  if (S.phase === 'run') crossyPlayer(dt, wdt);
+  else if (S.phase === 'dead' || S.phase === 'over') crossyDeadStep(dt);
+  crossyHawkStep(dt);
+}
+function crossyHud(dt) {
+  const S = CROSSY, u = S.ui, P = S.P; if (!u) return;
+  const n = P.maxRow; if (u.n !== n) { u.n = n; u.Dist.textContent = n; }
+  if (u.f !== S.fishN) { u.f = S.fishN; u.Fish.textContent = S.fishN; }
+  const zn = S.zone || 'Top of the bank'; if (u.z !== zn) { u.z = zn; u.Zone.textContent = zn; }
+  const sl = S.slowT > 0; u.ps.classList.toggle('on', sl); if (sl) u.psb.style.width = Math.max(0, Math.min(100, S.slowT / 5.5 * 100)) + '%';
+  u.ph.classList.toggle('on', !!S.shield);
+  const hw = S.hk.on && S.hk.ph === 'warn' && S.phase === 'run'; if (u.hw !== hw) { u.hw = hw; u.root.classList.toggle('hawk', hw); }
+}
+function crossyPop(text, cls, sub) { const u = CROSSY.ui; if (!u) return; const el = u.Msg; el.textContent = text; if (sub) { const s = document.createElement('small'); s.textContent = sub; el.appendChild(s); } el.className = 'cy-msg' + (cls ? ' ' + cls : ''); void el.offsetWidth; el.classList.add('pop'); }
+function crossyBanner(text, sub) { const u = CROSSY.ui; if (!u) return; const el = u.Banner; el.textContent = text; if (sub) { const s = document.createElement('small'); s.textContent = sub; el.appendChild(s); } el.className = 'cy-banner'; void el.offsetWidth; el.classList.add('pop'); }
+function crossyFadeDom() { const S = CROSSY, v = Math.round(S.fade * 50) / 50; if (v !== S.fadeShown && S.ui) { S.fadeShown = v; S.ui.Fade.style.opacity = v; } }
+function crossyBuildUI() {
+  const st = document.createElement('style'); st.id = 'crossyStyle';
+  st.textContent = `
+#cyUI{position:fixed;inset:0;z-index:30;display:none;pointer-events:none;overflow:hidden;color:#fff;font-family:var(--display);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+#cyUI.on{display:block}
+#cyArea{position:absolute;inset:0;pointer-events:auto;touch-action:none;cursor:pointer}
+#cyUI button{pointer-events:auto;font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulation}
+#cyUI .cy-top{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) + 10px);left:calc(env(safe-area-inset-left,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:6px;pointer-events:none}
+#cyUI .cy-fish{justify-self:start;display:flex;align-items:center;gap:6px;background:rgba(18,46,24,.72);border-radius:16px;padding:6px 12px 6px 9px;font-size:24px;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+#cyUI .cy-fish i{font-style:normal;font-size:.8em}
+#cyUI .cy-fish.bump{animation:cyBump .3s cubic-bezier(.2,1.6,.4,1)}
+#cyUI .cy-dist{text-align:center;line-height:1;text-shadow:0 3px 0 #17652c,0 0 14px rgba(10,40,20,.7)}
+#cyUI .cy-dist b{font-size:clamp(40px,11vw,62px);font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:1px}
+#cyUI .cy-dist small{display:block;font:800 12px var(--body);opacity:.9;margin-top:3px;text-shadow:0 1px 3px #000;white-space:nowrap}
+#cyUI .cy-x{justify-self:end;width:44px;height:44px;border-radius:50%;background:#2fa84f;padding:0;box-shadow:0 3px 0 #17652c;pointer-events:auto}
+#cyUI .cy-x svg{display:block;width:20px;height:20px;margin:auto;fill:#fff}
+#cyUI .cy-pups{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 96px);transform:translateX(-50%);display:flex;gap:8px}
+#cyUI .cy-pup{display:none;align-items:center;gap:6px;background:rgba(18,46,24,.78);border-radius:999px;padding:4px 10px 4px 6px;font-size:18px;line-height:1;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+#cyUI .cy-pup.on{display:flex;animation:cyBump .35s cubic-bezier(.2,1.6,.4,1)}
+#cyUI .cy-pup s{position:relative;display:block;width:44px;height:7px;border-radius:4px;background:rgba(255,255,255,.22);overflow:hidden;text-decoration:none}
+#cyUI .cy-pup s u{position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(90deg,#ff5a7a,#ffd23a);border-radius:4px}
+#cyUI .cy-pup b{font:800 12px var(--body)}
+#cyUI .cy-hawk{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .4s;box-shadow:inset 0 0 70px 24px rgba(200,40,30,.55)}
+#cyUI .cy-hawk b{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 132px);transform:translateX(-50%);font-weight:400;font-size:22px;white-space:nowrap;text-shadow:0 2px 0 #7a1a10,0 0 12px rgba(0,0,0,.6)}
+#cyUI.hawk .cy-hawk{opacity:1;animation:cyHawk .6s ease-in-out infinite alternate}
+#cyUI .cy-msg,#cyUI .cy-banner{position:absolute;left:0;right:0;padding:0 16px;text-align:center;line-height:1.05;opacity:0;pointer-events:none}
+#cyUI .cy-msg{top:30%;font-size:clamp(28px,7.5vw,46px);text-shadow:0 3px 0 #17652c,0 0 16px rgba(10,40,20,.7)}
+#cyUI .cy-msg small,#cyUI .cy-banner small{display:block;font:800 clamp(14px,3.6vw,18px) var(--body);margin-top:6px;text-shadow:0 1px 3px #000}
+#cyUI .cy-msg.gold{color:#ffe27a;text-shadow:0 3px 0 #8a4a10,0 0 18px rgba(255,190,60,.8)}
+#cyUI .cy-msg.pop{animation:cyPop 1.3s ease-out forwards}
+#cyUI .cy-banner{top:17%;font-size:clamp(28px,7.6vw,48px);color:#fff;text-shadow:0 4px 0 #17652c,0 0 22px rgba(80,200,120,.7)}
+#cyUI .cy-banner.pop{animation:cyBan 2.4s ease-out forwards}
+#cyUI .cy-hint{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:2px;background:rgba(18,46,24,.86);border-radius:18px;padding:9px 18px;font:800 15px var(--body);white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.3);text-align:center}
+#cyUI .cy-hint.on{display:flex;animation:cyIn .4s cubic-bezier(.2,1.4,.4,1)}
+#cyUI .cy-hint b{font:400 20px var(--display)}
+#cyUI .cy-hint span{opacity:.75;font-size:13px}
+#cyUI .cy-over{position:absolute;z-index:3;inset:0;display:none;align-items:center;justify-content:center;background:rgba(8,26,12,.5);pointer-events:auto;padding:env(safe-area-inset-top,0px) 16px env(safe-area-inset-bottom,0px)}
+#cyUI .cy-over.on{display:flex}
+#cyUI .cy-card{position:relative;background:#f4fbf2;color:#183a20;border-radius:16px;padding:18px 20px 14px;width:min(340px,100%);max-height:calc(100% - 12px);overflow-y:auto;overscroll-behavior:contain;text-align:center;box-shadow:0 8px 0 #17652c,0 20px 44px rgba(0,0,0,.5);animation:cyIn .35s cubic-bezier(.2,1.4,.4,1)}
+#cyUI .cy-card h2{margin:0;font-size:30px;font-weight:400;color:#1f8a3e;line-height:1.1}
+#cyUI .cy-sub{font:700 14px var(--body);opacity:.78;margin-top:4px}
+#cyUI .cy-big{display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:4px}
+#cyUI .cy-big b{font-size:54px;font-weight:400;line-height:1.1}
+#cyUI .cy-big span{font-size:22px}
+#cyUI .cy-stats{display:flex;justify-content:space-around;margin:8px 0 2px}
+#cyUI .cy-stats b{display:block;font-size:22px;font-weight:400}
+#cyUI .cy-stats span{font:600 12px var(--body);opacity:.65}
+#cyUI .cy-badge{display:none;margin:8px auto 2px;padding:5px 16px 4px;border-radius:14px;color:#fff;font-size:20px;background:linear-gradient(90deg,#2fa84f,#ffb21a);box-shadow:0 4px 0 #183a20;width:max-content;max-width:100%;transform:rotate(-2deg);animation:cyStamp .6s cubic-bezier(.2,1.7,.4,1) both}
+#cyUI .cy-bank{font:800 14px var(--body);color:#1f8a3e;margin-top:8px;line-height:1.4}
+#cyUI .cy-wal{font:700 12px var(--body);opacity:.6;margin-top:10px}
+#cyUI .cy-btn{display:block;width:100%;margin-top:10px;padding:12px;border-radius:16px;background:#2fa84f;color:#fff;font-size:19px;box-shadow:0 4px 0 #17652c}
+#cyUI .cy-btn.alt{background:#183a20;box-shadow:0 4px 0 #000;font-size:16px}
+#cyUI .cy-btn.rev{background:#ff8a2a;box-shadow:0 4px 0 #b8531c}
+#cyUI .cy-btn.rev:disabled{opacity:.45;cursor:default}
+#cyUI .cy-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+#cyUI .cy-pcard{width:min(290px,100%)}
+#cyUI .cy-fade{position:absolute;inset:0;z-index:6;background:#0a1a10;opacity:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
+#cyUI .cy-fade b{font-weight:400;font-size:26px;color:#d8f4d8;text-shadow:0 0 14px rgba(120,220,140,.6)}
+#cyUI.paused .cy-msg,#cyUI.paused .cy-banner,#cyUI.paused .cy-hint,#cyUI.paused .cy-hawk{visibility:hidden}
+#cyUI.ghost,#cyUI.ghost *{pointer-events:none!important}
+#cyUI.ghost .cy-top,#cyUI.ghost .cy-pups,#cyUI.ghost .cy-msg,#cyUI.ghost .cy-banner,#cyUI.ghost .cy-hint,#cyUI.ghost .cy-hawk{visibility:hidden}
+@keyframes cyPop{0%{opacity:0;transform:scale(.5)}12%{opacity:1;transform:scale(1.12)}22%{transform:scale(1)}75%{opacity:1}100%{opacity:0;transform:translateY(-18px)}}
+@keyframes cyBan{0%{opacity:0;transform:translateY(-30px) scale(.8)}10%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+@keyframes cyBump{from{transform:scale(1.35)}}
+@keyframes cyIn{from{transform:scale(.7);opacity:0}}
+@keyframes cyHawk{from{box-shadow:inset 0 0 50px 14px rgba(200,40,30,.35)}to{box-shadow:inset 0 0 90px 34px rgba(220,40,30,.7)}}
+@keyframes cyStamp{0%{transform:scale(2.4) rotate(-12deg);opacity:0}100%{transform:scale(1) rotate(-2deg);opacity:1}}
+@media (max-width:420px){#cyUI .cy-fish{font-size:20px;padding:5px 10px 5px 7px}#cyUI .cy-hint{font-size:13px;padding:8px 14px}#cyUI .cy-hint b{font-size:17px}#cyUI .cy-pups{top:calc(env(safe-area-inset-top,0px) + 90px)}}
+@media (max-height:520px){#cyUI .cy-dist b{font-size:40px}#cyUI .cy-pups{top:calc(env(safe-area-inset-top,0px) + 70px)}#cyUI .cy-msg{top:45%;font-size:30px}#cyUI .cy-banner{top:24%;font-size:30px}#cyUI .cy-hawk b{top:calc(env(safe-area-inset-top,0px) + 100px)}
+  #cyUI .cy-card{padding:10px 16px}#cyUI .cy-card h2{font-size:24px}#cyUI .cy-big b{font-size:36px}#cyUI .cy-stats{margin:4px 0 0}#cyUI .cy-btn{padding:8px;margin-top:6px;font-size:16px}#cyUI .cy-bank{margin-top:4px}#cyUI .cy-wal{margin-top:5px}#cyUI .cy-hint{bottom:calc(env(safe-area-inset-bottom,0px) + 10px)}
+  #cyUI .cy-card.wide{width:min(560px,100%);display:grid;grid-template-columns:1fr 1fr;column-gap:16px;align-items:center}#cyUI .cy-card.wide .cy-left{grid-column:1}#cyUI .cy-card.wide .cy-right{grid-column:2}}
+body.crossing .banner,body.crossing #walkCaption,body.crossing #auntySubs,body.crossing #hopPill,body.crossing #chimSootPill,body.crossing #jetPill,body.crossing #sledPill,body.crossing #lotPill{display:none!important}
+body.crossing .ach-toast{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);z-index:40}`;
+  document.head.appendChild(st);
+  const ui = document.createElement('div'); ui.id = 'cyUI';
+  ui.innerHTML = `<div id="cyArea"></div>
+<div class="cy-hawk"><b>&#x1F985; Keep moving!</b></div>
+<div class="cy-top"><div class="cy-fish" id="cyFishB"><i>&#x1F41F;</i><b id="cyFish">0</b></div><div class="cy-dist"><b id="cyDist">0</b><small id="cyZone"></small></div>
+<button class="cy-x" id="cyPauseBtn" aria-label="Pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.4"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.4"/></svg></button></div>
+<div class="cy-pups" aria-hidden="true"><div class="cy-pup" id="cyPs"><i>&#x1F344;</i><b>SLOW</b><s><u id="cyPsb"></u></s></div><div class="cy-pup" id="cyPh"><i>&#x1F6E1;&#xFE0F;</i><b>SHIELD</b></div></div>
+<div class="cy-banner" id="cyBanner"></div>
+<div class="cy-msg" id="cyMsg"></div>
+<div class="cy-hint" id="cyHint"><b>&#x1F446; Tap to hop forward</b>Swipe &larr; &rarr; to hop sideways, &darr; to hop back<span>Keys: arrows or WASD &middot; space hops forward</span></div>
+<div class="cy-over" id="cyPauseOv"><div class="cy-card cy-pcard"><h2>Paused</h2><div class="cy-sub" id="cyPauseSub"></div><button class="cy-btn" id="cyResume">&#x25B6;&#xFE0E; Keep going</button><button class="cy-btn alt" id="cyQuit">Back to the yard</button></div></div>
+<div class="cy-over" id="cyOver"><div class="cy-card" id="cyCard"><div class="cy-left"><h2 id="cyTitle">Splat!</h2><div class="cy-sub" id="cySub"></div>
+<div class="cy-big"><b id="cyOD">0</b><span>rows</span></div>
+<div class="cy-stats"><div><b id="cyOF">0</b><span>fish</span></div><div><b id="cyOB">0</b><span>best</span></div></div>
+<div class="cy-badge" id="cyBadge"></div><div class="cy-bank" id="cyBank"></div></div>
+<div class="cy-right"><button class="cy-btn rev" id="cyRevive">Keep hopping &middot; &#x1F41F; <b id="cyRevCost">25</b></button><button class="cy-btn" id="cyAgain">Hop again</button><button class="cy-btn alt" id="cyHome">Back to the yard</button>
+<div class="cy-wal" id="cyWal"></div></div></div></div>
+<div class="cy-fade" id="cyFade"><b id="cyLoad"></b></div>`;
+  document.body.appendChild(ui);
+  const q = id => ui.querySelector('#' + id), u = CROSSY.ui = { root: ui }, S = CROSSY;
+  for (const k of ['Area', 'FishB', 'Fish', 'Dist', 'Zone', 'PauseBtn', 'Banner', 'Msg', 'Hint', 'PauseOv', 'PauseSub', 'Resume', 'Quit', 'Over', 'Card', 'Title', 'Sub', 'OD', 'OF', 'OB', 'Badge', 'Bank', 'Revive', 'RevCost', 'Again', 'Home', 'Wal', 'Fade', 'Load']) u[k] = q('cy' + k);
+  u.ps = q('cyPs'); u.ph = q('cyPh'); u.psb = q('cyPsb');
+  const area = u.Area, G = S.ptrs = {};
+  area.addEventListener('pointerdown', e => { if (!S.active) return; e.preventDefault(); e.stopPropagation(); if (typeof initAudio === 'function') initAudio();
+    G[e.pointerId] = { x: e.clientX, y: e.clientY, t: performance.now(), used: false }; try { area.setPointerCapture(e.pointerId); } catch (x) {} });
+  area.addEventListener('pointermove', e => { const g = G[e.pointerId]; if (!g || g.used || !S.active) return; const dx = e.clientX - g.x, dy = e.clientY - g.y;
+    if (Math.hypot(dx, dy) > 26) { g.used = true; crossyInput(Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'l' : 'r') : dy > 0 ? 'b' : 'f'); } });   /* (a swipe counts the moment it's far enough: no waiting for the finger to lift) */
+  const up = e => { const g = G[e.pointerId]; if (!g) return; delete G[e.pointerId]; if (!g.used && e.type === 'pointerup' && performance.now() - g.t < 450) crossyInput('f'); };
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) area.addEventListener(t, up);
+  area.addEventListener('contextmenu', e => e.preventDefault());
+  const tap = (el, fn) => el.addEventListener('click', e => { e.stopPropagation(); if (S.active) fn(); });
+  tap(u.PauseBtn, crossyPause); tap(u.Resume, crossyResume); tap(u.Quit, () => crossyLeave());
+  tap(u.Revive, () => { if (S.overT > 0.45) crossyRevive(); }); tap(u.Again, () => { if (S.overT > 0.45) crossyRun(false); }); tap(u.Home, () => { if (S.overT > 0.45) crossyLeave(); });   // (a beat's grace: the tap that got her squashed mustn't land on a button)
+  ui.addEventListener('pointerdown', e => { if (S.active) e.stopPropagation(); });
+  crossyKeysOn();
+  document.addEventListener('visibilitychange', () => { if (document.hidden && S.active && !S.paused && S.phase === 'run') crossyPause(); });
+}
+function crossyKeysOn() { if (CROSSY.keysOn) return; CROSSY.keysOn = true; addEventListener('keydown', crossyKey, true); }
+function crossyKey(e) {                                                  // arrows or WASD to hop (up, W or space: forward); Esc or P to pause; Enter: again, on the card
+  const S = CROSSY, k = e.key; if (!S.active || S.phase === 'enter' || S.phase === 'leave') return;
+  const d = k === 'ArrowUp' || k === 'w' || k === 'W' || k === ' ' || k === 'Spacebar' ? 'f' : k === 'ArrowDown' || k === 's' || k === 'S' ? 'b' : k === 'ArrowLeft' || k === 'a' || k === 'A' ? 'l' : k === 'ArrowRight' || k === 'd' || k === 'D' ? 'r' : '';
+  const pz = k === 'Escape' || k === 'p' || k === 'P', go = k === 'Enter';
+  if (!d && !pz && !go) return; e.preventDefault(); e.stopPropagation(); if (e.repeat) return;
+  if (S.paused) { if (pz || go || d === 'f') crossyResume(); return; }
+  if (S.phase === 'over') { if ((go || d === 'f') && S.overT > 0.6) crossyRun(false); else if (pz && S.overT > 0.6) crossyLeave(); return; }
+  if (pz) { crossyPause(); return; }
+  if (d) crossyInput(d);
+}
+function crossyPause() {
+  const S = CROSSY, u = S.ui; if (!S.active || S.paused || S.phase !== 'run') return;
+  S.paused = true; S.drawn = false; S.q.length = 0; for (const k in S.ptrs) delete S.ptrs[k];
+  u.PauseSub.textContent = S.P.maxRow + ' rows · 🐟 ' + S.fishN + ' fish'; u.PauseOv.classList.add('on'); u.root.classList.add('paused');
+}
+function crossyResume() { const S = CROSSY, u = S.ui; if (!S.paused) return; S.paused = false; u.PauseOv.classList.remove('on'); u.root.classList.remove('paused'); if (typeof initAudio === 'function') initAudio(); last = performance.now(); }
+
+/* ---------- the card: how far, the fish (banked), the best, a word from PKR; and keep hopping, for fish ---------- */
+function crossyReviveCost() { return 25 << (CROSSY.revives | 0); }   // 25, 50, 100 fish
+function crossyBank() {                                                  // the run's fish into the piggy bank (only what's new since the last time), and her best
+  const S = CROSSY, n = S.fishN - S.bankedN; if (n > 0) { crossySetWallet(crossyWallet() + n); S.bankedN = S.fishN; }
+  const d = S.P ? S.P.maxRow : 0, best = +crossyGet('catguard.crossyBest', '0') || 0; if (d > best) crossyPut('catguard.crossyBest', d);
+  return { d, best0: best };
+}
+function crossyOver() {
+  const S = CROSSY, u = S.ui, D = S.P.dead || { kind: 'car' }, k = D.kind; S.phase = 'over'; S.overT = 0;
+  const gain0 = S.fishN - S.bankedN, r = crossyBank(), pick = a => a[(Math.random() * a.length) | 0];
+  if (typeof unlock === 'function') unlock('crossyFirst');
+  const T = { car: ['Splat!', 'Bonk!', 'Beep beep... SPLAT!'], bonk: ['On your left!', 'Ding ding... bonk!'], flat: ['Pancaked!', 'Flat as a crêpe!'], train: ['Choo-choo-SPLAT!', 'Next stop: ouch!'],
+    water: ['Splash!', 'Kersploosh!'], swept: ['Swept away!', 'Bye-bye, log!'], goose: ['Goose betrayal!', 'Honk... glub glub!'], hawk: ['Hawk snack!', 'Airlifted!'] }[k] || ['Splat!'];
+  const Q = { car: ['Those cars don’t brake for royalty?!', 'Honk all you want. Still cute.', 'I had right of way. Probably.'], bonk: ['Rude. RUDE.', 'Watch where you’re pedalling!'],
+    flat: ['I’m fine. I’m just... two-dimensional now.', 'Flat is the new fluffy.'], train: ['The GO train doesn’t stop for cats. Noted.', 'At least I got a free ride downtown.'],
+    water: ['Cats. Do. Not. Swim.', 'Wet. So wet. Never again.'], swept: ['The Don took me halfway to Lake Ontario.', 'Wheee... wait, where’s the log going?'],
+    goose: ['That goose did it on purpose!', 'HONK HONK, traitors.'], hawk: ['Put me DOWN, you overgrown pigeon!', 'I was resting my paws! For a second!'] }[k] || ['Ow.'];
+  u.Title.textContent = pick(T); u.Sub.textContent = '“' + pick(Q) + '” — PKR';
+  u.OD.textContent = r.d; u.OF.textContent = S.fishN; u.OB.textContent = Math.max(r.best0, r.d);
+  const nb = r.d > S.best0 && S.best0 > 0; u.Badge.style.display = nb || (S.best0 === 0 && r.d > 0) ? 'block' : 'none'; u.Badge.textContent = nb ? 'New best!' : 'First run!';
+  u.Bank.textContent = gain0 > 0 ? '+' + gain0 + ' 🐟 into the piggy bank' : S.fishN ? 'Fish all banked' : 'No fish this time... grab some next run!';
+  crossyOverWallet(); u.Card.classList.toggle('wide', S.aspect > 1.4);
+  u.Over.classList.add('on'); u.PauseOv.classList.remove('on'); u.root.classList.remove('paused', 'hawk'); u.hw = false; u.Hint.classList.remove('on');
+  if (nb) crossySfx('best');
+}
+function crossyOverWallet() { const S = CROSSY, u = S.ui, w = crossyWallet(), c = crossyReviveCost(); u.Wal.textContent = '🐟 ' + w + ' in the piggy bank'; u.Revive.style.display = S.revives < 3 ? '' : 'none'; u.RevCost.textContent = c; u.Revive.disabled = w < c; }
+function crossyRevive() {                                                // keep hopping: fish out of the piggy bank; back on solid grass at (or a little behind) where it happened, blinking for a moment
+  const S = CROSSY, P = S.P, u = S.ui; if (!S.active || S.phase !== 'over' || S.revives >= 3) return;
+  const cost = crossyReviveCost(), w = crossyWallet(); if (w < cost) { crossySfx('nope'); return; }
+  crossySetWallet(w - cost); S.revives++;
+  const D = P.dead || { r: P.row, x0: P.x }; let row = null;
+  for (let i = 0; i < 40 && !row; i++) { const o = crossyRowGet(D.r - i); if (o && (o.t === 'grass' || o.t === 'start' || o.t === 'median')) row = o; }
+  if (!row) row = crossyRowGet(0) || S.rows.find(o => o && o.t === 'grass');
+  const H = S.HALF; let c = Math.max(-H, Math.min(H, Math.round(D.x0 || 0)));
+  for (let k = 0; k <= H * 2; k++) { const a = c + (k % 2 ? -1 : 1) * ((k + 1) >> 1); if (a >= -H && a <= H && !row.block[a + H]) { c = a; break; } if (!row.block[c + H]) break; }
+  Object.assign(P, { x: c, row: row.r, y: row.y, hop: null, ride: null, dead: null, sq: 0.6, face: Math.PI, yaw: Math.PI });
+  S.camRow = row.r; S.idle = 0; S.inv = 2.2; S.q.length = 0; S.riv = null; S.pkS.scale.set(1, 1, 1);
+  if (S.hk.on) { S.hk.on = false; S.hk.ph = 'off'; }
+  S.phase = 'run'; S.pt = 0; u.Over.classList.remove('on'); crossyBanner('Keep hopping!', ''); crossySfx('revive'); crossyCam(1, true);
+}
+
+/* ---------- sound: through the game's own little synth (the sound-effects switch covers it); the music past it, like the other games ---------- */
+function crossySfx(n, k) {
+  if (!actx || actx.state !== 'running') return;
+  try {
+    if (n === 'hop') { const f = 520 + Math.random() * 60; tone(f, f * 1.6, 0.07, 'triangle', 0.026); }
+    else if (n === 'bump') { tone(180, 110, 0.08, 'sine', 0.05); noise(0.06, 0.02, 900); }
+    else if (n === 'fish') { const f = 1046 * Math.pow(2, Math.min(k || 0, 12) % 12 / 12); tone(f, f * 1.5, 0.06, 'square', 0.012); tone(f * 2, f * 2.02, 0.12, 'sine', 0.02, 0.03); }
+    else if (n === 'power') { [523, 784, 1047, 1568].forEach((f, i) => tone(f, f * 1.02, 0.14, 'square', 0.014, i * 0.05)); noise(0.3, 0.03, 3000); }
+    else if (n === 'shield') { tone(1400, 300, 0.4, 'triangle', 0.04); noise(0.3, 0.06, 3500); }
+    else if (n === 'honk') { tone(392, 392, 0.16, 'square', 0.016); tone(330, 330, 0.16, 'square', 0.014); tone(392, 392, 0.12, 'square', 0.014, 0.2); }
+    else if (n === 'honkGoose') { for (let i = 0; i < 2; i++) { tone(620, 380, 0.14, 'sawtooth', 0.016, i * 0.2); noise(0.1, 0.02, 1800); } }
+    else if (n === 'bell') { tone(1568, 1560, 0.22, 'triangle', 0.02); tone(2350, 2340, 0.12, 'sine', 0.008); }
+    else if (n === 'horn') { [233, 294, 349].forEach(f => tone(f, f * 0.99, 0.9, 'sawtooth', 0.011)); noise(1.0, 0.05, 700); }
+    else if (n === 'splat') { noise(0.3, 0.12, 1400); tone(240, 60, 0.3, 'sine', 0.08); tone(900, 1300, 0.08, 'square', 0.012, 0.05); }
+    else if (n === 'bonk') { tone(300, 120, 0.18, 'sine', 0.07); tone(1760, 1750, 0.15, 'triangle', 0.02, 0.02); noise(0.12, 0.05, 1500); }
+    else if (n === 'flat') { noise(0.45, 0.16, 900); tone(180, 40, 0.4, 'sine', 0.1); tone(1200, 300, 0.25, 'sawtooth', 0.01, 0.05); }
+    else if (n === 'splash') { noise(0.7, 0.12, 1100); tone(500, 120, 0.4, 'sine', 0.05); noise(0.4, 0.05, 3000); }
+    else if (n === 'hiss') noise(0.5, 0.05, 6000);
+    else if (n === 'hawk') { tone(2600, 1500, 0.55, 'sawtooth', 0.012); tone(2900, 1700, 0.5, 'triangle', 0.02, 0.04); }
+    else if (n === 'close') { [659, 880, 1175, 1568].forEach((f, i) => tone(f, f * 1.01, 0.14, 'triangle', 0.032, i * 0.06)); }
+    else if (n === 'streak') { [784, 988, 1175].forEach((f, i) => tone(f, f * 1.01, 0.12, 'triangle', 0.03, i * 0.06)); }
+    else if (n === 'best') { [784, 988, 1175, 1568].forEach((f, i) => tone(f, f * 1.01, 0.18, 'triangle', 0.035, i * 0.08)); }
+    else if (n === 'go') { tone(523, 784, 0.14, 'triangle', 0.035); tone(784, 1046, 0.18, 'triangle', 0.03, 0.12); }
+    else if (n === 'revive') for (let i = 0; i < 5; i++) { const f = 523 * Math.pow(2, i / 4); tone(f, f * 1.01, 0.16, 'triangle', 0.035, i * 0.06); }
+    else if (n === 'nope') tone(200, 160, 0.08, 'square', 0.03);
+  } catch (e) {}
+}
+function crossyMusic() {                                                 // a bouncy little loop while she hops (the music switch covers it)
+  const S = CROSSY; if (!actx || actx.state !== 'running' || !musicOn || S.paused || document.hidden || S.phase !== 'run') { S.mNext = 0; return; }
+  const out = actx.__real || null; tone.out = out;
+  try { const now = actx.currentTime, six = 60 / 116 / 4, f = m => 440 * Math.pow(2, (m - 69) / 12), R = [48, 45, 41, 43], C = [[60, 64, 67, 72], [57, 60, 64, 69], [53, 57, 60, 65], [55, 59, 62, 67]], MEL = [76, 0, 79, 76, 74, 0, 72, 74, 76, 0, 72, 0, 69, 72, 74, 0];
+    if (!S.mNext || S.mNext < now) S.mNext = now + 0.06;
+    while (S.mNext < now + 0.2) { const t = S.mNext, d = t - now, n = S.mStep = (S.mStep || 0) + 1, st = n % 16, bar = (n >> 4) % 4, ch = C[bar];
+      if (st % 4 === 0) tone(f(R[bar] - 12), f(R[bar] - 12), six * 2.5, 'triangle', 0.035, d);
+      if (st % 4 === 2) tone(f(R[bar]), f(R[bar]), six * 1.2, 'triangle', 0.02, d);
+      if (st % 2 === 1) { const m = ch[(st >> 1) % 4] + 12; tone(f(m), f(m), six * 0.8, 'square', 0.004, d); }
+      if ((n >> 6) % 2) { const m = MEL[st]; if (m) tone(f(m), f(m) * 1.003, six * 1.6, 'triangle', 0.016, d); }
+      S.mNext += six; } } catch (e) {} finally { tone.out = null; }
+}
+
+/* ---------- a run, and the frame ---------- */
+function crossyRun(first) {                                              // a fresh run from the wall (the first from the yard: the fade lifts on her through the panel)
+  const S = CROSSY, u = S.ui;
+  crossyLook(); crossyReset(); S.best0 = +crossyGet('catguard.crossyBest', '0') || 0;
+  if (!S.rig) crossyRigSet(); S.pkS.scale.set(1, 1, 1); S.pkS.visible = true;
+  S.phase = 'run'; S.pt = 0; S.overT = 0; S.paused = false; crossyPose(0); crossyFill(); crossyCam(1, true);
+  if (u) { u.Over.classList.remove('on'); u.PauseOv.classList.remove('on'); u.root.classList.remove('paused', 'hawk'); u.hw = false; u.n = u.f = u.z = null;
+    u.Hint.classList.toggle('on', crossyGet('catguard.crossyHinted', '') !== '1'); }
+  if (!first) crossySfx('go');
+}
+function crossyUpdate(dt) {
+  const S = CROSSY; S.t += dt; S.pt += dt;
+  if (S.phase === 'enter') { crossyEnterStep(dt); return; }
+  if (S.phase === 'leave') { S.fade = Math.min(1, S.pt / 0.35); crossyFadeDom(); if (S.fade >= 1) crossyHandoff(); return; }
+  if (S.paused) { crossyHud(dt); return; }
+  S.time += dt;
+  crossyStep(dt);
+  if (S.phase === 'over') S.overT += dt;
+  if (S.fade > 0) S.fade = Math.max(0, S.fade - dt / 0.45);
+  crossyPose(dt); crossyCam(dt); crossyGroundFlow(S.ts * dt); crossyFill(); chimFxStep(S.fx, dt); chimFxStep(S.gx, dt); crossyHud(dt); crossyMusic();
+}
+function crossyDraw() {
+  const S = CROSSY;
+  if (S.phase === 'enter' || !S.built || !S.rig) { if (povEndWall) povEndWall.visible = true; if (typeof updateUpperLights === 'function') updateUpperLights(); const hid = typeof cullBegin === 'function' ? cullBegin() : null; renderer.render(scene, camera); if (hid) cullEnd(hid); }
+  else if (!(S.paused && S.drawn)) { S.drawn = S.paused; renderer.render(S.scene, S.cam); }
+  crossyFadeDom();
+}
+function crossyFrame(dt) {                                               // (frame) every frame: Crossy Kitty when it's on (its own world, drawn here: true); otherwise the bent panel up on the bank and its 🐾 button
+  const S = CROSSY;
+  if (state === 'crossy') { try { crossyUpdate(dt); crossyDraw(); } catch (e) { if (S.err++ < 3) console.error(e); crossyBail('🐾 Yikes, a fender bender! Back to the yard.'); } return true; }
+  try {
+    if (S.goQ) { S.goQ = false; if (S.pillOn) { crossyStart(); if (state === 'crossy') return crossyFrame(0); } }
+    if (S.post > 0) { S.post -= dt; S.fade = Math.max(0, S.post / 0.45); crossyFadeDom(); if (S.post <= 0 && S.ui) S.ui.root.classList.remove('on', 'ghost'); }
+    crossyPill(dt);
+  } catch (e) { if (S.err++ < 3) console.error(e); }
+  return false;
+}
+
+/* ---------- in from the bank, and back out ---------- */
+function crossyStart() {
+  const S = CROSSY; if (state !== 'playing' || !walk.on || !walk.rig || S.active) return;
+  markFound('crossy'); if (typeof todAudioStop === 'function') todAudioStop(); if (typeof todActorsReset === 'function') todActorsReset();
+  S.back = { x: walk.pos.x, y: walk.pos.y, z: walk.pos.z, face: walk.face };
+  state = 'crossy'; S.active = true; S.paused = false; S.phase = 'enter'; S.pt = 0; S.fade = 0;
+  walk.stick.x = walk.stick.y = 0; walk.vel.set(0, 0, 0); walk.vy = 0; walk.jumpQ = -1;
+  document.body.classList.add('crossing'); $('walkUI').hidden = true; ui.hud.hidden = true; crossyPillSet(false);
+  if (typeof ammoChip === 'function') ammoChip(); if (UPPER.aunty && typeof hideBubbles === 'function') hideBubbles(UPPER.aunty);
+  if (ZN && ZN.hud) ZN.hud.hidden = true; if (ZN && ZN.flashEl) ZN.flashEl.style.opacity = 0; if (TOD && TOD.flashEl) { TOD.flashEl.style.opacity = 0; TOD.flashOn = false; }
+  try { if (!S.ui) crossyBuildUI(); } catch (e) { console.error(e); crossyBail('🐾 The panel’s stuck... try again in a bit!'); return; }
+  const u = S.ui; S.post = 0; u.Load.textContent = S.built ? '' : '🐾 Squeezing through the wall...'; u.root.classList.add('on', 'ghost'); u.root.classList.remove('paused', 'hawk'); u.Over.classList.remove('on'); u.PauseOv.classList.remove('on');
+  crossySfx('go');
+}
+function crossyEnterStep(dt) {                                           // (still in the yard) a beat to fade out; built behind the dark, then the run
+  const S = CROSSY; S.fade = Math.min(1, S.pt / 0.35); crossyFadeDom();
+  if (S.pt < 0.4) return;
+  try {
+    if (!S.built) crossyBuild();
+    crossyRigSet(); S.ui.root.classList.remove('ghost'); crossyRun(true); S.fade = 1;
+  } catch (e) { console.error(e); crossyBail('🐾 The panel’s stuck... try again in a bit!'); }
+}
+function crossyLeave() { const S = CROSSY; if (!S.active) return; if (S.phase === 'run' || S.phase === 'dead') crossyBank(); S.paused = false; const u = S.ui; if (u) { u.root.classList.remove('paused', 'hawk'); u.PauseOv.classList.remove('on'); u.Over.classList.remove('on'); u.Hint.classList.remove('on'); } S.phase = 'leave'; S.pt = 0; S.q.length = 0; }
+function crossyHandoff() {                                               // back to Free roam, beside the bent panel up on the bank
+  const S = CROSSY, W = walk.rig, u = S.ui, P = crossySpotPos();
+  S.active = false; S.paused = false; S.phase = 'off'; S.post = 0.45; S.fade = 1; S.fadeShown = -1;
+  if (u) { u.root.classList.remove('paused', 'hawk'); u.root.classList.add('on', 'ghost'); u.Over.classList.remove('on'); u.PauseOv.classList.remove('on'); crossyFadeDom(); }
+  if (S.rig && S.rig.g.parent) S.rig.g.parent.remove(S.rig.g); S.rig = null;   // (hand the clone back)
+  if (S.hk) { S.hk.on = false; S.hk.ph = 'off'; S.hk.g.visible = false; }
+  state = 'playing'; last = performance.now(); document.body.classList.remove('crossing'); $('walkUI').hidden = false; ui.hud.hidden = false;
+  if (W) { W.g.rotation.order = 'XYZ'; W.g.rotation.set(0, 0, 0); W.g.visible = true; W.shadow.visible = true; W.body.scale.set(1, 1, 1); W.body.position.set(0, 0, 0); W.body.rotation.set(0, 0, 0); W.head.rotation.set(0, 0, 0); }
+  walk.vel.set(0, 0, 0); walk.vy = 0; walk.grounded = true; walk.climb = null; walk.jumpQ = -1; walk.stick.x = walk.stick.y = 0; walk.squash = 0.4; walk.free = true;
+  if (typeof heist !== 'undefined' && heist.keys) for (const k in heist.keys) heist.keys[k] = false;
+  if (P) { walk.pos.set(P.sx, typeof hillY === 'function' ? hillY(P.sz) : P.y, P.sz); walk.face = Math.PI; } else if (S.back) { walk.pos.set(S.back.x, S.back.y, S.back.z); walk.face = S.back.face; }
+  if (typeof fc !== 'undefined' && fc.focus) { fc.focus.set(walk.pos.x, walk.pos.y + 0.55, walk.pos.z); if (fc.s && fc.s.focus) fc.s.focus.copy(fc.focus); }
+  if (W) { W.g.position.copy(walk.pos); W.g.rotation.y = walk.face; }
+  const best = +crossyGet('catguard.crossyBest', '0') || 0;
+  showWalkName(best ? '🐾 Back through the wall, safe and sound. Crossy Kitty best: ' + best + ' rows' : '🐾 Back through the wall, safe and sound!');
+  S.saidVisit = walk.treesSeen;
+}
+function crossyBail(msg) {                                               // (something went wrong: back to Free roam, safe)
+  const S = CROSSY;
+  try { S.phase = 'leave'; crossyHandoff(); } catch (e) { S.active = false; S.phase = 'off'; state = 'playing'; document.body.classList.remove('crossing'); try { $('walkUI').hidden = false; ui.hud.hidden = false; if (S.ui) S.ui.root.classList.remove('on'); } catch (x) {} }
+  if (msg) showWalkName(msg);
+}
+
+/* ---------- up on the bank: the bent panel in the sound wall (the traffic beyond), and the 🐾 button ---------- */
+function crossyClear(x, z, pad) {                                        // (the yard builder asks, as it plants the bank: true keeps trees and bushes off the way up from the sled's clearing to the panel)
+  if (typeof YARD === 'undefined' || YARD.sledX === undefined) return false;
+  const ax = YARD.sledX + 0.6, az = YARD.sledZ + 1.6, bx = -5.8, bz = YARD.FZ + 18.4, dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+  return Math.hypot(x - bx, z - bz) < 2.0 + pad || Math.hypot(x - ax - dx * t, z - az - dz * t) < 0.9 + pad;
+}
+function crossySpotPos() {
+  const S = CROSSY; if (typeof YARD === 'undefined' || typeof YARD.FZ !== 'number') return null;
+  if (!S.spotP) { const z = YARD.FZ + 19.4; S.spotP = { x: -5.8, z, y: typeof hillY === 'function' ? hillY(z) : 8.5, sx: -5.1, sz: YARD.FZ + 18.9, wz: YARD.FZ + 20.5, wy: typeof hillY === 'function' ? hillY(YARD.FZ + 20) : 8.5 }; }
+  return S.spotP;
+}
+function crossyWallTex() {                                               // the panel: the sound wall's grey, its grooves, and a pink paw sprayed on
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256; const c = cv.getContext('2d');
+  c.fillStyle = '#9a9a94'; c.fillRect(0, 0, 256, 256); for (let x = 0; x < 256; x += 64) { c.fillStyle = 'rgba(60,60,58,.6)'; c.fillRect(x, 0, 3, 256); }
+  for (let i = 0; i < 700; i++) { c.fillStyle = Math.random() < 0.5 ? 'rgba(70,70,68,.3)' : 'rgba(170,170,164,.3)'; c.fillRect(Math.random() * 256, Math.random() * 256, 2, 2); }
+  c.fillStyle = 'rgba(90,70,50,.25)'; for (let i = 0; i < 40; i++) c.fillRect(Math.random() * 256, 120 + Math.random() * 136, 3 + Math.random() * 5, 2 + Math.random() * 6);   /* (dents and scuffs on the bent half) */
+  c.save(); c.shadowColor = 'rgba(255,90,160,.9)'; c.shadowBlur = 6; c.fillStyle = '#ff5fa2';
+  c.beginPath(); c.ellipse(128, 76, 26, 21, 0, 0, Math.PI * 2); c.fill(); for (const [x, y] of [[92, 46], [114, 30], [142, 30], [164, 46]]) { c.beginPath(); c.ellipse(x, y, 10, 12, 0, 0, Math.PI * 2); c.fill(); }
+  c.restore(); const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; return t;
+}
+function crossySpotBuild() {
+  const S = CROSSY, P = crossySpotPos(); if (!P || !povEndWall) return;
+  const g = S.spot = new THREE.Group(); g.userData.name = 'Bent wall panel'; g.userData.noWalk = true;
+  const mat = S.spotMat = new THREE.MeshBasicMaterial({ map: crossyWallTex(), vertexColors: true, side: THREE.DoubleSide }); mat.userData.noTod = true;
+  const L = new THREE.Vector3(0.35, 0.75, -0.55).normalize(), x0 = -7.4, x1 = -4.2, w = x1 - x0, hy = P.wy + 2.2, top = P.wy + 4.2;
+  const shade = geo => { geo.computeVertexNormals(); const n = geo.attributes.normal, cl = []; for (let i = 0; i < n.count; i++) { const k = 0.62 + 0.38 * Math.abs(n.getX(i) * L.x + n.getY(i) * L.y + n.getZ(i) * L.z); cl.push(k, k, k * 0.98); } geo.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3)); return geo; };
+  { const geo = new THREE.PlaneGeometry(w, top - hy, 6, 3), p = geo.attributes.position, uv = geo.attributes.uv;   /* (the top half, still in line with the wall, a little crumpled) */
+    for (let i = 0; i < p.count; i++) { const u = p.getX(i) / w + 0.5, v = p.getY(i) / (top - hy) + 0.5; p.setXYZ(i, x1 - u * w, hy + v * (top - hy), P.wz + Math.sin(u * 9 + v * 3) * 0.04 * (1 - v)); uv.setXY(i, u, 0.5 + v * 0.5); }
+    const m = new THREE.Mesh(shade(geo), mat); m.userData.noWalk = true; m.userData.name = 'Bent wall panel'; g.add(m); }
+  { const geo = new THREE.PlaneGeometry(w, hy - P.wy, 8, 6), p = geo.attributes.position, uv = geo.attributes.uv;   /* (the bottom half: peeled out over the shoulder, more at one corner, a way through underneath) */
+    for (let i = 0; i < p.count; i++) { const u = p.getX(i) / w + 0.5, v = 0.5 - p.getY(i) / (hy - P.wy), d = v * (hy - P.wy), a = 1.0 + 0.28 * v + 0.32 * (1 - u) + Math.sin(u * 7) * 0.05;
+      p.setXYZ(i, x1 - u * w + v * 0.25 * (1 - u), hy - d * Math.cos(a), P.wz + d * Math.sin(a)); uv.setXY(i, u, 0.5 - v * 0.5); }
+    const m = new THREE.Mesh(shade(geo), mat); m.userData.noWalk = true; m.userData.name = 'Bent wall panel'; g.add(m); }
+  { const sh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), softShadowMat(0.3, true)); sh.rotation.x = -Math.PI / 2; sh.position.set(-5.8, P.wy + 0.03, P.wz + 0.9); sh.scale.set(3.4 / 0.53 * 0.62, 1.8 / 0.53 * 0.62, 1); sh.renderOrder = 1; sh.userData.noWalk = true; g.add(sh); }
+  povEndWall.add(g);
+}
+function crossyNear() {                                                  // standing by the bent panel (either side of it)
+  const P = crossySpotPos(), p = walk.pos; if (!P) return false;
+  return state === 'playing' && gameMode === 'walk' && walk.on && !!walk.rig && walk.grounded && !walk.climb && !mirrorWorld && !(walk.napT > 0) && Math.hypot(p.x - P.x, p.z - P.z) < 1.9 && p.y > P.y - 1.2 && p.y < P.y + 1.4;
+}
+function crossyPill(dt) {
+  const S = CROSSY;
+  if (!walk.on || !povEndWall) { if (S.pillOn) crossyPillSet(false); return; }
+  if (!S.spot) { try { crossySpotBuild(); } catch (e) { console.error(e); S.spot = new THREE.Group(); } }
+  if (S.spotMat && TOD && TOD.tint) { const t = TOD.tint; if (!S.tint || Math.abs(S.tint - (t.r + t.g + t.b)) > 0.004) { S.tint = t.r + t.g + t.b; S.spotMat.color.setRGB(Math.min(1.2, t.r), Math.min(1.2, t.g), Math.min(1.2, t.b)); } }
+  const P = crossySpotPos(); if (!P) return;
+  let on = crossyNear(); if (on && document.querySelector('#sledPill.on,#jetPill.on,#hopPill.on,#chimPill.on,#lotPill.on')) on = false;   /* (another button's showing there: that one first) */
+  if (state === 'playing' && gameMode === 'walk' && !mirrorWorld && S.saidVisit !== walk.treesSeen) {
+    const p = walk.pos, dd = Math.hypot(p.x - P.x, p.z - P.z), first = crossyGet('catguard.crossySeen', '') !== '1';
+    if ((first && dd < 9 && p.y > P.y - 3) || on) { S.saidVisit = walk.treesSeen; if (first) crossyPut('catguard.crossySeen', '1');
+      const best = +crossyGet('catguard.crossyBest', '0') || 0;
+      showWalkName(first ? '🐾 One panel of the sound wall is bent wide open... and the traffic whooshing by on the other side! Tap “Crossy Kitty” to hop across!'
+        : best ? '🐾 The bent panel. Crossy Kitty best: ' + best + ' rows. Tap to hop again!' : '🐾 Tap “Crossy Kitty” to hop across the traffic!'); }
+  }
+  if (on !== S.pillOn) crossyPillSet(on);
+}
+function crossyPillSet(on) { const S = CROSSY; S.pillOn = on; (S.pill || crossyPillMake()).classList.toggle('on', on); document.body.classList.toggle('crossy-pill', on); }
+function crossyPillMake() {
+  const S = CROSSY; if (S.pill) return S.pill;
+  const st = document.createElement('style'); st.textContent = `
+#crossyPill{position:fixed;right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(236px + env(safe-area-inset-bottom,0px));z-index:6;display:none;align-items:center;gap:6px;padding:9px 16px 9px 12px;border-radius:999px;background:#2fa84f;color:#fff;font:800 16px var(--body);border:3px solid #fff4f8;box-shadow:0 5px 0 #17652c,0 10px 18px rgba(0,0,0,.3);touch-action:none;cursor:pointer;white-space:nowrap}
+#crossyPill b{font-size:20px;line-height:1}
+#crossyPill.on{display:flex;animation:cyPillIn .45s cubic-bezier(.2,1.6,.4,1),cyPillBob 1.8s ease-in-out .5s infinite}
+body.heist-ui #crossyPill,body.hopping #crossyPill,body.biking #crossyPill,body.chimneying #crossyPill,body.jetting #crossyPill,body.jet-intro #crossyPill,body.sledding #crossyPill,body.lotting #crossyPill,body.crossing #crossyPill{display:none}
+body.crossy-pill #chimSootPill{display:none!important}
+@keyframes cyPillIn{from{transform:scale(.4);opacity:0}}
+@keyframes cyPillBob{50%{transform:translateY(-4px)}}`;
+  document.head.appendChild(st);
+  const b = S.pill = document.createElement('button'); b.id = 'crossyPill'; b.innerHTML = '<b>&#x1F43E;</b>Crossy Kitty'; b.setAttribute('aria-label', 'Hop across the traffic: Crossy Kitty');
+  ($('walkUI') || document.body).appendChild(b);
+  b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (CROSSY.pillOn) CROSSY.goQ = true; });
+  crossyKeysOn(); return b;
+}
+
+/* ---------- the title screen: 🐾 Crossy Kitty, once she's played it (catguard.found.crossy) ---------- */
+function crossySync() {                                                  // (syncSecretModes) no CROSSY here: this runs at load, before this block's consts are set
+  const box = document.getElementById('secretModes'); if (!box) return;
+  let b = document.getElementById('crossyBtn');
+  if (!b) { const dot = document.createElement('span'); dot.className = 'dot'; dot.id = 'crossyDot'; dot.hidden = true; dot.textContent = '·';
+    b = document.createElement('button'); b.className = 'link-btn chaos-link'; b.id = 'crossyBtn'; b.hidden = true; b.textContent = '🐾 Crossy Kitty';
+    const w = document.createElement('span'); w.className = 'ml-pair'; w.style.cssText = 'display:inline-flex;align-items:center;gap:5px;white-space:nowrap'; w.appendChild(dot); w.appendChild(b); box.appendChild(w);   /* (the dot stays with its button when the row wraps) */
+    b.addEventListener('click', () => { startGame('walk'); setTimeout(() => { if (state !== 'playing' || !walk.on) return;   /* (Free roam, up on the bank by the bent panel, and through) */
+      sliderGlass.forEach(g => { g.visible = false; }); const P = crossySpotPos(); if (!P) return;
+      walk.free = true; walk.pos.set(P.sx, typeof hillY === 'function' ? hillY(P.sz) : P.y, P.sz); walk.face = Math.PI; walk.vy = 0; walk.vel.set(0, 0, 0); walk.grounded = true;
+      if (typeof roamSave === 'function') try { roamSave({ free: 1 }); } catch (e) {}
+      crossyStart(); }, 150); }); }
+  let on = false; try { on = localStorage.getItem('catguard.found.crossy') === '1'; } catch (e) {}
+  b.hidden = !on; const w = b.parentNode; if (w && w.classList && w.classList.contains('ml-pair')) w.style.display = on ? 'inline-flex' : 'none';
+  const others = ['rideBtn', 'hopBtn', 'jetBtn', 'sledBtn', 'lotBtn'].some(id => { const e = document.getElementById(id); return e && !e.hidden; });
+  document.getElementById('crossyDot').hidden = !(on && others); if (on) box.hidden = false;
+  if (typeof lotDots === 'function') requestAnimationFrame(() => lotDots());
+}
+/* (end of CROSSY KITTY) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
@@ -26914,6 +28046,7 @@ function frame(now) {
   if (chimFrame(dt)) return;                                         /* (Chimney Drop: down the flue in its own little world; in Free roam, the 🧱 button on the chimney top, and the soot she brings back) */
   if (sledFrame(dt)) return;                                           /* (Sled Rush: down the ice in its own little world; in Free roam, the red sled on the back fence and its 🛷 button) */
   if (lotFrame(dt)) return;                                            /* (Meow Lot: a jammed lot in its own little world; in Free roam, the valet stand on our driveway and its 🅿️ button) */
+  if (crossyFrame(dt)) return;                                         /* (Crossy Kitty: hopping the traffic in its own little world; in Free roam, the bent panel up on the bank and its 🐾 button) */
   if (state === 'jet') { updateJet(dt); renderJet(); return; } jetPill();   /* (Sky Paws: the raccoon's jet, its own little world; in Free roam, the ✈️ button by the jet on our roof) */
   if (state === 'hop') { updateHop(dt); renderHop(); return; } hopPill();   /* (Treetop Hop: its own little world; in Free roam, the 🌳 button on a tree top) */
   if (state === 'bike') markFound('ride');                            /* (found the motorcycle: it gets a button on the title screen) */
