@@ -10741,7 +10741,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-12 13:36';                                              // stamped when the site is published
+const BUILD = '2026-10-12 14:20';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -25563,7 +25563,7 @@ function lotDots() {                                                     // (a d
 const CROSSY = {
   built: false, active: false, paused: false, phase: 'off', err: 0, t: 0, pt: 0, fade: 0, fadeShown: -1, post: 0, drawn: false,
   scene: null, cam: null, size: null, aspect: 0, ui: null, pill: null, pillOn: false, goQ: false, spot: null, spotMat: null, saidVisit: null, keysOn: false,
-  HALF: 4, GW: 20, LW: 48, NR: 64, HOP: 0.125, SC: 1.0, WY: -0.32,
+  HALF: 4, GW: 20, LW: 48, NR: 64, HOP: 0.125, SC: 1.25, WY: -0.32,
   rows: null, G: null, P: null, q: [], seed: 1, wt: 0, mods: null, decDirty: true, look: '', revives: 0, fishN: 0, bankedN: 0,
 };
 function crossyRnd() { const S = CROSSY; S.seed = (S.seed * 16807) % 2147483647; return (S.seed - 1) / 2147483646; }
@@ -25649,22 +25649,73 @@ function crossyGooseGeo() {                                              // a Ca
   P.add(crossyFlat(new THREE.ConeGeometry(0.035, 0.12, 5)), 0x2a2a2a, 0, 0.59, 0.43, 1, 1, 1, Math.PI / 2);
   return lotMerge(P);
 }
-function crossyBikeGeo(col) {                                            // a cyclist on the trail (1 long): helmet, a bright jersey, two thin wheels
-  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(), dark = 0x26262c;
-  for (const z of [0.36, -0.36]) { P.add(new THREE.TorusGeometry(0.2, 0.03, 4, 12), dark, 0, 0.22, z, 1, 1, 1, 0, Math.PI / 2); P.add(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 6), 0xcfd3d8, 0, 0.22, z, 1, 1, 1, 0, 0, Math.PI / 2); }
-  P.add(B(0.05, 0.05, 0.62, 0.02), col, 0, 0.42, 0, 1, 1, 1, 0.12); P.add(B(0.05, 0.3, 0.05, 0.02), col, 0, 0.32, -0.12); P.add(B(0.4, 0.035, 0.035, 0.015), 0x2a2a2a, 0, 0.6, 0.3);
-  P.add(B(0.26, 0.32, 0.2, 0.08), col, 0, 0.78, -0.02, 1, 1, 1, 0.75); P.add(B(0.22, 0.12, 0.2, 0.05), 0x22242a, 0, 0.6, -0.14);
-  P.add(new THREE.SphereGeometry(0.11, 8, 6), 0xf1c7a0, 0, 0.98, 0.14); P.add(new THREE.SphereGeometry(0.125, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), 0xffffff, 0, 1.0, 0.13, 1, 1, 1.2);
-  for (const sx of [-1, 1]) { P.add(B(0.07, 0.28, 0.07, 0.03), 0x22242a, sx * 0.08, 0.42, -0.04, 1, 1, 1, sx * 0.5); P.add(B(0.06, 0.06, 0.3, 0.03), col, sx * 0.12, 0.76, 0.18, 1, 1, 1, 0.5); }
+/* CROSSY2_V1 (2026-10-12): the Lower Don Trail's people really move now. A jogger is a torso (shirt, shorts, head) plus two thighs,
+   two shins and two bent arms, each its own instance, swung from the hips and shoulders in a run cycle: legs and arms in opposite
+   phase, a bob on every step, a lean into it, and a stride a metre long, so the feet keep pace with the ground. A cyclist is the
+   bike and its rider in one piece, two wheels that turn with the ground, a crank going round, the rider's legs worked out from the
+   pedals (two-bone IK), and a little sway. The limbs are shared instanced meshes, so it's a handful of draw calls however many. */
+function crossyBikeGeo(col) {                                            // a cyclist on the trail (1 long, facing +z), without the parts that move: the frame, saddle and bars, the rider (helmet, jersey, arms to the bars)
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), B1 = (w, h, d, r) => lotRBox(w, h, d, r, 1), P = crossyParts(), dark = 0x26262c, skin = 0xf1c7a0, steel = 0xcfd3d8;
+  const seg = (y0, z0, y1, z1, wx, wz, c, x) => P.add((wx < 0.1 ? B1 : B)(wx, Math.hypot(y1 - y0, z1 - z0), wz, Math.min(wx, wz) * 0.4), c, x || 0, (y0 + y1) / 2, (z0 + z1) / 2, 1, 1, 1, Math.atan2(z1 - z0, y1 - y0));
+  seg(0.24, 0, 0.56, -0.12, 0.05, 0.05, col); seg(0.24, 0, 0.52, 0.27, 0.055, 0.055, col); seg(0.53, -0.1, 0.54, 0.27, 0.045, 0.045, col);   // seat tube, down tube, top tube
+  for (const sx of [-1, 1]) { seg(0.24, 0, 0.22, -0.36, 0.03, 0.03, col, sx * 0.045); seg(0.53, -0.11, 0.22, -0.36, 0.03, 0.03, col, sx * 0.045); seg(0.56, 0.29, 0.22, 0.36, 0.03, 0.03, steel, sx * 0.04); }   // stays, the fork
+  seg(0.5, 0.27, 0.62, 0.3, 0.05, 0.05, col); P.add(B(0.42, 0.035, 0.035, 0.015), 0x2a2a2a, 0, 0.63, 0.31);                 // head tube, bars
+  P.add(B(0.1, 0.04, 0.22, 0.02), 0x22242a, 0, 0.58, -0.14);                                                                  // saddle
+  P.add(B(0.25, 0.13, 0.24, 0.05), 0x22242a, 0, 0.64, -0.12);                                                                 // the rider: bike shorts on the saddle...
+  seg(0.66, -0.1, 0.92, 0.12, 0.27, 0.19, col);                                                                                // ...a jersey, leaning to the bars...
+  for (const sx of [-1, 1]) { seg(0.9, 0.12, 0.8, 0.19, 0.075, 0.075, col, sx * 0.15); seg(0.8, 0.19, 0.64, 0.3, 0.06, 0.06, skin, sx * 0.17); }   // ...arms reaching for the bars
+  P.add(new THREE.SphereGeometry(0.11, 9, 7), skin, 0, 1.0, 0.2); P.add(new THREE.SphereGeometry(0.125, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2), 0xffffff, 0, 1.02, 0.19, 1, 1, 1.25, -0.2);
+  P.add(B(0.16, 0.035, 0.03, 0.012), 0x1c1c22, 0, 1.0, 0.31);                                                                 // sunglasses
   return lotMerge(P);
 }
-function crossyJogGeo(col) {                                             // a jogger: headband, a bright top, running shorts (facing +z)
-  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts();
-  for (const sx of [-1, 1]) { P.add(B(0.1, 0.42, 0.11, 0.04), 0xf1c7a0, sx * 0.08, 0.24, sx * 0.06, 1, 1, 1, sx * 0.45); P.add(B(0.12, 0.07, 0.18, 0.03), 0xffffff, sx * 0.08, 0.04, sx * 0.1 + 0.03); }
-  P.add(B(0.28, 0.14, 0.18, 0.05), 0x2a2a38, 0, 0.5, 0); P.add(B(0.3, 0.36, 0.2, 0.08), col, 0, 0.74, 0.02, 1, 1, 1, 0.12);
-  for (const sx of [-1, 1]) P.add(B(0.07, 0.26, 0.08, 0.03), 0xf1c7a0, sx * 0.19, 0.72, -sx * 0.04, 1, 1, 1, -sx * 0.6);
-  P.add(new THREE.SphereGeometry(0.12, 8, 6), 0xf1c7a0, 0, 1.03, 0.03); P.add(B(0.26, 0.05, 0.26, 0.02), col, 0, 1.06, 0.03); P.add(new THREE.SphereGeometry(0.07, 8, 6), 0x5a3a22, 0, 1.04, -0.12);
+function crossyJogGeo(col) {                                             // a jogger's torso, from the hips up (origin at the hips, facing +z): running shorts, a bright top, head, ponytail, headband
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(), skin = 0xf1c7a0, hair = 0x5a3a22;
+  P.add(B(0.27, 0.15, 0.19, 0.05), 0x2a2a38, 0, -0.01, 0); P.add(B(0.29, 0.34, 0.2, 0.08), col, 0, 0.22, 0.01); P.add(B(0.09, 0.07, 0.09, 0.03), skin, 0, 0.41, 0.01);
+  P.add(new THREE.SphereGeometry(0.12, 9, 7), skin, 0, 0.53, 0.02); P.add(new THREE.SphereGeometry(0.125, 9, 7), hair, 0, 0.56, -0.025, 1, 0.86, 1);
+  P.add(B(0.255, 0.045, 0.255, 0.02), col, 0, 0.56, 0.0); P.add(new THREE.SphereGeometry(0.06, 8, 6), hair, 0, 0.53, -0.16, 0.8, 1.35, 0.8);
   return lotMerge(P);
+}
+function crossyLimbGeo(kind) {                                           // the moving parts: a thigh and a shin (hung from the joint at the origin, pointing down), a jogger's bent arm, a bike wheel and crank (turning about x), a goose's wing (out along +x)
+  const B = (w, h, d, r) => lotRBox(w, h, d, r, 2), P = crossyParts(), skin = 0xf1c7a0, dark = 0x26262c;
+  if (kind === 'thigh') { P.add(B(0.11, 0.25, 0.12, 0.045), skin, 0, -0.11, 0); P.add(B(0.125, 0.07, 0.135, 0.04), 0x2a2a38, 0, -0.03, 0); }
+  else if (kind === 'shin') { P.add(B(0.095, 0.22, 0.105, 0.04), skin, 0, -0.11, 0); P.add(B(0.1, 0.04, 0.11, 0.015), 0xffffff, 0, -0.21, 0); P.add(B(0.115, 0.07, 0.21, 0.035), 0xf4f4f4, 0, -0.245, 0.045); P.add(B(0.12, 0.022, 0.22, 0.01), 0x55585e, 0, -0.275, 0.045); }
+  else if (kind === 'arm') { P.add(B(0.075, 0.2, 0.08, 0.035), skin, 0, -0.09, 0); P.add(B(0.07, 0.07, 0.19, 0.03), skin, 0, -0.18, 0.08, 1, 1, 1, -0.25); P.add(new THREE.SphereGeometry(0.042, 8, 6), skin, 0, -0.155, 0.175); }
+  else if (kind === 'wheel') { P.add(new THREE.TorusGeometry(0.2, 0.03, 4, 16), dark, 0, 0, 0, 1, 1, 1, 0, Math.PI / 2);
+    for (let k = 0; k < 3; k++) P.add(new THREE.BoxGeometry(0.012, 0.36, 0.012), 0xd8dce0, 0, 0, 0, 1, 1, 1, k * Math.PI / 3); P.add(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 6), 0x9aa0a6, 0, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2); }
+  else if (kind === 'crank') { P.add(new THREE.CylinderGeometry(0.075, 0.075, 0.015, 10), 0xb8bcc2, 0.05, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2); P.add(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 6), 0x9aa0a6, 0, 0, 0, 1, 1, 1, 0, 0, Math.PI / 2);
+    for (const sd of [1, -1]) { P.add(new THREE.BoxGeometry(0.02, 0.11, 0.03), dark, sd * 0.07, -sd * 0.05, 0); P.add(new THREE.BoxGeometry(0.08, 0.02, 0.05), dark, sd * 0.1, -sd * 0.1, 0); } }
+  else if (kind === 'gwing') { P.add(new THREE.SphereGeometry(0.5, 10, 6), 0x7a6a5a, 0.22, 0, 0, 0.46, 0.05, 0.21); P.add(new THREE.SphereGeometry(0.5, 8, 5), 0x2e2a26, 0.4, -0.004, -0.04, 0.24, 0.04, 0.12); P.add(new THREE.SphereGeometry(0.5, 8, 5), 0xece6da, 0.14, -0.014, 0.02, 0.22, 0.03, 0.15); }
+  return lotMerge(P);
+}
+function crossyMx() { const S = CROSSY; return S.mx || (S.mx = { e: new THREE.Euler(0, 0, 0, 'YXZ'), a: new THREE.Matrix4(), b: new THREE.Matrix4(), c: new THREE.Matrix4(), h: new THREE.Matrix4(), l: new THREE.Matrix4(), w: new THREE.Matrix4() }); }
+function crossyML(M, x, y, z, rx, ry, rz) { M.makeRotationFromEuler(crossyMx().e.set(rx || 0, ry || 0, rz || 0)); M.elements[12] = x; M.elements[13] = y; M.elements[14] = z; return M; }   // (a joint: turned yaw, then pitch, then roll; at x, y, z)
+function crossyIM(name, M) { const D = CROSSY.mods[name]; if (!D || D.n >= D.cap) return -1; D.m.setMatrixAt(D.n, M); return D.n++; }
+function crossyRunner(m, y, z, d) {                                      // (crossyFill) a jogger mid-stride, or a cyclist pedalling: the body, then each limb from its joint
+  const R = crossyMx(), L = crossyML, ry = d > 0 ? Math.PI / 2 : -Math.PI / 2, s = m.x * d;   /* (s: how far along the lane: the cycle runs off it, so feet and wheels never slide) */
+  if (m.ph === undefined) m.ph = (Math.abs(m.x * 7.31 + m.len * 3.7) % 1) * Math.PI * 2;
+  if (m.kind === 'jog') {
+    const ph = m.ph + s * Math.PI * 2, sn = Math.sin(ph), bob = Math.abs(sn) * 0.05;   /* (a stride, two steps, every 1.0 along the trail; up off the ground mid-step) */
+    L(R.a, m.x, y, z, 0, ry, 0); R.h.multiplyMatrices(R.a, L(R.b, 0, 0.5 + bob, 0));
+    R.c.multiplyMatrices(R.h, L(R.b, 0, 0, 0, 0.17, 0.12 * sn, 0)); crossyIM(m.model, R.c);   /* (leaning into it, the shoulders turning against the stride) */
+    for (const sd of [1, -1]) {
+      const p = sd > 0 ? ph : ph + Math.PI, sp = Math.sin(p), cp = Math.cos(p), th = -0.62 * sp, kn = 0.2 + 1.25 * Math.pow(Math.max(0, cp), 1.6);   /* (the knee folds as the leg swings through, straight as it lands) */
+      R.l.multiplyMatrices(R.h, L(R.b, sd * 0.075, 0, 0, th)); crossyIM('limbT', R.l);
+      R.w.multiplyMatrices(R.l, L(R.b, 0, -0.22, 0, kn)); crossyIM('limbS', R.w);
+      R.w.multiplyMatrices(R.c, L(R.b, sd * 0.19, 0.37, 0, 0.75 * sp - 0.17, 0, sd * 0.08)); crossyIM('jogArm', R.w);   /* (each arm with the other leg) */
+    }
+    return;
+  }
+  const cr = m.ph + s / 0.5, sway = Math.sin(cr) * 0.045, bob = Math.abs(Math.sin(cr)) * 0.012;   /* (a cyclist: the crank once round every 3.1 along) */
+  L(R.a, m.x, y + bob, z, 0, ry, sway); crossyIM(m.model, R.a);
+  for (const wz of [0.36, -0.36]) { R.w.multiplyMatrices(R.a, L(R.b, 0, 0.22, wz, s / 0.2)); crossyIM('wheel', R.w); }
+  R.w.multiplyMatrices(R.a, L(R.b, 0, 0.24, 0, cr)); crossyIM('crank', R.w);
+  for (const sd of [1, -1]) {
+    const a = sd > 0 ? cr : cr + Math.PI, py = 0.24 - 0.1 * Math.cos(a), pz = -0.1 * Math.sin(a), hy = 0.6, hz = -0.12, Lt = 0.22, Ls = 0.26;   /* (its pedal, its hip) */
+    const ty = py - hy, tz = pz - hz, dd = Math.max(0.05, Math.min(Lt + Ls - 0.002, Math.hypot(ty, tz))), ca = Math.max(-1, Math.min(1, (Lt * Lt + dd * dd - Ls * Ls) / (2 * Lt * dd)));
+    const thg = Math.atan2(-tz, -ty) - Math.acos(ca), ky = hy - Lt * Math.cos(thg), kz = hz - Lt * Math.sin(thg), shn = Math.atan2(-(pz - kz), -(py - ky)) - thg;   /* (knee forward) */
+    R.l.multiplyMatrices(R.a, L(R.b, sd * 0.08, hy, hz, thg)); crossyIM('limbT', R.l);
+    R.w.multiplyMatrices(R.l, L(R.b, 0, -Lt, 0, shn)); crossyIM('limbS', R.w);
+  }
 }
 function crossyTreeGeo(kind, sea) {                                      // a ravine tree in the season's colours: a round one, a pine, or (winter) a bare one
   const P = crossyParts(), trunk = 0x6b4a30, L = { summer: [0x4f9a3a, 0x5fae44, 0x3f8a34], spring: [0x7fcf5a, 0xf2b0cf, 0x6cc04e], autumn: [0xe0782c, 0xd8452a, 0xe8b13a], winter: [0xffffff, 0xffffff, 0xffffff] }[sea] || [0x4f9a3a, 0x5fae44, 0x3f8a34];
@@ -25710,19 +25761,83 @@ function crossyMushGeo() {                                               // a po
 }
 function crossyStarGeo() { const sh = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2, r = i % 2 ? 0.05 : 0.12; i ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
   const g = new THREE.ExtrudeGeometry(sh, { depth: 0.04, bevelEnabled: false }); g.translate(0, 0, -0.02); const P = crossyParts(); P.add(g, 0xffd23a); return lotMerge(P); }
-function crossyHawkGeo(part) {                                           // a red-tailed hawk: brown back, pale belly, the rufous tail; the wings apart, to flap
-  const P = crossyParts(), br = 0x6e4a2c, pale = 0xeee0c4;
-  if (part === 'body') { P.add(crossyFlat(new THREE.IcosahedronGeometry(0.3, 1)), br, 0, 0, 0, 0.8, 0.7, 1.5); P.add(crossyFlat(new THREE.IcosahedronGeometry(0.24, 1)), pale, 0, -0.07, 0.06, 0.75, 0.6, 1.2);
-    P.add(crossyFlat(new THREE.IcosahedronGeometry(0.17, 1)), br, 0, 0.1, 0.46); P.add(crossyFlat(new THREE.ConeGeometry(0.06, 0.16, 5)), 0xd8b030, 0, 0.06, 0.62, 1, 1, 1, Math.PI / 2 + 0.6);
-    for (const sx of [-1, 1]) { P.add(new THREE.SphereGeometry(0.035, 6, 5), 0xffd040, sx * 0.09, 0.15, 0.55); P.add(new THREE.SphereGeometry(0.018, 5, 4), 0x111111, sx * 0.1, 0.15, 0.57); }
-    P.add(crossyFlat(new THREE.ConeGeometry(0.22, 0.5, 6)), 0xc0502a, 0, 0.02, -0.56, 1, 0.3, 1, -Math.PI / 2);
-    for (const sx of [-1, 1]) P.add(crossyFlat(new THREE.CylinderGeometry(0.025, 0.02, 0.26, 5)), 0xd8b030, sx * 0.1, -0.24, 0.12, 1, 1, 1, 0.5);
-    return lotMerge(P); }
-  const s = part === 'wl' ? -1 : 1;
-  P.add(crossyFlat(new THREE.BoxGeometry(1.0, 0.05, 0.5)), br, s * 0.5, 0, 0); P.add(crossyFlat(new THREE.BoxGeometry(0.5, 0.045, 0.36)), 0x4a321e, s * 1.15, 0, -0.04, 1, 1, 1, 0, s * 0.25);
-  P.add(crossyFlat(new THREE.BoxGeometry(0.9, 0.055, 0.3)), pale, s * 0.45, -0.02, 0.05);
-  for (let k = 0; k < 4; k++) P.add(crossyFlat(new THREE.BoxGeometry(0.42, 0.03, 0.09)), 0x3a2616, s * (1.48 + k * 0.03), 0, 0.12 - k * 0.11, 1, 1, 1, 0, s * (0.35 - k * 0.22));   /* (the fingered tips of a raptor's wing) */
-  return lotMerge(P);
+function crossyHawkBuild(pose) {                                         // (CROSSY2_V1, crossyHawkGeo) the red-tailed hawk in one pose, as one smooth piece: a tapered body, a head with a hooked
+  // beak, rounded wings that grow out of the body (the arm and the hand, bent at the shoulder and the wrist) with five fingered primaries, a fanned
+  // rust-red tail and yellow feet. Every pose has the same vertices in the same order (they're its morph targets): glide (the base), up and down
+  // (the ends of a wingbeat), tuck (folded back for the stoop) and talons (feet thrown forward to grab, the tail spread).
+  const W = { glide: [0.1, 0.06, 0, 0.12, 1, 0.55, 0, 1.5, 0], up: [0.95, 0.4, 0.1, 0.35, 0.7, 0.5, 0, 1.5, 0], down: [-0.75, -0.3, -0.08, 0, 1.15, 0.55, 0, 1.5, 0],
+    tuck: [0.22, -0.25, 0.8, 0.95, 0.25, 0.14, 0, 1.5, 0], talons: [0.1, 0.06, 0, 0.12, 1, 0.8, 0.3, -0.45, 1] }[pose];
+  const A1 = W[0], A2 = W[1], S1 = W[2], S2 = W[3], FS = W[4], TF = W[5], TP = W[6], LEG = W[7], TOE = W[8];   /* (shoulder and wrist lift, shoulder and wrist sweep, fingers spread; tail fan and droop; legs swung from the hip, toes open) */
+  const O = { p: [], n: [], c: [], i: [] }, v = new THREE.Vector3(), nv = new THREE.Vector3(), col = new THREE.Color(), c2 = new THREE.Color(), M = new THREE.Matrix4(), M2 = new THREE.Matrix4(), NM = new THREE.Matrix3(), E = new THREE.Euler(0, 0, 0, 'YXZ'), Q = new THREE.Quaternion(), V1 = new THREE.Vector3(), V2 = new THREE.Vector3();
+  const sm = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x), C = h => col.setHex(h), mixc = (h, t) => col.lerp(c2.setHex(h), Math.max(0, Math.min(1, t)));
+  const T = (x, y, z, rx, ry, rz, sx, sy, sz) => M.compose(V1.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz)), V2.set(sx, sy, sz));
+  const put = (g, colf, mat, def, flip) => {                             // a part: its own normals carried through, coloured (before any bend), then bent; flipped faces if mirrored
+    const pa = g.attributes.position, na = g.attributes.normal, base = O.p.length / 3; NM.getNormalMatrix(mat);
+    for (let k = 0; k < pa.count; k++) { v.fromBufferAttribute(pa, k).applyMatrix4(mat); nv.fromBufferAttribute(na, k).applyMatrix3(NM).normalize(); colf(v, nv); if (def) def(v, nv); O.p.push(v.x, v.y, v.z); O.n.push(nv.x, nv.y, nv.z); O.c.push(col.r, col.g, col.b); }
+    const ix = g.index ? Array.from(g.index.array) : Array.from({ length: pa.count }, (_, k) => k);
+    for (let k = 0; k < ix.length; k += 3) { if (flip) O.i.push(base + ix[k], base + ix[k + 2], base + ix[k + 1]); else O.i.push(base + ix[k], base + ix[k + 1], base + ix[k + 2]); }
+    g.dispose(); };
+  const ID = new THREE.Matrix4();
+  /* the body: a lathe, plump at the chest, tapering to the tail; brown above, pale below with a streaky belly band */
+  put(new THREE.LatheGeometry([[0.004, -0.53], [0.05, -0.49], [0.095, -0.38], [0.14, -0.22], [0.172, -0.05], [0.18, 0.08], [0.165, 0.2], [0.13, 0.31], [0.1, 0.38], [0.088, 0.43]].map(a => new THREE.Vector2(a[0], a[1])), 18),
+    (p, n) => { C(0xf2e6cf); mixc(0x6b4a2e, sm((n.y + 0.3) / 0.65)); if (p.z > -0.14 && p.z < 0.1 && n.y < 0.2) mixc(0x7a5838, 0.45 * (1 - sm((n.y + 0.3) / 0.5))); }, T(0, 0, 0, Math.PI / 2, 0, 0, 1, 1, 0.8));
+  /* the head: brown cap, pale throat; dark eyes under a stern brow; a yellow cere and a hooked dark beak */
+  put(new THREE.SphereGeometry(0.13, 16, 12), (p, n) => { C(0xf0e2c8); mixc(0x5e3e24, sm((n.y + 0.45) / 0.7)); }, T(0, 0.05, 0.47, 0, 0, 0, 0.9, 0.86, 1.08));
+  for (const sx of [-1, 1]) { put(new THREE.SphereGeometry(0.027, 8, 6), () => C(0x24160c), T(sx * 0.082, 0.083, 0.545, 0, 0, 0, 1, 1, 1)); put(new THREE.SphereGeometry(0.009, 5, 4), () => C(0xffffff), T(sx * 0.098, 0.093, 0.562, 0, 0, 0, 1, 1, 1));
+    put(new THREE.SphereGeometry(0.04, 8, 6), () => C(0x4a3018), T(sx * 0.068, 0.117, 0.535, 0, 0, sx * 0.25, 1.1, 0.42, 1.25)); }
+  put(new THREE.SphereGeometry(0.042, 10, 8), () => C(0xe6bf3a), T(0, 0.062, 0.575, 0, 0, 0, 1, 0.85, 0.9));
+  put(new THREE.ConeGeometry(0.04, 0.14, 10), p => { C(0x6a7078); mixc(0x23262b, (p.z - 0.6) / 0.11); }, T(0, 0.06, 0.65, Math.PI / 2, 0, 0, 1, 1, 0.75), q => { const t = Math.max(0, (q.z - 0.58) / 0.14); q.y -= 0.085 * t * t; q.z -= 0.025 * t * t * t; });
+  /* the wings: a rounded arm and hand (thick at the leading edge, thin at the trailing), bent like a beam from the shoulder out */
+  const ang = r => [A1 * sm(r / 0.14) + A2 * sm((r - 0.5) / 0.16), S1 * sm(r / 0.14) + S2 * sm((r - 0.42) / 0.16)], NS = 180, RS = 1.6, sp = [];
+  for (let k = 0, X = 0.1, Y = 0, Z = 0; k <= NS; k++) { const a = ang(k / NS * RS); sp.push([X, Y, Z, a[0], a[1]]); const dl = RS / NS; X += Math.cos(a[0]) * Math.cos(a[1]) * dl; Y += Math.sin(a[0]) * dl; Z -= Math.cos(a[0]) * Math.sin(a[1]) * dl; }
+  const bend = s => (q, n) => { const kk = Math.min(NS - 1e-6, Math.max(0, q.x - 0.1) / RS * NS), k0 = Math.floor(kk), f = kk - k0, a = sp[k0], b = sp[k0 + 1], L = i => a[i] + (b[i] - a[i]) * f;
+    const th = L(3), ph = L(4), ct = Math.cos(th), st = Math.sin(th), cp = Math.cos(ph), spp = Math.sin(ph);
+    const ox = -q.y * st, oy = q.y * ct, oz = q.z; q.set(s * (L(0) + ox * cp + oz * spp), L(1) + oy, L(2) - ox * spp + oz * cp);
+    const nx = n.x * ct - n.y * st, ny = n.x * st + n.y * ct, nz = n.z; n.set(s * (nx * cp + nz * spp), ny, -nx * spp + nz * cp); };
+  const edge = u => [0.16 + 0.025 * Math.sin(Math.PI * u) - 0.07 * u * u, -0.21 - 0.05 * Math.sin(Math.PI * u) + 0.15 * u * u * u];
+  const wingCol = (p, n) => { const u = Math.max(0, Math.min(1, (p.x - 0.1) / 0.88)), e = edge(u), w = Math.max(0, Math.min(1, (e[0] - p.z) / (e[0] - e[1])));
+    if (n.y >= 0) { C(0x6b4a2e); mixc(0x8e6842, 0.4 * sm((w - 0.25) / 0.4) * (1 - u)); mixc(0x3e2a1a, sm((u - 0.72) / 0.28)); }                     /* (brown above: paler coverts, a darker hand) */
+    else { C(0xf2e8d6); if (u < 0.62) mixc(0x5a3a22, (1 - w / 0.28) * 0.85); mixc(0x4a2e1a, 0.75 * (1 - Math.abs(u - 0.66) / 0.09) * (w < 0.55 ? 1 : 0)); mixc(0x8a7a68, sm((w - 0.82) / 0.18) * 0.7); } };   /* (pale below: the dark leading-edge bar and wrist comma of a red-tail) */
+  for (const s of [1, -1]) {
+    const NU = 14, NW = 12, pos = [], idx = [];
+    for (let i = 0; i <= NU; i++) { const u = i / NU, x = 0.1 + u * 0.88, e = edge(u), zc = (e[0] + e[1]) / 2, hc = (e[0] - e[1]) / 2, th = 0.042 * (1 - 0.55 * u);
+      for (let k = 0; k < NW; k++) { const w = k / NW * Math.PI * 2, sw = Math.sin(w), cw = Math.cos(w); pos.push(x, th * sw * (sw > 0 ? 1 : 0.45) * (0.7 + 0.3 * cw), zc + hc * cw); } }
+    { const e = edge(1); pos.push(0.995, 0, (e[0] + e[1]) / 2); }
+    for (let i = 0; i < NU; i++) for (let k = 0; k < NW; k++) { const a = i * NW + k, b = a + NW, c = i * NW + (k + 1) % NW, d = c + NW; idx.push(a, b, c, b, d, c); }
+    for (let k = 0; k < NW; k++) idx.push(NU * NW + (k + 1) % NW, NU * NW + k, (NU + 1) * NW);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    put(g, wingCol, ID, bend(s), s < 0);
+    for (let f = 0; f < 5; f++) { const ps = (-0.22 + f * 0.25) * FS, L = [0.3, 0.36, 0.38, 0.35, 0.29][f], bx = 0.9 + f * 0.012, bz = 0.075 - f * 0.045;   /* (the five primaries, fanned) */
+      put(new THREE.SphereGeometry(1, 10, 6), p => { C(0x4a3220); mixc(0x22160e, (p.x - 1.0) / 0.3); }, T(bx + Math.cos(ps) * L / 2, 0.004, bz - Math.sin(ps) * L / 2, 0, ps, 0, L / 2, 0.02, 0.036), bend(s), s < 0); }
+  }
+  /* the tail: a fan of feathers (rust above with a dark band and a pale tip, pale below), from under the rump */
+  { const NR = 8, NW = 12, z0 = -0.36, pos = [], idx = [];
+    for (let i = 0; i <= NR; i++) { const f = i / NR, rho = 0.05 + f * 0.38, th = 0.028 * (1 - f) + 0.004;
+      for (let k = 0; k < NW; k++) { const w = k / NW * Math.PI * 2, a = TF * Math.cos(w), rr = rho * (i === NR ? 1 + 0.035 * Math.abs(Math.cos(a * 9)) : 1); pos.push(rr * Math.sin(a), 0.03 + th * Math.sin(w) - rr * Math.sin(TP), z0 - rr * Math.cos(a) * Math.cos(TP)); } }
+    pos.push(0, 0.03 - 0.45 * Math.sin(TP), z0 - 0.45 * Math.cos(TP));
+    for (let i = 0; i < NR; i++) for (let k = 0; k < NW; k++) { const a = i * NW + k, b = a + NW, c = i * NW + (k + 1) % NW, d = c + NW; idx.push(a, b, c, b, d, c); }
+    for (let k = 0; k < NW; k++) idx.push(NR * NW + (k + 1) % NW, NR * NW + k, (NR + 1) * NW);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    put(g, (p, n) => { const r = Math.hypot(p.x, p.y - 0.03, p.z - z0) / 0.43; if (n.y >= 0) { C(0xc4562a); mixc(0x3a2418, 1 - Math.abs(r - 0.88) / 0.05); mixc(0xf0e4d4, sm((r - 0.95) / 0.05)); } else { C(0xf2dccb); mixc(0xc89a80, 0.3 * (1 - Math.abs(r - 0.88) / 0.06)); } }, ID); }
+  /* the legs: feathered trousers, yellow legs and toes, dark talons; tucked back under the tail in flight, thrown forward to grab */
+  for (const sx of [-1, 1]) {
+    put(new THREE.SphereGeometry(0.065, 10, 8), () => C(0xeee0c8), T(sx * 0.07, -0.12, 0.05, 0, 0, 0, 0.85, 1.2, 1));
+    const H = new THREE.Matrix4().compose(V1.set(sx * 0.07, -0.13, 0.03), Q.setFromEuler(E.set(LEG, 0, 0)), V2.set(1, 1, 1)), part = (x, y, z, rx, ry, rz, s1, s2, s3) => M2.multiplyMatrices(H, T(x, y, z, rx, ry, rz, s1, s2, s3));
+    put(new THREE.CylinderGeometry(0.019, 0.022, 0.15, 8), () => C(0xe9c23e), part(0, -0.12, 0, 0, 0, 0, 1, 1, 1));
+    for (const a0 of [-0.45, 0, 0.45, Math.PI]) { const a = a0 === Math.PI ? a0 : a0 * (0.45 + 0.55 * TOE), c = (1 - TOE) * 1.15 + 0.12, dz = Math.cos(c), dy = -Math.sin(c);
+      const tx = Math.sin(a) * dz * 0.0375, tz = Math.cos(a) * dz * 0.0375, ty = -0.195 + dy * 0.0375;
+      put(new THREE.CylinderGeometry(0.012, 0.014, 0.075, 6), () => C(0xe9c23e), part(tx, ty, tz, Math.PI / 2 + c, a, 0, 1, 1, 1));
+      const c2a = c + 0.9, ex = Math.sin(a) * dz * 0.075, ez = Math.cos(a) * dz * 0.075, ey = -0.195 + dy * 0.075;
+      put(new THREE.ConeGeometry(0.014, 0.05, 6), () => C(0x1e1a18), part(ex + Math.sin(a) * Math.cos(c2a) * 0.02, ey - Math.sin(c2a) * 0.02, ez + Math.cos(a) * Math.cos(c2a) * 0.02, Math.PI / 2 + c2a, a, 0, 1, 1, 1)); }
+  }
+  return O;
+}
+function crossyHawkGeo() {                                               // the hawk: one indexed mesh, the glide as its shape and four morph targets (up, down, tuck, talons) that the flight blends
+  const B = crossyHawkBuild('glide'), g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(B.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(B.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(B.c, 3)); g.setIndex(B.i);
+  g.morphAttributes.position = []; g.morphAttributes.normal = [];
+  for (const p of ['up', 'down', 'tuck', 'talons']) { const T = crossyHawkBuild(p); g.morphAttributes.position.push(new THREE.Float32BufferAttribute(T.p, 3)); g.morphAttributes.normal.push(new THREE.Float32BufferAttribute(T.n, 3)); }
+  g.computeBoundingSphere(); g.boundingSphere.radius += 0.6; return g;
 }
 function crossyWallGeo() {                                               // (behind the first row) the sound wall she came through: grey panels, and the bent one peeled out at x = 0
   const B = (w, h, d, r) => lotRBox(w, h, d, r, 1), P = crossyParts(); return world2CrossyWallGeo(B, P);   /* (WORLD2_V1: no bent panel, no paw) */
@@ -25918,9 +26033,46 @@ function crossyWaterFill(row, k) {                                       // logs
   if (row.kind === 'goose' && mv.length && mv.every(m => m.dive)) mv[0].dive = false;
   row.mv = mv;
 }
-function crossyGooseUnder(m, t) {                                        // a diving raft: 0 afloat, (0, 1) the hiss and flap before it goes, 1 under
+function crossyGooseUnder(m, t) {                                        // a diving raft: 0 afloat, (0, 1) the hiss and flap before it goes (1.1 s), 1 from the moment it tips forward until it's back up (no standing on it)
   if (!m.dive) return 0; const P = 7, f = ((t + m.ph) % P + P) % P;
-  return f < P - 2.3 ? 0 : f < P - 1.3 ? (f - (P - 2.3)) * 0.99 : 1;
+  return f < 4.5 ? 0 : f < 5.6 ? (f - 4.5) / 1.1 * 0.99 : 1;
+}
+/* CROSSY2_V1: diving geese look it now. A raft that's about to go rears up, hisses and flaps (1.1 s, a little longer than before); then
+   each goose tips forward, bottoms up, and sinks with a ring spreading on the water and a splash; while they're down, rings and
+   bubbles mark the spot; then they bob back up with a shake and a spray of drops. From the first tip until they're up again there's
+   no standing on them (crossyGooseUnder is 1), just as before. */
+function crossyGooseDive(m, t, o) {                                      // where a diving raft is: o.ph 0 afloat, 1 hissing and flapping, 2 tipping, 3 under, 4 bobbing back up; o.k how far into it; o.f its clock
+  o.ph = 0; o.k = 0; o.f = 9; if (!m.dive) return o; const P = 7, f = o.f = ((t + m.ph) % P + P) % P;
+  if (f < 4.5) o.k = f / 4.5; else if (f < 5.6) { o.ph = 1; o.k = (f - 4.5) / 1.1; } else if (f < 5.95) { o.ph = 2; o.k = (f - 5.6) / 0.35; } else if (f < 6.6) { o.ph = 3; o.k = (f - 5.95) / 0.65; } else { o.ph = 4; o.k = (f - 6.6) / 0.4; }
+  return o;
+}
+function crossyGooseDraw(m, z, t, bob, ry) {                             // (crossyFill) a raft of geese, and the rings on the water where they went down or come up
+  const S = CROSSY, R = crossyMx(), o = crossyGooseDive(m, t, S.gdo || (S.gdo = {})), ph = o.ph, k = o.k, f = o.f, W = S.WY, ease = k * k * (3 - 2 * k);
+  const ring = (x, age, life, s0, s1, a) => { if (age < 0 || age > life) return; const q = age / life, i = crossyI('gring', x, W + 0.012, z, 0, s0 + (s1 - s0) * Math.sqrt(q)); if (i >= 0) S.mods.gring.m.setColorAt(i, S.vv.c.setScalar(a * (1 - q) * (1 - q))); };
+  for (let j = 0; j < m.len; j++) {
+    const gx = m.x - m.len / 2 + 0.5 + j; let gy = W + 0.02 + bob, pitch = 0, roll = 0, yaw = ry, draw = true;
+    if (ph === 1) { pitch = -0.24 * Math.min(1, k * 5); gy += 0.03 + Math.abs(Math.sin(t * 9 + j)) * 0.02; yaw += Math.sin(t * 31 + j * 2) * 0.06; }   /* (rearing up, hissing) */
+    else if (ph === 2) { pitch = 1.4 * ease; gy = W + 0.02 - 0.12 * k; }                                                                          /* (bottoms up) */
+    else if (ph === 3) { pitch = 1.4 + 0.15 * k; gy = W - 0.1 - 0.55 * k; draw = k < 0.6; }                                                      /* (going, going, gone) */
+    else if (ph === 4) { gy = W - 0.42 + 0.44 * (1 - Math.pow(1 - k, 3)) + Math.sin(k * Math.PI) * 0.07 + bob; pitch = -0.55 * (1 - k); roll = Math.sin(t * 34 + j) * 0.3 * (1 - k); }   /* (popping back up, head first) */
+    else if (f < 0.45) { const q = 1 - f / 0.45; roll = Math.sin(t * 30 + j) * 0.22 * q; yaw += Math.sin(t * 23 + j) * 0.12 * q; }               /* (a shake, once it's up) */
+    if (draw) { crossyML(R.a, gx, gy, z, pitch, yaw, roll); crossyIM('goose', R.a);
+      if (ph === 1) for (const sd of [1, -1]) { const fl = 0.35 + 0.85 * Math.abs(Math.sin(t * 19 + j * 0.9)); R.w.multiplyMatrices(R.a, crossyML(R.b, sd * 0.11, 0.2, -0.02, 0, 0, sd > 0 ? fl : Math.PI - fl)); crossyIM('gwing', R.w); } }
+    if (f >= 5.6 && f < 6.6) { const a = f - 5.6; ring(gx, a, 0.9, 0.45, 1.5, 0.6); ring(gx, a - 0.22, 0.8, 0.3, 1.1, 0.38); if (ph === 3) ring(gx + Math.sin(j * 2.1) * 0.12, (f - 5.95 + j * 0.13) % 0.42, 0.42, 0.12, 0.55, 0.32); }
+    const sa = f >= 6.6 ? f - 6.6 : f + 0.4; if (m.dive && sa < 0.8) ring(gx, sa, 0.8, 0.4, 1.3, 0.5);
+  }
+}
+function crossyGooseFx(row, t, dt) {                                     // (crossyWorld) a diving raft's moments: a flap of wings (heard near her), a splash as they go, bubbles while they're down, drops as they come up
+  const S = CROSSY; if (S.vis0 === undefined || row.r < S.vis0 || row.r > S.vis1) return;
+  const o = S.gdo2 || (S.gdo2 = {}), z = -row.r, near = S.phase === 'run' && Math.abs(row.r - S.P.row) <= 3, W = S.WY;
+  for (const m of row.mv) { if (!m.dive) continue; crossyGooseDive(m, t, o); const ph = o.ph, was = m.gph; m.gph = ph;
+    if (Math.abs(m.x) > S.GW) continue; const close = near && Math.abs(m.x) < 7;
+    if (was !== undefined && was !== ph) {
+      if (ph === 1) { if (close) crossySfx('flap'); }
+      else if (ph === 2) { for (let j = 0; j < m.len; j++) chimFxBurst(S.fx, m.x - m.len / 2 + 0.5 + j, W + 0.08, z, S.low ? 4 : 9, 0xe8f6ff, 1.3, 2.2, 0.05, 0.11, 0.45, 0.85, 6, 1.5); if (close) crossySfx('plop'); }
+      else if (ph === 4) { for (let j = 0; j < m.len; j++) chimFxBurst(S.fx, m.x - m.len / 2 + 0.5 + j, W + 0.06, z, S.low ? 3 : 6, 0xe8f6ff, 0.9, 1.7, 0.04, 0.09, 0.4, 0.8, 6, 1.5); if (close) crossySfx('surface'); } }
+    if (ph === 3 && !S.low && Math.random() < dt * 9 * m.len) { const j = (Math.random() * m.len) | 0; chimFxPut(S.fx, m.x - m.len / 2 + 0.5 + j + (Math.random() - 0.5) * 0.4, W + 0.02, z + (Math.random() - 0.5) * 0.3, 0, 0.3 + Math.random() * 0.25, 0, 0xf2fbff, 0.07, 0.13, 0.45, 0.9, 0, 1); }   /* (bubbles) */
+  }
 }
 
 /* ---------- built once, the first time she goes through (or ahead of time, by WARM_V1) ---------- */
@@ -25937,7 +26089,7 @@ function crossyBuild() {
   const S = CROSSY; if (S.built) return;
   S.low = typeof devTier === 'function' && devTier() === 'low';
   const sc = S.scene = new THREE.Scene(); sc.background = new THREE.Color(0xa8dcff); sc.fog = new THREE.Fog(0xa8dcff, 40, 80);
-  S.cam = new THREE.PerspectiveCamera(36, 1, 0.5, 160); sc.add(S.cam); S.size = new THREE.Vector2();
+  S.cam = new THREE.PerspectiveCamera(20, 1, 1, 220);   /* (CROSSY2_V1: a long lens, nearly flat like Crossy Road's; it was 36) */ sc.add(S.cam); S.size = new THREE.Vector2();
   sc.add(S.hemi = new THREE.HemisphereLight(0xffffff, 0x8a9a7a, 0.95));
   S.sun = new THREE.DirectionalLight(0xffffff, 0.72); S.sun.position.set(-5, 12, 7); sc.add(S.sun); sc.add(S.sun.target);
   S.M = { veh: new THREE.MeshLambertMaterial({ vertexColors: true, map: lotAtlas() }), ground: new THREE.MeshLambertMaterial({ vertexColors: true, map: crossyGroundTex('summer') }), bulb: new THREE.MeshBasicMaterial({ color: 0xffffff }),
@@ -25954,6 +26106,10 @@ function crossyBuild() {
   for (const n of [2, 3, 4]) crossyMod('log' + n, crossyLogGeo(n), 24, null, true);
   crossyMod('pad', crossyPadGeo(false), 40, null, true); crossyMod('padF', crossyPadGeo(true), 24, null, true); crossyMod('goose', crossyGooseGeo(), 160, null, true);
   [0xff4a6a, 0x3aa8ff, 0xffc93a].forEach((c, i) => { crossyMod('bike' + i, crossyBikeGeo(c), 12, null, true); crossyMod('jog' + i, crossyJogGeo([0x9a6bff, 0x5cc46a, 0xff8a3a][i]), 12, null, true); });
+  crossyMod('limbT', crossyLimbGeo('thigh'), 150, null, true); crossyMod('limbS', crossyLimbGeo('shin'), 150, null, true); crossyMod('jogArm', crossyLimbGeo('arm'), 80, null, true);   /* (CROSSY2_V1: the joggers' and cyclists' moving parts) */
+  crossyMod('wheel', crossyLimbGeo('wheel'), 80, null, true); crossyMod('crank', crossyLimbGeo('crank'), 40, null, true); crossyMod('gwing', crossyLimbGeo('gwing'), 60, null, true);
+  { const g = new THREE.TorusGeometry(0.5, 0.05, 3, 24); g.rotateX(Math.PI / 2); S.M.ring = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });   /* (rings on the water where geese go down and come up) */
+    const D = crossyMod('gring', g, 80, S.M.ring, true); D.m.renderOrder = 2; D.m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(80 * 3), 3); D.m.instanceColor.setUsage(THREE.DynamicDrawUsage); }
   crossyMod('fish', crossyFishGeo(), 16, null, true); crossyMod('mush', crossyMushGeo(), 4, null, true); crossyMod('star', crossyStarGeo(), 6, null, true);
   { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); crossyMod('shad', g, 160, S.M.shad, true).m.renderOrder = 1; crossyMod('glow', g.clone(), 120, S.M.glow, true).m.renderOrder = 2; crossyMod('lglow', g.clone(), 24, S.M.glow, false).m.renderOrder = 2; }
   { const D = crossyMod('bulb', new THREE.SphereGeometry(0.08, 8, 6), 48, S.M.bulb, true); D.m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(48 * 3), 3); D.m.instanceColor.setUsage(THREE.DynamicDrawUsage); for (let i = 0; i < 48; i++) D.m.setColorAt(i, S.vv.c.setHex(0x441010)); }   /* (its colour buffer made full size: setColorAt sizes it by count, which starts at 0) */
@@ -25966,8 +26122,9 @@ function crossyBuild() {
   { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); S.pkSh = new THREE.Mesh(g, softShadowMat(0.32)); S.pkSh.renderOrder = 1; sc.add(S.pkSh); }
   S.bub = new THREE.Mesh(new THREE.SphereGeometry(0.5, 18, 12), new THREE.MeshBasicMaterial({ color: 0x8fdcff, transparent: true, opacity: 0.26, depthWrite: false })); S.bub.position.y = 0.3; S.bub.visible = false; S.pk.add(S.bub);
   { const hk = S.hk = { g: new THREE.Group(), on: false, ph: 'off', t: 0, a: 0, p: new THREE.Vector3(), p0: new THREE.Vector3(), cry: 0 };
-    hk.body = new THREE.Mesh(crossyHawkGeo('body'), S.M.veh); hk.wl = new THREE.Mesh(crossyHawkGeo('wl'), S.M.veh); hk.wr = new THREE.Mesh(crossyHawkGeo('wr'), S.M.veh);
-    for (const w of [hk.wl, hk.wr]) w.position.set(0, 0.06, 0.05); hk.g.add(hk.body, hk.wl, hk.wr); hk.g.scale.setScalar(1.25); hk.g.visible = false; sc.add(hk.g);
+    S.M.hawk = new THREE.MeshLambertMaterial({ vertexColors: true, morphTargets: true, morphNormals: true });   /* (CROSSY2_V1: one smooth mesh; its wingbeats, stoop and grab are morph targets) */
+    hk.body = new THREE.Mesh(crossyHawkGeo(), S.M.hawk); hk.body.frustumCulled = false; hk.body.userData.name = 'Crossy hawk'; hk.g.rotation.order = 'YXZ'; hk.v = new THREE.Vector3(); hk.yaw = 0; hk.yr = 0; hk.hold = new THREE.Vector3();
+    hk.g.add(hk.body); hk.g.scale.setScalar(1.3); hk.g.visible = false; sc.add(hk.g);
     const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); hk.sh = new THREE.Mesh(g, softShadowMat(0.3)); hk.sh.renderOrder = 1; hk.sh.visible = false; sc.add(hk.sh); }
   S.fx = chimFxMake(sc, S.low ? 160 : 320, false); S.gx = chimFxMake(sc, S.low ? 60 : 140, true);
   S.rows = new Array(S.NR).fill(null);
@@ -26018,7 +26175,7 @@ function crossyFill() {                                                  // (eac
     if (!row || row.r < v0 || row.r > v1) continue; const z = -row.r, y = row.y, d = row.dir, ry = d > 0 ? Math.PI / 2 : -Math.PI / 2;
     if (row.t === 'road' || row.t === 'trail') for (const m of row.mv) { if (Math.abs(m.x) > S.GW + 3) continue;
       const jog = m.kind === 'jog', bob = jog ? Math.abs(Math.sin(t * 9 + m.x)) * 0.07 : m.kind === 'bike' ? 0 : Math.abs(Math.sin(t * 13 + m.x * 3)) * 0.012;
-      crossyI(m.model, m.x, y + bob, z, ry, 1); crossyI('shad', m.x, y + 0.01, z, 0, (m.len + 0.25) / 0.53 * 0.62, 1, (jog ? 0.5 : 0.95) / 0.53 * 0.62);
+      if (row.t === 'trail') crossyRunner(m, y, z, d); else crossyI(m.model, m.x, y + bob, z, ry, 1); crossyI('shad', m.x, y + 0.01, z, 0, (m.len + 0.25) / 0.53 * 0.62, 1, (jog ? 0.5 : 0.95) / 0.53 * 0.62);
       if (night && row.t === 'road') crossyI('glow', m.x + d * (m.len / 2 + 1.0), y + 0.02, z, 0, 2.2, 1, 1.1); }
     else if (row.t === 'rail') { const T = row.tr;
       if (T.ph === 'pass') for (let i = 0; i <= T.n; i++) { const x = T.front - d * (2.475 + i * 4.95); if (Math.abs(x) > S.GW + 4) continue; crossyI(i ? 'coach' : 'eng', x, y, z, ry, 1); crossyI('shad', x, y + 0.01, z, 0, 5.2 / 0.53 * 0.62, 1, 1.1 / 0.53 * 0.62);
@@ -26029,8 +26186,7 @@ function crossyFill() {                                                  // (eac
     else if (row.t === 'water') for (const m of row.mv) { if (Math.abs(m.x) > S.GW + 3) continue; const bob = Math.sin(t * 2.2 + m.x * 1.7) * 0.025;
       if (m.kind === 'log') crossyI(m.model, m.x, S.WY + 0.04 + bob, z, Math.PI / 2, 1, 1, 1, 0, Math.sin(t * 1.3 + m.x) * 0.03);
       else if (m.kind === 'pad') { crossyI(m.model, m.x, S.WY + 0.01 + bob * 0.3, z, m.x * 1.7, 1); if (m.fish) crossyI('fish', m.x, S.WY + 0.38 + Math.sin(t * 3 + m.x) * 0.06, z, t * 2.4, 1); }
-      else { const u = crossyGooseUnder(m, t), wob = u > 0 && u < 1 ? Math.sin(t * 40) * 0.15 : 0;
-        if (u < 1) for (let j = 0; j < m.len; j++) crossyI('goose', m.x - m.len / 2 + 0.5 + j, S.WY + 0.02 + bob - u * 0.18 + (u > 0.85 ? -(u - 0.85) * 3 : 0), z, ry + wob, 1, 1, 1, 0, wob * 0.5); } }
+      else crossyGooseDraw(m, z, t, bob, ry); }   /* (CROSSY2_V1) */
     if (row.fish > -99) crossyI('fish', row.fish, y + 0.36 + Math.sin(t * 3 + row.r) * 0.06, z, t * 2.4, 1);
     if (row.mush > -99) crossyI('mush', row.mush, y + 0.02 + Math.abs(Math.sin(t * 2.5)) * 0.08, z, t * 0.8, 1.15 + Math.sin(t * 5) * 0.05);
   }
@@ -26047,6 +26203,7 @@ function crossyWorld(dt) {
       if (row.ramp) { crossyRamp(row, dt); continue; }
       const dx = row.v * dt; for (const m of row.mv) { m.x += dx; if (m.x > h) m.x -= LW; else if (m.x < -h) m.x += LW; }
       if (row.kind === 'goose' && Math.abs(row.r - S.P.row) <= 3) for (const m of row.mv) if (m.dive) { const u = crossyGooseUnder(m, S.wt); if (u > 0 && u < 1) { if (!m.hissed && Math.abs(m.x) < 7 && S.phase === 'run') { m.hissed = true; crossySfx('hiss'); } } else if (!u) m.hissed = false; }   /* (a raft about to dive hisses first) */
+      if (row.kind === 'goose') crossyGooseFx(row, S.wt, dt);   /* (CROSSY2_V1: the dive's splash, bubbles and drops) */
     } else if (row.t === 'rail') crossyTrain(row, dt);
   }
 }
@@ -26169,27 +26326,38 @@ function crossyDeadStep(dt) {                                            // how 
 }
 
 /* ---------- the hawk: dawdle (no new row for 8 s) or fall behind the camera and it comes for her ---------- */
-function crossyHawkStep(dt) {
-  const S = CROSSY, P = S.P, K = S.hk;
+function crossyHawkStep(dt) {                                            // (CROSSY2_V1) it circles over her gliding, a few wingbeats now and then, banked into the turn; stoops with its wings
+  const S = CROSSY, P = S.P, K = S.hk;                                   // folded back, flares at the last moment with its talons thrown forward, and labours off with her
   if (S.phase === 'run' && S.started && !S.paused) {
     S.idle += dt; const behind = S.camRow - P.row;
-    if (!K.on && (S.idle > 5.2 || behind > 2.4)) { K.on = true; K.ph = 'warn'; K.t = 0; K.a = 0; K.p.set(P.x + 6, 9, -P.row - 6); K.cry = 0; K.g.visible = true; }
+    if (!K.on && (S.idle > 5.2 || behind > 2.4)) { K.on = true; K.ph = 'warn'; K.t = 0; K.a = 0; K.p.set(P.x + 6, 9, -P.row - 6); K.cry = 0; K.g.visible = true; K.v.set(-3, -2, 3); K.yaw = Math.atan2(-1, 1); K.yr = 0; }
     if (K.on && K.ph === 'warn' && S.idle < 4 && behind < 1.8) crossyHawkGo();
     if (K.on && K.ph === 'warn' && (S.idle > 8 || behind > 3.6)) { K.ph = 'dive'; K.t = 0; K.p0.copy(K.p); crossySfx('hawk'); }
   }
   if (!K.on) { K.g.visible = false; K.sh.visible = false; return; }
-  K.t += dt; const g = K.g, fl = K.ph === 'dive' ? 0.15 : K.ph === 'carry' ? Math.sin(S.time * 22) * 0.6 : Math.sin(S.time * 7) * 0.45;
+  K.t += dt; const g = K.g, I = K.body.morphTargetInfluences, sm = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x), px = K.p.x, py = K.p.y, pz = K.p.z;
+  let up = 0, dn = 0, tuck = 0, tal = 0, pitchO = null;
+  const beat = (hz, a) => { const f = Math.sin(S.time * hz); up = Math.max(0, f) * a; dn = Math.max(0, -f) * a; };
   if (K.ph === 'warn') { K.a += dt * 1.7; const tx = P.x + Math.cos(K.a) * 2.6, tz = -P.row - 1.6 + Math.sin(K.a) * 1.5, ty = 5.2 + Math.sin(S.time * 1.7) * 0.3;
-    K.p.x += (tx - K.p.x) * Math.min(1, dt * 2.2); K.p.y += (ty - K.p.y) * Math.min(1, dt * 2.2); K.p.z += (tz - K.p.z) * Math.min(1, dt * 2.2); g.rotation.set(0.1, K.a + Math.PI, -0.35);
+    K.p.x += (tx - K.p.x) * Math.min(1, dt * 2.2); K.p.y += (ty - K.p.y) * Math.min(1, dt * 2.2); K.p.z += (tz - K.p.z) * Math.min(1, dt * 2.2);
+    if (S.time % 2.6 < 0.85) beat(11, 1); else up = 0.12 + Math.sin(S.time * 2) * 0.05;   /* (a few beats, then a glide) */
     K.cry -= dt; if (K.cry <= 0) { crossySfx('hawk'); K.cry = 2.4; } }
-  else if (K.ph === 'dive') { const e = Math.min(1, K.t / 0.42), tx = P.hop ? P.x : P.x, ty = P.y + 0.55, tz = S.pk.position.z;
-    K.p.set(K.p0.x + (tx - K.p0.x) * e * e, K.p0.y + (ty - K.p0.y) * e * e, K.p0.z + (tz - K.p0.z) * e * e); g.rotation.set(0.7 * (1 - e), Math.atan2(tx - K.p0.x, tz - K.p0.z), 0);
-    if (e >= 1) { K.ph = 'carry'; K.t = 0; if (S.phase === 'run') { if (P.hop) crossyLand(); S.inv = 0; S.shield = false; crossyDie('hawk', null, crossyRowGet(P.row)); } chimFxBurst(S.fx, K.p.x, K.p.y, K.p.z, 14, 0x8a6040, 1.6, 1.0, 0.08, 0.14, 0.7, 0.9, 1.5, 2); } }
-  else if (K.ph === 'carry') { K.p.x += dt * 1.6; K.p.y += dt * (2.2 + K.t * 4); K.p.z -= dt * (2.5 + K.t * 3); g.rotation.set(-0.25, Math.PI * 0.85, 0.1); }
-  else if (K.ph === 'leave') { K.p.x += dt * 4; K.p.y += dt * 5; K.p.z -= dt * 5; g.rotation.set(-0.3, Math.PI * 0.8, 0.2); if (K.t > 1.6) { K.on = false; K.ph = 'off'; } }
-  g.position.copy(K.p); K.wl.rotation.z = fl; K.wr.rotation.z = -fl; g.visible = true;
+  else if (K.ph === 'dive') { const e = Math.min(1, K.t / 0.5), tx = P.x, ty = P.y + 0.62 * S.SC + 0.42, tz = S.pk.position.z, ey = 1 - Math.pow(1 - e, 2.2), eh = Math.pow(e, 1.4);   /* (down fast first, then in low) */
+    K.p.set(K.p0.x + (tx - K.p0.x) * eh, K.p0.y + (ty - K.p0.y) * ey, K.p0.z + (tz - K.p0.z) * eh);
+    tuck = sm(e / 0.22) * (1 - sm((e - 0.6) / 0.25)); tal = sm((e - 0.55) / 0.35); up = sm((e - 0.66) / 0.3) * 0.9; if (e > 0.7) pitchO = -0.75 * sm((e - 0.7) / 0.3);
+    if (e >= 1) { K.ph = 'carry'; K.t = 0; if (S.phase === 'run') { if (P.hop) crossyLand(); S.inv = 0; S.shield = false; crossyDie('hawk', null, crossyRowGet(P.row)); } chimFxBurst(S.fx, K.p.x, K.p.y - 0.4, K.p.z, 14, 0x8a6040, 1.6, 1.0, 0.08, 0.14, 0.7, 0.9, 1.5, 2); } }
+  else if (K.ph === 'carry') { K.p.x += dt * 1.6; K.p.y += dt * (2.2 + K.t * 4); K.p.z -= dt * (2.5 + K.t * 3); beat(15, 1); tal = 1; pitchO = -0.45; }   /* (heavy, quick beats: she's not light) */
+  else if (K.ph === 'leave') { K.p.x += dt * 4; K.p.y += dt * 5; K.p.z -= dt * 5; beat(12, 1); if (K.t > 1.6) { K.on = false; K.ph = 'off'; } }
+  if (dt > 0) { const q = Math.min(1, dt * 10); K.v.x += ((K.p.x - px) / dt - K.v.x) * q; K.v.y += ((K.p.y - py) / dt - K.v.y) * q; K.v.z += ((K.p.z - pz) / dt - K.v.z) * q;   /* (facing where it's going...) */
+    const h = Math.hypot(K.v.x, K.v.z); if (h > 0.05) { let dy = Math.atan2(K.v.x, K.v.z) - K.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; const st = dy * Math.min(1, dt * 8); K.yaw += st; K.yr += (st / dt - K.yr) * Math.min(1, dt * 6); } }
+  const hv = Math.hypot(K.v.x, K.v.z), pitch = pitchO !== null ? pitchO : Math.max(-0.7, Math.min(1.2, Math.atan2(-K.v.y, Math.max(0.3, hv)))), roll = Math.max(-0.7, Math.min(0.7, -K.yr * 0.3));   /* (...nose down as it drops, banked into its turns) */
+  g.rotation.set(pitch, K.yaw, roll); I[0] = up; I[1] = dn; I[2] = tuck; I[3] = tal;
+  g.position.copy(K.p); g.visible = true;
   const gy = crossyRowGet(Math.round(-K.p.z)); K.sh.visible = K.ph !== 'leave'; K.sh.position.set(K.p.x, (gy ? gy.y : 0) + 0.02, K.p.z); K.sh.scale.setScalar(Math.max(0.6, 2.6 - K.p.y * 0.2));
   K.sh.material.opacity = Math.max(0.05, 0.32 - K.p.y * 0.03);
+}
+function crossyHawkHold(o) {                                             // (crossyPose) where she hangs from its talons: o gets the point just under its feet
+  const K = CROSSY.hk; K.g.updateMatrixWorld(true); return K.g.localToWorld(o.set(0, -0.36, 0.14));
 }
 function crossyHawkGo() { const K = CROSSY.hk; if (!K.on || K.ph !== 'warn') return; K.ph = 'leave'; K.t = 0; }
 
@@ -26199,8 +26367,8 @@ function crossyCam(dt, snap) {
   if (Math.abs(a - S.aspect) > 1e-3) { S.aspect = a; cam.aspect = a; cam.updateProjectionMatrix(); S.drawn = false; }
   if (S.phase === 'run' && S.started && !S.paused) S.camRow += (0.16 + 0.42 * crossyK(P.maxRow)) * dt * S.ts;
   if (P.row > S.camRow) S.camRow = P.row;
-  const t = Math.tan(cam.fov * Math.PI / 360), dist = Math.max(4.0 / (t * a), 4.9 / t), D = S.vv.cd.set(0.13, 0.8, 0.56).normalize();
-  const rows = 2 * dist * t / D.y, ahead = Math.min(7.5, rows * 0.19), fx = Math.max(-1.4, Math.min(1.4, P.x * 0.45)), fz = -(S.camRow + ahead), F = S.vv.cf;
+  const t = Math.tan(cam.fov * Math.PI / 360), dist = Math.max(3.7 / (t * a), 4.9 / t), D = S.vv.cd.set(0.2031, 0.7193, 0.6643).normalize();   /* (CROSSY2_V1: framed like Crossy Road: about 6.5 cells across a phone held upright, looking down at 46 degrees (it was 54) and turned 17 (was 13) to show the sides of things) */
+  const rows = 2 * dist * t / D.y, ahead = Math.min(7.5, rows * 0.21), fx = Math.max(-2, Math.min(2, P.x * 0.5)) - ahead * D.x / D.z, fz = -(S.camRow + ahead), F = S.vv.cf;
   if (snap) F.set(fx, 0, fz); else { F.x += (fx - F.x) * Math.min(1, dt * 3); F.z += (fz - F.z) * Math.min(1, dt * 5); }
   cam.position.copy(F).addScaledVector(D, dist);
   if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt); const s = S.shake * 0.35; cam.position.x += (Math.random() - 0.5) * s; cam.position.y += (Math.random() - 0.5) * s; }
@@ -26222,7 +26390,7 @@ function crossyPose(dt) {
     if (k === 'car' || k === 'bonk') { y = Math.max(D.row ? D.row.y : 0, D.y0 - D.t * 3); ps.rotation.z = D.dir * 1.45 * u; sy = 1 - 0.22 * u; sxz = 1 + 0.08 * u; ps.position.y = 0.06 * u; }
     else if (k === 'flat' || k === 'train') { y = (D.row ? D.row.y : 0) + (k === 'train' ? 0.07 : 0.01); pk.rotation.y = D.side * 0.4 + P.yaw; sy = 0.06; sxz = k === 'train' ? 1.5 : 1.35; }   /* (pancaked, paper-thin: the train's version shows once it's gone by) */
     else if (k === 'water' || k === 'swept' || k === 'goose') { y = S.WY + 0.1 - Math.min(1.2, D.t * 1.1); ps.rotation.z = Math.sin(D.t * 14) * 0.3 * Math.max(0, 1 - D.t); if (D.t < 0.05 && D.kind === 'swept') S.shake = 0.1; }
-    else if (k === 'hawk' && S.hk.on) { const K = S.hk; x = K.p.x; y = K.p.y - 0.62; z = K.p.z + 0.05; pk.rotation.set(0, P.yaw, Math.sin(S.time * 9) * 0.2); }
+    else if (k === 'hawk' && S.hk.on) { const K = S.hk, hp = crossyHawkHold(K.hold); x = hp.x - Math.sin(K.yaw) * 0.3; y = hp.y - 0.6 * S.SC - 0.1; z = hp.z - Math.cos(K.yaw) * 0.3; pk.rotation.set(0, K.yaw, Math.sin(S.time * 9) * 0.2); }   /* (CROSSY2_V1: hanging from its talons by the scruff) */
     ps.scale.set(sxz, sy, sxz); pk.position.set(x, y, z); crossyPoseLegs(R, 0, D.t, k === 'hawk' || k === 'water' || k === 'swept' || k === 'goose');
     S.pkSh.visible = k === 'car' || k === 'bonk'; S.pkSh.position.set(x, y + 0.01, z); return;
   }
@@ -26230,13 +26398,13 @@ function crossyPose(dt) {
   if (h) { e = Math.min(1, h.t / h.dur); const arc = 4 * e * (1 - e);
     if (h.bump) { const o = Math.sin(Math.PI * e) * 0.22; x = h.x0 + h.vx * h.w + h.dx * o; z = -h.r0 - h.dr * o; y = h.y0 + arc * 0.16; }
     else { x = P.x; z = -(h.r0 + (h.r1 - h.r0) * e); y = h.y0 + (h.y1 - h.y0) * e + arc * 0.42; sy = 1 + 0.2 * arc; sxz = 1 - 0.08 * arc; } }
-  else if (P.ride) { const m = P.ride; y = m.kind === 'log' ? S.WY + 0.37 + Math.sin(S.wt * 2.2 + m.x * 1.7) * 0.025 : m.kind === 'pad' ? S.WY + 0.05 : S.WY + 0.27 + Math.sin(S.wt * 2.2 + m.x * 1.7) * 0.025 - crossyGooseUnder(m, S.wt) * 0.18; }
+  else if (P.ride) { const m = P.ride; y = m.kind === 'log' ? S.WY + 0.37 + Math.sin(S.wt * 2.2 + m.x * 1.7) * 0.025 : m.kind === 'pad' ? S.WY + 0.05 : S.WY + 0.27 + Math.sin(S.wt * 2.2 + m.x * 1.7) * 0.025 + crossyGooseUnder(m, S.wt) * 0.04; }
   if (P.sq > 0) { P.sq = Math.max(0, P.sq - dt * 7); sy *= 1 - 0.24 * P.sq; sxz *= 1 + 0.12 * P.sq; }
   pk.position.set(x, y, z); pk.rotation.set(0, P.yaw, 0); ps.rotation.set(0, 0, 0); ps.position.set(0, 0, 0); ps.scale.set(sxz, sy, sxz);
   ps.visible = !(S.inv > 0 && ((S.time * 14) | 0) % 2);
-  S.bub.visible = S.shield; if (S.shield) S.bub.scale.setScalar(1 + Math.sin(S.time * 6) * 0.04);
+  S.bub.visible = S.shield; if (S.shield) { S.bub.scale.setScalar((1 + Math.sin(S.time * 6) * 0.04) * S.SC); S.bub.position.y = 0.3 * S.SC; }
   const gr = h && !h.bump ? crossyRowGet(e < 0.5 ? h.r0 : h.r1) : crossyRowGet(P.row), gy = gr ? (gr.t === 'water' ? (h ? Math.max(S.WY, Math.min(h.y0, h.y1)) : y) : gr.y) : 0;
-  S.pkSh.visible = true; S.pkSh.position.set(x, gy + 0.012, z); S.pkSh.scale.setScalar(0.62 * (1 - Math.min(0.4, (y - gy) * 0.6)));
+  S.pkSh.visible = true; S.pkSh.position.set(x, gy + 0.012, z); S.pkSh.scale.setScalar(0.62 * S.SC * (1 - Math.min(0.4, (y - gy) * 0.6)));
   crossyPoseLegs(R, h && !h.bump ? Math.sin(Math.PI * e) : 0, S.time, false);
 }
 function crossyPoseLegs(R, k, t, flail) {
@@ -26463,6 +26631,9 @@ function crossySfx(n, k) { if (sndFx('crossy', n, k)) return;   /* (SOUND_V1) */
     else if (n === 'bonk') { tone(300, 120, 0.18, 'sine', 0.07); tone(1760, 1750, 0.15, 'triangle', 0.02, 0.02); noise(0.12, 0.05, 1500); }
     else if (n === 'flat') { noise(0.45, 0.16, 900); tone(180, 40, 0.4, 'sine', 0.1); tone(1200, 300, 0.25, 'sawtooth', 0.01, 0.05); }
     else if (n === 'splash') { noise(0.7, 0.12, 1100); tone(500, 120, 0.4, 'sine', 0.05); noise(0.4, 0.05, 3000); }
+    else if (n === 'flap') { for (let i = 0; i < 4; i++) tone(150, 90, 0.05, 'sine', 0.035, i * 0.085); noise(0.34, 0.035, 1300); }   /* (CROSSY2_V1: a goose's wings, its dive and its return) */
+    else if (n === 'plop') { tone(420, 110, 0.2, 'sine', 0.05); noise(0.28, 0.05, 1600); }
+    else if (n === 'surface') { tone(240, 520, 0.12, 'sine', 0.03); noise(0.2, 0.03, 2400); }
     else if (n === 'hiss') noise(0.5, 0.05, 6000);
     else if (n === 'hawk') { tone(2600, 1500, 0.55, 'sawtooth', 0.012); tone(2900, 1700, 0.5, 'triangle', 0.02, 0.04); }
     else if (n === 'close') { [659, 880, 1175, 1568].forEach((f, i) => tone(f, f * 1.01, 0.14, 'triangle', 0.032, i * 0.06)); }
