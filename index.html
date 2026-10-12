@@ -10741,7 +10741,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-12 17:48';                                              // stamped when the site is published
+const BUILD = '2026-10-12 19:01';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -15083,7 +15083,7 @@ const CK_LINES = ['Ooh la la!', 'Très chic!', 'Purrfect!', 'Meow-velous!', 'So 
 function ckGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function ckPut(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 function ckState() {
-  if (ckState.S) return ckState.S; roofCkReg(); ckSnReg(); ck4Reg(); ck5Reg(); ck5bReg(); ck6Reg();
+  if (ckState.S) return ckState.S; roofCkReg(); ckSnReg(); ck4Reg(); ck5Reg(); ck5bReg(); ck6Reg(); ears2Reg();
   const S = ckState.S = { owned: new Set(['crown']), outfit: {}, spent: 0, memFish: null };
   try { const a = JSON.parse(ckGet('catguard.closet') || '[]'); if (Array.isArray(a)) for (const id of a) if (typeof id === 'string' && CK_BY_ID[id]) S.owned.add(id); } catch (e) {}
   try { ckExLoad(S); } catch (e) { console.error(e); }
@@ -15736,7 +15736,7 @@ function ckRotSet(m, a, t) {                                           // a part
 }
 function ckSwayStep(f, t, amt) {                                       // the jhumkas: each bell swings on its hook (out from her cheek, never into it)
   const g = f.geo, P = g.attributes.position.array, N = g.attributes.normal.array;
-  for (const q of f.groups) {
+  for (const q of f.groups) { if (q.e2) { ears2Sway(f, q, t, amt); continue; }   /* (EARS2_V1: a charm on the ear swings across it) */
     let az = (0.05 + 0.13 * amt) * Math.sin(t * 2.7 + q.ph); az = Math.max(-0.045, az) * q.sx; const ax = (0.06 + 0.14 * amt) * Math.sin(t * 2.1 + q.ph * 1.7);
     const cz = Math.cos(az), sz = Math.sin(az), cx = Math.cos(ax), sx = Math.sin(ax), px = q.c[0], py = q.c[1], pz = q.c[2];
     for (let i = q.a * 3; i < q.b * 3; i += 3) {
@@ -16086,7 +16086,7 @@ function closetDress(R, outfit) {
   }
   if (R.crown) R.crown.visible = !outfit.hat || outfit.hat === 'crown';   // her own gold crown, unless another hat's on (or she's gone bare-headed)
   if (W.cape && W.cape.clasp) W.cape.clasp.visible = !W.collar;          // (a collar covers the cape's chain)
-  if (R === walk.rig) closetTodSync(R); ck5bDressEnd(R);   /* (CK5B_V1: worn together, fitted round each other) */ ck6DressEnd(R);   /* (CK6_V1: a cape over a sash) */
+  if (R === walk.rig) closetTodSync(R); ck5bDressEnd(R);   /* (CK5B_V1: worn together, fitted round each other) */ ck6DressEnd(R);   /* (CK6_V1: a cape over a sash) */ ears2DressEnd(R);   /* (EARS2_V1: earrings up out of a hood; a cap that lets her ears through) */
 }
 function closetTodSync(R) {                                            // outdoors at night her fur is tinted to the sky: her new things too (todActors keeps the list)
   if (!R.todMats || !R.todF || !R.ck) return;
@@ -16175,6 +16175,7 @@ const CK_VIEWS = {   // where the camera looks for each kind of thing (yaw: how 
   back: { yaw: 2.5, el: 0.42, r: 0.68, at: 'root', off: [0, 0.5, -0.02] },
   tail: { yaw: 2.3, el: 0.22, r: 0.42, at: 'tail', off: [0, 0.02, 0] },
   ears: { yaw: 0.5, el: 0.12, r: 0.36, at: 'head', off: [0, -0.025, 0] },
+  ...ears2Views(),   /* (EARS2_V1: the earrings are up on her ears now) */
 };
 function ckSfx(n) { if (sndFx('ck', n)) return;   /* (SOUND_V1) */   // the game's own little synth (tone / noise): Settings' sound switch covers it
   if (!actx) return;
@@ -29979,6 +29980,284 @@ function w3Tick(dt) {                                                 // (update
     W.body.rotation.z = w * 0.3 * a; W.head.rotation.z = -w * 0.4 * a; W.g.position.y -= 0.04 * a; }
   S.wasG = ground;
 }
+/* EARS2_V1 */
+/* =====================================================================
+   EARS2_V1 (2026-10-12): earrings sit ON her ears. Every earring is now pinned to the front face of her ear, near its outer
+   edge and low down (where a cat's ear would be pierced), facing the camera: a stud on the ear, and anything that dangles is
+   short and lies along the ear, swinging across it (never into it). New: Double-knot earrings (a polished stack of three
+   gold tubes on the ear, two interlocked rings just below; gold, silver, two-tone and rose gold), a Cozy orange sweater
+   (outfit) and a Layered heart locket (collar).
+   Her ears are makeWalker's cones, merged into her head: they never move against it, so head space is ear space.
+   ears2Ear rebuilds each cone from makeWalker's numbers (the two ears are NOT mirror images: the left one sits further back
+   and stands straighter), so each earring is placed on its own ear.
+   Function declarations only (hoisted): nothing here runs at load.
+   ===================================================================== */
+
+/* ---------- her ears (head space) ---------- */
+function ears2Ear(sx) {                                                  // the ear's front face: its tip (ap), its outer and inner base corners (fo, fi), which way it faces (n)
+  const C = ears2Ear.C || (ears2Ear.C = {}); if (C[sx]) return C[sx];
+  const m = new THREE.Matrix4().compose(new THREE.Vector3(sx * 0.095, 0.14, -0.01), new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.08, Math.PI / 4, -sx * 0.32)), new THREE.Vector3(1, 1, 1));   /* (makeWalker: ConeGeometry(0.066, 0.15, 4)) */
+  const ap = new THREE.Vector3(0, 0.075, 0).applyMatrix4(m), cs = [];
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2; cs.push(new THREE.Vector3(0.066 * Math.sin(a), -0.075, 0.066 * Math.cos(a)).applyMatrix4(m)); }
+  cs.sort((a, b) => b.z - a.z); const fo = Math.abs(cs[0].x) > Math.abs(cs[1].x) ? cs[0] : cs[1], fi = fo === cs[0] ? cs[1] : cs[0];
+  const n = new THREE.Vector3().subVectors(ap, fo).cross(new THREE.Vector3().subVectors(fi, fo)).normalize(); if (n.z < 0) n.negate();
+  return (C[sx] = { ap, fo, fi, n });
+}
+function ears2Frame(sx, s, t, h) {                                       // a spot on the ear's front face: s up its outer edge (0 its base corner .. 1 the tip), t across (0 the edge .. 1 the inner corner), h out
+  const E = ears2Ear(sx), O = E.fo.clone().addScaledVector(new THREE.Vector3().subVectors(E.ap, E.fo), s).addScaledVector(new THREE.Vector3().subVectors(E.fi, E.fo), t).addScaledVector(E.n, h || 0);
+  const Z = E.n.clone(), Y = new THREE.Vector3(0, 1, 0).addScaledVector(Z, -Z.y).normalize(), Xr = new THREE.Vector3().crossVectors(Y, Z), X = Xr.clone().multiplyScalar(sx);   /* (+x toward her outer edge on both ears: the left one is mirrored) */
+  return { O, X, Y, Z, Xr, M: new THREE.Matrix4().makeBasis(X, Y, Z).setPosition(O) };
+}
+function ears2Pair(B, o, stud, charm) {                                  // an earring on each ear: stud(B, sx) sits on the ear (still); charm(B, sx) hangs from o.pv (it swings)
+  const cnt = () => B.parts.s.reduce((n, [g]) => n + g.attributes.position.count, 0), groups = [], k = (o.k || 1) * 1.45, v = new THREE.Vector3();   /* (all of them a size up: they read from across the yard) */
+  const up = ears2Pair.up || 0, kk = k * (up > 0 ? 0.86 : 1);            /* (up: under the ghost's hood, higher up the ear, where it pokes out; down: under a cap) */
+  for (const sx of [1, -1]) {
+    const F = ears2Frame(sx, o.s + up, o.t * (up > 0 ? 0.8 : 1), o.h || 0), M = F.M.clone().multiply(new THREE.Matrix4().makeScale(kk, kk, kk));
+    B.M = M.clone(); if (stud) stud(B, sx);
+    const a = cnt(); B.M = M.clone(); if (charm) charm(B, sx); const b = cnt(); B.frame();
+    if (charm && b > a) { v.fromArray(o.pv || [0, 0, 0]).applyMatrix4(M); groups.push({ c: v.toArray(), a, b, sx, ph: sx > 0 ? (o.ph || 0) : (o.ph || 0) + 1.9, e2: { n: F.Z.toArray(), x: F.Xr.toArray() } }); }
+  }
+  if (groups.length) B.fx = { sway: { k: 's', groups } };
+}
+function ears2Sway(f, q, t, amt) {                                      // (ckSwayStep, for these) a charm swings across the ear's face, and lifts off it a little: never into it
+  const S = ears2Sway, qa = S.qa || (S.qa = new THREE.Quaternion()), qb = S.qb || (S.qb = new THREE.Quaternion()), m = S.m || (S.m = new THREE.Matrix4()), ax = S.ax || (S.ax = new THREE.Vector3());
+  const a1 = (0.08 + 0.22 * amt) * Math.sin(t * 2.7 + q.ph), a2 = (0.05 + 0.18 * amt) * (0.5 + 0.5 * Math.sin(t * 2.1 + q.ph * 1.7));
+  qa.setFromAxisAngle(ax.fromArray(q.e2.n), a1); qb.setFromAxisAngle(ax.fromArray(q.e2.x), -a2); qa.multiply(qb); m.makeRotationFromQuaternion(qa);
+  const e = m.elements, P = f.geo.attributes.position.array, N = f.geo.attributes.normal.array, c = q.c;
+  for (let i = q.a * 3; i < q.b * 3; i += 3) {
+    const x = f.P0[i] - c[0], y = f.P0[i + 1] - c[1], z = f.P0[i + 2] - c[2], nx = f.N0[i], ny = f.N0[i + 1], nz = f.N0[i + 2];
+    P[i] = e[0] * x + e[4] * y + e[8] * z + c[0]; P[i + 1] = e[1] * x + e[5] * y + e[9] * z + c[1]; P[i + 2] = e[2] * x + e[6] * y + e[10] * z + c[2];
+    N[i] = e[0] * nx + e[4] * ny + e[8] * nz; N[i + 1] = e[1] * nx + e[5] * ny + e[9] * nz; N[i + 2] = e[2] * nx + e[6] * ny + e[10] * nz;
+  }
+}
+function ears2Stud(B, col, r, z) { B.s(CKG.sph(r, 12, 8), col, [0, 0, z == null ? r * 0.25 : z], null, [1, 1, 0.55]); }   // a little domed stud, flat on the ear
+
+/* ---------- the earrings, on the ear (local: +x toward her outer edge, +y up the ear, +z out of it) ---------- */
+function ears2Jhumka(B) {                                                // Aunty-ji's jhumkas: a flower stud on the ear, a little gold bell beaded with pearls hanging just below it, lying on the ear
+  const gold = 0xf2c14a, deep = 0xc8901f;
+  ears2Pair(B, { s: 0.6, t: 0.14, pv: [0, -0.007, 0.004], ph: 0 }, b => {
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; b.s(CKG.sph(0.0038, 8, 6), gold, [Math.cos(a) * 0.0052, Math.sin(a) * 0.0052, 0.0016], null, [1, 1, 0.5]); }
+    b.s(CKG.sph(0.0034, 8, 6), 0xd81b3a, [0, 0, 0.003], null, [1, 1, 0.7]);
+  }, b => {
+    const zb = 0.0088, k = 0.5;
+    b.s(ckTaper([[0, -0.006, 0.003], [0, -0.0085, 0.006], [0, -0.0105, zb - 0.002]], 0.0016, 0.0016, 6, 5), gold);
+    b.s(CKG.sph(0.0034, 10, 8), gold, [0, -0.0108, zb]);
+    const prof = [[0.0035, 0], [0.0062, -0.002], [0.009, -0.007], [0.0122, -0.014], [0.0152, -0.022], [0.0178, -0.029], [0.0192, -0.034], [0.0196, -0.0365]].map(([r, y]) => new THREE.Vector2(r * k, (y - 0.002) * k));
+    b.s(ckTwoSided(new THREE.LatheGeometry(prof, 18)), (x, y) => y < -0.019 * k && y > -0.023 * k ? deep : gold, [0, -0.0108, zb], null, [1, 1, 0.72]);
+    for (let i = 0; i < 8; i++) { const t = i / 8 * Math.PI * 2; b.s(CKG.sph(0.0016, 6, 4), i % 2 ? 0x1e9a5a : 0xd81b3a, [Math.sin(t) * 0.0142 * k, -0.0108 - 0.0225 * k, zb + Math.cos(t) * 0.0142 * k * 0.72]); }
+    for (let i = 0; i < 12; i++) { const t = i / 12 * Math.PI * 2; b.s(CKG.sph(0.0021, 6, 5), 0xfff4e2, [Math.sin(t) * 0.0192 * k, -0.0108 - 0.0255 * k, zb + Math.cos(t) * 0.0192 * k * 0.72]); }
+    b.s(CKG.sph(0.003, 8, 6), gold, [0, -0.0108 - 0.026 * k, zb]);
+  });
+}
+function ears2Hoops(B) {                                                 // gold hoops through the edge of each ear (like a cartilage piercing): a big one low down, a little one above it
+  const gold = 0xf2c14a;
+  ears2Pair(B, { s: 0.43, t: 0.0, pv: [0, 0, 0], ph: 0.2 }, b => {
+    b.s(CKG.tor(0.0118, 0.0026, 10, 44), gold, [0.0035, -0.0042, 0.0], [0, 1.1, 0.32]);
+    b.M = b.M.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.024, 0));
+    b.s(CKG.tor(0.0082, 0.0021, 8, 36), gold, [0.0028, -0.003, 0.0], [0, 1.1, 0.32]);
+  }, null);
+}
+function ears2Cherries(B) {                                              // two little cherries perched on each ear, on a gold stud, a leaf on top
+  ears2Pair(B, { s: 0.6, t: 0.13, pv: [0, -0.002, 0.003], ph: 0, k: 0.85 }, b => ears2Stud(b, 0xf2c14a, 0.0042), b => {
+    const cher = [[-0.0085, -0.02], [0.0075, -0.017]], z = 0.0095;
+    for (const [x, y] of cher) { b.s(ckTaper([[0, -0.001, 0.003], [x * 0.45, y * 0.45, 0.006], [x, y + 0.008, z]], 0.0014, 0.0012, 8, 4), 0x4f8a2a);
+      b.s(CKG.sph(0.0088, 12, 9), 0xd8143a, [x, y, z]); b.s(CKG.sph(0.0024, 6, 5), 0xff9fb0, [x - 0.003, y + 0.003, z + 0.0068]); }
+    b.s(ckFlat([[0, 0], [0.007, 0.004], [0.014, 0.002], [0.008, -0.003]], 0.0018), 0x5fae55, [0.001, 0.0005, 0.0045], [0, 0, 0.35]);
+  });
+}
+function ears2Spider(B) {                                                // a fuzzy black spider sitting on each ear, on a short silver thread from a silver stud
+  const silver = 0xd8dde6, black = 0x1a1620;
+  ears2Pair(B, { s: 0.62, t: 0.14, pv: [0, -0.002, 0.003], ph: 0.4 }, b => ears2Stud(b, silver, 0.004), b => {
+    const y0 = -0.019, z = 0.0085;
+    b.s(ckTaper([[0, -0.001, 0.003], [0, -0.006, 0.004], [0, y0 + 0.012, z - 0.002]], 0.0009, 0.0009, 6, 4), 0xf4f6fb);
+    b.s(CKG.sph(0.0098, 12, 9), black, [0, y0, z], null, [1, 1.1, 0.75]); b.s(CKG.sph(0.006, 10, 8), black, [0, y0 + 0.0105, z + 0.001]);
+    b.s(CKG.sph(0.0034, 6, 5), 0xd8143a, [0, y0 - 0.002, z + 0.0072], null, [1, 1.3, 0.5]);
+    for (const ex of [-1, 1]) b.s(CKG.sph(0.0018, 6, 5), 0xffffff, [ex * 0.0028, y0 + 0.012, z + 0.0055]);
+    for (const s of [-1, 1]) for (let i = 0; i < 4; i++) { const a = -0.75 + i * 0.5, ca = Math.cos(a), sa = Math.sin(a);   /* (its legs spread out over the ear) */
+      b.s(ckTaper([[s * 0.006 * ca, y0 + 0.006 * sa, z], [s * 0.014 * ca, y0 + 0.014 * sa + 0.003, z + 0.002], [s * 0.021 * ca, y0 + 0.02 * sa - 0.003, 0.0035]], 0.0014, 0.0009, 6, 4), black); }
+  });
+}
+function ears2Toad(B) {                                                  // a tiny spotted toadstool on each ear, from a gold stud
+  ears2Pair(B, { s: 0.6, t: 0.14, pv: [0, -0.002, 0.003], ph: 0.3, k: 1.05 }, b => ears2Stud(b, 0xf2c14a, 0.0038), b => {
+    const z = 0.0094;
+    b.s(ckTaper([[0, -0.001, 0.003], [0, -0.004, 0.006], [0, -0.0075, z]], 0.0011, 0.0011, 6, 4), 0xf2c14a);
+    b.s(CKG.cyl(0.0048, 0.0064, 0.014, 10), 0xfff4e0, [0, -0.026, z], null, [1, 1, 0.8]);
+    b.s(new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0xd9232f, [0, -0.0195, z], null, [0.0135, 0.012, 0.0092]);
+    b.s(CKG.cyl(0.013, 0.005, 0.0025, 12), 0xf2e2c8, [0, -0.0198, z], null, [1, 1, 0.8]);
+    for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2 + 0.3; b.s(CKG.sph(0.0024, 6, 5), 0xffffff, [Math.cos(a) * 0.0102, -0.0135, z + Math.sin(a) * 0.0071]); }
+    b.s(CKG.sph(0.0024, 6, 5), 0xffffff, [0, -0.0078, z + 0.0012]);
+  });
+}
+function ears2Acorn(B) {                                                 // a shiny little acorn and a red oak leaf on each ear, from a gold stud
+  ears2Pair(B, { s: 0.6, t: 0.14, pv: [0, -0.002, 0.003], ph: 0.3, k: 1.0 }, b => ears2Stud(b, 0xf2c14a, 0.0038), b => {
+    const z = 0.0092;
+    b.s(ckTaper([[0, -0.001, 0.003], [0, -0.004, 0.006], [0, -0.007, z]], 0.0011, 0.0011, 6, 4), 0xf2c14a);
+    b.s(CKG.sph(1, 14, 10), 0xc68a45, [0, -0.0225, z], null, [0.0092, 0.0118, 0.0082]);
+    b.s(CKG.cone(0.0026, 0.005, 6), 0x7a4a22, [0, -0.0355, z], [Math.PI, 0, 0]);
+    b.s(new THREE.SphereGeometry(1, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2), (x, y, z2) => Math.sin(x * 900) * Math.sin(z2 * 900) > 0 ? 0x6a4122 : 0x845331, [0, -0.0175, z], null, [0.011, 0.0082, 0.0098]);
+    b.s(CKG.cyl(0.0014, 0.0014, 0.006, 5), 0x5a3418, [0, -0.0085, z]);
+    b.s(ckFlat([[0, 0], [0.006, 0.005], [0.012, 0.004], [0.017, 0.008], [0.021, 0.002], [0.016, -0.004], [0.008, -0.004]], 0.0018), 0xd06a22, [0.002, -0.011, z - 0.003], [0, 0, -0.5]);
+  });
+}
+
+/* ---------- 🪢 Double-knot earrings: three thick polished tubes in a little arched pillow on the ear, two interlocked rings just below ---------- */
+function ears2KnotCols(v) {                                               // [top, rings A, ring B, shine]: 0 gold, 1 silver, 2 two-tone (gold top, silver knot), 3 rose gold
+  return [[0xf2c14a, 0xf2c14a, 0xf2c14a, 0xffe39a], [0xd9dde4, 0xd9dde4, 0xd9dde4, 0xffffff], [0xf2c14a, 0xd9dde4, 0xf2c14a, 0xffe39a], [0xe8a888, 0xe8a888, 0xe8a888, 0xffe0cf]][v] || [0xf2c14a, 0xf2c14a, 0xf2c14a, 0xffe39a];
+}
+function ears2Knot(B, v) {
+  const C = ears2KnotCols(v), rt = 0.0036, half = 0.0088;
+  const shine = (base, hi, r) => (x, y, z) => (z > r * 0.8 ? hi : base);   /* (a polished highlight along each tube's crown) */
+  ears2Pair(B, { s: 0.64, t: 0.14, pv: [0, -half - 0.002, 0.003], ph: 0.5 }, b => {
+    for (const i of [-1, 0, 1]) {                                        // the top: three tubes side by side, each bowed out from the ear (the middle one most), rounded ends
+      const L = i ? half * 0.84 : half, bow = i ? 0.0026 : 0.0038, x0 = i * rt * 1.9, pts = [];
+      for (let k = 0; k <= 8; k++) { const u = k / 8, y = L - 2 * L * u; pts.push(new THREE.Vector3(x0 * (1 - 0.12 * Math.pow(2 * u - 1, 2)), y, rt + 0.0006 + bow * Math.sin(Math.PI * u))); }
+      const cu = new THREE.CatmullRomCurve3(pts), g = new THREE.TubeGeometry(cu, 20, rt, 12, false), zc = y => rt + 0.0006 + bow * Math.sin(Math.PI * Math.min(1, Math.max(0, (L - y) / (2 * L))));
+      b.s(g, (x, y, z) => (z > zc(y) + rt * 0.72 ? C[3] : C[0]));
+      for (const e of [pts[0], pts[8]]) b.s(CKG.sph(rt, 12, 9), C[0], [e.x, e.y, e.z]);
+    }
+  }, b => {                                                              // the knot: two thick rings linked through each other, offset a touch, as wide as the top
+    const R = 0.0058, tr = 0.0025, y = -half - 0.0068, z = 0.0068;
+    b.s(CKG.tor(R, tr, 12, 40), shine(C[1], C[3], tr), [-0.0036, y, z], [0.1, 0.38, 0]);
+    b.s(CKG.tor(R, tr, 12, 40), shine(C[2], C[3], tr), [0.0036, y - 0.0042, z], [-0.1, -0.38, 0]);
+  });
+}
+function ears2KnotVars(it, up) {                                         // (ears2Reg, ears2Var) its four real colourways, not dyed: gold (the original), silver, two-tone, rose gold
+  it.ck5bVs = [{ n: 'Gold', hex: 0xf2c14a }, { n: 'Silver', hex: 0xd9dde4 }, { n: 'Two-tone', hex: 0xe6cf8e }, { n: 'Rose gold', hex: 0xe8a888 }];
+  const cache = {}, get = v => () => { if (cache[v]) return cache[v]; ck5bBase(it); const B = ckB(), u0 = ears2Pair.up; ears2Pair.up = up || 0; try { ears2Knot(B, v); } finally { ears2Pair.up = u0; } const G = {}; for (const k of ['m', 's', 'g', 'l', 'f']) G[k] = ckMerge(B.parts[k]); return (cache[v] = G); };
+  it.ck5bV = {}; for (const v of [1, 2, 3]) Object.defineProperty(it.ck5bV, v, { get: get(v), enumerable: true });   /* (ck5bVarGeo reads it.ck5bV[idx]: built the first time it's asked for) */
+}
+
+/* ---------- 🍊 Cozy orange sweater: bright tangerine, oversized and slouchy, fine ribs, balloon sleeves, a crew neck, a rolled hem ---------- */
+function ears2Sweater(B) {
+  const o1 = 0xff8a1e, o2 = 0xf47f16, o3 = 0xe37010;
+  const sh = ck5bShell({ m: 0.027, nd: 0.034, zb: -0.335, zbB: -0.19, cols: 64, rows: 28,
+    bump: (u, f, k, j) => (k % 2 ? 0.0011 : -0.0011) + 0.006 * u * u * (0.55 + 0.45 * Math.sin(f * 5 + 0.7)),   /* (fine ribs; it slouches and folds toward the hem) */
+    col: (u, f, k, j) => j >= 26 ? (k % 2 ? o2 : o3) : (k % 2 ? o1 : o2) });
+  B.m(sh.g, sh.c);
+  B.m(ck5bHem(sh.front, true, 0.0125, 0.004), (x, y, z, i) => (i >> 2) % 2 ? o2 : o3);   // the ribbed crew neck
+  B.m(ck5bHem(sh.back, true, 0.0115, 0.003), (x, y, z, i) => (i >> 3) % 3 ? o2 : o1);    // the rolled hem
+}
+function ears2Sleeve(B) {                                                // (a front leg's space) a roomy balloon sleeve over her dropped shoulder, gathered into a ribbed cuff
+  const o1 = 0xff8a1e, o2 = 0xf47f16, o3 = 0xe37010, n = 32, rib = x => x % 2 ? o1 : o2;
+  const prof = [[0.093, -0.03], [0.097, -0.065], [0.094, -0.105], [0.086, -0.14], [0.073, -0.172], [0.06, -0.192], [0.053, -0.202]].map(([r, y]) => new THREE.Vector2(r, y));
+  const g = new THREE.LatheGeometry(prof, n), P = g.attributes.position;
+  for (let i = 0; i < P.count; i++) { const k = Math.floor(i / prof.length), s = 1 + (k % 2 ? 0.012 : -0.012) * (1 - Math.abs(P.getY(i) + 0.1) * 4); P.setX(i, P.getX(i) * s); P.setZ(i, P.getZ(i) * s); }   /* (ribs, gathered at both ends) */
+  g.computeVertexNormals();
+  B.m(ckTwoSided(g), (x, y, z, i) => rib(Math.floor(i / prof.length)), [0, 0, 0.004], null, [0.88, 1, 1.02]);
+  B.m(ckTwoSided(CKG.cyl(0.0515, 0.0495, 0.026, n, true)), (x, y, z) => Math.floor((Math.atan2(x, z) + Math.PI) / (Math.PI * 2) * n * 2) % 2 ? o2 : o3, [0, -0.214, 0.004], null, [0.88, 1, 1.02]);   // the cuff
+  B.m(CKG.tor(0.051, 0.0042, 6, n), o3, [0, -0.227, 0.004], [Math.PI / 2, 0, 0], [0.88, 1.02, 1]);
+}
+
+/* ---------- 💛 Layered heart locket: two fine gold chains, a short one with a tiny red gem, a long one with a puffy gold heart ---------- */
+function ears2Locket(B) {
+  const gold = 0xf2c14a, link = 0xdcaa32, hi = 0xfff0b0;
+  const chain = N => B.s(new THREE.TubeGeometry(N.curve, 180, 0.0017, 5, true), (x, y, z, i) => Math.floor(i / 6) % 2 ? gold : link);
+  const A = ckNeck(0.011, 0.02), L = ckNeck(0.013, 0.062);
+  chain(A); chain(L);
+  { const f = ckFrontOf(A, 0.75), c = f.p.clone().addScaledVector(f.out, 0.0045).add(new THREE.Vector3(0, -0.0055, 0));   // the short chain's tiny red gem in a gold bezel
+    B.frame([c.x, c.y, c.z], [Math.atan2(-f.out.y, f.out.z) - 0.15, 0, 0]);
+    B.s(CKG.tor(0.0022, 0.0008, 5, 10), gold, [0, 0.0058, 0]); B.s(CKG.tor(0.0043, 0.0012, 6, 20), gold, [0, 0, 0]);
+    B.s(CKG.sph(0.0042, 10, 8), 0xd3122f, [0, 0, 0.0012], null, [1, 1, 0.7]); B.s(CKG.sph(0.0012, 6, 4), 0xffd6dc, [-0.0013, 0.0014, 0.0038]);
+    B.frame(); }
+  { const f = ckFrontOf(L, 0.75), c = f.p.clone().addScaledVector(f.out, 0.0085).add(new THREE.Vector3(0, -0.017, 0));   // the long chain's puffy heart locket on a little bail
+    B.frame([c.x, c.y, c.z], [Math.atan2(-f.out.y, f.out.z) - 0.18, 0, 0]);
+    B.s(CKG.tor(0.0032, 0.0011, 6, 12), gold, [0, 0.0158, 0]);
+    const hs = ckShape(ckHeartPts(0.0142, 48)), hg = new THREE.ExtrudeGeometry(hs, { depth: 0.0016, bevelEnabled: true, bevelThickness: 0.0034, bevelSize: 0.0027, bevelSegments: 5, curveSegments: 24 });
+    hg.translate(0, 0, -0.0008); hg.computeVertexNormals();
+    B.s(hg, (x, y, z) => Math.abs(z) < 0.0004 ? 0xc8901f : z > 0.0034 && x < 0 && y > 0 ? hi : gold, [0, -0.001, 0]);   /* (a hinge seam round its edge; a shine on its shoulder) */
+    B.frame(); }
+}
+
+/* ---------- worn with other things (closetDress, last): under the ghost's hood they sit higher up her ears; the toadstool crown lets her ears through ---------- */
+function ears2Var(it, up) {                                              // the same earring, baked higher up her ears (its own geometry and colourways)
+  const V = it.e2Var || (it.e2Var = {}); if (V[up]) return V[up];
+  const v = Object.create(it); Object.assign(v, { geo: undefined, fx: null, sprite: undefined, ck5bV: {}, e2Var: null, e2Up: up,
+    build: B => { const u0 = ears2Pair.up; ears2Pair.up = up; try { it.build(B); } finally { ears2Pair.up = u0; } } });
+  if (it.id === 'doubleKnot') ears2KnotVars(v, up);
+  return (V[up] = v);
+}
+function ears2Covers(W) {                                                // how far up her ears the earrings go: under a hood (the ghost sheet), to where her ears poke out of it; under the toadstool cap, down below its rim
+  const o = W.outfit && W.outfit.it; if (o && o.head) return 0.17;
+  return W.hat && W.hat.it && W.hat.it.id === 'toadCrown' ? -0.07 : 0;
+}
+function ears2DressEnd(R) {
+  try {
+    const W = R.ck; if (!W) return;
+    if (W.hat && W.hat.fit && W.ears && W.hat.it && W.hat.it.id === 'toadCrown') { W.hat.fit.scale.set(0.8, 1.04, 0.95); W.hat.fit.position.y += 0.016; }   /* (its cap swallowed her ears: a touch narrower, her ears and earrings show either side) */
+    const cur = W.ears; if (!cur || !cur.fit) return;
+    const base = CK_BY_ID[cur.id], up = ears2Covers(W), it = base && up ? ears2Var(base, up) : base;
+    if (!it || cur.it === it) return;
+    if (cur.obj.parent) cur.obj.parent.remove(cur.obj); ckFxDrop(cur);
+    ck5bCol.want = cur.col || 0; const inst = ckInstance(it); ck5bCol.want = 0;
+    inst.col = cur.col; inst.fit = cur.fit; inst.xs = cur.xs; cur.fit.add(inst.obj); W.ears = inst;
+    if (R === walk.rig) closetTodSync(R);
+  } catch (e) { console.error(e); }
+}
+
+/* ---------- registering (from ckState, after ck6Reg): the new things, the earrings re-hung, the thumbnails, the neighbours' lines ---------- */
+function ears2Items() {
+  return [
+    { id: 'doubleKnot', slot: 'ears', name: 'Double-knot earrings', price: 290, ic: '🪢', tags: ['chic', 'sparkly', 'cool'],
+      blurb: 'Chunky, high-shine statement earrings: a plump little pillow of three gold tubes on each ear, and two thick rings knotted together just below. Liquid gold. Very main character.',
+      say: 'Knot bad, huh?', build: B => ears2Knot(B, 0) },
+    { id: 'orangeSweater', slot: 'outfit', name: 'Cozy orange sweater', price: 280, ic: '🍊', tags: ['cozy', 'cute'], k5: 'shell', thumbDir: [0.75, 0.55, 0.9],
+      blurb: 'A big, slouchy tangerine knit with dropped shoulders, roomy balloon sleeves, a crew neck and a rolled hem. Like wearing a hug that’s also a pumpkin.',
+      say: 'Peak cozy!', build: B => ears2Sweater(B), legs: B => ears2Sleeve(B), legsOn: [0, 1] },
+    { id: 'layeredLocket', slot: 'collar', name: 'Layered heart locket', price: 210, ic: '💛', tags: ['cute', 'chic', 'cozy'],
+      blurb: 'Two fine gold chains layered together: a short one with a tiny red gem, a long one with a puffy gold heart locket. Dainty, and goes with everything (especially orange).',
+      say: 'Layered and lovely!', build: B => ears2Locket(B) },
+  ];
+}
+function ears2Reg() {
+  if (ears2Reg.done) return; ears2Reg.done = true;
+  try {
+    const I = CK_BY_ID, re = (id, build, x) => { const it = I[id]; if (!it) return; it.build = build; if (x) Object.assign(it, x); };
+    re('jhumkas', B => ears2Jhumka(B), { blurb: 'Little gold bells with pearls, pinned on her ears with a flower stud. A gift from Aunty-ji. They swing when she walks!' });
+    re('hoops', B => ears2Hoops(B), { blurb: 'Two shiny gold hoops through the edge of each ear, a big one and a baby one. Very rock and roll.' });
+    re('cherries', B => ears2Cherries(B), { blurb: 'Two little cherries perched on each ear. They swing when she walks!' });
+    re('spiderEars', B => ears2Spider(B), { blurb: 'A fuzzy black spider sitting right on each ear, on a silver thread. They wiggle when she walks!' });
+    re('toadStuds', B => ears2Toad(B), { blurb: 'A tiny spotted toadstool on each ear, pinned with a gold stud. Mushroom royalty, down to the details.' });
+    re('acornEars', B => ears2Acorn(B));
+    for (const it of ears2Items()) if (!I[it.id]) { CK_ITEMS.push(it); I[it.id] = it; }
+    if (I.doubleKnot) ears2KnotVars(I.doubleKnot);
+    const shop = it => !ckIsEx(it) && !it.season, slot = it => CK_SLOTS.findIndex(s => s.id === it.slot);   /* (each tab cheapest first, as ck6Reg sorts them) */
+    const regs = CK_ITEMS.filter(shop).sort((a, b) => slot(a) - slot(b) || a.price - b.price), rest = CK_ITEMS.filter(it => !shop(it));
+    CK_ITEMS.length = 0; regs.concat(rest).forEach(it => CK_ITEMS.push(it));
+    ears2Thumbs();
+    ears2Rx();
+  } catch (e) { console.error(e); }
+}
+function ears2Thumbs() {                                                 // each earring's card: framed on the one on her right ear (measured from its baked shape), seen from in front and a little to the side
+  const F = ears2Frame(1, 0.6, 0.14, 0), d = F.Z.clone().addScaledVector(F.X, 0.55).add(new THREE.Vector3(0, 0.1, 0)).toArray();
+  for (const it of CK_ITEMS) if (it.slot === 'ears' && it.build) { Object.defineProperty(it, 'thumb', { get() { return ears2ThumbOf(this); }, configurable: true }); it.thumbDir = it.id === 'hoops' ? [1, 0.25, 0.75] : d; }
+  const L = CK_BY_ID.layeredLocket; if (L) { let th = null; Object.defineProperty(L, 'thumb', { get() { if (!th) { const f = ckFrontOf(ckNeck(0.013, 0.062), 0.75).p; th = [0, f.y - 0.012, f.z, 0.085]; } return th; }, configurable: true }); L.thumbDir = [0.3, 0.25, 1]; }   /* (the two pendants and the chains crossing her chest; measured when first drawn: her body's shape isn't there yet at load) */
+}
+function ears2ThumbOf(it) {                                             // (ckThumbStep reads it.thumb after baking) the right-ear earring's middle and size: [x, y, z, r]
+  if (it.e2th) return it.e2th; const G = it.geo; if (!G) return null;
+  const b = new THREE.Box3(), v = new THREE.Vector3();
+  for (const k of ['s', 'm', 'l']) { const g = G[k]; if (!g) continue; const P = g.attributes.position; for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); if (v.x > 0.02) b.expandByPoint(v); } }
+  if (b.isEmpty()) return null; const c = b.getCenter(new THREE.Vector3()), r = b.getSize(new THREE.Vector3()).length() * 0.56;
+  return (it.e2th = [c.x, c.y, c.z, Math.max(0.018, r)]);
+}
+function ears2Views() { return { ears: { yaw: 0.42, el: 0.14, r: 0.3, at: 'head', off: [0, 0.075, 0.01] } }; }   /* (CK_VIEWS: the earrings are up on her ears now) */
+function ears2Rx() {                                                     // what the neighbours say (rxLines' item lines)
+  try {
+    const L = rxLines(), item = (who, id, lines) => { const D = L[who]; if (D && D.item && !D.item[id]) D.item[id] = lines; };
+    item('aunty', 'doubleKnot', ["Arre, so much gold! Beta, are those earrings or a down payment?", [['a', "Those earrings! Real gold?"], ['k', "Real enough, Aunty-ji."], ['a', "Then don't wear them to the No Frills. Sharma-ji's wife will faint."]]]);
+    item('aunty', 'orangeSweater', ["Orange! Like a ladoo! So cheerful. Finally some colour in this house.", "Very warm, very good. Now if only the landlord would fix the heating."]);
+    item('aunty', 'layeredLocket', ["Two chains! Layering, the girls call it. Very fashionable. Whose photo is in the heart?", [['a', "Such a sweet locket. Is there a photo inside?"], ['k', "It's a fish, Aunty-ji."], ['a', "Of course it is."]]]);
+    item('roof', 'doubleKnot', ["Whoa. Shiny. SO shiny. I'm not gonna take them. I'm just gonna... look. Closely. Forever.", "Are those knots? I can't even tie a knot. I've got little hands."]);
+    item('roof', 'orangeSweater', ["Orange sweater! You look like a traffic cone. A really cozy traffic cone. Respect."]);
+    item('roof', 'layeredLocket', ["A heart locket! What's inside? Snacks? Please say snacks."]);
+    item('slider', 'doubleKnot', ["Fancy earrings! Bet you can't hear me through all that gold! Nyah!"]);
+    item('slider', 'orangeSweater', ["Nice sweater, pumpkin! It's not even Halloween yet! ...Wait, is it? Nyah!"]);
+    item('porter', 'doubleKnot', [["🐕 Porter sees the shiny gold and wags so hard his whole back end wiggles!", 'wag']]);
+    item('porter', 'orangeSweater', [["🐕 Porter thinks you're a big orange ball! He play-bows!", 'bark']]);
+    item('porter', 'layeredLocket', [["🐕 Porter tilts his head at the little gold heart...", 'tilt']]);
+  } catch (e) {}
+}
+/* (end of EARS2_V1) */
+
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
