@@ -10757,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-13 08:54';                                              // stamped when the site is published
+const BUILD = '2026-10-13 11:12';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -41543,6 +41543,790 @@ function bpInstall() {
 }
 bpInstall();
 /* (end of BIRDS_V1) */
+/* FIT_V1 */
+/* =====================================================================
+   FIT_V1 (2026-10-13): tops that really fit PKR. Every Closet top (slot 'outfit', all but the ghost sheet) is re-cut on
+   ONE body-conforming garment generator:
+   - fitShell(): a smooth surface offset from her real body blobs (CK_BODY, blended with a soft minimum so fabric bridges
+     the creases instead of clinging into them). It wraps the chest and belly, starts at a snug neck ring at her real
+     neck (the collar plane, hugging the head-neck junction), and ends at a soft rounded hem: high over her rump, curving
+     down her flanks to a belly cut-out just behind her front legs (like real pet sweaters), so her tail and back legs
+     are free. It has the same shape as ck5bShell's result ({ g, c, front, back, full, at }) and the same (u, f, k, j)
+     parameters, so each item's own pattern and colours (col), knit bumps, hems, buttons, pockets, patches, collars...
+     go on the new shape unchanged: the item's build runs with ck5bShell / ck5bHem swapped for fitShell / fitHem.
+     Small add-ons are then turned to the new surface (they were laid on the old radial normals).
+   - Per-item spec (fitSpecs): sleeves none / cap / puff / mid / full / flare (none = real armholes cut round her front
+     legs, with a bound edge), neck drop, V opening (cut, with lapels, or filled with a shirt), zip, padding, a flared
+     skirt or coat tails.
+   - fitSleeve(): real sleeves fitted to her shoulder and leg, children of the leg pivots (via it.legs, the CK5B hook),
+     so they swing and bend with every walk, run, jump, trick and pose, in the Closet and on every clone of walk.rig.
+     Their colours come from the item's own sleeve design when it had one, else from its own pattern's lower rows and
+     hem rib. One material each: a garment is its body (1-2 draw calls) plus a sleeve per front leg.
+   Colourways keep working: the new geometry carries vertex colours exactly as before, so the CK5B dye (ck5bDyeSet /
+   ck5bPart) recolours body and sleeves together. Ids, names, prices, blurbs, perks, sets and colourways are untouched.
+   How it plugs in (no anchors elsewhere): fitInstall() (the one guarded call below) wraps ckPacksRun (so fitReg() runs
+   once after every pack has registered), ck5bDressX (the space suit's trouser legs on her back legs) and
+   ck5bDressEnd (a collar or necklace sits over the new roll neck). If ckState already ran, it re-cuts and re-dresses now.
+   ===================================================================== */
+function fitInstall() {
+  if (fitInstall.done) return; fitInstall.done = true;
+  try { const o = ckPacksRun; ckPacksRun = function () { o(); fitReg(); }; } catch (e) { console.error(e); }
+  try { const o = ck5bDressX; ck5bDressX = function (R, sid, inst, par) { o(R, sid, inst, par); fitDressX(R, sid, inst); }; } catch (e) { console.error(e); }
+  try { const o = ck5bDressEnd; ck5bDressEnd = function (R) { o(R); fitDressEnd(R); }; } catch (e) { console.error(e); }
+  try { if (ckState.S) { fitReg(); fitRedress(); } } catch (e) { console.error(e); }
+}
+function fitSpecs() {                                                    // each top's cut (anything not listed: mid sleeves, a crew neck)
+  return fitSpecs.T || (fitSpecs.T = {
+    sweater: { sl: 'mid' }, hoodie: { sl: 'mid' }, seaJumper: { sl: 'mid' }, orangeSweater: { sl: 'mid', ease: 0.008 }, natBeeJumper: { sl: 'mid' }, jersey: { sl: 'mid' },
+    popVelour: { sl: 'full', zip: 0xdfe2ea }, evTrack: { sl: 'full', zip: 0xe4e6ec }, calFlannel: { sl: 'full' }, popBodysuit: { sl: 'full', nd: 0.026 },
+    raincoat: { sl: 'full' }, parka: { sl: 'full', pad: 0.004, zip: 0xcfd3dc, ro: 0.012 }, seaSilkJacket: { sl: 'mid' }, fanArmour: { sl: 'mid' }, fanSpaceSuit: { sl: 'full', back: 1, zip: 0xb9c0cc },
+    fanCoat: { sl: 'full', v: 0.34, vw: 0.72, vfill: 0xfffaf2, lapel: 1, tails: 1 }, cardigan: { sl: 'mid', v: 0.22, vw: 0.5 }, jacket: { sl: 'full', v: 0.26, vw: 0.72, lapel: 1 },
+    evVest: { sl: 'none', v: 0.3, vw: 0.72, vfill: 0xfdfdfb }, natLeafVest: { sl: 'none' }, evPuffer: { sl: 'none', pad: 0.004 }, guardVest: { sl: 'none' },
+    fanRobe: { sl: 'flare', skirt: 1 }, fanMermaid: { sl: 'none', nd: 0.026 }, tutu: { sl: 'none', nd: 0.026 },
+    evDress: { sl: 'puff' }, gown: { sl: 'puff', nd: 0.026 }, fdApron: { sl: 'puff' }, fdStrawDress: { sl: 'puff' }, fdNigiriSuit: { sl: 'cap' },
+  });
+}
+function fitSpec(it) { return Object.assign({ sl: 'mid', nd: 0.012 }, fitSpecs()[it.id] || {}); }
+function fitRules() {                                                    // (the pairs that still can't look right on the new cut)
+  return [];
+}
+function fitReg() {                                                      // (ckPacksRun, after every pack) every top re-cut on the fitted shape
+  if (fitReg.done) return; fitReg.done = true;
+  try {
+    for (const it of CK_ITEMS) {
+      if (it.slot !== 'outfit' || !it.build || it.k5 === 'sheet' || it.fitB0) continue;
+      const P = fitSpec(it); it.fitB0 = it.build; it.fitP = P; it.fitL0 = it.legs || null; it.build = B => fitBuild(it, B);
+      if (P.sl === 'none') { it.legs = null; it.legsOn = null; } else { it.legs = B => fitSleeve(it, B, 0); it.legsOn = [0, 1]; }
+      it.fitLegsB = P.back ? (B => fitSleeve(it, B, 1)) : null;
+      delete it.geo; delete it.ck5bV; delete it.ck5bP; delete it.ck5bH;
+    }
+    const R = ck5bRules(); for (const r of fitRules()) if (!R.some(q => q.a === r.a && q.b === r.b)) R.push(r);
+  } catch (e) { console.error(e); }
+}
+function fitRedress() {                                                  // (only if she was dressed before the re-cut) put the new cut on
+  for (const R of [walk && walk.rig, typeof CK !== 'undefined' && CK.rig]) { try { if (!R || !R.ck || !R.ck.outfit) continue; R.ck.outfit.id = '#'; closetDress(R, R === walk.rig ? ckState().outfit : CK.prev); } catch (e) {} }
+}
+function fitDressX(R, sid, inst) {                                       // (ck5bDressX, after) the space suit's trouser legs on her back legs
+  try { const it = inst && inst.it; if (sid !== 'outfit' || !it || !it.fitLegsB || !R.legs || !inst.xs) return;
+    for (const li of [2, 3]) { const L = R.legs[li]; if (!L) continue; const h = ck5bPart(it, 'fitLegsB', inst.col); L.add(h); inst.xs.push(h); } } catch (e) { console.error(e); }
+}
+function fitDressEnd(R) {                                                // (ck5bDressEnd, after) a collar or necklace sits over the roll neck
+  try {
+    const W = R.ck; if (!W || !W.outfit || !W.outfit.it || !W.outfit.it.fitP) return;
+    const w = W.collar; if (!w || !w.fit) return;
+    const s = 1.1, C = [0, 0.575, 0.27]; w.fit.scale.setScalar(s); w.fit.position.set(C[0] * (1 - s), C[1] * (1 - s) + 0.008, C[2] * (1 - s) + 0.006);
+  } catch (e) { console.error(e); }
+}
+
+/* ---------- the garment: her shape, a spine sweep, a soft field ---------- */
+function fitEl() {                                                       // her blobs (CK_BODY: body, chest, haunches, shoulders) and her head
+  return fitEl.L || (fitEl.L = CK_BODY.concat([CK_HEADE]).map(e => [e[0], e[1], e[2], e[3], e[4], e[5]]));
+}
+function fitF(x, y, z, wh) {                                             // a smooth distance to her (a soft minimum over the blobs); wh pushes the head away (> 0.3: no head)
+  const L = fitEl(), k = 0.022; let s = 0;
+  for (let i = 0; i < L.length; i++) {
+    if (i === 6 && wh > 0.3) continue;
+    const e = L[i], dx = x - e[0], dy = y - e[1], dz = z - e[2], qx = dx / e[3], qy = dy / e[4], qz = dz / e[5], k0 = Math.sqrt(qx * qx + qy * qy + qz * qz);
+    const px = dx / (e[3] * e[3]), py = dy / (e[4] * e[4]), pz = dz / (e[5] * e[5]), k1 = Math.sqrt(px * px + py * py + pz * pz) || 1e-6;
+    let d = k0 * (k0 - 1) / k1; if (i === 6) d += wh; s += Math.exp(-d / k);
+  }
+  return -k * Math.log(Math.max(s, 1e-30));
+}
+function fitGrad(x, y, z, wh, out) {
+  const h = 0.0015, gx = fitF(x + h, y, z, wh) - fitF(x - h, y, z, wh), gy = fitF(x, y + h, z, wh) - fitF(x, y - h, z, wh), gz = fitF(x, y, z + h, wh) - fitF(x, y, z - h, wh), l = Math.hypot(gx, gy, gz) || 1;
+  out[0] = gx / l; out[1] = gy / l; out[2] = gz / l; return out;
+}
+function fitHit(o, d, m, wh, r0) {                                       // the outermost point along o + d·t where the fabric (m out from her) sits
+  let far = Math.max(0.12, r0 + 0.07), n = 0; const F = t => fitF(o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t, wh);
+  while (F(far) <= m && n++ < 6) far += 0.08;
+  let t = far; const st = 0.0035; while (t > 0 && F(t) > m) t -= st;
+  if (t <= 0) return r0;
+  let a = t, b = t + st; for (let i = 0; i < 7; i++) { const c = (a + b) / 2; if (F(c) > m) b = c; else a = c; }
+  return (a + b) / 2;
+}
+function fitSs(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+function fitHole(x, y, z) {                                              // < 0 inside the leg opening (round both front legs and across under her chest between them)
+  const ex = Math.max(0, Math.abs(x) - 0.1) / 0.084, ez = (z - 0.235) / (z > 0.235 ? 0.112 : 0.135);
+  return Math.max(Math.sqrt(ex * ex + ez * ez) - 1, (y - 0.37) / 0.05);
+}
+function fitGrid(cols, rows, f0, f1, m, zT, zB, P) {                     // the fitted surface (shared by every top with the same cut): positions, normals, the V, armholes
+  const zTop = zT, zBot = P.zBot != null ? P.zBot : Math.max(-0.02, Math.min(0.13, zB + 0.2)), nd = P.nd == null ? 0.012 : P.nd, ro = P.ro || 0.004;
+  const key = [cols, rows, f0.toFixed(3), f1.toFixed(3), m.toFixed(4), zTop, zBot, nd, P.v || 0, P.vw || 0, P.vfill ? 1 : 0, P.sl === 'none' ? 1 : 0, ro].join(',');
+  const CC = fitGrid.C || (fitGrid.C = {}); if (CC[key]) return CC[key];
+  const n0 = [0, 0.86, 0.51], nl = Math.hypot(n0[1], n0[2]); n0[1] /= nl; n0[2] /= nl;
+  const Pn = [0, 0.585 - n0[1] * nd, 0.285 - n0[2] * nd], a0 = Math.atan2(n0[2], n0[1]);   /* (the neck plane's tilt: its sections turn from it to upright ones) */
+  const sp = new THREE.CatmullRomCurve3([new THREE.Vector3(Pn[0], Pn[1], Pn[2]), new THREE.Vector3(0, 0.5, 0.17), new THREE.Vector3(0, 0.455, 0.02), new THREE.Vector3(0, 0.44, -0.2), new THREE.Vector3(0, 0.44, -0.48)], false, 'centripetal');
+  const NS = 96, mN = Math.min(m, 0.011), np = (cols + 1) * (rows + 1), Pp = new Float32Array(np * 3), N = new Float32Array(np * 3), Vf = new Uint8Array(np), ring = new Uint8Array(np), VE = [];
+  const O = new THREE.Vector3(), g3 = [0, 0, 0];
+  for (let k = 0; k <= cols; k++) {
+    const f = f0 + (f1 - f0) * k / cols, sf = Math.sin(f), cf = Math.cos(f), zh = zTop + (zBot - zTop) * Math.pow((1 - cf) / 2, 1.5);
+    const pts = []; let rp = 0.16;
+    for (let i = 0; i <= NS; i++) {
+      const t = Math.pow(i / NS, 1.35); sp.getPoint(t, O); const al = a0 + (Math.PI / 2 - a0) * fitSs(0, 0.4, t), uy = Math.sin(al), uz = -Math.cos(al);   /* (U: the section's "up"; at t 0 it is the neck plane's up-and-back) */
+      const d = [sf, cf * uy, cf * uz], wh = t / 0.05 * 0.3, mm = mN + (m - mN) * fitSs(0, 0.16, t), o = [O.x, O.y, O.z];
+      const r = fitHit(o, d, mm, wh, rp); rp = r; const p = [o[0] + d[0] * r, o[1] + d[1] * r, o[2] + d[2] * r];
+      if (pts.length && p[2] <= zh) { const q = pts[pts.length - 1], w = (q[2] - zh) / Math.max(1e-6, q[2] - p[2]); pts.push([q[0] + (p[0] - q[0]) * w, q[1] + (p[1] - q[1]) * w, zh]); break; }
+      pts.push(p);
+    }
+    { const e = pts[pts.length - 1], D = [e[0] - pts[0][0], e[1] - pts[0][1], e[2] - pts[0][2]], dl = Math.hypot(D[0], D[1], D[2]) || 1, keep = [pts[0]]; let best = 0;   /* (no folds: a column only ever moves on) */
+      for (let i = 1; i < pts.length; i++) { const q = pts[i], pr = ((q[0] - pts[0][0]) * D[0] + (q[1] - pts[0][1]) * D[1] + (q[2] - pts[0][2]) * D[2]) / dl; if (pr > best + 1e-4 || i === pts.length - 1) { keep.push(q); best = Math.max(best, pr); } }
+      pts.length = 0; keep.forEach(q => pts.push(q)); }
+    const S = [0]; for (let i = 1; i < pts.length; i++) S.push(S[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]));
+    const L = S[S.length - 1] || 1e-6;
+    let df = Math.abs(f - Math.PI); df = Math.min(df, Math.abs(f + Math.PI));                 /* (how far round from her front centre) */
+    const vs = P.v && P.vw && df < P.vw ? P.v * L * Math.pow(1 - df / P.vw, 0.9) : 0, cut = vs > 0 && !P.vfill, s0 = cut ? vs : 0;
+    let seg = 0;
+    if (vs > 0) { let q = 0; while (q < S.length - 2 && S[q + 1] < vs) q++; const w = Math.max(0, Math.min(1, (vs - S[q]) / Math.max(1e-9, S[q + 1] - S[q]))), a = pts[q], b = pts[q + 1] || a; VE[k] = [a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w, a[2] + (b[2] - a[2]) * w]; }
+    for (let j = 0; j <= rows; j++) {
+      const s = s0 + (L - s0) * j / rows; while (seg < S.length - 2 && S[seg + 1] < s) seg++;
+      const w = Math.max(0, Math.min(1, (s - S[seg]) / Math.max(1e-9, S[seg + 1] - S[seg]))), a = pts[seg], b = pts[Math.min(pts.length - 1, seg + 1)], i = j * (cols + 1) + k;
+      Pp[i * 3] = a[0] + (b[0] - a[0]) * w; Pp[i * 3 + 1] = a[1] + (b[1] - a[1]) * w; Pp[i * 3 + 2] = a[2] + (b[2] - a[2]) * w;
+      if (P.vfill && s < vs) Vf[i] = 1; if (j === 0 && !cut) ring[i] = 1;
+    }
+  }
+  for (let pass = 0; pass < 2; pass++) {                                 // a little smoothing round each row (the rays can step), kept on her surface
+    const Q = Pp.slice();
+    for (let j = 1; j <= rows; j++) for (let k = 0; k <= cols; k++) { const full = f1 - f0 > 6.2, ka = k > 0 ? k - 1 : full ? cols - 1 : k, kb = k < cols ? k + 1 : full ? 1 : k, i = j * (cols + 1) + k, ia = j * (cols + 1) + ka, ib = j * (cols + 1) + kb;
+      for (let c = 0; c < 3; c++) Pp[i * 3 + c] = Q[i * 3 + c] * 0.5 + (Q[ia * 3 + c] + Q[ib * 3 + c]) * 0.25; }
+  }
+  for (let i = 0; i < np; i++) { const j = Math.floor(i / (cols + 1)), wh = j === 0 ? 0 : 0.6; fitGrad(Pp[i * 3], Pp[i * 3 + 1], Pp[i * 3 + 2], wh, g3); N[i * 3] = g3[0]; N[i * 3 + 1] = g3[1]; N[i * 3 + 2] = g3[2]; }
+  const RN = new Float32Array((cols + 1) * 3);                           // the neck ring's outward way: away from the neck, in the collar plane
+  for (let k = 0; k <= cols; k++) { const i = k; let x = Pp[i * 3] - Pn[0], y = Pp[i * 3 + 1] - Pn[1], z = Pp[i * 3 + 2] - Pn[2]; const dn = x * n0[0] + y * n0[1] + z * n0[2]; x -= n0[0] * dn; y -= n0[1] * dn; z -= n0[2] * dn;
+    const l = Math.hypot(x, y, z) || 1; if (ring[i]) { RN[k * 3] = x / l; RN[k * 3 + 1] = y / l; RN[k * 3 + 2] = z / l; } else { RN[k * 3] = N[i * 3]; RN[k * 3 + 1] = N[i * 3 + 1]; RN[k * 3 + 2] = N[i * 3 + 2]; } }
+  for (let k = 0; k <= cols; k++) if (ring[k]) for (let c = 0; c < 3; c++) Pp[k * 3 + c] += RN[k * 3 + c] * ro;   /* (the neck edge stands a hair off her fur) */
+  let I = null, holes = null;
+  if (P.sl === 'none') { const r = fitArmholes(Pp, N, cols, rows, f1 - f0 > 6.2); I = r.I; holes = r.holes; }
+  const VEN = VE.map(p => p ? fitGrad(p[0], p[1], p[2], 0.6, [0, 0, 0]) : null);
+  return (CC[key] = { P: Pp, N, Vf, RN, I, holes, cols, rows, f0, f1, Pn, n0, VE, VEN });
+}
+function fitArmholes(Pp, N, cols, rows, full) {                          // cut a hole round each front leg (snapping the cut edge onto the hole's outline); returns the index list and the two outlines
+  const W = cols + 1, np = W * (rows + 1), g = new Float32Array(np), snap = new Uint8Array(np), acc = new Float32Array(np * 4);
+  for (let i = 0; i < np; i++) g[i] = fitHole(Pp[i * 3], Pp[i * 3 + 1], Pp[i * 3 + 2]);
+  const nb = (j, k) => { const L = []; if (j > 0) L.push((j - 1) * W + k); if (j < rows) L.push((j + 1) * W + k); if (k > 0) L.push(j * W + k - 1); else if (full) L.push(j * W + cols - 1); if (k < cols) L.push(j * W + k + 1); else if (full) L.push(j * W + 1); return L; };
+  for (let j = 0; j <= rows; j++) for (let k = 0; k <= cols; k++) { const i = j * W + k; if (g[i] >= 0) continue;
+    for (const q of nb(j, k)) { if (g[q] < 0) continue; const t = g[i] / (g[i] - g[q]); acc[i * 4] += Pp[i * 3] + (Pp[q * 3] - Pp[i * 3]) * t; acc[i * 4 + 1] += Pp[i * 3 + 1] + (Pp[q * 3 + 1] - Pp[i * 3 + 1]) * t; acc[i * 4 + 2] += Pp[i * 3 + 2] + (Pp[q * 3 + 2] - Pp[i * 3 + 2]) * t; acc[i * 4 + 3]++; } }
+  const outl = [[], []];
+  for (let i = 0; i < np; i++) if (acc[i * 4 + 3] > 0) { const c = acc[i * 4 + 3]; Pp[i * 3] = acc[i * 4] / c; Pp[i * 3 + 1] = acc[i * 4 + 1] / c; Pp[i * 3 + 2] = acc[i * 4 + 2] / c; snap[i] = 1;
+    const x = Pp[i * 3], z = Pp[i * 3 + 2], k = i % W; if (full && k === cols) continue; outl[0].push([Math.atan2((z - 0.235) / 0.125, x / 0.184), x, Pp[i * 3 + 1], z, i]); }
+  const I = [];
+  for (let j = 0; j < rows; j++) for (let k = 0; k < cols; k++) { const a = j * W + k, b = a + 1, c = a + W, d = c + 1;
+    for (const tri of [[a, b, c], [b, d, c]]) { let deep = 0, sn = 0; for (const v of tri) { if (g[v] < 0 && !snap[v]) deep++; if (snap[v]) sn++; } if (deep || sn === 3) continue; I.push(tri[0], tri[1], tri[2]); } }
+  const holes = outl.map(L => L.sort((p, q) => p[0] - q[0]).map(p => new THREE.Vector3(p[1], p[2], p[3]).addScaledVector(new THREE.Vector3(N[p[4] * 3], N[p[4] * 3 + 1], N[p[4] * 3 + 2]), 0.002))).filter(L => L.length > 5);
+  return { I, holes };
+}
+function fitShell(o, P) {                                                // (in place of ck5bShell, while a top is built) the same answer, on the fitted shape
+  const cols = o.cols || 48, rows = o.rows || 22, full = o.f0 == null, f0 = full ? -Math.PI : o.f0, f1 = full ? Math.PI : o.f1;
+  const m = (o.m == null ? 0.02 : o.m) + (P.pad || 0), G = fitGrid(cols, rows, f0, f1, m, o.zb == null ? -0.31 : o.zb, o.zbB == null ? (o.zb == null ? -0.17 : o.zb) : o.zbB, P);
+  const W = cols + 1, np = W * (rows + 1), Pp = new Float32Array(G.P), cols3 = new Array(np), front = [], back = [], frontN = [], backN = [];
+  for (let k = 0; k <= cols; k++) { const f = f0 + (f1 - f0) * k / cols;
+    for (let j = 0; j <= rows; j++) { const u = j / rows, i = j * W + k, i3 = i * 3;
+      if (o.bump) { const b = o.bump(u, f, k, j); Pp[i3] += G.N[i3] * b; Pp[i3 + 1] += G.N[i3 + 1] * b; Pp[i3 + 2] += G.N[i3 + 2] * b; }
+      cols3[i] = G.Vf[i] ? P.vfill : o.col ? o.col(u, f, k, j, [Pp[i3], Pp[i3 + 1], Pp[i3 + 2]]) : 0xffffff; }
+    const a = k * 3, b = (rows * W + k) * 3;
+    front.push(new THREE.Vector3(Pp[a], Pp[a + 1], Pp[a + 2])); frontN.push(new THREE.Vector3(G.RN[a], G.RN[a + 1], G.RN[a + 2]));
+    back.push(new THREE.Vector3(Pp[b], Pp[b + 1], Pp[b + 2])); backN.push(new THREE.Vector3(G.N[b], G.N[b + 1], G.N[b + 2]));
+  }
+  if (full && o.col) { let bad = 0; for (let j = 0; j <= rows; j++) if (cols3[j * W] !== cols3[j * W + cols]) bad++;   /* (the seam now runs down her chest: a pattern that doesn't wrap round is mirrored about it instead) */
+    if (bad > rows * 0.2) for (let k = 0; k <= cols; k++) { const f = f0 + (f1 - f0) * k / cols, km = Math.min(k, cols - k); for (let j = 0; j <= rows; j++) { const i = j * W + k; if (!G.Vf[i]) cols3[i] = o.col(j / rows, f, km, j, [Pp[i * 3], Pp[i * 3 + 1], Pp[i * 3 + 2]]); } } }
+  const g = ck5bGrid(Pp, cols, rows, false), NA = g.attributes.normal;     // the cloth's own normals (its knit bumps catch the light), eased toward the smooth ones, the seam closed
+  for (let i = 0; i < np; i++) { const x = NA.getX(i) + G.N[i * 3], y = NA.getY(i) + G.N[i * 3 + 1], z = NA.getZ(i) + G.N[i * 3 + 2], l = Math.hypot(x, y, z) || 1; NA.setXYZ(i, x / l, y / l, z / l); }
+  if (full) for (let j = 0; j <= rows; j++) { const a = j * W, b = a + cols, x = NA.getX(a) + NA.getX(b), y = NA.getY(a) + NA.getY(b), z = NA.getZ(a) + NA.getZ(b), l = Math.hypot(x, y, z) || 1; NA.setXYZ(a, x / l, y / l, z / l); NA.setXYZ(b, x / l, y / l, z / l); }
+  if (G.I) g.setIndex(G.I);
+  const at = (u, f, mm) => {                                             // a point on it (bilinear between its rows and columns), m out along its normal
+    let kf = (f - f0) / (f1 - f0) * cols; if (full) { kf = ((kf % cols) + cols) % cols; } kf = Math.max(0, Math.min(cols, kf));
+    const jf = Math.max(0, Math.min(rows, u * rows)), k0 = Math.min(cols - 1, Math.floor(kf)), j0 = Math.min(rows - 1, Math.floor(jf)), a = kf - k0, b = jf - j0, out = new THREE.Vector3(), n = new THREE.Vector3();
+    for (const [dj, dk, w] of [[0, 0, (1 - a) * (1 - b)], [0, 1, a * (1 - b)], [1, 0, (1 - a) * b], [1, 1, a * b]]) { const i = ((j0 + dj) * W + k0 + dk) * 3; out.x += Pp[i] * w; out.y += Pp[i + 1] * w; out.z += Pp[i + 2] * w; n.x += G.N[i] * w; n.y += G.N[i + 1] * w; n.z += G.N[i + 2] * w; }
+    return out.addScaledVector(n.normalize(), mm || 0);
+  };
+  return { g, c: (x, y, z, i) => cols3[i % np], front, back, full, at, o, P, G, Pp, cols, rows, f0, f1, frontN, backN, cols3 };
+}
+function fitHem(st, o2, pts, closed, r, out) {                           // (in place of ck5bHem) the neck roll and the hem, rolled out along the new shape's own normals
+  const sh = st.sh, isF = !!sh && pts === sh.front, isB = !!sh && pts === sh.back;
+  if (!isF && !isB) return o2(pts, closed, r, out);
+  const N = isF ? sh.frontN : sh.backN, L = closed ? pts.slice(0, -1) : pts.slice(), NL = closed ? N.slice(0, -1) : N.slice(), push = isF ? Math.max(out || 0, r * 0.85) : Math.max(out || 0, r * 0.35);
+  const P = L.map((p, i) => p.clone().addScaledVector(NL[i], push));
+  const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(P, !!closed, 'centripetal'), Math.max(24, P.length * 2), r, 6, !!closed);
+  g.userData.fitHem = isF ? 'front' : 'back'; return g;
+}
+function fitBuild(it, B) {                                               // (it.build) the item's own build, on the fitted shape; then its add-ons turned to it, and the cut's extras
+  const P = it.fitP, o1 = ck5bShell, o2 = ck5bHem, st = { it, P, sh: null, n0: {} };
+  for (const k in B.parts) st.n0[k] = B.parts[k].length;
+  ck5bShell = o => { const sh = fitShell(o, P); if (!st.sh) st.sh = sh; return sh; };
+  ck5bHem = (pts, closed, r, out) => fitHem(st, o2, pts, closed, r, out);
+  try { it.fitB0(B); } finally { ck5bShell = o1; ck5bHem = o2; }
+  if (!st.sh) { it.fitSt = null; return; }
+  try { fitFix(B, st); fitExtras(B, st); } catch (e) { console.error(e); }
+  const sh = st.sh; it.fitSt = { o: sh.o, cols: sh.cols, rows: sh.rows, f0: sh.f0, f1: sh.f1, bk: st.bk || 'm', hemCol: st.hemCol };
+}
+function fitFix(B, st) {                                                 // small add-ons were laid on the old shell's radial normals: turn each to the new surface under it
+  const sh = st.sh, Pp = sh.Pp, NN = sh.G.N, n = Pp.length / 3, W = sh.cols + 1, c = new THREE.Vector3(), nr = new THREE.Vector3(), Nn = new THREE.Vector3(), Q = new THREE.Quaternion(), M = new THREE.Matrix4(), T = new THREE.Matrix4();
+  for (const k of ['m', 's', 'g', 'l']) { const L = B.parts[k];
+    for (let i = st.n0[k] || 0; i < L.length; i++) { const part = L[i], geo = part[0], Mx = part[2];
+      if (geo === sh.g) { st.bk = k; continue; }
+      if (geo.userData && geo.userData.fitHem) { if (geo.userData.fitHem === 'back' && st.hemCol == null) st.hemCol = part[1]; if (geo.userData.fitHem === 'front' && st.frontCol == null) st.frontCol = part[1]; continue; }
+      if (!geo.boundingSphere) geo.computeBoundingSphere(); const bs = geo.boundingSphere; if (!bs) continue;
+      c.copy(bs.center).applyMatrix4(Mx); const rad = bs.radius * Mx.getMaxScaleOnAxis(); if (rad > 0.06) continue;
+      let best = -1, bd = 1e9; for (let v = 0; v < n; v++) { const dx = Pp[v * 3] - c.x, dy = Pp[v * 3 + 1] - c.y, dz = Pp[v * 3 + 2] - c.z, d2 = dx * dx + dy * dy + dz * dz; if (d2 < bd) { bd = d2; best = v; } }
+      if (best < 0 || bd > 0.05 * 0.05) continue;
+      const f = sh.f0 + (sh.f1 - sh.f0) * (best % W) / sh.cols; nr.set(Math.sin(f), Math.cos(f), 0); Nn.set(NN[best * 3], NN[best * 3 + 1], NN[best * 3 + 2]);
+      if (nr.dot(Nn) < 0.995) { Q.setFromUnitVectors(nr, Nn); M.makeTranslation(c.x, c.y, c.z).multiply(T.makeRotationFromQuaternion(Q)).multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z)); part[2] = M.clone().multiply(Mx); }
+      const h = (c.x - Pp[best * 3]) * Nn.x + (c.y - Pp[best * 3 + 1]) * Nn.y + (c.z - Pp[best * 3 + 2]) * Nn.z, need = Math.min(0.004, rad * 0.25);   /* (and never sunk into the cloth) */
+      if (h < need) part[2] = new THREE.Matrix4().makeTranslation(Nn.x * (need - h), Nn.y * (need - h), Nn.z * (need - h)).multiply(part[2]);
+    } }
+}
+function fitColAt(sh, u, f, k) { const o = sh.o, j = Math.round(Math.max(0, Math.min(1, u)) * sh.rows); return o.col ? o.col(u, f, k == null ? Math.round((f - sh.f0) / (sh.f1 - sh.f0) * sh.cols) : k, j, [0, 0, 0]) : 0xffffff; }
+function fitExtras(B, st) {                                              // the cut's own pieces: armhole bindings, a zip, lapels, a robe's skirt, coat tails
+  const sh = st.sh, P = st.P, bk = st.bk || 'm', add = (g, col) => B[bk](g, col), hem = st.hemCol != null ? st.hemCol : fitColAt(sh, 1, Math.PI / 2);
+  const hemHex = typeof hem === 'function' ? hem(0, 0, 0, 0) : hem;
+  if (sh.G.holes) for (const L of sh.G.holes) {                          // armholes: a bound edge round each
+    const pts = L.map(p => p.clone()); add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true, 'centripetal'), Math.max(32, pts.length * 3), 0.0075 + (P.pad || 0), 6, true), hemHex); }
+  if (P.zip) { const pts = []; for (let i = 0; i <= 24; i++) pts.push(sh.at(0.01 + i / 24 * 0.97, Math.PI, 0.003).toArray());
+    B.s(ckTaper(pts, 0.0032, 0.0032, 72, 5), (x, y, z, i) => (Math.floor(i / 6) % 2 ? P.zip : 0x8a8f99)); }
+  if (P.lapel && P.v) for (const s of [-1, 1]) {                         // lapels: the opening's edge folded back, wider toward her shoulders
+    const E = [], Nl = [];
+    for (let k = 0; k <= sh.cols; k++) { const f = sh.f0 + (sh.f1 - sh.f0) * k / sh.cols, df = Math.PI - Math.abs(f), ve = sh.G.VE[k]; if (Math.sign(f) !== s || !ve) continue; const vn = sh.G.VEN[k];
+      E.push([df, new THREE.Vector3(ve[0], ve[1], ve[2]), new THREE.Vector3(vn[0], vn[1], vn[2])]); }
+    { const top = E.reduce((a, e) => e[0] > a[0] ? e : a, [-1]); if (top[1]) { const k = Math.round(((s > 0 ? Math.PI - P.vw : -Math.PI + P.vw) - sh.f0) / (sh.f1 - sh.f0) * sh.cols); if (sh.front[k]) E.push([P.vw, sh.front[k].clone(), sh.frontN[k].clone()]); } }
+    E.sort((a, b) => b[0] - a[0]); if (E.length < 3) continue;
+    const Pq = [], C = []; for (let i = 0; i < E.length; i++) { const [df, p, n] = E[i], q = E[Math.min(E.length - 1, i + 1)][1], r = E[Math.max(0, i - 1)][1], t = q.clone().sub(r).normalize(), side = new THREE.Vector3().crossVectors(n, t).normalize();
+      if (side.x * s < 0) side.negate(); const w = 0.01 + 0.026 * Math.min(1, df / P.vw); const a = p.clone().addScaledVector(n, 0.004), b = p.clone().addScaledVector(side, w).addScaledVector(n, 0.007);
+      Pq.push(a.x, a.y, a.z, b.x, b.y, b.z); }
+    const g = new THREE.BufferGeometry(), I = []; for (let i = 0; i < E.length - 1; i++) { const q = i * 2; if (s > 0) I.push(q, q + 1, q + 2, q + 1, q + 3, q + 2); else I.push(q, q + 2, q + 1, q + 1, q + 2, q + 3); }
+    g.setAttribute('position', new THREE.Float32BufferAttribute(Pq, 3)); g.setIndex(I); g.computeVertexNormals();
+    const fh = st.frontCol != null ? st.frontCol : fitColAt(sh, 0.05, Math.PI * 0.8);
+    add(ckTwoSided(g), typeof fh === 'function' ? fh(0, 0, 0, 0) : fh);
+  }
+  if (P.skirt || P.tails) {                                              // a robe's long flared skirt down her sides, or a captain's coat tails
+    const fa = P.tails ? 0.4 : 0.85, fb = P.tails ? 1.65 : 2.35, Lm = P.tails ? 0.15 : 0.15, fl = P.tails ? 0.03 : 0.07, body = fitColAt(sh, 0.7, 1.6), edge = fitColAt(sh, 1, 1.6);
+    for (const s of [-1, 1]) { const H = [];
+      for (let k = 0; k <= sh.cols; k++) { const f = sh.f0 + (sh.f1 - sh.f0) * k / sh.cols; if (Math.sign(f) !== s) continue; const a = Math.abs(f); if (a < fa || a > fb) continue; H.push([a, sh.back[k], sh.backN[k]]); }
+      H.sort((p, q) => p[0] - q[0]); if (H.length < 3) continue;
+      const rowsS = 8, Pq = [], C = [];
+      for (let j = 0; j <= rowsS; j++) for (let i = 0; i < H.length; i++) { const [a, p, n] = H[i], v = j / rowsS, env = Math.pow(Math.sin(Math.PI * (a - fa) / (fb - fa)), 0.55), len = Lm * env, h = new THREE.Vector3(n.x, 0, n.z).normalize();
+        const q = p.clone().addScaledVector(n, 0.003).add(new THREE.Vector3(0, -len * v, 0)).addScaledVector(h, fl * env * Math.pow(v, 1.4) + 0.004 * Math.sin(i * 1.3) * v);
+        Pq.push(q.x, q.y, q.z); C.push(j >= rowsS - 1 ? edge : body); }
+      const W = H.length, I = []; for (let j = 0; j < rowsS; j++) for (let i = 0; i < W - 1; i++) { const a = j * W + i, b = a + 1, c = a + W, d = c + 1; I.push(a, c, b, b, c, d); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(Pq, 3)); g.setIndex(I); g.computeVertexNormals();
+      add(ckTwoSided(g), (x, y, z, i) => C[i % C.length]); }
+  }
+}
+
+/* ---------- sleeves: fitted to her shoulder and leg, hung from the leg pivot (so they swing with her) ---------- */
+function fitSleeve(it, B, back) {                                        // (it.legs, in a leg's own space: the leg runs down -y from the pivot)
+  if (it.fitSt === undefined) { try { ck5bBase(it); if (it.fitSt === undefined) fitBuild(it, ckB()); } catch (e) { console.error(e); } }
+  const st = it.fitSt; if (!st) return;
+  const P = it.fitP, typ = P.sl, puff = typ === 'puff', flare = typ === 'flare', yT = 0.035, yB = back ? -0.25 : typ === 'cap' ? -0.172 : puff ? -0.168 : typ === 'full' ? -0.272 : flare ? -0.24 : -0.214;
+  const bl = back ? [0.092, 0.144, 0.138] : [0.068, 0.098, 0.085], NA = 28, NY = 15, mS = 0.013 + (P.pad || 0) * 0.8 + (P.ease || 0), sm = (a, b) => { const k = 0.012, h = Math.max(0, Math.min(1, 0.5 + 0.5 * (a - b) / k)); return a * h + b * (1 - h) + k * h * (1 - h); };
+  const Pq = new Float32Array((NA + 1) * (NY + 1) * 3), ring = [];
+  for (let r = 0; r <= NY; r++) { const v = r / NY, y = yT + (yB - yT) * v, e = (y + 0.02) / bl[1], bf = e * e < 1 ? Math.sqrt(1 - e * e) : 0, rl = y < 0 ? 0.052 + 0.012 * (y / 0.36) : 0.052 * fitSs(0.06, 0, y);
+    const cuff = fitSs(0.84, 0.92, v), ex = puff ? 0.028 * Math.pow(Math.sin(Math.PI * Math.min(1, v / 0.86)), 0.8) : flare ? 0.06 * Math.pow(v, 1.6) : 0.003 * (1 - cuff);
+    const tight = puff ? 0.004 * cuff : 0;
+    const rx = sm(bl[0] * bf, rl) + mS + ex - tight, rz = sm(bl[2] * bf, rl) + mS + ex - tight;
+    for (let a = 0; a <= NA; a++) { const th = a / NA * Math.PI * 2, i = (r * (NA + 1) + a) * 3; Pq[i] = Math.sin(th) * rx; Pq[i + 1] = y; Pq[i + 2] = Math.cos(th) * rz + 0.004; }
+    if (r === NY) for (let a = 0; a < NA; a++) { const th = a / NA * Math.PI * 2; ring.push(new THREE.Vector3(Math.sin(th) * (rx + 0.002), y, Math.cos(th) * (rz + 0.002) + 0.004)); }
+  }
+  const cnt = (NA + 1) * (NY + 1), C = fitSleeveCols(it, st, NA, NY, back);
+  const g = ckTwoSided(ck5bGrid(Pq, NA, NY, true)), bk = st.bk || 'm';
+  B[bk](g, (x, y, z, i) => C[i % cnt]);
+  B[bk](new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ring, true), 40, flare ? 0.006 : 0.0048, 5, true), C[NY * (NA + 1) + Math.round(NA / 4)]);   // the cuff's rolled edge
+}
+function fitSleeveCols(it, st, NA, NY, back) {                           // a sleeve's colours: the item's own sleeve design if it had one, else its pattern's lower rows and hem rib
+  const out = new Array((NA + 1) * (NY + 1));
+  if (it.fitL0) {
+    try { const B2 = ckB(), cyl = CKG.cyl; CKG.cyl = (rt, rb, h, n, open) => new THREE.CylinderGeometry(rt, rb, h, n || 16, 24, !!open); try { it.fitL0(B2); } finally { CKG.cyl = cyl; }
+      const g = ckMerge(B2.parts.m.concat(B2.parts.s)); if (g) {
+      const Pa = g.attributes.position, Ca = g.attributes.color, n = Pa.count; let y0 = -1e9, y1 = 1e9; for (let i = 0; i < n; i++) { const y = Pa.getY(i); if (y > y0) y0 = y; if (y < y1) y1 = y; }
+      const V = [], TH = [], c = new THREE.Color(); for (let i = 0; i < n; i++) { V.push((y0 - Pa.getY(i)) / Math.max(1e-6, y0 - y1)); TH.push(Math.atan2(Pa.getX(i), Pa.getZ(i) - 0.004)); }
+      for (let r = 0; r <= NY; r++) for (let a = 0; a <= NA; a++) { const v = r / NY, th = Math.atan2(Math.sin(a / NA * Math.PI * 2), Math.cos(a / NA * Math.PI * 2)); let best = 0, bd = 1e9;
+        for (let i = 0; i < n; i++) { let dt = Math.abs(TH[i] - th); if (dt > Math.PI) dt = 2 * Math.PI - dt; const d = (V[i] - v) * (V[i] - v) + dt * dt * 0.12; if (d < bd) { bd = d; best = i; } }
+        out[r * (NA + 1) + a] = c.setRGB(Ca.getX(best), Ca.getY(best), Ca.getZ(best)).getHex(); }
+      g.dispose(); return out; } } catch (e) { console.error(e); }
+  }
+  const o = st.o, rows = st.rows, cols = st.cols, k0 = Math.round(cols * 0.72);
+  for (let r = 0; r <= NY; r++) for (let a = 0; a <= NA; a++) { const v = r / NY, u = 0.45 + 0.55 * v, j = Math.round(u * rows), th = a / NA * Math.PI * 2, f = Math.PI / 2 + 0.55 * Math.sin(th), k = k0 + a;
+    out[r * (NA + 1) + a] = o.col ? o.col(j / rows, f, k, j, [0, 0, 0]) : 0xffffff; }
+  return out;
+}
+
+try { fitInstall(); } catch (e) { console.error(e); }   /* (FIT_V1: the one call at load: wraps ckPacksRun, ck5bDressX, ck5bDressEnd) */
+/* (end of FIT_V1) */
+
+/* TAIL_V1 */
+/* =====================================================================
+   TAIL_V1 (2026-10-13): tail items that read and move right. Every tail item is one of three kinds:
+   CHARM (it dangles): a ring snug round her tail about two-thirds of the way up (where it narrows between two segments), a jump
+     ring and a short chain, and the charm hanging from it, about 1.6x bigger than before, with a thin light outline so a dark
+     charm still reads against her dark tail. A real pendulum: gravity, inertia from her tail's own motion, damping; the jump ring
+     slides round the ring to the low side; it keeps off her tail and body, faces back past her shoulder, settles when she stops.
+   WRAP (it sits round the tail at one point): bows, scrunchie, rings, twilly, claw clip, cuffs, riders. Skinned to her tail
+     segments, so it bends and twists exactly with it; toppers turned to the top of her tail (the side you see from behind) and
+     scaled up where they were too small to read.
+   COVER (it runs along the tail): fox fluff, mermaid scales and fin, dino plates, rainbow streamers, the unicorn ribbon: rebuilt
+     along her whole tail and skinned to all seven segments, so they curl with it; ribbons and the fin flutter.
+   How: ckInstance is wrapped (tail items only). The item's baked geometry (the original or any colourway, built or dyed) becomes
+   a skinned part (the ring / wrap / cover, in her tail's straight rest frame) and, for a charm, a pendulum part. The skinned part
+   binds to the tail segments above it (closetDress tags them), so her clones in the mini-games bind to their own tails; with no
+   tail (a card's thumbnail) it draws in its rest pose. The pendulum is solved in onBeforeRender (per drawn copy, on the game
+   clock), so it swings wherever she is drawn: Free roam, the Closet, the photo booth and Fashion Show, the mini-game clones.
+   Ids, names, prices, blurbs, sets, perks and colourways are untouched. Draws: 1-2 for a wrap or cover, 2-4 for a charm. No lights.
+   Everything is a hoisted function declaration; tcInstall() runs once when this block is reached and chains runtime wrappers onto
+   ckInstance, closetDress, ckFxDrop and ckPacksRun. Nothing else in the file is edited.
+   ===================================================================== */
+function tcK() {
+  return tcK.K || (tcK.K = { SEG: 0.06, RSEG: 5, RZ: -0.01, RR: 0.0386, POLD: [0, -0.046, -0.03], HULL: 0.0042, HULLC: 0xfff3f8, G: 13, DAMP: 2.4, VMAX: 4.5, FACE: 1.15, FACEV: 0.5 });
+}
+function tcTailR(z) {                                                    // her tail's radius at z, in its straight rest frame (seven overlapping spheres; -z runs to the tip)
+  let r = 0; for (let k = 0; k < 7; k++) { const rk = 0.046 * (1 - k * 0.045), c = -0.06 * k - 0.03, q = (z - c) / (2.3 * rk); if (q * q < 1) r = Math.max(r, rk * Math.sqrt(1 - q * q)); }
+  return r;
+}
+function tcSm(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+function tcH(i, k) { const h = Math.sin(i * 127.1 + (k || 0) * 311.7 + 0.37) * 43758.5453; return h - Math.floor(h); }
+function tcMix(a, b, t) { const c = new THREE.Color(a), d = new THREE.Color(b); return c.lerp(d, Math.max(0, Math.min(1, t))).getHex(); }
+function tcNow() { try { return clock; } catch (e) { return performance.now() / 1000; } }
+function tcErr(e) { if (!tcErr.n) { tcErr.n = 1; console.error(e); } }
+
+/* ---------- which kind each tail item is, and how it's tuned ---------- */
+function tcSpecs() {
+  if (tcSpecs.S) return tcSpecs.S; const PI = Math.PI;
+  const C = (S, fy, o) => Object.assign({ c: 1, S, fy }, o || {}), W = o => Object.assign({ w: 1 }, o || {}), V = fn => ({ v: 1, fn });
+  return (tcSpecs.S = {
+    tailbell: C(1.75, 0), tailHeart: C(1.7, -PI / 2, { cc: 0xf2c14a }), coffeeCharm: C(1.35, 0), mushCharm: C(1.5, PI, { cord: 0.008 }), coonBow: C(1.6, 0, { flip: 1, tS: 1.2, face: 1, cc: 0xf2c14a }),
+    seaLoveNote: C(1.7, -0.35), seaTassel: C(1.6, 0), seaDreidel: C(1.6, 0), seaPotGold: C(1.6, -0.5),
+    evTower: C(1.4, PI, { cord: 0.008 }), evStreetcar: C(1.55, 0, { cord: 0.008 }),
+    calTeacup: C(1.6, PI, { cord: 0.014 }), calMelonCharm: C(1.6, -PI / 2), calAppleCharm: C(1.65, PI, { cord: 0.014 }), calDiscoCharm: C(1.6, 0, { cord: 0.014 }),
+    popRaccoon: C(1.6, PI, { spin: 1.3, cord: 0.008 }), popFlip: C(1.5, PI, { cord: 0.008 }), popMonster: C(1.6, PI, { cord: 0.008 }),
+    fdSoyFish: C(1.5, PI, { cord: 0.008 }), fdTaffyCharm: C(1.5, PI, { cord: 0.008 }), fdPopsicle: C(1.5, PI, { cord: 0.008 }), fdPizzaCharm: C(1.45, PI, { cord: 0.008 }), fdCherryPie: C(1.5, PI, { cord: 0.008 }),
+    tailbow: W({ flip: 1, s: 1.3, face: 1 }), scrunchie: W(), pompom: W({ s: 1.3, top: c => c.c[2] < -0.04 }), plaidRibbon: W({ flip: 1, s: 1.3, face: 1 }), seaRosette: W({ flip: 1, s: 1.1 }),
+    natSunTail: W({ s: 1.3 }), natButterflyTail: W({ s: 1.35 }), natSnailBuddy: W({ s: 1.5 }),
+    fanRoboTail: W({ flip: 1, each: 1 }), fanWandCharm: W({ flip: 1, s: 1.25 }), evRings: W({ each: 1 }), evTwilly: W({ flip: 1, fit: 0.9, s: 1.2 }), evClaw: W({ flip: 1 }),
+    natFoxTail: V(tcFox), natFinTail: V(tcFin), fanDinoSpikes: V(tcDino), calPrideStreamers: Object.assign(V(tcPride), { rib: 1 }), fanUniRibbon: Object.assign(V(tcUni), { rib: 1 }),
+  });
+}
+function tcPrep(it) {                                                    // (once per item) its spec; the segment it hangs from; a new build for a cover; its card's framing
+  if (!it || it.slot !== 'tail') return null; if (it.tcP !== undefined) return it.tcP;
+  const sp = tcSpecs()[it.id] || null; it.tcP = sp; if (!sp) return null;
+  const K = tcK(); it.tcSeg0 = Math.min(6, it.seg || 3);
+  it.seg = sp.c ? K.RSEG : sp.v ? 0 : it.tcSeg0;
+  if (sp.v) { it.tcBuild0 = it.build; it.build = B => tcCover(B, sp); if (it.geo) it.geo = null; }
+  if (sp.c) it.thumbDir = [0.3, 0.22, 1];
+  if (sp.v) it.thumbDir = sp.rib ? [0.75, 0.3, -0.75] : [1, 0.3, 0.25];
+  Object.defineProperty(it, 'thumb', { get() { return tcThumb(this); }, configurable: true });
+  return sp;
+}
+function tcPrepAll() { try { for (const it of CK_ITEMS) if (it && it.slot === 'tail') tcPrep(it); } catch (e) { tcErr(e); } }
+
+/* ---------- geometry helpers ---------- */
+function tcComps(g) {                                                    // the parts a merged geometry was made of: connected by its triangles (and by shared positions)
+  const P = g.attributes.position, n = P.count, I = g.index, par = new Int32Array(n);
+  for (let i = 0; i < n; i++) par[i] = i;
+  const f = i => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; }, u = (a, b) => { a = f(a); b = f(b); if (a !== b) par[b] = a; };
+  const ni = I ? I.count : n; for (let k = 0; k + 2 < ni; k += 3) { const a = I ? I.getX(k) : k; u(a, I ? I.getX(k + 1) : k + 1); u(a, I ? I.getX(k + 2) : k + 2); }
+  const seen = new Map(); for (let i = 0; i < n; i++) { const key = Math.round(P.getX(i) * 1e5) + ',' + Math.round(P.getY(i) * 1e5) + ',' + Math.round(P.getZ(i) * 1e5); const j = seen.get(key); if (j === undefined) seen.set(key, i); else u(j, i); }
+  const map = new Map(), comp = new Int32Array(n), list = [];
+  for (let i = 0; i < n; i++) { const r = f(i); let c = map.get(r);
+    if (!c) { c = { id: list.length, v: [], mn: [1e9, 1e9, 1e9], mx: [-1e9, -1e9, -1e9] }; map.set(r, c); list.push(c); }
+    comp[i] = c.id; c.v.push(i); const x = P.getX(i), y = P.getY(i), z = P.getZ(i);
+    if (x < c.mn[0]) c.mn[0] = x; if (y < c.mn[1]) c.mn[1] = y; if (z < c.mn[2]) c.mn[2] = z; if (x > c.mx[0]) c.mx[0] = x; if (y > c.mx[1]) c.mx[1] = y; if (z > c.mx[2]) c.mx[2] = z; }
+  for (const c of list) c.c = [(c.mn[0] + c.mx[0]) / 2, (c.mn[1] + c.mx[1]) / 2, (c.mn[2] + c.mx[2]) / 2];
+  return { list, comp };
+}
+function tcIsBand(c) { return c.mn[0] < -0.02 && c.mx[0] > 0.02 && c.mn[1] < -0.02 && c.mx[1] > 0.02; }   /* (it goes all the way round her tail) */
+function tcAnchor(P, comps, rSeg) { return tcAnchorMulti(comps.map(c => [P, c]), rSeg); }
+function tcSkinAttrs(g) {                                                // which of her seven tail segments moves each vertex (by how far along her rest tail it is)
+  const P = g.attributes.position, n = P.count, SI = new Float32Array(n * 4), SW = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) { const u = (-P.getZ(i) - 0.03) / 0.06; let i0, w;
+    if (u <= 0) { i0 = 0; w = 0; } else if (u >= 6) { i0 = 6; w = 0; } else { i0 = Math.floor(u); w = u - i0; }
+    SI[i * 4] = i0; SI[i * 4 + 1] = Math.min(6, i0 + 1); SW[i * 4] = 1 - w; SW[i * 4 + 1] = w; }
+  g.setAttribute('skinIndex', new THREE.BufferAttribute(SI, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(SW, 4)); return g;
+}
+function tcGeo(P, N, C, I) {                                             // a fresh indexed geometry
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(C, 3)); g.setIndex(new THREE.BufferAttribute(P.length / 3 > 65000 ? new Uint32Array(I) : new Uint16Array(I), 1)); g.computeBoundingSphere(); g.computeBoundingBox(); return g;
+}
+function tcSub(g, keep, xf) {                                            // the triangles of g whose first vertex passes keep(i), each vertex moved by xf(i, p, n)
+  const P0 = g.attributes.position, N0 = g.attributes.normal, C0 = g.attributes.color, I0 = g.index, ni = I0 ? I0.count : P0.count, map = new Int32Array(P0.count).fill(-1), P = [], N = [], C = [], I = [], p = new THREE.Vector3(), n = new THREE.Vector3();
+  const at = i => { if (map[i] >= 0) return map[i]; map[i] = P.length / 3; p.fromBufferAttribute(P0, i); n.fromBufferAttribute(N0, i); xf(i, p, n); P.push(p.x, p.y, p.z); N.push(n.x, n.y, n.z);
+    C.push(C0 ? C0.getX(i) : 1, C0 ? C0.getY(i) : 1, C0 ? C0.getZ(i) : 1); return map[i]; };
+  for (let k = 0; k + 2 < ni; k += 3) { const a = I0 ? I0.getX(k) : k, b = I0 ? I0.getX(k + 1) : k + 1, c = I0 ? I0.getX(k + 2) : k + 2; if (!keep(a)) continue; I.push(at(a), at(b), at(c)); }
+  return I.length ? { P, N, C, I } : null;
+}
+function tcHull(parts, w, col) {                                         // an outline: the charm puffed out a hair along its (welded) normals, inside out, in a pale colour
+  const acc = new Map(), key = (x, y, z) => Math.round(x * 2e4) + ',' + Math.round(y * 2e4) + ',' + Math.round(z * 2e4), c = new THREE.Color(col);
+  for (const q of parts) for (let i = 0; i < q.P.length; i += 3) { const k = key(q.P[i], q.P[i + 1], q.P[i + 2]); const a = acc.get(k) || [0, 0, 0]; a[0] += q.N[i]; a[1] += q.N[i + 1]; a[2] += q.N[i + 2]; acc.set(k, a); }
+  const P = [], N = [], C = [], I = [];
+  for (const q of parts) { const o = P.length / 3;
+    for (let i = 0; i < q.P.length; i += 3) { const a = acc.get(key(q.P[i], q.P[i + 1], q.P[i + 2])), l = Math.hypot(a[0], a[1], a[2]) || 1, nx = a[0] / l, ny = a[1] / l, nz = a[2] / l;
+      P.push(q.P[i] + nx * w, q.P[i + 1] + ny * w, q.P[i + 2] + nz * w); N.push(-nx, -ny, -nz); C.push(c.r, c.g, c.b); }
+    for (let k = 0; k < q.I.length; k += 3) I.push(q.I[k] + o, q.I[k + 2] + o, q.I[k + 1] + o); }
+  return { P, N, C, I };
+}
+function tcJoin(list) {                                                  // several {P, N, C, I} into one geometry
+  let nv = 0, ni = 0; for (const q of list) if (q) { nv += q.P.length / 3; ni += q.I.length; } if (!ni) return null;
+  const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), C = new Float32Array(nv * 3), I = new Array(ni); let o = 0, k = 0;
+  for (const q of list) { if (!q) continue; P.set(q.P, o * 3); N.set(q.N, o * 3); C.set(q.C, o * 3); for (const i of q.I) I[k++] = i + o; o += q.P.length / 3; }
+  return tcGeo(P, N, C, I);
+}
+
+/* ---------- an item's baked geometry -> its skinned part (and a charm's pendulum part); cached per geometry set ---------- */
+function tcX(it, G, sp) {
+  const W = tcX.W || (tcX.W = new WeakMap()); let X = W.get(G); if (X) return X;
+  X = sp.v ? tcXCover(it, G, sp) : sp.c ? tcXCharm(it, G, sp) : tcXWrap(it, G, sp);
+  for (const k in X.skin) { const bs = X.skin[k].boundingSphere; if (bs) bs.center.z += tcK().SEG * X.seg; }   /* (ckCenter reads it in the item's own space: where the try-on sparkles go) */
+  W.set(G, X); return X;
+}
+function tcXWrap(it, G, sp) {                                            // a wrap: bands fitted round her tail, toppers turned to the top and scaled; vertex order kept (so what flaps still flaps)
+  const K = tcK(), seg = it.seg, flip = !!sp.flip, s = sp.s || 1, fit = sp.fit || 1, dz = -K.SEG * seg, B = {}, tops = [], rSeg = 0.046 * (1 - 0.045 * (it.tcSeg0 || seg));
+  for (const k of ['m', 's', 'g', 'l']) { const g = G[k]; if (!g) continue; const cc = tcComps(g); B[k] = { g, cc };
+    for (const c of cc.list) { c.top = sp.top ? sp.top(c) : !tcIsBand(c); if (c.top) tops.push([g.attributes.position, c]); } }
+  const gA = !sp.each && tops.length ? tcAnchorMulti(tops, rSeg) : null;
+  const mv = (A, p, n, top) => { if (top) tcTopXf(A, s, fit, sp.face)(p, n); else { p.x *= fit; p.y *= fit; } if (flip) { p.x = -p.x; p.y = -p.y; n.x = -n.x; n.y = -n.y; } p.z += dz; };
+  const skin = {};
+  for (const k in B) { const { g, cc } = B[k], P0 = g.attributes.position, N0 = g.attributes.normal, n = P0.count, P = new Float32Array(n * 3), N = new Float32Array(n * 3), p = new THREE.Vector3(), q = new THREE.Vector3();
+    for (const c of cc.list) { const A = c.top ? gA || tcAnchor(P0, [c], rSeg) : null;
+      for (const i of c.v) { p.fromBufferAttribute(P0, i); q.fromBufferAttribute(N0, i); mv(A, p, q, c.top); P[i * 3] = p.x; P[i * 3 + 1] = p.y; P[i * 3 + 2] = p.z; N[i * 3] = q.x; N[i * 3 + 1] = q.y; N[i * 3 + 2] = q.z; } }
+    const h = new THREE.BufferGeometry(); h.setAttribute('position', new THREE.BufferAttribute(P, 3)); h.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+    if (g.attributes.color) h.setAttribute('color', g.attributes.color.clone()); if (g.index) h.setIndex(g.index.clone()); h.userData = g.userData; tcSkinAttrs(h); h.computeBoundingSphere(); h.computeBoundingBox();
+    skin[k] = h; }
+  let fx = null; const f0 = it.fx;
+  if (f0) { fx = {}; const p = new THREE.Vector3(), nn = new THREE.Vector3(), A = gA || { x: 0, y: 0, z: 0, cx: 0, cy: 0, cz: 0, dx: 0, dy: 0, r: 0 };
+    const q2 = q => { const o = Object.assign({}, q); if (q.c) { p.fromArray(q.c); nn.set(0, 0, 1); mv(A, p, nn, true); o.c = p.toArray(); } if (q.ax) { p.set(0, 0, 0); nn.fromArray(q.ax); mv(A, p, nn, true); o.ax = nn.toArray(); } return o; };
+    for (const key in f0) { const e = f0[key]; fx[key] = e && e.groups ? Object.assign({}, e, { groups: e.groups.map(q2) }) : e; } }
+  return { kind: 'w', seg, flip, skin, charm: null, fx };
+}
+function tcAnchorMulti(tops, rSeg) {                                     // a topper's (or a group of toppers') anchor: on the line out from her tail through its middle, at about her fur
+  const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9]; for (const [, c] of tops) for (let a = 0; a < 3; a++) { mn[a] = Math.min(mn[a], c.mn[a]); mx[a] = Math.max(mx[a], c.mx[a]); }
+  const cx = (mn[0] + mx[0]) / 2, cy = (mn[1] + mx[1]) / 2, cz = (mn[2] + mx[2]) / 2, l = Math.hypot(cx, cy);
+  if (l < 1e-3) return { x: 0, y: 0, z: mx[2], cx, cy, cz, dx: 0, dy: 0, r: 0 };   /* (on her tail's axis: a pom-pom on the tip grows out from its band) */
+  const dx = cx / l, dy = cy / l, r = Math.min(l, (rSeg || 0.042) + 0.006); return { x: dx * r, y: dy * r, z: cz, cx, cy, cz, dx, dy, r };
+}
+function tcXCharm(it, G, sp) {                                           // a charm: the ring (and a bow on it) round her tail at the ring spot, skinned; the rest hangs from a pivot on a short chain, scaled up, outlined
+  const K = tcK(), S = sp.S || 1.6, fy = sp.fy == null ? Math.PI : sp.fy, kr = K.RR / 0.046, Po = K.POLD, cy = Math.cos(fy), sy = Math.sin(fy), flip = !!sp.flip, tS = sp.tS || 1, cord = sp.cord == null ? 0.026 : sp.cord;
+  const dz = K.RZ + 0.03 - K.SEG * K.RSEG, skinL = {}, chL = {}, stats = { mn: [1e9, 1e9, 1e9], mx: [-1e9, -1e9, -1e9] }, ringTops = [], info = [];
+  for (const k of ['m', 's', 'g', 'l']) { const g = G[k]; if (!g) continue; const cc = tcComps(g); info.push([k, g, cc]);
+    for (const c of cc.list) { c.ring = sp.ring ? sp.ring(c) : c.c[1] > -0.035; c.top = c.ring && !tcIsBand(c); if (c.top) ringTops.push([g.attributes.position, c]); } }
+  const A = ringTops.length ? tcAnchorMulti(ringTops, 0.042) : null;
+  const ringXf = top => (i, p, n) => { if (top && A) tcTopXf(A, tS, kr, sp.face)(p, n); else { p.x *= kr; p.y *= kr; }
+    if (flip) { p.x = -p.x; p.y = -p.y; n.x = -n.x; n.y = -n.y; } p.z += dz; };
+  const chXf = (i, p, n) => { const x = (p.x - Po[0]) * S, y = (p.y - Po[1]) * S - cord, z = (p.z - Po[2]) * S; p.set(cy * x + sy * z, y, -sy * x + cy * z); const nx = n.x, nz = n.z; n.set(cy * nx + sy * nz, n.y, -sy * nx + cy * nz); };
+  for (const [k, g, cc] of info) {
+    const isRing = i => cc.list[cc.comp[i]].ring, isTop = i => cc.list[cc.comp[i]].top;
+    skinL[k] = [tcSub(g, i => isRing(i) && !isTop(i), ringXf(false)), tcSub(g, i => isRing(i) && isTop(i), ringXf(true))].filter(Boolean);
+    const ch = tcSub(g, i => !isRing(i), chXf); if (ch) { chL[k] = ch;
+      for (let i = 0; i < ch.P.length; i += 3) for (let a = 0; a < 3; a++) { stats.mn[a] = Math.min(stats.mn[a], ch.P[i + a]); stats.mx[a] = Math.max(stats.mx[a], ch.P[i + a]); } } }
+  const bx = Math.sin(K.FACE), by = -Math.cos(K.FACE), br = K.RR + 0.0045; (skinL.s || (skinL.s = [])).push(tcBail(bx, by, br, K.RZ - K.SEG * K.RSEG, sp.cc || 0xd4d9e1));
+  const skin = {}; for (const k in skinL) { const h = tcJoin(skinL[k]); if (h) skin[k] = tcSkinAttrs(h); }
+  /* the outline: round the charm itself, not its jump ring and chain (they'd look like a thick white rope) */
+  const parts = []; let main = null, mvol = -1, best = null, bestN = -1;
+  for (const k in chL) { const q = chL[k], cc = tcComps(tcGeo(new Float32Array(q.P), new Float32Array(q.N), new Float32Array(q.C), q.I)); parts.push([k, q, cc]);
+    for (const c of cc.list) { const v = (c.mx[0] - c.mn[0] + 1e-3) * (c.mx[1] - c.mn[1] + 1e-3) * (c.mx[2] - c.mn[2] + 1e-3); if (v > mvol) { mvol = v; main = c; } }
+    if ((k === 'm' || k === 's') && q.P.length > bestN) { bestN = q.P.length; best = k; } }
+  const topBody = main ? main.mx[1] : 0, hullParts = [];
+  const chainBit = c => Math.abs(c.c[0]) < 0.009 && Math.abs(c.c[2]) < 0.009 && Math.max(c.mx[0] - c.mn[0], c.mx[1] - c.mn[1], c.mx[2] - c.mn[2]) < 0.032 && c.mn[1] > topBody - 0.004;
+  for (const [k, q, cc] of parts) { if (k === 'l') continue; const I = [];
+    for (let t = 0; t < q.I.length; t += 3) { if (chainBit(cc.list[cc.comp[q.I[t]]])) continue; I.push(q.I[t], q.I[t + 1], q.I[t + 2]); }
+    if (I.length) hullParts.push({ P: q.P, N: q.N, I }); }
+  const charm = {}; for (const k in chL) charm[k] = [chL[k]];
+  if (cord > 0) (charm.s || (charm.s = [])).push(tcChainBits(cord, sp.cc || 0xd4d9e1));
+  if (hullParts.length) { const hk = best || 'm'; (charm[hk] || (charm[hk] = [])).push(tcHull(hullParts, K.HULL, K.HULLC)); }
+  for (const k in charm) { charm[k] = tcJoin(charm[k]); if (!charm[k]) delete charm[k]; }
+  const bm = main || { mn: stats.mn, mx: stats.mx }, len = -stats.mn[1], Lc = Math.max(0.02, -(bm.mn[1] + bm.mx[1]) / 2), rc = Math.max(0.012, 0.3 * (bm.mx[2] - bm.mn[2]));
+  const fd = new THREE.Vector3(it.thumbDir ? it.thumbDir[0] : 0.3, 0, it.thumbDir ? it.thumbDir[2] : 1).normalize();
+  const cu = { c: [0, 0, K.RZ], b: [bx * (br + 0.0035), by * (br + 0.0035), K.RZ], r: K.RR, L: Lc, rc, len, fy0: sp.face0 == null ? K.FACE : sp.face0, fv: sp.facev == null ? K.FACEV : sp.facev, fd: [fd.x, 0, fd.z], spin: sp.spin || 0, ph: tcH(it.id.length * 13 + (it.price | 0), 2) * 6.28 };
+  return { kind: 'c', seg: K.RSEG, flip, skin, charm, cu, fx: null };
+}
+function tcXCover(it, G, sp) {                                           // a cover: built in her rest frame already; skinned along all seven segments; its flutter data comes along
+  const skin = {};
+  for (const k of ['m', 's', 'g', 'l']) { const g = G[k]; if (!g) continue;
+    const h = new THREE.BufferGeometry(); h.setAttribute('position', new THREE.BufferAttribute(g.attributes.position.array.slice(), 3)); h.setAttribute('normal', new THREE.BufferAttribute(g.attributes.normal.array.slice(), 3));
+    if (g.attributes.color) h.setAttribute('color', g.attributes.color.clone()); if (g.index) h.setIndex(g.index.clone()); tcSkinAttrs(h); h.computeBoundingSphere(); h.computeBoundingBox();
+    const F = g.userData && g.userData.tcFl; if (F) { h.userData = { tcFl: Object.assign({}, F, { P0: h.attributes.position.array.slice(), N0: h.attributes.normal.array.slice(), t: -1 }) }; h.attributes.position.setUsage(THREE.DynamicDrawUsage); h.attributes.normal.setUsage(THREE.DynamicDrawUsage); }
+    skin[k] = h; }
+  return { kind: 'v', seg: 0, flip: false, skin, charm: null, fx: null, cover: 1 };
+}
+
+/* ---------- the meshes: a skinned mesh that binds to whatever tail it's on; a pendulum mesh posed as it's drawn ---------- */
+function tcCls() {
+  if (tcCls.C) return tcCls.C;
+  class TcSkin extends THREE.SkinnedMesh {
+    constructor(g, m) { super(g, m); this.onBeforeRender = tcSkinOBR; }
+    updateMatrixWorld(force) { try { tcBind(this); } catch (e) { tcErr(e); } super.updateMatrixWorld(force); }
+  }
+  class TcCharm extends THREE.Mesh {
+    constructor(g, m) { super(g, m); this.onBeforeRender = tcCharmOBR; }
+  }
+  return (tcCls.C = { S: TcSkin, C: TcCharm });
+}
+function tcSkinMat(k) {                                                  // her Closet materials, skinned
+  const C = tcSkinMat.C || (tcSkinMat.C = {}); if (C[k]) return C[k];
+  const m = ckMat()[k].clone(); m.skinning = true; return (C[k] = m);
+}
+function tcTag(R) { if (R && R.tail) R.tail.forEach((s, i) => { if (s && s.userData) s.userData.tcSeg = i; }); }
+function tcSegOf(o) { for (let i = 0; o && i < 6; i++, o = o.parent) if (o.userData && o.userData.tcSeg != null) return o; return null; }
+function tcChain(seg) {                                                  // her seven tail segments (and her body), found from the one an item hangs on
+  if (!seg) return null; let s0 = seg; for (let i = seg.userData.tcSeg; i > 0 && s0; i--) { s0 = s0.parent; if (!s0 || !s0.userData || s0.userData.tcSeg !== i - 1) return null; }
+  const segs = [s0]; for (let i = 1; i < 7; i++) { const nx = segs[i - 1].children.find(c => c.userData && c.userData.tcSeg === i); if (!nx) break; segs.push(nx); }
+  return { segs, body: s0.parent || null };
+}
+function tcBind(m) {                                                     // (each frame, before its matrices) bound to the tail it's on; or, with none, to itself in its rest pose
+  const seg = tcSegOf(m.parent), sk = m.skeleton; if (m.userData.tcStand) m.visible = !seg;
+  if (seg) { if (sk && sk.tcRoot === seg && sk.tcOwn === m) return; const ch = tcChain(seg); if (ch && ch.segs.length === 7) { tcSkel(m, ch.segs, seg); return; } }
+  if (sk && sk.tcOwn === m && !sk.tcRoot) return;
+  tcSkel(m, null, null);
+}
+function tcSkel(m, segs, root) {
+  const K = tcK(), inv = [], bones = [];
+  if (segs) for (let i = 0; i < 7; i++) { bones.push(segs[i]); inv.push(new THREE.Matrix4().makeTranslation(0, 0, K.SEG * i)); }
+  else if (m.userData.tcCurl) { let p = m; for (let i = 0; i < 7; i++) { const b = new THREE.Object3D(); if (i) b.position.z = -K.SEG; b.rotation.x = i ? 0.2 : 0.45; p.add(b); bones.push(b); p = b; inv.push(new THREE.Matrix4().makeTranslation(0, 0, K.SEG * i)); } }   /* (a cover on its card: curled like her tail) */
+  else { const f = m.userData.tcFlip ? new THREE.Matrix4().makeRotationZ(Math.PI) : new THREE.Matrix4(); for (let i = 0; i < 7; i++) { bones.push(m); inv.push(f); } }   /* (on its card: as it was built, its bow on top) */
+  if (m.skeleton && m.skeleton.tcOwn === m && m.skeleton.dispose) try { m.skeleton.dispose(); } catch (e) {}
+  if (m.tcDummy) { m.tcDummy.forEach(b => { if (b.parent) b.parent.remove(b); }); m.tcDummy = null; }
+  if (!segs && m.userData.tcCurl) m.tcDummy = [bones[0]];
+  const sk = new THREE.Skeleton(bones, inv); sk.tcRoot = root; sk.tcOwn = m; m.bind(sk, new THREE.Matrix4());
+}
+function tcSkinOBR() { const g = this.geometry, F = g && g.userData && g.userData.tcFl; if (F) { const t = tcNow(); if (F.t !== t) { F.t = t; tcFlutter(g, F, t); } } }
+function tcCharmOBR(renderer) { const G = this.parent; if (!G) return; let M = null; try { M = tcPose(G, renderer); } catch (e) { tcErr(e); } if (M) this.matrixWorld.copy(M); }
+
+/* ---------- the pendulum ---------- */
+function tcPose(G, renderer) {
+  const U = G.userData.tc, par = G.parent; if (!U || !par) return null;
+  const K = tcK(), now = tcNow(), fr = renderer && renderer.info ? renderer.info.render.frame : -1;
+  const S = G.tcS || (G.tcS = { ok: false, now: -1, fr: -2, X: new THREE.Vector3(), Xp: new THREE.Vector3(), P: new THREE.Vector3(), C: new THREE.Vector3(), C0: new THREE.Vector3(), dir: new THREE.Vector3(0, 0, -1),
+    Cp: new THREE.Vector3(), dp: new THREE.Vector3(), M: new THREE.Matrix4(), v: [0, 1, 2, 3, 4, 5, 6, 7, 8].map(() => new THREE.Vector3()), bi: new THREE.Matrix4(), segRef: null, ch: null, tw: 0 });
+  if (S.ok && S.now === now && S.fr === fr) return S.M;
+  const [C, A, F, d, up, xa, za, Ci, Fv] = S.v, e = par.matrixWorld.elements, sc = Math.hypot(e[0], e[1], e[2]) || 1;
+  C.set(U.b[0], U.b[1], U.b[2]).applyMatrix4(par.matrixWorld); A.set(-e[8], -e[9], -e[10]).normalize();   /* (C: its bail, a little loop fixed on the ring at her side, a touch back: where it hangs from) */
+  const L = U.L * sc, rc = U.rc * sc;
+  const seg = tcSegOf(par); if (seg !== S.segRef) { S.segRef = seg; S.ch = seg ? tcChain(seg) : null; } const ch = S.ch;
+  if (ch && ch.body) { const b = ch.body.matrixWorld.elements, a = U.fy0; F.set(Math.sin(a), 0, -Math.cos(a)); F.set(b[0] * F.x + b[8] * F.z, b[1] * F.x + b[9] * F.z, b[2] * F.x + b[10] * F.z); const v = U.fv == null ? a : U.fv; Fv.set(b[0] * Math.sin(v) - b[8] * Math.cos(v), 0, b[2] * Math.sin(v) - b[10] * Math.cos(v)); S.bi.copy(ch.body.matrixWorld).invert(); }
+  else { F.set(U.fd[0], 0, U.fd[2]).transformDirection(par.matrixWorld); Fv.copy(F); }
+  F.y = 0; if (F.lengthSq() < 1e-8) F.set(0, 0, -1); F.normalize(); Fv.y = 0; if (Fv.lengthSq() < 1e-8) Fv.copy(F); Fv.normalize();   /* (Fv: which way its face looks: back past her hip, so both the yard camera and the Closet see it) */
+  const ring = (c, X, out) => out.copy(c);
+  const hang = (P, X) => { d.subVectors(X, P); const l = d.length() || 1e-6; X.copy(P).addScaledVector(d, L / l); };
+  let dt = now - S.now;
+  if (!S.ok || !(dt >= 0) || dt > 0.3 || S.C.distanceTo(C) > 0.5 * sc) {   /* (first time, after a gap, or she was moved: hanging still) */
+    S.P.copy(C); S.X.copy(S.P); S.X.y -= L; for (let i = 0; i < 4; i++) { if (ch) tcCollide(S.X, ch, rc, sc, S); ring(C, S.X, S.P); hang(S.P, S.X); }
+    S.Xp.copy(S.X); S.ok = true; S.C0.copy(C); S.Cp.copy(C); S.dp.set(0, 0, 0); dt = 0; S.tw = 0;
+  } else if (dt > 0) {
+    const n = Math.min(10, Math.max(1, Math.ceil(dt * 120))), h = dt / n, damp = Math.exp(-K.DAMP * h), vmax = K.VMAX * h * sc;
+    for (let i = 1; i <= n; i++) {
+      Ci.lerpVectors(S.C0, C, i / n); up.subVectors(Ci, S.Cp); S.Cp.copy(Ci);   /* (up: how far the ring moved this substep) */
+      d.subVectors(S.X, S.Xp).sub(S.dp).multiplyScalar(damp); if (d.length() > vmax) d.setLength(vmax); S.dp.copy(up);   /* (its swing relative to the ring: steady running carries it along, a lurch or a turn swings it) */
+      S.Xp.copy(S.X); S.X.add(d).add(up); S.X.y -= K.G * h * h;
+      ring(Ci, S.X, S.P); hang(S.P, S.X);
+      if (ch) for (let it = 0; it < 3; it++) { tcCollide(S.X, ch, rc, sc, S); hang(S.P, S.X); }
+      d.subVectors(S.X, S.P); const ang = Math.acos(Math.max(-1, Math.min(1, -d.y / (d.length() || 1))));   /* (never swung up over the top) */
+      if (ang > 2.0) { up.set(0, -1, 0); xa.crossVectors(up, d).normalize(); if (xa.lengthSq() > 0.5) { d.copy(up).applyAxisAngle(xa, 2.0).multiplyScalar(L); S.X.copy(S.P).add(d); } }
+    }
+  } else { ring(C, S.X, S.P); hang(S.P, S.X); }
+  S.tw += dt * (U.spin || 0);
+  up.subVectors(S.P, S.X).normalize(); const tw = S.tw + 0.16 * Math.sin(now * 1.3 + U.ph);
+  za.copy(Fv).addScaledVector(up, -Fv.dot(up)); if (za.lengthSq() < 1e-6) za.set(1, 0, 0).addScaledVector(up, -up.x); za.normalize(); if (tw) za.applyAxisAngle(up, tw);
+  xa.crossVectors(up, za).normalize(); za.crossVectors(xa, up);
+  S.M.makeBasis(xa, up, za).scale(d.set(sc, sc, sc)).setPosition(S.P);
+  S.now = now; S.fr = fr; S.C.copy(C); S.C0.copy(C); S.Cp.copy(C);
+  return S.M;
+}
+function tcCollide(X, ch, rc, sc, S) {                                   // keep the charm off her tail and her body
+  const v = S.v[3];
+  for (let j = 0; j < ch.segs.length; j++) { const e = ch.segs[j].matrixWorld.elements, s = Math.hypot(e[0], e[1], e[2]) || sc, r = 0.04 * (1 - j * 0.045) * s + rc;   /* (a little less than her tail's own radius: it rests into her fur) */
+    v.set(X.x - (e[12] - 0.03 * e[8]), X.y - (e[13] - 0.03 * e[9]), X.z - (e[14] - 0.03 * e[10])); const l = v.length(); if (l < r && l > 1e-6) X.addScaledVector(v, (r - l) / l); }
+  if (ch.body) { const p = v.copy(X).applyMatrix4(S.bi), q = rc / sc, ax = 0.2 + q, ay = 0.19 + q, az = 0.39 + q, x = p.x / ax, y = (p.y - 0.42) / ay, z = (p.z + 0.02) / az, l = Math.hypot(x, y, z);
+    if (l < 1 && l > 1e-6) { p.set(x / l * ax, y / l * ay + 0.42, z / l * az - 0.02).applyMatrix4(ch.body.matrixWorld); X.copy(p); } }
+}
+
+/* ---------- flutter (ribbons, the fin): the cover's own rest-frame vertices, once per frame ---------- */
+function tcFlutter(g, F, t) {
+  const P = g.attributes.position.array, P0 = F.P0, n = P.length / 3;
+  if (F.D) { const D = F.D, U = F.U, w = F.w || 8, k = F.k || 9; for (let i = 0; i < n; i++) { const a = Math.sin(t * w - U[i] * k) + 0.35 * Math.sin(t * w * 1.7 - U[i] * k * 1.3 + 1.1);
+    P[i * 3] = P0[i * 3] + D[i * 3] * a; P[i * 3 + 1] = P0[i * 3 + 1] + D[i * 3 + 1] * a; P[i * 3 + 2] = P0[i * 3 + 2] + D[i * 3 + 2] * a; } }
+  if (F.rot) { const N = g.attributes.normal.array, N0 = F.N0, T = tcFlutter.T || (tcFlutter.T = { R: new THREE.Matrix4(), Q: new THREE.Matrix4(), A: new THREE.Matrix4(), v: new THREE.Vector3(), ax: new THREE.Vector3() });
+    for (const r of F.rot) { T.ax.fromArray(r.ax).normalize(); T.R.makeRotationAxis(T.ax, r.amp * Math.sin(t * r.w + (r.ph || 0)));
+      T.Q.makeTranslation(r.c[0], r.c[1], r.c[2]).multiply(T.R).multiply(T.A.makeTranslation(-r.c[0], -r.c[1], -r.c[2]));
+      for (let i = r.a; i < r.b; i++) { T.v.set(P0[i * 3], P0[i * 3 + 1], P0[i * 3 + 2]).applyMatrix4(T.Q); P[i * 3] = T.v.x; P[i * 3 + 1] = T.v.y; P[i * 3 + 2] = T.v.z;
+        T.v.set(N0[i * 3], N0[i * 3 + 1], N0[i * 3 + 2]).transformDirection(T.R); N[i * 3] = T.v.x; N[i * 3 + 1] = T.v.y; N[i * 3 + 2] = T.v.z; } }
+    g.attributes.normal.needsUpdate = true; }
+  g.attributes.position.needsUpdate = true;
+}
+
+/* ---------- the instance (ckInstance, for tail items) ---------- */
+function tcInstance(it, sp) {
+  const G = ckBake(it); if (!G) return null;
+  const X = tcX(it, G, sp), Cl = tcCls(), M = ckMat(), obj = new THREE.Group(), ms = {}, K = tcK();
+  obj.userData.ck = it.id; obj.userData.base = new THREE.Vector3();
+  for (const k of ['m', 's', 'g', 'l']) { const g = X.skin[k]; if (!g) continue; const m = new Cl.S(g, tcSkinMat(k)); m.position.z = K.SEG * X.seg; m.userData.tcFlip = X.flip ? 1 : 0; m.userData.tcCurl = X.cover ? 1 : 0;
+    m.frustumCulled = false; if (k === 'l') m.renderOrder = 2; tcSkel(m, null, null); obj.add(m); ms[k] = m; }
+  if (X.cover) { const m = new Cl.S(tcStandIn(), tcSkinMat('m')); m.userData.tcCurl = 1; m.userData.tcStand = 1; m.frustumCulled = false; tcSkel(m, null, null); obj.add(m); }   /* (her tail, only on the card: a cover with nothing inside looks odd) */
+  if (X.charm) { const cg = new THREE.Group(); cg.userData.tc = X.cu; cg.position.fromArray(X.cu.b); cg.rotation.y = Math.atan2(X.cu.fd[0], X.cu.fd[2]);
+    for (const k of ['m', 's', 'g', 'l']) { const g = X.charm[k]; if (!g) continue; const m = new Cl.C(g, M[k]); m.frustumCulled = false; if (k === 'l') m.renderOrder = 2; cg.add(m); }
+    obj.add(cg); }
+  const pit = X.pit || (X.pit = Object.assign(Object.create(it), { geo: X.skin, fx: X.fx }));
+  const inst = { id: it.id, it: pit, obj, flame: null, cape: null, clasp: null, bob: false };
+  return ckFxInst(pit, inst, ms);
+}
+function tcDrop(inst) { if (!inst || !inst.obj) return; inst.obj.traverse(o => { if (o.isSkinnedMesh && o.skeleton && o.skeleton.tcOwn === o && o.skeleton.dispose) try { o.skeleton.dispose(); } catch (e) {} }); }
+function tcThumb(it) {                                                   // (ckThumbStep) a card framed on what you'd see: the ring and the charm under it; the wrap; the curled cover
+  if (it.tcTh && it.tcTh.g === it.geo) return it.tcTh.v; const sp = it.tcP, G = it.geo; if (!sp || !G) return null;
+  const X = tcX(it, G, sp), K = tcK(); let v = null;
+  if (X.charm) { let top = X.cu.r + 0.008; for (const k in X.skin) { const P = X.skin[k].attributes.position; for (let i = 0; i < P.count; i++) top = Math.max(top, X.flip ? -P.getY(i) : P.getY(i)); } const bot = X.cu.b[1] - X.cu.len; v = [X.cu.b[0] * 0.5, (top + bot) / 2, X.cu.c[2], Math.max(0.075, (top - bot) * 0.56)]; }
+  else { const b = new THREE.Box3(), p = new THREE.Vector3(), mats = X.cover ? tcCurlMats() : null;
+    for (const k in X.skin) { const g = X.skin[k], P = g.attributes.position, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight;
+      for (let i = 0; i < P.count; i += 2) { p.fromBufferAttribute(P, i);
+        if (mats) { const a = SI.getX(i), c = SI.getY(i), w = SW.getY(i), q = p.clone().applyMatrix4(mats[a]).multiplyScalar(1 - w).add(p.clone().applyMatrix4(mats[c]).multiplyScalar(w)); p.copy(q); }
+        else { if (X.flip) { p.x = -p.x; p.y = -p.y; } p.z += K.SEG * X.seg; }
+        b.expandByPoint(p); } }
+    if (!b.isEmpty()) { const c = b.getCenter(new THREE.Vector3()); v = [c.x, c.y, c.z, b.getSize(p).length() * 0.5]; } }
+  it.tcTh = { g: G, v }; return v;
+}
+function tcStandIn() {                                                  // (a cover's card) a plain tail like hers, in its rest frame, skinned like the cover
+  if (tcStandIn.g) return tcStandIn.g; const rings = []; for (let i = 0; i <= 40; i++) { const z = 0.02 - 0.49 * i / 40; rings.push({ z, r: Math.max(0.002, tcTailR(z)) }); }
+  const g = tcTube(rings, 18, true, false), n = g.attributes.position.count, C = new Float32Array(n * 3); for (let i = 0; i < n; i++) { C[i * 3] = 0.24; C[i * 3 + 1] = 0.2; C[i * 3 + 2] = 0.19; }
+  g.setAttribute('color', new THREE.BufferAttribute(C, 3)); return (tcStandIn.g = tcSkinAttrs(g));
+}
+function tcCurlMats() {                                                  // (a cover's card) the curl its dummy bones give it, as skinning matrices
+  if (tcCurlMats.M) return tcCurlMats.M; const K = tcK(), out = []; let w = new THREE.Matrix4();
+  for (let i = 0; i < 7; i++) { if (i) w = w.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, -K.SEG)); w = w.clone().multiply(new THREE.Matrix4().makeRotationX(i ? 0.2 : 0.45));
+    out.push(w.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, K.SEG * i))); }
+  return (tcCurlMats.M = out);
+}
+
+/* ---------- the covers, built in her tail's straight rest frame (z 0 at its root, -z to the tip; -y is the top of her tail, the side seen from behind) ---------- */
+function tcCover(B, sp) { sp.fn(B); }
+function tcCnt(B, k) { return B.parts[k].reduce((n, [g]) => n + g.attributes.position.count, 0); }
+function tcTube(rings, nA, cap0, cap1) {                                 // rings [{ z, r(theta) | r, x, y }] -> a closed tube along -z, (nA + 1) vertices a ring
+  const P = [], I = [], W = nA + 1;
+  rings.forEach(R => { for (let j = 0; j <= nA; j++) { const th = (j % nA) / nA * Math.PI * 2, r = typeof R.r === 'function' ? R.r(th, j % nA) : R.r; P.push((R.x || 0) + Math.cos(th) * r, (R.y || 0) + Math.sin(th) * r, R.z); } });
+  for (let i = 0; i + 1 < rings.length; i++) for (let j = 0; j < nA; j++) { const a = i * W + j; I.push(a, a + W, a + 1, a + 1, a + W, a + W + 1); }
+  if (cap0) { const c = P.length / 3, R = rings[0]; P.push(R.x || 0, R.y || 0, R.z + 0.002); for (let j = 0; j < nA; j++) I.push(c, j, j + 1); }
+  if (cap1) { const c = P.length / 3, R = rings[rings.length - 1], o = (rings.length - 1) * W; P.push(R.x || 0, R.y || 0, R.z - 0.002); for (let j = 0; j < nA; j++) I.push(c, o + j + 1, o + j); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+  const N = g.attributes.normal; for (let i = 0; i < rings.length; i++) { const a = i * W, b = a + nA; const x = N.getX(a) + N.getX(b), y = N.getY(a) + N.getY(b), z = N.getZ(a) + N.getZ(b), l = Math.hypot(x, y, z) || 1; N.setXYZ(a, x / l, y / l, z / l); N.setXYZ(b, x / l, y / l, z / l); }
+  return g;
+}
+function tcStrip(path, half, two) {                                      // a ribbon: path [{ p, w (across, unit), n (out, unit), k (width factor) }]; two-sided: a back face a hair behind
+  const P = [], N = [], I = [], n = path.length;
+  for (const q of path) { const hw = half * (q.k == null ? 1 : q.k); P.push(q.p.x - q.w.x * hw, q.p.y - q.w.y * hw, q.p.z - q.w.z * hw, q.p.x + q.w.x * hw, q.p.y + q.w.y * hw, q.p.z + q.w.z * hw); N.push(q.n.x, q.n.y, q.n.z, q.n.x, q.n.y, q.n.z); }
+  for (let i = 0; i + 1 < n; i++) { const a = i * 2; I.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  { const v = k => new THREE.Vector3(P[k * 3], P[k * 3 + 1], P[k * 3 + 2]), m = Math.floor(n / 2) * 2, a = v(m - 2), f = v(m).sub(a).cross(v(m - 1).sub(a));   /* (face the way n says) */
+    if (f.dot(new THREE.Vector3(N[(m - 2) * 3], N[(m - 2) * 3 + 1], N[(m - 2) * 3 + 2])) < 0) for (let k = 0; k < I.length; k += 3) { const t = I[k + 1]; I[k + 1] = I[k + 2]; I[k + 2] = t; } }
+  if (two) { const o = P.length / 3; for (let i = 0; i < o; i++) { P.push(P[i * 3] - N[i * 3] * 0.0007, P[i * 3 + 1] - N[i * 3 + 1] * 0.0007, P[i * 3 + 2] - N[i * 3 + 2] * 0.0007); N.push(-N[i * 3], -N[i * 3 + 1], -N[i * 3 + 2]); }
+    const m = I.length; for (let k = 0; k < m; k += 3) I.push(I[k] + o, I[k + 2] + o, I[k + 1] + o); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setIndex(I); return g;
+}
+function tcFlPush(B, k, D, U) {                                          // (a cover's builder, just before it adds the part) which vertices flutter, and how: D (direction x amplitude), U (phase) per vertex
+  (B.tcFl || (B.tcFl = { m: [], s: [] }))[k].push({ a: tcCnt(B, k), D, U });
+}
+function tcFlPost(B, o) {                                                // (ckBake, after merging) the flutter data onto the merged geometry
+  B.post = G => { for (const k of ['m', 's']) { const g = G[k], L = B.tcFl && B.tcFl[k], rot = o && o.rot && o.rot.k === k ? o.rot.list : null; if (!g || ((!L || !L.length) && !rot)) continue;
+    let D = null, U = null; if (L && L.length) { const n = g.attributes.position.count; D = new Float32Array(n * 3); U = new Float32Array(n); for (const q of L) { D.set(q.D, q.a * 3); U.set(q.U, q.a); } }
+    g.userData = Object.assign({}, g.userData, { tcFl: { D, U, w: (o && o.w) || 8, k: (o && o.k) || 9, rot } }); } };
+}
+function tcFox(B) {                                                      // a big fluffy fox brush over her whole tail: russet with darker streaks, a creamy underside, spiky tufts, a snow-white tip
+  const NR = 58, nA = 36, z0 = -0.026, z1 = -0.6, rings = [];
+  for (let i = 0; i <= NR; i++) { const u = i / NR, z = z0 + (z1 - z0) * u; let r = 0.05 + 0.036 * tcSm(0, 0.55, u);
+    if (u > 0.62) r *= Math.pow(Math.max(0, 1 - (u - 0.62) / 0.38), 0.6); if (z > -0.47) r = Math.max(r, tcTailR(z) + 0.012); if (i === NR) r = 0.0005;
+    const rr = (th, j) => { if (!i || i === NR) return r; const a = th + 0.35 * Math.sin(u * 7);
+      const lump = 0.09 * Math.sin(3 * a + u * 9) * Math.sin(2 * a - u * 6 + 1.3) + 0.04 * Math.sin(5 * a + u * 17) + 0.03 * (tcH(i * 31 + j, 5) - 0.5)
+        + 0.2 * Math.pow(Math.max(0, Math.sin(7 * a + u * 29 + 2 * Math.sin(a * 2 + u * 5))), 8);
+      return r * (1 + lump * Math.sin(Math.PI * Math.min(1, u * 1.2 + 0.08))); };
+    rings.push({ z, r: rr }); }
+  const g = tcTube(rings, nA, true, false), W = nA + 1;
+  B.m(g, (x, y, z, i) => { if (i >= (NR + 1) * W) return 0xe8742a; const ri = Math.floor(i / W), j = i % W % nA, u = ri / NR, th = j / nA * Math.PI * 2, tipU = 0.79 + 0.035 * Math.sin(th * 5 + 1.3);
+    if (u > tipU) return tcH(ri * 7 + j, 2) > 0.75 ? 0xf2ece2 : 0xfffaf2; if (u > tipU - 0.04) return 0xf6c89a;
+    if (Math.sin(th) > 0.5) return Math.sin(th * 9 + u * 7) > 0.3 ? 0xf8c696 : 0xf4b07a;
+    const st = Math.sin(th * 5 + u * 9 + 1.7 * Math.sin(u * 4)) + 0.6 * (tcH(ri * 13 + j, 8) - 0.5); return st > 0.95 ? 0xc65a1c : st < -1.05 ? 0xf3984a : 0xe8742a; });
+  for (let k = 0; k < 7; k++) { const a = k / 7 * Math.PI * 2; B.m(CKG.cone(0.0085, 0.034, 6), k % 2 ? 0xfffaf2 : 0xf2ece2, [Math.cos(a) * 0.01, Math.sin(a) * 0.01, z1 + 0.014], [-Math.PI / 2 + Math.sin(a) * 0.45, 0, -Math.cos(a) * 0.45]); }
+}
+function tcFin(B) {                                                      // a mermaid's tail: a shimmering scaled sleeve snug over her tail, a pearly band at the top, a big sea-glass fin that beats
+  const NR = 72, nA = 40, z0 = -0.1, zt = -0.472, rings = [], rowH = 0.019, NC = 16;
+  const cell = (z, j) => { const q = (z0 - z) / rowH, row = Math.floor(q), f = q - row, cp = j / nA * NC + (row % 2) * 0.5, cf = cp - Math.floor(cp); return { row, f, cf, col: Math.floor(cp) }; };
+  for (let i = 0; i <= NR; i++) { const u = i / NR, z = z0 + (zt - z0) * u, base = tcTailR(z) + 0.0055;
+    rings.push({ z, r: i === NR ? 0.004 : (th, j) => { const c = cell(z, j); return Math.max(0.004, base + 0.0022 * Math.max(0, 1 - Math.hypot((c.cf - 0.5) * 1.5, c.f))); } }); }
+  const g = tcTube(rings, nA, false, true), W = nA + 1;
+  B.s(g, (x, y, z, i) => { const ri = Math.min(NR, Math.floor(i / W)), j = i % W % nA, zz = z0 + (zt - z0) * ri / NR, c = cell(zz, j), t = ri / NR, h = Math.max(0, 1 - Math.hypot((c.cf - 0.5) * 1.5, c.f));
+    const deep = tcMix((c.col + c.row) % 2 ? 0x22b8b0 : 0x34c8bc, 0x7f6cf0, t * 0.8); return h < 0.12 ? tcMix(deep, 0x0d5f6a, 0.45) : tcMix(deep, 0xd8fff8, 0.42 * h); });
+  B.s(CKG.tor(tcTailR(z0) + 0.0075, 0.0042, 8, 36), (x, y, z, i) => tcH(i, 9) > 0.5 ? 0xe8fbff : 0xd6f0ff, [0, 0, z0]);
+  for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; B.s(CKG.sph(0.0048, 8, 6), 0xf6f2ff, [Math.cos(a) * (tcTailR(z0) + 0.0085), Math.sin(a) * (tcTailR(z0) + 0.0085), z0 + 0.003]); }
+  const a = tcCnt(B, 'm'), zf = -0.452, k = 1.3, half = [[0, 0], [0.028, 0.012], [0.07, 0.04], [0.106, 0.088], [0.086, 0.1], [0.05, 0.083], [0.016, 0.07]].map(([x, y]) => [x * k, y * k]);
+  const out = natCurve(half.concat(half.slice(1).reverse().map(([x, y]) => [-x, y])), 80);
+  B.m(CKG.cyl(0.006, 0.012, 0.026, 12), 0x5fd8d6, [0, 0, zf - 0.006], [Math.PI / 2, 0, 0]);
+  for (const sx of [-1, 1]) { const lobe = natCurve([[0, 0]].concat(half.slice(1).map(([x, y]) => [x * sx, y])).concat([[0, half[half.length - 1][1] * 0.7]]), 48);   /* (two lobes in a shallow V: a fin from behind and from the side) */
+    B.m(ckFlat(lobe, 0.0045), (x, y) => { const r = Math.floor((Math.atan2(Math.abs(x), y) + 0.1) * 9) % 2; return tcMix(r ? 0x3fd8d0 : 0x22bfc4, r ? 0x9a7bff : 0x7f5ff0, y / 0.13); }, [0, 0, zf - 0.014], [-Math.PI / 2, 0, sx * 0.55]); }
+  tcFlPost(B, { rot: { k: 'm', list: [{ a, b: tcCnt(B, 'm'), c: [0, 0, zf], ax: [1, 0, 0], amp: 0.22, w: 4.6 }] } });
+}
+function tcDino(B) {                                                     // a dinosaur's tail: green scaly skin over her whole tail, darker spots and bands, a pale belly, two staggered rows of orange plates down the top
+  const NR = 60, nA = 32, z0 = -0.045, zt = -0.475, rings = [];
+  for (let i = 0; i <= NR; i++) { const u = i / NR, z = z0 + (zt - z0) * u; rings.push({ z, r: i === NR ? 0.003 : (th, j) => Math.max(0.006, tcTailR(z) + 0.0062 + 0.0014 * tcH(i * 37 + j, 2)) }); }
+  const g = tcTube(rings, nA, true, true), W = nA + 1;
+  B.m(g, (x, y, z, i) => { const ri = Math.floor(i / W), j = i % W % nA, th = j / nA * Math.PI * 2, u = ri / NR;
+    if (Math.sin(th) > 0.62) return 0xcfe98f; const n = Math.sin(th * 4 + u * 23) * Math.sin(th * 3 - u * 31 + 1.7); return n > 0.45 ? 0x3f8a2e : n < -0.55 ? 0x74c24e : 0x58a83a; });
+  for (let k = 0; k < 7; k++) { const z = -0.08 - k * 0.056, h = 0.074 - k * 0.0062, w = 0.05 - k * 0.0038, R = tcTailR(z) + 0.002, sx = k % 2 ? 1 : -1;
+    B.s(ckFlat([[-w / 2, 0], [w / 2, 0], [w * 0.36, h * 0.55], [w * 0.12, h * 0.94], [0, h], [-w * 0.12, h * 0.94], [-w * 0.36, h * 0.55]], 0.009), (x, y) => y > h * 0.62 ? 0xffd23a : y > h * 0.3 ? 0xf8a030 : 0xf07a28, [sx * 0.004, -R, z], [0, Math.PI / 2, Math.PI + sx * 0.12]); }
+  B.s(CKG.cone(0.008, 0.028, 8), 0xf07a28, [0, 0, zt - 0.01], [-Math.PI / 2, 0, 0]);
+}
+function tcPride(B) {                                                    // six silky ribbons, red to violet, tied on in a white bow near the root, running up the top of her tail and streaming off the tip
+  const RB = [0xe8303a, 0xff8a1f, 0xf6d02a, 0x3cb44b, 0x3f7fe0, 0x8a4fd0], wh = 0xfafafa, zb = -0.08, Rb = tcTailR(zb) + 0.007;
+  B.s(CKG.sph(0.0115, 12, 9), wh, [0, -Rb - 0.004, zb], null, [1, 0.8, 1.1]);
+  for (const sx of [-1, 1]) { B.s(CKG.tor(0.015, 0.0052, 8, 18), wh, [sx * 0.019, -Rb - 0.006, zb + 0.004], [Math.PI / 2 - 0.25, 0, sx * 0.5], [1.25, 0.8, 0.6]);
+    B.s(ckTwoSided(evTwillyEnd(0.03, 0.011)), wh, [sx * 0.008, -Rb - 0.003, zb + 0.004], [-Math.PI / 2 + 0.3, sx * 0.5, 0]); }
+  tcRibbons(B, RB.map((c, i) => ({ col: c, x0: (i - 2.5) * 0.0105, spread: 1.35, ph: i * 1.3 })), zb - 0.006, -0.545, 0.0052);
+  tcFlPost(B, { w: 9, k: 11 });
+}
+function tcRibbons(B, list, za, zb, half) {                              // ribbons lying along the top of her tail from za, curling back off the tip to zb; they flutter, most at their ends
+  const zt = -0.455, N = 44, R0 = Math.max(tcTailR(zt), 0.012) + 0.0055;
+  for (const q of list) { const path = [], Dp = [], Up = [];
+    for (let s = 0; s <= N; s++) { const u = s / N, z = za + (zb - za) * u, x = q.x0 * (1 + (q.spread - 1) * u); let p, n, w;
+      if (z > zt) { const R = Math.max(tcTailR(z), 0.012) + 0.0055, xx = Math.max(-R * 0.9, Math.min(R * 0.9, x)), y = -Math.sqrt(R * R - xx * xx);
+        p = new THREE.Vector3(xx, y, z); n = new THREE.Vector3(xx, y, 0).normalize(); w = new THREE.Vector3(-n.y, n.x, 0); }
+      else { const t = zt - z, xx = Math.max(-R0 * 0.9, Math.min(R0 * 0.9, x)), y0 = -Math.sqrt(R0 * R0 - xx * xx), a = 0.55 + 4.4 * t;
+        p = new THREE.Vector3(xx + (x - xx) * 0.5 + q.x0 * t * 3, y0 - t * 0.55 - t * t * 2.2, z); n = new THREE.Vector3(0, -1, a).normalize(); w = new THREE.Vector3(1, 0, 0); }
+      path.push({ p, n, w, k: s === N ? 0.4 : 1 });
+      const amp = 0.0011 + 0.017 * Math.pow(tcSm(0.45, 1, u), 1.3); Dp.push(n.x * amp + 0.3 * amp * Math.sign(q.x0 || 1), n.y * amp, n.z * amp); Up.push(u * 1.6 + q.ph * 0.31); }
+    const nv = 4 * (N + 1), D = new Float32Array(nv * 3), U = new Float32Array(nv);
+    for (let vi = 0; vi < nv; vi++) { const i = (vi % (2 * (N + 1))) >> 1; D[vi * 3] = Dp[i * 3]; D[vi * 3 + 1] = Dp[i * 3 + 1]; D[vi * 3 + 2] = Dp[i * 3 + 2]; U[vi] = Up[i]; }
+    tcFlPush(B, 's', D, U); B.s(tcStrip(path, half, true), q.col); }
+}
+function tcUni(B) {                                                      // a unicorn ribbon: a lilac bow at the root, a pastel rainbow ribbon wound twice round her tail to the tip, its five colours streaming off the end
+  const lil = 0xc9a8ff, lil2 = 0xb08cf0, cols = [0xffb3d1, 0xffe0a0, 0xb8f0d0, 0xb8d8ff, 0xd8c0ff], zb = -0.07, Rb = tcTailR(zb) + 0.007;
+  B.m(CKG.tor(tcTailR(zb) + 0.004, 0.0062, 8, 30), lil, [0, 0, zb + 0.004]);
+  B.m(CKG.sph(0.011, 12, 9), lil2, [0, -Rb - 0.003, zb]);
+  for (const sx of [-1, 1]) B.m(CKG.sph(0.02, 14, 10), lil, [sx * 0.024, -Rb - 0.006, zb], [0, 0, sx * 0.38], [1.35, 0.6, 0.85]);
+  const za = -0.095, zw = -0.43, turns = 2, N = 110, th0 = -Math.PI / 2, wid = 0.0104;
+  cols.forEach((c, k) => { const path = [], off = (k - 2) * wid;
+    for (let s = 0; s <= N; s++) { const u = s / N, zc = za + (zw - za) * u, th = th0 + u * turns * Math.PI * 2, R = Math.max(tcTailR(zc), 0.014) + 0.006;
+      const n = new THREE.Vector3(Math.cos(th), Math.sin(th), 0), T = new THREE.Vector3(-Math.sin(th) * R * turns * Math.PI * 2, Math.cos(th) * R * turns * Math.PI * 2, zw - za).normalize();
+      const w = new THREE.Vector3(0, 0, 1).addScaledVector(T, -T.z).normalize(), p = new THREE.Vector3(Math.cos(th) * R, Math.sin(th) * R, zc).addScaledVector(w, off); path.push({ p, n, w }); }
+    B.m(tcStrip(path, wid * 0.5, false), c); });
+  tcRibbons(B, cols.map((c, k) => ({ col: c, x0: (k - 2) * 0.0075, spread: 2.2, ph: k * 1.7 })), -0.427, -0.535, 0.0042);
+  tcFlPost(B, { w: 8, k: 10 });
+}
+
+/* ---------- install (runs once, when this block is reached) ---------- */
+function tcTopXf(A, s, fit, face) {                                      // a topper: (turned to face out from her tail), scaled about where it meets her fur, moved out or in with a refitted band
+  return (p, n) => { if (face) { const y = p.y, z = p.z; p.y = A.cy + (z - A.cz); p.z = A.cz - (y - A.cy); const ny = n.y; n.y = n.z; n.z = -ny; }
+    const sh = (fit - 1) * A.r; p.set(A.x + A.dx * sh + s * (p.x - A.x), A.y + A.dy * sh + s * (p.y - A.y), A.z + s * (p.z - A.z)); };
+}
+function tcBail(bx, by, r, z, col) {                                     // the little loop on the ring the charm hangs from (in her tail's rest frame)
+  const g = CKG.tor(0.0058, 0.0019, 6, 14), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(-by, bx, 0)), m = new THREE.Matrix4().compose(new THREE.Vector3(bx * r, by * r, z), q, new THREE.Vector3(1, 1, 1));
+  const B = ckB(); B.parts.s.push([g, col, m]); return tcSub(ckMerge(B.parts.s), () => true, () => {});
+}
+function tcChainBits(cord, col) {                                        // a short bead chain from the ring down to the charm's own jump ring (y 0 down to -cord)
+  const B = ckB(), n = Math.max(1, Math.round(cord / 0.0088));
+  B.s(CKG.cyl(0.0012, 0.0012, cord, 5), col, [0, -cord / 2, 0]);
+  for (let i = 0; i < n; i++) B.s(CKG.sph(0.0038, 8, 6), col, [0, -(i + 0.5) * cord / n, 0]);
+  const g = ckMerge(B.parts.s); return tcSub(g, () => true, () => {});
+}
+function tcInstall() {
+  if (tcInstall.done) return; tcInstall.done = true;
+  const ok = f => typeof f === 'function';
+  if (ok(ckInstance)) { const f0 = ckInstance; ckInstance = function (it) { if (it && it.slot === 'tail') { const sp = tcPrep(it); if (sp) { try { const r = tcInstance(it, sp); if (r) return r; } catch (e) { tcErr(e); } } } return f0.apply(this, arguments); }; }
+  if (ok(closetDress)) { const f0 = closetDress; closetDress = function (R) { try { tcTag(R); } catch (e) {} return f0.apply(this, arguments); }; }
+  if (ok(ckFxDrop)) { const f0 = ckFxDrop; ckFxDrop = function (inst) { try { tcDrop(inst); } catch (e) {} return f0.apply(this, arguments); }; }
+  if (ok(ckPacksRun)) { const f0 = ckPacksRun; ckPacksRun = function () { const r = f0.apply(this, arguments); tcPrepAll(); return r; }; }
+  try { if (ckState.S) tcPrepAll(); } catch (e) {}
+  try { const R = walk.rig; if (R && R.ck && R.ck.tail) { R.ck.tail.id = '#'; closetDress(R); } } catch (e) {}   /* (dressed before this ran: her tail item again, the new way) */
+}
+tcInstall();
+/* (end of TAIL_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
