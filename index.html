@@ -10757,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-13 07:44';                                              // stamped when the site is published
+const BUILD = '2026-10-13 08:14';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -15108,6 +15108,7 @@ function ckState() {
       if (s.id === 'hat' && id === 'none') S.outfit.hat = 'none';
       else if (typeof id === 'string' && id !== 'crown' && CK_BY_ID[id] && CK_BY_ID[id].slot === s.id && S.owned.has(id)) S.outfit[s.id] = id; } } catch (e) {}
   S.spent = Math.max(0, parseInt(ckGet('catguard.closetSpent') || '0', 10) || 0);
+  ckuiGone(S);   /* (CKUI_V1) */
   return S;
 }
 function ckSave() { const S = ckState(); ckPut('catguard.closet', JSON.stringify([...S.owned].filter(id => id !== 'crown'))); ckPut('catguard.outfit', JSON.stringify(S.outfit)); ckPut('catguard.closetSpent', String(S.spent)); }
@@ -29060,9 +29061,9 @@ function ck5bRefresh() {
     ck5bDots();
     const locked = sel && ckIsEx(sel) && !S.owned.has(sel.id), V = sel && !locked ? ck5bVars(sel) : null, cur = V ? ck5bColFor(CK.rig, sel.id) : 0;
     let html = '';
-    if (V) html = '<span class="ck5b-swl">🎨</span>' + V.map((v, i) => '<button class="ck5b-sw' + (i === cur ? ' on' : '') + (ck5bColOwned(sel.id, i) ? '' : ' lock') + '" data-col="' + i + '" style="--c:' + ck5bHex(v.hex) + '" aria-label="' + ckbEsc(v.n) + '" title="' + ckbEsc(v.n) + '"></button>').join('');
+    if (V) html = V.map((v, i) => '<button class="ck5b-sw' + (i === cur ? ' on' : '') + (ck5bColOwned(sel.id, i) ? '' : ' lock') + '" data-col="' + i + '" style="--c:' + ck5bHex(v.hex) + '" aria-label="' + ckbEsc(v.n) + '" title="' + ckbEsc(v.n) + '"></button>').join('');
     if (Y.row.ck5b !== html) { Y.row.innerHTML = html; Y.row.ck5b = html; } Y.row.hidden = !html;
-    const tg = sel && !locked && sel.tags ? sel.tags.map(t => '#' + t).join(' ') : ''; if (Y.tags.textContent !== tg) Y.tags.textContent = tg; Y.tags.hidden = !tg;
+    const tg = '';   /* (CKUI_V1: no hashtags: the description says it) */ if (Y.tags.textContent !== tg) Y.tags.textContent = tg; Y.tags.hidden = !tg;
     if (html || tg) X.meta.hidden = false;
     if (!sel || !V) return;
     const saved = C.on[sel.id] || 0, own = S.owned.has(sel.id), cOwn = ck5bColOwned(sel.id, cur), dye = ck5bVarPrice(sel), nm = V[cur] ? V[cur].n : '';
@@ -29071,7 +29072,7 @@ function ck5bRefresh() {
     else if (own && cur && !cOwn) { ok = w >= dye; label = ok ? 'Dye it ' + nm + ': 🐟 ' + dye : 'Need ' + (dye - w) + ' more 🐟'; act = 'ck5bdye'; }
     else if (own && cOwn && cur !== saved) { ok = true; label = 'Wear it in ' + nm + ' 💖'; act = 'ck5bwear'; }
     if (label) { u.Main.textContent = label; u.Main.disabled = !ok; u.Main.className = 'btn ck-main' + (ok ? ' wear' : ''); CK.act = ok ? act : null; if (u.Act) u.Act.classList.remove('idle'); }
-    if (cur && !cOwn) { const n = '🎨 ' + nm + ': ' + dye + ' 🐟 to dye it' + (own ? '' : ' (with the ' + sel.name.toLowerCase() + ')'); X.note.textContent = X.note.textContent ? X.note.textContent + ' · ' + n : n; X.note.hidden = false; }
+    if (cur && !cOwn) { const n = nm + ': ' + dye + ' 🐟 to dye it' + (own ? '' : ' (with the ' + sel.name.toLowerCase() + ')'); X.note.textContent = X.note.textContent ? X.note.textContent + ' · ' + n : n; X.note.hidden = false; }
   } catch (e) { if (!ck5bRefresh.err) { ck5bRefresh.err = 1; console.error(e); } }
 }
 function ck5bDots() {                                                 // little colour dots on the cards (once each is baked)
@@ -29945,13 +29946,18 @@ function w3Press(super_) {                                            // Jump pr
 }
 function w3Listen() {                                                 // the Jump button and Space, pressed again in the air
   const S = w3S(), b = document.getElementById('walkJump'); S.listen = true;
-  const down = id => { S.ptr = id; S.pressT = clock; if (!flyOn()) w3Press(false); };   /* (Super Kitty: wait and see if it's a tap or the jetpack) */
-  const up = id => { if (id !== S.ptr) return; S.ptr = null; if (flyOn() && clock - S.pressT < 0.22) w3Press(true); };
+  const down = id => { S.ptr = id; S.pressT = clock; S.pressAir = w3InAir(); if (!flyOn() && S.pressAir) w3Press(false); };   /* (Super Kitty: wait and see if it's a tap or the jetpack) */
+  /* (TRICK2_V1: only a press that STARTS with her already in the air is a trick: the press that makes her jump never is) */
+  const up = id => { if (id !== S.ptr) return; S.ptr = null; if (flyOn() && clock - S.pressT < 0.22 && S.pressAir) w3Press(true); };
   if (b) b.addEventListener('pointerdown', e => down(e.pointerId));
   window.addEventListener('pointerup', e => up(e.pointerId)); window.addEventListener('pointercancel', e => { if (e.pointerId === S.ptr) S.ptr = null; });
   window.addEventListener('keydown', e => { if (e.key === ' ' && !e.repeat && gameMode === 'walk' && state === 'playing') down('key'); });
   window.addEventListener('keyup', e => { if (e.key === ' ') up('key'); });
   window.addEventListener('blur', () => { S.ptr = null; });
+}
+function w3InAir() {                                                  // (TRICK2_V1) really in the air: off the ground, up a bit or on the way up (not a stair or a bump in the lawn)
+  if (!walk.on || walk.grounded || walk.climb || !walk.rig) return false;
+  const p = walk.pos; return walk.vy > 1 || p.y - surfaceTop(p.x, p.z, p.y + 0.02) > 0.3;
 }
 function w3Upright(W) { W.g.rotation.order = 'XYZ'; W.g.rotation.set(0, walk.face, 0); }
 function w3Pay(n) {                                                   // a fish a trick, eight a minute at most
@@ -32094,7 +32100,7 @@ function seaSets() {                                                     // the 
   return [
     { id: 'seaLucky', name: 'Lucky Clover', ic: '☘️', items: ['seaLepHat', 'seaCloverSpecs', 'seaCloverEars', 'seaPotGold', 'seaBuckleShoes', 'seaClovers'], tags: ['lucky', 'festive', 'funny'], ck6: { a: '#dcf5dc', b: '#fff8dc', blurb: 'St Patrick’s Day from her hat to her toes: shamrocks, gold buckles and a pot of gold on her tail.' } },
     { id: 'seaLunar', name: 'Lunar New Year', ic: '🏮', items: ['seaSilkJacket', 'seaLuckyKnot', 'seaLanternPack', 'seaLanternEars', 'seaTassel', 'seaLanternTrail'], tags: ['festive', 'lucky', 'fancy'], ck6: { a: '#ffe0e0', b: '#fff3d6', blurb: 'Red silk, gold coins and lanterns everywhere: dressed for the lantern festival and all the luck of the new year.' } },
-    { id: 'seaWinter', name: 'Winter Lights', ic: '❄️', items: ['seaFrostScarf', 'seaSnowSpecs', 'seaFlakeEars', 'seaDreidel', 'seaIceSkates', 'snow'], tags: ['cozy', 'festive', 'sparkly'], ck6: { a: '#dfeaff', b: '#f6f9ff', blurb: 'Blue and silver, snowflakes and skates: cosy nights of lights and the first ice on the rink.' } },
+    { id: 'seaWinter', name: 'Winter Lights', ic: '❄️', items: ['seaFrostScarf', 'seaSnowSpecs', 'seaFlakeEars', 'seaIceSkates', 'snow'], tags: ['cozy', 'festive', 'sparkly'], ck6: { a: '#dfeaff', b: '#f6f9ff', blurb: 'Blue and silver, snowflakes and skates: cosy nights of lights and the first ice on the rink.' } },
   ];
 }
 
@@ -38067,7 +38073,7 @@ function carHeroPrep() {                                                 // (onc
   const S = carHeroShape(), M = { S }; M.rings = carHeroStations(S).map(z => carHeroRing(S, z)); carHeroSurf(M); M.rawSideX = M.sideX;
   const P = carHeroParts(); carHeroLoft(M, P); carHeroParts2(M, P);
   M.geo = { body: carHeroMerge(P.body), door: carHeroMerge(P.door), glass: carHeroMerge(P.glass) }; M.hinge = { x: 0.86, z: 0.858 };
-  M.tex = carHeroTex(M, typeof devTier === 'function' && devTier() === 'low'); M.env = carHeroEnvTex(); carHeroMats(M);
+  M.tex = carHeroTex(M, typeof devTier === 'function' && devTier() === 'low'); carHero4RearTex(M); /* CAR4_V1 */ M.env = carHeroEnvTex(); carHeroMats(M);
   return (CARH.M = M);
 }
 
@@ -38782,7 +38788,7 @@ function carHeroParts2(M, P) {                                          // every
   const rN = (x, y) => { const e = 0.03, dx = (M.rearZ(x + e, y) - M.rearZ(x - e, y)) / (2 * e), dy = (M.rearZ(x, y + e) - M.rearZ(x, y - e)) / (2 * e); return new V3(dx, dy, -1).normalize(); };
   const onF = (x, y, o) => { const n = fN(x, y); return [x + n.x * o, y + n.y * o, M.frontZ(x, y) + n.z * o]; };
   const onR = (x, y, o) => { const n = rN(x, y); return [x + n.x * o, y + n.y * o, M.rearZ(x, y) + n.z * o]; };
-  /* CAR3_V1 */ carHero3Cap(M, P); carHero3V(M, P, fN); if (false) for (const sx of [1, -1]) { const V = [[0.42, 0.903], [0.345, 0.906], [0.315, 0.878], [0.21, 0.738], [0.14, 0.652], [0.07, 0.624], [0.0, 0.619]];
+  /* CAR3_V1 */ /* CAR4_V1 */ carHero4Rear(M, P); carHero3Cap(M, P); carHero3V(M, P, fN); if (false) for (const sx of [1, -1]) { const V = [[0.42, 0.903], [0.345, 0.906], [0.315, 0.878], [0.21, 0.738], [0.14, 0.652], [0.07, 0.624], [0.0, 0.619]];
     const fz = (x, y) => Math.max(M.frontZ(x, y), M.frontZ(x, y + 0.03), M.frontZ(x, y - 0.03)) + 0.012;   /* (a chrome strip standing on the face, facing forward) */
     for (let i = 0; i + 1 < V.length; i++) { const x0 = sx * V[i][0], x1 = sx * V[i + 1][0], a = [x0, V[i][1], fz(x0, V[i][1])], c = [x1, V[i + 1][1], fz(x1, V[i + 1][1])], xm = (x0 + x1) / 2;
       carHeroBar(P, 'body', a, c, i < 1 ? 0.026 : 0.058 - i * 0.002, i < 1 ? 0.012 : 0.026, [xm * 0.5, 0.05, 1], Q.CHROME, 0.88, 0); } }
@@ -40689,6 +40695,84 @@ function carHero3Lamps(o) {                                              // (car
   }
 }
 /* (end of CAR3_V1) */
+/* CAR4_V1 */
+/* =====================================================================
+   CAR4_V1 (2026-10-13): the red car's back bumper, from the user's photos (6, 7). The flat cap across the middle of the back was
+   wound inside out (as the nose's was, fixed in CAR3_V1): the shader drew it as the car's dark inside, a dead black slab with no
+   reflectors. It's turned round, so the bumper shows its paint and pictures. The black lower bumper now tops out at 0.56 m (it was
+   0.585; photo 7's red-to-black proportions under the plate) right round the back corners; the red reflectors sit low in its outer corners
+   where they can be seen; a faint groove runs along it; the two dark "sensor" dots (the car has none) are gone.
+   Hooks: carHero4Rear in carHeroParts2 (next to CAR3_V1's carHero3Cap), carHero4RearTex after carHeroPrep paints the pictures.
+   Same meshes, same draw calls; nothing else on the car is touched.
+   ===================================================================== */
+function carHero4Rear(M, P) {                                            // (carHeroParts2) the back: the end cap turned round; the black lower bumper brought down to 0.56 m
+  const ZR = M.S.ZR, YT = 0.56, CL = new THREE.Color(carHeroCols().CLAD), PA = carHeroCols().PAINT, add = [];
+  const isClad = L => Math.abs(L.r - CL.r) < 1e-4 && Math.abs(L.g - CL.g) < 1e-4 && Math.abs(L.b - CL.b) < 1e-4;
+  for (const L of P.body) { if (!L.shell) continue; const p = L.pos;
+    let cap = L.nrm[2] === -1; for (let i = 2; cap && i < p.length; i += 3) if (Math.abs(p[i] - ZR) > 1e-6) cap = false;
+    if (cap) {                                                           // the end cap's strips: turned round (they faced into the car); the red comes down to YT
+      let yc = 0; for (let i = 0; i < p.length; i += 9) for (let j = 0; j < 3; j++) { const t = p[i + 3 + j]; p[i + 3 + j] = p[i + 6 + j]; p[i + 6 + j] = t; }
+      for (let i = 1; i < p.length; i += 3) yc += p[i]; yc /= p.length / 3;
+      if (isClad(L) && yc >= YT) { const C = new THREE.Color(PA); L.r = C.r; L.g = C.g; L.b = C.b; L.refl = 0.3; }
+      continue; }
+    if (!isClad(L) || Math.abs(L.refl - 0.05) > 1e-6) continue;          // the lower body's black round the back corners: the triangles above YT go red
+    const keep = [], kn = [], mv = [], mn = [];
+    for (let i = 0; i < p.length; i += 9) { const zc = (p[i + 2] + p[i + 5] + p[i + 8]) / 3, yc = (p[i + 1] + p[i + 4] + p[i + 7]) / 3, up = zc <= -1.86 && yc >= YT && yc < 0.6;
+      const P9 = p.slice(i, i + 9), N9 = L.nrm.slice(i, i + 9); if (up) { mv.push(...P9); mn.push(...N9); } else { keep.push(...P9); kn.push(...N9); } }
+    if (mv.length) { L.pos = keep; L.nrm = kn; add.push([mv, mn, L.deco]); }
+  }
+  for (const [pos, nrm, deco] of add) P.push('body', pos, nrm, PA, 0.44, deco, true);
+}
+function carHero4RearTex(M) {                                            // (after carHeroPrep's carHeroTex) the back's picture: reflectors low in the black, a groove, no sensor dots
+  const cv = M.tex && M.tex.rear; if (!cv) return; const c = cv.getContext('2d'), W = cv.width, H = cv.height, ZC = -1.45, D2 = 180 / Math.PI, pxv = H;
+  const X = (x, z) => (Math.atan2(x, -(z - ZC)) * D2 / 198 + 0.5) * W, Y = y => (1 - (y - 0.25)) * H;
+  const at = (x, y) => { c.setTransform(1, 0, 0, 1, 0, 0); c.translate(X(x, M.rearZ(x, y)), Y(y)); c.scale(W / 198 * D2 / Math.hypot(x, M.rearZ(x, y) - ZC), pxv); };
+  c.save(); c.globalCompositeOperation = 'destination-out'; c.fillStyle = '#000';
+  for (const sx of [1, -1]) { for (const xs of [0.24, 0.5]) { at(sx * xs, 0.5); c.beginPath(); c.arc(0, 0, 0.02, 0, Math.PI * 2); c.fill(); }
+    at(sx * 0.66, 0.37); c.fillRect(-0.075, -0.024, 0.15, 0.048); }
+  c.restore(); c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0); c.lineCap = 'round';
+  for (const [dy, col, w] of [[0.004, 'rgba(8,8,9,.75)', 0.006], [0, 'rgba(78,80,85,.55)', 0.0035]]) {   // the groove along the black, a shadowed edge under a faint light one
+    c.strokeStyle = col; c.lineWidth = pxv * w; c.beginPath();
+    for (let k = 0; k <= 20; k++) { const x = -0.52 + 1.04 * k / 20, y = 0.462 - dy; const q = [X(x, M.rearZ(x, y)), Y(y)]; if (k) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]); } c.stroke(); }
+  for (const sx of [1, -1]) { at(sx * 0.635, 0.432); c.fillStyle = '#8f0a15'; c.beginPath(); c.rect(-0.058, -0.011, 0.116, 0.022); c.fill();   // the reflectors
+    c.fillStyle = 'rgba(255,110,110,.35)'; c.fillRect(-0.054, -0.009, 0.108, 0.006); c.strokeStyle = 'rgba(20,2,4,.8)'; c.lineWidth = 0.003; c.strokeRect(-0.058, -0.011, 0.116, 0.022); }
+  c.restore(); c.setTransform(1, 0, 0, 1, 0, 0);
+}
+/* (end of CAR4_V1) */
+/* ---------- CKUI_V1 (2026-10-13): item chatter in person only; a calmer Closet ----------
+   - What the neighbours say about her new things (bought, a new outfit, a finished set, the collection book, a perk) is
+     no longer a card in the Closet or out of nowhere: it waits (up to half an hour) until PKR is actually beside one of
+     them in Free roam (Aunty-ji upstairs, the raccoon on the roof, Porter at the fence) and they say it themselves.
+   - The silver spinning-top charm is gone (anyone who bought it gets the fish back, once). */
+function ckuiInPerson(e) { return !!e && /^(bought|outfit|set|book|perk)$/.test(e.id); }
+function ckuiInstall() {
+  if (ckuiInstall.done) return; ckuiInstall.done = true;
+  const make0 = talkMake, say0 = talkSay;
+  talkMake = function (name, d) {
+    const e = make0(name, d);
+    if (ckuiInPerson(e)) { e.ctx = 'roam'; e.inPerson = true; e.exp = Math.max(e.exp || 0, 1800); e.pref = (e.pref || ['aunty', 'coon', 'porter']).filter(w => w !== 'chotu'); }
+    return e;
+  };
+  talkSay = function (e, ctx) {
+    if (!e || !e.inPerson) return say0(e, ctx);
+    if (ctx !== 'roam') return false;                                     /* (not here: it waits for Free roam) */
+    const near = (e.pref || []).filter(w => talkNear(w)); if (!near.length) return false;   /* (nobody right beside her yet: it waits) */
+    const keep = e.pref; e.pref = near;
+    try { const r = say0(e, ctx); return r == null ? false : r; } finally { e.pref = keep; }
+  };
+}
+function ckuiGone(S) {                                                  // (ckState) the spinning-top charm: off the shelf; its fish back to anyone who'd bought it
+  try { const i = CK_ITEMS.findIndex(it => it && it.id === 'seaDreidel'); if (i >= 0) CK_ITEMS.splice(i, 1); delete CK_BY_ID.seaDreidel;
+    S.owned.delete('seaDreidel'); for (const k in S.outfit) if (S.outfit[k] === 'seaDreidel') delete S.outfit[k];
+    if (ckGet('catguard.ckuiDreidel')) return; ckPut('catguard.ckuiDreidel', '1');
+    const a = JSON.parse(ckGet('catguard.closet') || '[]'); if (!Array.isArray(a) || a.indexOf('seaDreidel') < 0) return;
+    ckPut('catguard.closet', JSON.stringify(a.filter(id => id !== 'seaDreidel')));
+    const f = Math.max(0, parseInt(ckGet('catguard.fish') || '0', 10) || 0); ckPut('catguard.fish', String(f + 110));
+  } catch (e) {}
+}
+try { ckuiInstall(); } catch (e) { console.error(e); }
+/* (end of CKUI_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
