@@ -4826,7 +4826,7 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
     { const sp = grp('Spruce', true), SX = Y.HL - 21, SZ = zF - 17; yCyl(sp, 0.25, 0.35, 2, 0x4a3a2e, SX, 1, SZ, 8);   // and a tall blue spruce past it, in front of 30 & 32
       for (let k = 0; k < 5; k++) { const cn = new THREE.Mesh(new THREE.ConeGeometry(2.4 - k * 0.42, 3.2, 10), yMat([0x3f5f4a, 0x4a6a55][k % 2])); cn.position.set(SX, 2.6 + k * 1.9, SZ); sp.add(cn); }
       bakeYard(sp); treeReg(SX, SZ, 11, 0.35, 0, null, sp); shadow(SX, SZ, 2.6, 2.6); }
-    parkedCar(XR - 5.8, zF - 8.6, 0, 0xa59e90, 'sedan', 'PURR 123', [-1e5, 1e5, -1e5, zF - 0.6]);            // our champagne sedan, nosed in to the garage
+    if (typeof carHeroOn !== 'function' || !carHeroOn()) parkedCar(XR - 5.8, zF - 8.6, 0, 0xa59e90, 'sedan', 'PURR 123', [-1e5, 1e5, -1e5, zF - 0.6]);            // our champagne sedan, nosed in to the garage
     bakeYard(cb); }
   // -- the neighbours: semis like ours (two houses joined down the middle, mirror images of each other), to scale from the satellite view:
   // 30 & 32 to the north (grey roof, white siding over brick, set further back than us), 22 & 24 to the south past next door, and four
@@ -10757,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-13 00:03';                                              // stamped when the site is published
+const BUILD = '2026-10-13 00:08';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -25428,7 +25428,7 @@ function lotPill(dt) {
     const p = walk.pos, dd = Math.hypot(p.x - P.x, p.z - P.z), first = lotGet('catguard.lotSeen', '') !== '1';
     if ((first && dd < 11 && p.y < 3) || on) { S.saidVisit = walk.treesSeen; if (first) lotPut('catguard.lotSeen', '1');
       const pr = lotProg(), tot = pr.st.reduce((a, b) => a + b, 0);
-      showWalkName(first ? '🅿️ A valet stand on our driveway! And look at those cars, jammed nose to nose... Tap “Meow Lot” and sort them out!'
+      if (!(typeof carHeroSay === 'function' && carHeroSay(first, tot, pr))) showWalkName(first ? '🅿️ A valet stand on our driveway! And look at those cars, jammed nose to nose... Tap “Meow Lot” and sort them out!'
         : tot ? '🅿️ PKR’s valet stand. Meow Lot: ★ ' + tot + ' of ' + pr.st.length * 3 + '. Tap to park some more!' : '🅿️ Tap “Meow Lot” to clear the jam!'); }
   }
   if (on !== S.pillOn) lotPillSet(on);
@@ -37604,6 +37604,594 @@ try { parts.forEach(q => { q.m.userData.noWalk = true; }); } catch (e) {}   /* (
 window.addEventListener('keydown', e => { if (e.repeat || (e.key || '').toLowerCase() !== 'g') return; try { const W = wpnState(), h = W.held; if (h && h.st === 'held' && walk.on && state === 'playing' && gameMode === 'walk') { wpnDrop(h); showWalkName(`${h.D.ic} PKR puts the ${h.D.name.toLowerCase()} down`); } } catch (err) {} });
 /* (end of WEAPONS_V1) */
 
+/* CAR_V1 */
+/* =====================================================================
+   CAR_V1 (2026-10-12): the family's red car on our driveway, from the user's 7 photos: a 2017-19 compact crossover (the
+   Canadian Qashqai SV) in deep metallic scarlet red. It's the only car on our driveway now: the Meow Lot valet podium, its two
+   jammed toy cars and the champagne sedan are gone. It's parked as in the photos: in front of our front door and stoop, beside
+   the lawn, nosed in toward the house (its tail to the street), the driver's side toward the garage.
+   - The model (metres, scaled 2.52 to the game): one lofted body (sections along its length: sills, shoulder, hood, glasshouse,
+     roof, hatch), black cladding round the arches, sills and lower bumpers, chrome window line, black B and C pillars, a small
+     rear quarter window, mirrors with turn signals, handles, a roof spoiler with a brake light, an antenna mast, wipers, 5 twin
+     spoke silver alloys. The grille's honeycomb, the boomerang headlights, the wraparound tail lights, the plates ("PKR 💖",
+     no brand or real plate) and the silver butterfly decals on the hood and bumper are painted on with three projected pictures
+     (front, rear, top). A dreamcatcher with a pink tassel hangs from the mirror and a little white plush sits on the dash,
+     seen through the tinted windscreen. Its own little shader: baked yard light (as every outdoor thing), a fake sky reflection
+     for the paint, chrome and glass, the time of day's tint. Four draws: the body, the driver's door (it opens), the windscreen,
+     the shadow. No lights in it.
+   - Solid: invisible boxes she bumps into, and hops up on (the hood, the roof).
+   - Meow Lot starts from it: by the driver's door the pill says "🚗 Hop in"; the door swings open, PKR leaps in, the door shuts,
+     a little honk, and into Meow Lot as before (lotStart). Coming back she pops out of the driver's door.
+   Hooks: lotSpotPos / lotSpotBuild / lotNear / lotPillMake / lotHandoff / lotFrame / warmJobs wrapped at load (below); the
+   sedan's parkedCar call and the discovery line in lotPill guarded by carHeroOn() / carHeroSay().
+   ===================================================================== */
+var CARH = { K: 2.52, door: 0, doorWant: 0, hop: null, tintSum: -1 };
+function carHeroOn() { return true; }                                     // (the yard builder asks, before this block's code has run: no TDZ here)
+function carHeroPlace() {                                               // where it's parked: our driveway, in front of the stoop, its tail to the street
+  return { x: -3.2, z: UPPER.zF - 14.5, ry: 0 };                        // (ry 0: its nose toward the house, as in the photos; Math.PI would turn it round)
+}
+function carHeroW(lx, ly, lz, out) {                                     // a point on the car (metres, its own frame) out in the world
+  const P = carHeroPlace(), K = CARH.K, c = Math.cos(P.ry), s = Math.sin(P.ry), o = out || {};
+  o.x = P.x + K * (lx * c + lz * s); o.y = K * ly; o.z = P.z + K * (-lx * s + lz * c); return o;
+}
+
+/* ---------- the shape: sections along its length ---------- */
+function carHeroCurve(pts) {                                            // a smooth curve through [z, v] points (Catmull-Rom; z ascending)
+  const n = pts.length;
+  return z => {
+    if (z <= pts[0][0]) return pts[0][1]; if (z >= pts[n - 1][0]) return pts[n - 1][1];
+    let i = 0; while (i < n - 2 && z > pts[i + 1][0]) i++;
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(n - 1, i + 2)], t = (z - p1[0]) / (p2[0] - p1[0]);
+    const m1 = (p2[1] - p0[1]) / (p2[0] - p0[0] || 1) * (p2[0] - p1[0]), m2 = (p3[1] - p1[1]) / (p3[0] - p1[0] || 1) * (p2[0] - p1[0]);
+    const t2 = t * t, t3 = t2 * t; return (2 * t3 - 3 * t2 + 1) * p1[1] + (t3 - 2 * t2 + t) * m1 + (-2 * t3 + 3 * t2) * p2[1] + (t3 - t2) * m2;
+  };
+}
+function carHeroShape() {                                                // the numbers (metres): 4.39 long, 1.84 wide, 1.6 tall, 2.65 between the axles
+  const C = carHeroCurve, ZF = 2.197, ZR = -2.197;
+  return {
+    ZF, ZR, AXF: 1.277, AXR: -1.369, WR: 0.352, ARC: 0.43, TW: 0.775,
+    yB: C([[ZR, 0.40], [ZR + 0.05, 0.345], [ZR + 0.2, 0.31], [-1.6, 0.30], [1.6, 0.30], [ZF - 0.2, 0.29], [ZF - 0.05, 0.33], [ZF, 0.38]]),
+    a: C([[ZR, 0.78], [ZR + 0.03, 0.835], [ZR + 0.1, 0.875], [ZR + 0.28, 0.908], [-1.55, 0.919], [1.45, 0.919], [1.8, 0.914], [2.0, 0.9], [2.1, 0.878], [2.16, 0.845], [ZF - 0.012, 0.8], [ZF, 0.76]]),
+    ys: C([[ZR, 0.60], [ZR + 0.02, 0.72], [ZR + 0.06, 0.88], [-2.11, 0.99], [-2.05, 1.08], [-1.95, 1.16], [-1.80, 1.205], [-1.62, 1.215], [-1.32, 1.15], [-0.4, 1.115], [0.4, 1.095], [0.9, 1.075], [1.4, 1.03], [1.9, 0.98], [2.07, 0.94], [2.12, 0.9], [2.15, 0.83], [2.175, 0.72], [2.19, 0.63], [ZF, 0.57]]),
+    top: C([[ZR, 0.62], [ZR + 0.012, 0.74], [-2.16, 0.84], [-2.12, 1.0], [-2.07, 1.2], [-2.03, 1.245], [-1.95, 1.335], [-1.86, 1.425], [-1.80, 1.468], [-1.6, 1.515], [-1.2, 1.56], [-0.6, 1.588], [0.0, 1.578], [0.3, 1.552], [0.4, 1.532],
+      [0.48, 1.48], [0.6, 1.392], [0.75, 1.272], [0.9, 1.132], [1.5, 1.08], [2.0, 1.02], [2.07, 0.985], [2.12, 0.94], [2.15, 0.86], [2.175, 0.74], [2.19, 0.64], [ZF, 0.58]]),
+    zCowl: 0.90, zRoofF: 0.40, zRoofR: -1.80, zDeck: -2.07,
+  };
+}
+function carHeroRing(S, z) {                                             // one section, the +x half, bottom middle to top middle: the lower body (sills, side, shoulder), the side glass, the top
+  const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const yB = S.yB(z), a = S.a(z), ys = S.ys(z), top = S.top(z), inset = 0.068, aG = a - inset;
+  const gh = sm(S.zCowl + 0.01, S.zCowl - 0.06, z) * sm(S.zDeck - 0.01, S.zDeck + 0.07, z);        // (a glasshouse between the cowl and the hatch)
+  const h = Math.max(0, top - 0.062 - ys) * gh, xe = aG - (0.42 + 0.75 * sm(-1.55, -2.05, z)) * h, yq = ys + h;                     // (its sides lean in: tumblehome)
+  const nu = 3.2, nl = 5, yc = yB + 0.58 * (ys - yB), q = Math.pow(1 - Math.pow(aG / a, nu), 1 / nu), bu = (ys - yc) / q, bl = yc - yB;
+  const ts = Math.acos(Math.pow(aG / a, nu / 2)), pts = [], NL = 26, NS = 6, NT = 10;
+  for (let k = 0; k <= NL; k++) {                                        // the lower body: a superellipse, boxy below, rounder above
+    const u = Math.pow(k / NL, 0.72), th = -Math.PI / 2 + (ts + Math.PI / 2) * u, c = Math.cos(th), s = Math.sin(th);
+    const n = s < 0 ? nl : nu, b = s < 0 ? bl : bu;
+    pts.push([a * Math.pow(Math.max(0, c), 2 / n), yc + b * Math.sign(s) * Math.pow(Math.abs(s), 2 / n), 'L']);
+  }
+  pts[NL][0] = aG; pts[NL][1] = ys;
+  for (let k = 1; k <= NS; k++) { const t = k / NS; pts.push([aG - (aG - xe) * Math.pow(t, 1.15), ys + h * t, 'S']); }   // the side glass and pillars (a little bowed)
+  const nq = 2.3 + 0.9 * Math.min(1, h / 0.3), hq = top - yq;
+  for (let k = 1; k <= NT; k++) { const ph = k / NT * Math.PI / 2; pts.push([xe * Math.pow(Math.cos(ph), 2 / nq), yq + hq * Math.pow(Math.sin(ph), 2 / nq), 'T']); }   // the top: hood, windscreen, roof, back glass, hatch
+  pts[pts.length - 1][0] = 0;
+  return { z, pts, yB, a, ys, top, yq, xe, aG, h, NL, NS };
+}
+function carHeroStations(S) {                                            // where the sections go (closer at the ends and round the edges that matter)
+  const zs = []; for (let z = S.ZR; z <= S.ZF + 1e-6; z += 0.05) zs.push(z);
+  for (let k = 1; k < 10; k++) { zs.push(S.ZF - 0.012 * k); zs.push(S.ZR + 0.012 * k); }
+  zs.push(S.ZF - 0.004, S.ZR + 0.004, 0.866, 0.858, -0.392, -0.400, -1.262, -1.270, S.zCowl, S.zCowl - 0.03, S.zRoofF, S.zRoofR, S.zDeck, S.ZF, S.ZR);
+  for (const ax of [S.AXF, S.AXR]) for (let d = -0.5; d <= 0.5; d += 0.025) zs.push(ax + d);   // (round the wheel arches: a smoother edge)
+  zs.sort((p, q) => p - q); const out = []; for (const z of zs) if (z >= S.ZR - 1e-6 && z <= S.ZF + 1e-6 && (!out.length || z - out[out.length - 1] > 0.0035)) out.push(z);
+  out[0] = S.ZR; out[out.length - 1] = S.ZF; return out;
+}
+function carHeroWidthAt(R, y) {                                          // a section's half width at height y (0 if it doesn't reach)
+  const p = R.pts; if (y < p[0][1] || y > p[p.length - 1][1]) return 0;
+  for (let k = 0; k < p.length - 1; k++) { const a = p[k], b = p[k + 1]; if (y >= a[1] && y <= b[1]) { const t = b[1] - a[1] < 1e-9 ? 0 : (y - a[1]) / (b[1] - a[1]); return a[0] + (b[0] - a[0]) * t; } }
+  return 0;
+}
+function carHeroSurf(M) {                                                // looking things up on the body: where the front (or back) is at (x, y); how wide the side is at (z, y)
+  const R = M.rings;
+  M.frontZ = (x, y) => { x = Math.abs(x); for (let i = R.length - 1; i > 0; i--) { const w1 = carHeroWidthAt(R[i], y); if (w1 >= x) return R[i].z; const w0 = carHeroWidthAt(R[i - 1], y); if (w0 >= x) { const t = (x - w1) / (w0 - w1 || 1); return R[i].z + (R[i - 1].z - R[i].z) * t; } } return R[0].z; };
+  M.rearZ = (x, y) => { x = Math.abs(x); for (let i = 0; i < R.length - 1; i++) { const w1 = carHeroWidthAt(R[i], y); if (w1 >= x) return R[i].z; const w0 = carHeroWidthAt(R[i + 1], y); if (w0 >= x) { const t = (x - w1) / (w0 - w1 || 1); return R[i].z + (R[i + 1].z - R[i].z) * t; } } return R[R.length - 1].z; };
+  M.sideX = (z, y) => { let i = 0; while (i < R.length - 2 && R[i + 1].z < z) i++; const a = R[i], b = R[i + 1], t = Math.max(0, Math.min(1, (z - a.z) / (b.z - a.z || 1))); return carHeroWidthAt(a, y) * (1 - t) + carHeroWidthAt(b, y) * t; };
+  M.ringAt = z => { let i = 0; while (i < R.length - 2 && R[i + 1].z < z) i++; return R[i]; };
+}
+
+/* ---------- the parts list: geometry, colour, shine; merged at the end into a few meshes ---------- */
+function carHeroParts() {
+  const P = { body: [], door: [], glass: [] };
+  const C = new THREE.Color();
+  P.push = (bucket, pos, nrm, col, refl, deco, shell) => {               // flat arrays of triangles (non-indexed)
+    const L = P[bucket]; C.set(col); L.push({ pos, nrm, r: C.r, g: C.g, b: C.b, refl, deco: deco ? 1 : 0, shell: shell ? 1 : 0 });
+  };
+  P.geo = (bucket, g, col, refl, deco, flip) => {                        // a three.js geometry as parts (its own normals)
+    const n = g.index ? g.toNonIndexed() : g; if (!n.attributes.normal) n.computeVertexNormals();
+    const pa = n.attributes.position.array, na = n.attributes.normal.array, pos = Array.from(pa), nrm = Array.from(na);
+    if (flip) for (let i = 0; i < pos.length; i += 9) for (let j = 0; j < 3; j++) { const t = pos[i + 3 + j]; pos[i + 3 + j] = pos[i + 6 + j]; pos[i + 6 + j] = t; const u = nrm[i + 3 + j]; nrm[i + 3 + j] = nrm[i + 6 + j]; nrm[i + 6 + j] = u; }
+    P.push(bucket, pos, nrm, col, refl, deco, false); if (n !== g) n.dispose(); g.dispose();
+  };
+  return P;
+}
+function carHeroMirrorX(g) { g.scale(-1, 1, 1); const n = g.index ? g.toNonIndexed() : g; const p = n.attributes.position.array, q = n.attributes.normal ? n.attributes.normal.array : null;   // (a mirrored copy, its triangles turned back the right way round)
+  for (let i = 0; i < p.length; i += 9) for (let j = 0; j < 3; j++) { let t = p[i + 3 + j]; p[i + 3 + j] = p[i + 6 + j]; p[i + 6 + j] = t; if (q) { t = q[i + 3 + j]; q[i + 3 + j] = q[i + 6 + j]; q[i + 6 + j] = t; } }
+  return n; }
+function carHeroCols() {                                                  // the paint box (base colours; the shader lights them)
+  return { PAINT: 0x8e1123, CLAD: 0x202022, GLASS: 0x0d1117, PILL: 0x0f0f11, SHUT: 0x3a0c12, WELL: 0x0b0b0c, CHROME: 0xdfe2e6, TYRE: 0x1c1c1d, RIM: 0xc4c7cb, DARK: 0x26282b, INT: 0x2b2c2f, SEAT: 0x303236 };
+}
+function carHeroLoft(M, P) {                                            // the body: section to section, both halves, each face coloured by where it is (the driver's door's faces go to its own mesh)
+  const S = M.S, R = M.rings, Q = carHeroCols(), NL = R[0].NL, NS = R[0].NS;
+  const wTop = (z, r) => z > -1.27 ? r.yq - 0.035 : r.ys + (r.yq - 0.035 - r.ys) * Math.pow(Math.max(0, (z + 1.6) / 0.33), 1.7);   // (the side windows' top edge; the quarter window tapers down at the back)
+  const arch = (z, y) => Math.min(Math.hypot(z - S.AXF, y - S.WR), Math.hypot(z - S.AXR, y - S.WR));
+  const inShut = z => (z > 0.857 && z < 0.867) || (z > -0.401 && z < -0.391) || (z > -1.271 && z < -1.261);
+  const face = (seg, k, zc, yc, sx, pushed, r, xc) => {                     // [colour, shine, painted-on pictures?, bucket]
+    if (seg === 'L') {
+      const dA = arch(zc, yc); if (dA < S.ARC) return null;              // (the wheel arches: open)
+      if (dA < S.ARC + 0.07) return [Q.CLAD, 0.05, 1, 'body'];
+      const door = sx > 0 && zc > -0.392 && zc < 0.858 && yc > 0.47;
+      if (inShut(zc) && yc > 0.47) return [Q.SHUT, 0, 0, 'body'];
+      if (yc < (zc > -1.5 && zc < 0.95 ? 0.47 : 0.43) && zc > -1.86 && zc < 1.82) return [Q.CLAD, 0.05, 1, 'body'];
+      if (zc >= 1.82 && yc < 0.415) return [Q.CLAD, 0.05, 1, 'body'];
+      if (zc <= -1.86 && yc < 0.585) return [Q.CLAD, 0.05, 1, 'body'];
+      return [Q.PAINT, 0.38, 1, door ? 'door' : 'body'];
+    }
+    if (seg === 'S') {
+      const door = sx > 0 && zc > -0.392 && zc < 0.858;
+      if (zc < 0.9 && zc > -1.635 && yc > r.ys + 0.012 && yc < wTop(zc, r)) {
+        if ((zc > -0.47 && zc < -0.355) || (zc > -1.34 && zc < -1.222)) return [Q.PILL, 0.35, 0, door ? 'door' : 'body'];
+        return [Q.GLASS, 0.6, 0, door ? 'door' : 'body'];
+      }
+      return [Q.PAINT, 0.38, 0, door ? 'door' : 'body'];
+    }
+    const edge = k <= NL + NS + 1;                                       // (the top's first cells, round its edge: the A pillars, the roof's edge)
+    if (zc > 0.872 && zc < 0.935) return [Q.CLAD, 0.08, 0, 'body'];     // the cowl (wipers sit on it)
+    if (zc >= 0.935) return [Q.PAINT, 0.38, 1, 'body'];                  // the hood
+    if (zc > S.zRoofF + 0.005 && zc <= 0.872) return edge ? [Q.PAINT, 0.38, 0, 'body'] : [Q.GLASS, 0.6, 0, 'glass'];   // the windscreen (see-through), the A pillars
+    if (zc < S.zRoofR - 0.005 && zc > S.zDeck + 0.006) return edge || xc > 0.5 + (1.4 - yc) * 0.25 ? [Q.PAINT, 0.38, 0, 'body'] : [Q.GLASS, 0.6, 0, 'body'];   // the back glass (thick D pillars either side)
+    if (zc <= S.zDeck + 0.006) return [Q.PAINT, 0.38, 1, 'body'];        // the hatch below it
+    return [Q.PAINT, 0.4, 0, 'body'];                                   // the roof
+  };
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), Cc = new THREE.Vector3(), U = new THREE.Vector3(), V = new THREE.Vector3();
+  const nI = R.length, nK = R[0].pts.length;
+  for (const sx of [1, -1]) {
+    const G = [], N = [], PU = [];
+    for (let i = 0; i < nI; i++) { const r = R[i], row = [], pu = []; for (let k = 0; k < nK; k++) { const p = r.pts[k]; let x = p[0];
+        const isP = false;
+        row.push([sx * x, p[1], r.z]); pu.push(isP); }
+      G.push(row); PU.push(pu); }
+    for (let i = 0; i < nI; i++) { const nr = []; for (let k = 0; k < nK; k++) {                 // smooth normals off the grid
+        const a = G[Math.max(0, i - 1)][k], b = G[Math.min(nI - 1, i + 1)][k], c = G[i][Math.max(0, k - 1)], d = G[i][Math.min(nK - 1, k + 1)];
+        U.set(d[0] - c[0], d[1] - c[1], d[2] - c[2]); V.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); A.crossVectors(U, V); if (sx < 0) A.negate();
+        if (k === 0 || k === nK - 1) A.x = 0; if (A.lengthSq() < 1e-14) A.set(sx, 0, 0); A.normalize(); nr.push([A.x, A.y, A.z]); }   /* (on the middle line: straight up, down or out the end) */
+      N.push(nr); }
+    const bk = { body: [[], []], door: [[], []], glass: [[], []] }, meta = {};
+    const tri = (b, p0, p1, p2, n0, n1, n2, f) => {
+      A.set(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]); B.set(p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]); if (Cc.crossVectors(A, B).lengthSq() < 1e-16) return;
+      const key = b + '|' + f[0] + '|' + f[1] + '|' + f[2]; let L = meta[key]; if (!L) L = meta[key] = { b, f, pos: [], nrm: [] };
+      L.pos.push(...p0, ...p1, ...p2); L.nrm.push(...n0, ...n1, ...n2);
+    };
+    for (let i = 0; i < nI - 1; i++) for (let k = 0; k < nK - 1; k++) {
+      const p00 = G[i][k], p01 = G[i][k + 1], p10 = G[i + 1][k], p11 = G[i + 1][k + 1], seg = R[i].pts[k + 1][2];
+      const zc = (p00[2] + p10[2]) / 2, yc = (p00[1] + p01[1] + p10[1] + p11[1]) / 4, pushed = PU[i][k] || PU[i][k + 1] || PU[i + 1][k] || PU[i + 1][k + 1];
+      const f = face(seg, k, zc, yc, sx, pushed, R[i], Math.abs(p00[0] + p01[0] + p10[0] + p11[0]) / 4); if (!f) continue;
+      if (sx > 0) { tri(f[3], p00, p01, p10, N[i][k], N[i][k + 1], N[i + 1][k], f); tri(f[3], p01, p11, p10, N[i][k + 1], N[i + 1][k + 1], N[i + 1][k], f); }
+      else { tri(f[3], p00, p10, p01, N[i][k], N[i + 1][k], N[i][k + 1], f); tri(f[3], p01, p10, p11, N[i][k + 1], N[i + 1][k], N[i + 1][k + 1], f); }
+    }
+    for (const key in meta) { const L = meta[key]; P.push(L.b, L.pos, L.nrm, L.f[0], L.f[1], L.f[2], true); }
+    if (sx > 0) M.grid = G;
+  }
+  for (const end of [0, nI - 1]) {                                       // the two ends: strips across, both halves
+    const r = R[end], fz = end ? 1 : -1, nz = [0, 0, fz];
+    for (let k = 0; k < nK - 1; k++) { const a = r.pts[k], b = r.pts[k + 1], yc = (a[1] + b[1]) / 2, col = yc < (fz > 0 ? 0.415 : 0.585) ? [Q.CLAD, 0.05] : [Q.PAINT, 0.3];
+      const pa = [a[0], a[1], r.z], pb = [b[0], b[1], r.z], qa = [-a[0], a[1], r.z], qb = [-b[0], b[1], r.z];
+      const pos = fz > 0 ? [...pa, ...qa, ...pb, ...qa, ...qb, ...pb] : [...pa, ...pb, ...qa, ...qa, ...pb, ...qb];
+      P.push('body', pos, [].concat(nz, nz, nz, nz, nz, nz), col[0], col[1], 1, true); }
+  }
+}
+function carHeroBox(P, b, w, h, d, x, y, z, col, refl, deco, rx, ry, rz) {   // a box (w along x, h along y, d along z), turned (radians, XYZ)
+  const g = new THREE.BoxGeometry(w, h, d); if (rx || ry || rz) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx || 0, ry || 0, rz || 0)));
+  g.translate(x, y, z); P.geo(b, g, col, refl, deco);
+}
+function carHeroBar(P, b, a, c, w, t, nrm, col, refl, deco) {             // a strip from point a to c, w wide across the surface, t thick out of it (nrm: the surface's outward normal)
+  const d = new THREE.Vector3(c[0] - a[0], c[1] - a[1], c[2] - a[2]), L = d.length(); if (L < 1e-5) return; d.normalize();
+  const n = new THREE.Vector3(...nrm).normalize(), s = new THREE.Vector3().crossVectors(d, n).normalize(); n.crossVectors(s, d).normalize();
+  const g = new THREE.BoxGeometry(w, L + t * 0.8, t); g.applyMatrix4(new THREE.Matrix4().makeBasis(s, d, n)); g.translate((a[0] + c[0]) / 2, (a[1] + c[1]) / 2, (a[2] + c[2]) / 2); P.geo(b, g, col, refl, deco);
+}
+function carHeroParts2(M, P) {                                          // everything that isn't the shell: wheels, arches, glass trim, mirrors, handles, spoiler, lamps' chrome, plates, the inside
+  const S = M.S, Q = carHeroCols(), sideX = M.rawSideX, V3 = THREE.Vector3;
+  // -- the wheels: tyres, 5 twin spoke silver alloys
+  for (const zA of [S.AXF, S.AXR]) for (const sx of [1, -1]) {
+    const parts = [], put = (g, col, refl) => parts.push([g, col, refl]);
+    const lathe = (pts, seg) => { const g = new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg || 28); g.rotateZ(-Math.PI / 2); return g; };
+    put(lathe([[0.205, -0.113], [0.27, -0.119], [0.322, -0.111], [0.346, -0.086], [0.352, -0.05], [0.352, 0.05], [0.346, 0.086], [0.322, 0.111], [0.27, 0.119], [0.205, 0.113]]), Q.TYRE, 0.04);
+    put(lathe([[0.196, 0.06], [0.206, 0.104], [0.217, 0.114], [0.222, 0.108], [0.213, 0.09]]), Q.RIM, 0.55);
+    { const g = new THREE.CircleGeometry(0.205, 24); g.rotateY(Math.PI / 2); g.translate(0.035, 0, 0); put(g, Q.DARK, 0.05); }
+    for (let i = 0; i < 5; i++) for (const t of [-1, 1]) {               // (twin spokes, a little dished)
+      const a = i * Math.PI * 2 / 5 + t * 0.115 + 0.3, g = new THREE.BoxGeometry(0.03, 0.152, 0.024); g.applyMatrix4(new THREE.Matrix4().makeRotationZ(-0.1)); g.rotateX(a);
+      g.translate(0.092, 0.128 * Math.cos(a), 0.128 * Math.sin(a)); put(g, Q.RIM, 0.5); }
+    { const g = new THREE.CylinderGeometry(0.072, 0.078, 0.03, 18); g.rotateZ(Math.PI / 2); g.translate(0.1, 0, 0); put(g, Q.RIM, 0.5); }
+    { const g = new THREE.CylinderGeometry(0.036, 0.036, 0.012, 16); g.rotateZ(Math.PI / 2); g.translate(0.118, 0, 0); put(g, 0xd6d9dd, 0.7); }
+    { const g = new THREE.TorusGeometry(0.037, 0.005, 5, 16); g.rotateY(Math.PI / 2); g.translate(0.123, 0, 0); put(g, 0x55595e, 0.3); }
+    for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5 + 0.3 + Math.PI / 5, g = new THREE.CylinderGeometry(0.009, 0.009, 0.02, 6); g.rotateZ(Math.PI / 2); g.translate(0.112, 0.052 * Math.cos(a), 0.052 * Math.sin(a)); put(g, 0x9a9ea3, 0.5); }
+    for (const [g, col, refl] of parts) { g.translate(S.TW, S.WR, zA); const h = sx < 0 ? carHeroMirrorX(g) : g; P.geo('body', h, col, refl, 0); }
+  }
+  // -- black cladding round the wheel arches (a lip into the well, a flare out over the paint)
+  for (const zA of [S.AXF, S.AXR]) for (const sx of [1, -1]) {
+    const N = 26, t0 = Math.asin((0.405 - S.WR) / (S.ARC + 0.07)), rings = [[S.ARC - 0.03, -0.08], [S.ARC - 0.036, 0.006], [S.ARC + 0.0, 0.02], [S.ARC + 0.065, 0.016], [S.ARC + 0.08, 0.002]], pos = [], idx = [];
+    for (let j = 0; j <= N; j++) { const th = t0 + (Math.PI - 2 * t0) * j / N, c = Math.cos(th), s = Math.sin(th);
+      for (const [r, dx] of rings) { const z = zA + r * c, y = Math.max(0.33, S.WR + r * s); pos.push(sx * (sideX(z, Math.max(0.42, y)) + dx), y, z); } }
+    const nr = rings.length; for (let j = 0; j < N; j++) for (let q = 0; q < nr - 1; q++) { const a = j * nr + q, b = a + 1, c = a + nr, d = c + 1; if (sx > 0) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); P.geo('body', g, Q.CLAD, 0.06, 0);
+    { const lp = [], li = [], r = S.ARC + 0.004, xs = [S.TW - 0.16, 0.5 * (S.TW - 0.16) + 0.5 * 0.86, 0.86];   // the wheel well's liner (no seeing into the car through the arch)
+      for (let j = 0; j <= N; j++) { const th = t0 * 0.5 + (Math.PI - t0) * j / N, z = zA + r * Math.cos(th), y = Math.max(0.3, S.WR + r * Math.sin(th)); for (const x of xs) lp.push(sx * Math.min(x, sideX(z, Math.max(0.42, y)) - 0.03), y, z); lp.push(sx * (S.TW - 0.16), S.WR, zA); }
+      const n2 = xs.length + 1; for (let j = 0; j < N; j++) { for (let q = 0; q < xs.length - 1; q++) { const a = j * n2 + q, b = a + 1, c = a + n2, d = c + 1; li.push(a, b, c, b, d, c); } const a = j * n2, c = a + n2, m = j * n2 + xs.length; li.push(a, m, c); }
+      const h = new THREE.BufferGeometry(); h.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); h.setIndex(li); h.computeVertexNormals(); P.geo('body', h, 0x0c0c0d, 0.02, 0); }
+  }
+  // -- the chrome line round the side windows, and the black sill trim
+  for (const sx of [1, -1]) {
+    const pts = [], R = M.ringAt;
+    for (let z = 0.86; z >= -1.6001; z -= 0.08) pts.push([z, R(z).ys + 0.004]);
+    const top = []; for (let z = 0.86; z >= 0.4; z -= 0.046) { const r = R(z); top.push([z, Math.max(r.ys, r.yq - 0.03)]); }
+    for (let z = 0.36; z >= -1.27; z -= 0.12) top.push([z, R(z).yq - 0.03]);
+    for (let z = -1.27; z >= -1.6001; z -= 0.055) { const r = R(z); top.push([z, r.ys + (r.yq - 0.03 - r.ys) * Math.pow(Math.max(0, (z + 1.6) / 0.33), 1.7)]); }
+    for (const line of [pts, top]) for (let i = 0; i + 1 < line.length; i++) {
+      const [z0, y0] = line[i], [z1, y1] = line[i + 1], a = [sx * (sideX(z0, y0) + 0.003), y0, z0], c = [sx * (sideX(z1, y1) + 0.003), y1, z1];
+      const zm = (z0 + z1) / 2, b = sx > 0 && zm > -0.395 && zm < 0.86 ? 'door' : 'body'; carHeroBar(P, b, a, c, 0.017, 0.012, [sx, 0.25, 0], Q.CHROME, 0.85, 0); }
+  }
+  // -- the mirrors (on the doors: body colour, a turn signal along the front), the handles (body colour)
+  for (const sx of [1, -1]) {
+    const b = sx > 0 ? 'door' : 'body', zb = 0.7, yb = M.ringAt(zb).ys + 0.04, xb = sideX(zb, yb);
+    carHeroBox(P, b, 0.07, 0.065, 0.15, sx * (xb + 0.02), yb, zb + 0.01, Q.CLAD, 0.1, 0);
+    { const g = new THREE.SphereGeometry(1, 16, 10); g.scale(0.085, 0.07, 0.12); g.translate(sx * (xb + 0.135), yb + 0.05, zb - 0.04); P.geo(b, g, Q.PAINT, 0.32, 0); }
+    { const g = new THREE.CircleGeometry(1, 18); g.scale(0.075, 0.058, 1); g.rotateY(Math.PI); g.translate(sx * (xb + 0.14), yb + 0.05, zb - 0.155); P.geo(b, g, 0x1b232c, 0.7, 0); }
+    carHeroBox(P, b, 0.075, 0.014, 0.05, sx * (xb + 0.16), yb + 0.006, zb + 0.06, 0xff8a1e, 0.25, 0, 0, sx * 0.35, 0);
+    for (const [zh, hb] of [[-0.2, sx > 0 ? 'door' : 'body'], [-1.08, 'body']]) { const yh = 0.985, xh = sideX(zh, yh);
+      carHeroBox(P, hb, 0.006, 0.042, 0.14, sx * (xh + 0.002), yh, zh, 0x3d0b12, 0.1, 0);
+      carHeroBox(P, hb, 0.026, 0.028, 0.12, sx * (xh + 0.016), yh + 0.002, zh, Q.PAINT, 0.34, 0); }
+  }
+  // -- the roof spoiler (a brake light along its back edge), the antenna mast, the wipers
+  { const sh = new THREE.Shape([[-1.6, 1.53], [-1.952, 1.484], [-1.968, 1.462], [-1.94, 1.446], [-1.86, 1.436], [-1.70, 1.488], [-1.6, 1.505]].map(([z, y]) => new THREE.Vector2(z, y)));
+    const g = new THREE.ExtrudeGeometry(sh, { depth: 1.16, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.008, bevelSegments: 1, curveSegments: 2 });
+    g.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -0.58, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1)); P.geo('body', g, Q.PAINT, 0.32, 0);
+    carHeroBox(P, 'body', 0.32, 0.018, 0.02, 0, 1.458, -1.958, 0xb30f1c, 0.3, 0); }
+  { const zr = -1.5, yr = M.ringAt(zr).top; carHeroBox(P, 'body', 0.05, 0.03, 0.08, 0, yr + 0.01, zr, Q.CLAD, 0.1, 0);
+    const g = new THREE.CylinderGeometry(0.0035, 0.005, 0.3, 6); g.translate(0, 0.15, 0); g.rotateX(-0.45); g.translate(0, yr + 0.02, zr); P.geo('body', g, 0x111112, 0.2, 0); }
+  { const yw = 1.16, zw = 0.865; carHeroBar(P, 'body', [0.6, yw, zw + 0.012], [-0.02, yw + 0.015, zw - 0.004], 0.022, 0.016, [0, 0.6, 0.8], 0x141416, 0.15, 0);
+    carHeroBar(P, 'body', [-0.08, yw + 0.005, zw + 0.004], [-0.66, yw - 0.005, zw + 0.016], 0.022, 0.016, [0, 0.6, 0.8], 0x141416, 0.15, 0);
+    const zb = M.rearZ(0, 1.235) - 0.012; carHeroBar(P, 'body', [0.02, 1.232, zb], [-0.4, 1.238, zb + 0.01], 0.02, 0.016, [0, 0.5, -0.86], 0x141416, 0.15, 0);
+    carHeroBox(P, 'body', 0.04, 0.04, 0.03, 0, 1.228, zb - 0.004, 0x141416, 0.15, 0); }
+  // -- the front: the chrome V round the grille, the oval emblem (no lettering), round fog lamps with chrome rings, the plate
+  const fN = (x, y) => { const e = 0.03, dx = (M.frontZ(x + e, y) - M.frontZ(x - e, y)) / (2 * e), dy = (M.frontZ(x, y + e) - M.frontZ(x, y - e)) / (2 * e); return new V3(-Math.max(-2.5, Math.min(2.5, dx)), -Math.max(-0.4, Math.min(0.4, dy)), 1).normalize(); };   /* (smoothed: the nose is made of sections, its slope steps) */
+  const rN = (x, y) => { const e = 0.03, dx = (M.rearZ(x + e, y) - M.rearZ(x - e, y)) / (2 * e), dy = (M.rearZ(x, y + e) - M.rearZ(x, y - e)) / (2 * e); return new V3(dx, dy, -1).normalize(); };
+  const onF = (x, y, o) => { const n = fN(x, y); return [x + n.x * o, y + n.y * o, M.frontZ(x, y) + n.z * o]; };
+  const onR = (x, y, o) => { const n = rN(x, y); return [x + n.x * o, y + n.y * o, M.rearZ(x, y) + n.z * o]; };
+  for (const sx of [1, -1]) { const V = [[0.475, 0.885], [0.41, 0.842], [0.32, 0.772], [0.22, 0.702], [0.13, 0.646], [0.05, 0.619], [0.0, 0.613]];
+    const fz = (x, y) => Math.max(M.frontZ(x, y), M.frontZ(x, y + 0.03), M.frontZ(x, y - 0.03)) + 0.012;   /* (a chrome strip standing on the face, facing forward) */
+    for (let i = 0; i + 1 < V.length; i++) { const x0 = sx * V[i][0], x1 = sx * V[i + 1][0], a = [x0, V[i][1], fz(x0, V[i][1])], c = [x1, V[i + 1][1], fz(x1, V[i + 1][1])], xm = (x0 + x1) / 2;
+      carHeroBar(P, 'body', a, c, 0.056 - i * 0.002, 0.024, [xm * 0.5, 0.05, 1], Q.CHROME, 0.85, 0); } }
+  const disc = (p, n, rx, ry, col, refl) => { const g = new THREE.CircleGeometry(1, 22); g.scale(rx, ry, 1); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), n))); g.translate(...p); P.geo('body', g, col, refl, 0); };
+  const ring = (p, n, rx, ry, tube, col, refl) => { const g = new THREE.TorusGeometry(1, tube, 6, 28); g.scale(rx, ry, (rx + ry) / 2); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), n))); g.translate(...p); P.geo('body', g, col, refl, 0); };
+  { const n = fN(0, 0.82); ring(onF(0, 0.82, 0.018), n, 0.074, 0.06, 0.13, Q.CHROME, 0.9); disc(onF(0, 0.82, 0.014), n, 0.068, 0.054, 0x9ea4aa, 0.6); }
+  for (const sx of [1, -1]) { const x = sx * 0.665, y = 0.405, n = fN(x, y); ring(onF(x, y, 0.012), n, 0.062, 0.062, 0.15, Q.CHROME, 0.9); disc(onF(x, y, 0.004), n, 0.054, 0.054, 0xb9c2cc, 0.6); disc(onF(x, y, 0.008), n, 0.03, 0.03, 0xe6ebf0, 0.4); }
+  { const n = fN(0, 0.5), p = onF(0, 0.5, 0.008), g = new THREE.BoxGeometry(0.305, 0.152, 0.008); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), n))); g.translate(...p); P.geo('body', g, 0xffffff, 0.2, 1); }
+  // -- the back: the oval emblem, the plate in its recess
+  { const n = rN(0, 0.975); ring(onR(0, 0.975, 0.016), n, 0.062, 0.048, 0.15, Q.CHROME, 0.9); disc(onR(0, 0.975, 0.012), n, 0.056, 0.042, 0x9ea4aa, 0.6); }
+  { const n = rN(0, 0.755), p = onR(0, 0.755, 0.006), g = new THREE.BoxGeometry(0.305, 0.152, 0.008); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), n))); g.translate(...p); P.geo('body', g, 0xffffff, 0.2, 1); }
+  // -- inside (seen through the windscreen and the open door): dash, wheel, seats, the mirror with its dreamcatcher, a little white plush
+  const IN = Q.INT, SE = Q.SEAT;
+  carHeroBox(P, 'body', 1.62, 0.16, 0.36, 0, 0.99, 0.74, IN, 0.08, 0); carHeroBox(P, 'body', 1.5, 0.3, 0.25, 0, 0.82, 0.62, IN, 0.05, 0);
+  carHeroBox(P, 'body', 0.36, 0.08, 0.14, 0.37, 1.09, 0.63, 0x1e1f21, 0.1, 0); carHeroBox(P, 'body', 0.22, 0.36, 0.55, 0, 0.6, 0.2, IN, 0.05, 0);
+  { const g = new THREE.TorusGeometry(0.17, 0.02, 6, 20); g.rotateX(-0.45); g.translate(0.37, 1.0, 0.47); P.geo('body', g, 0x1a1a1c, 0.1, 0); carHeroBox(P, 'body', 0.06, 0.06, 0.2, 0.37, 0.97, 0.56, 0x1a1a1c, 0.1, 0, -0.45); }
+  carHeroBox(P, 'body', 1.7, 0.06, 2.6, 0, 0.36, -0.5, 0x1d1d1f, 0, 0);
+  for (const sx of [1, -1]) { const x = sx * 0.37;
+    carHeroBox(P, 'body', 0.5, 0.13, 0.52, x, 0.6, 0.02, SE, 0.06, 0); carHeroBox(P, 'body', 0.5, 0.66, 0.13, x, 0.98, -0.3, SE, 0.06, 0, -0.2);
+    carHeroBox(P, 'body', 0.27, 0.19, 0.11, x, 1.38, -0.4, SE, 0.06, 0, -0.15); }
+  carHeroBox(P, 'body', 1.45, 0.14, 0.5, 0, 0.62, -1.0, SE, 0.06, 0); carHeroBox(P, 'body', 1.45, 0.6, 0.13, 0, 0.95, -1.3, SE, 0.06, 0, -0.25);
+  for (const x of [-0.5, 0, 0.5]) carHeroBox(P, 'body', 0.25, 0.16, 0.1, x, 1.33, -1.4, SE, 0.06, 0, -0.2);
+  carHeroBox(P, 'body', 0.025, 0.05, 0.025, 0, 1.465, 0.39, 0x222224, 0.1, 0); carHeroBox(P, 'body', 0.25, 0.065, 0.035, 0, 1.425, 0.405, 0x232427, 0.2, 0);
+  { const yR = 1.27, zR = 0.41;                                          // the dreamcatcher: a string, a ring with its web and beads, a pink tassel
+    carHeroBox(P, 'body', 0.004, 0.1, 0.004, 0, 1.345, zR, 0xf0e8f0, 0, 0);
+    { const g = new THREE.TorusGeometry(0.036, 0.004, 5, 18); g.translate(0, yR, zR); P.geo('body', g, 0xe9e1d2, 0.35, 0); }
+    for (let k = 0; k < 4; k++) carHeroBox(P, 'body', 0.068, 0.0025, 0.002, 0, yR, zR, 0xf4eef4, 0, 0, 0, 0, k * Math.PI / 4);
+    { const g = new THREE.SphereGeometry(0.008, 8, 6); g.translate(0, yR, zR + 0.002); P.geo('body', g, 0xff6fae, 0.3, 0); }
+    carHeroBox(P, 'body', 0.003, 0.03, 0.003, 0, yR - 0.05, zR, 0xf0e8f0, 0, 0);
+    { const g = new THREE.SphereGeometry(0.009, 8, 6); g.translate(0, yR - 0.068, zR); P.geo('body', g, 0xffffff, 0.3, 0); }
+    { const g = new THREE.CylinderGeometry(0.006, 0.017, 0.085, 8); g.translate(0, yR - 0.12, zR); P.geo('body', g, 0xff4f9a, 0.1, 0); } }
+  { const x = 0.13, y = 1.075, z = 0.78;                                 // the plush on the dash: a fluffy white lamb-ish thing, looking out
+    const bl = (r, sx, sy, sz, px, py, pz, col) => { const g = new THREE.SphereGeometry(r, 10, 8); g.scale(sx, sy, sz); g.translate(x + px, y + py, z + pz); P.geo('body', g, col, 0.04, 0); };
+    bl(0.06, 1.15, 0.8, 1, 0, 0.045, 0, 0xf4f1ea); bl(0.045, 1, 0.95, 1, 0, 0.1, 0.035, 0xf7f4ee);
+    for (const s of [-1, 1]) { bl(0.018, 1.4, 0.6, 0.8, s * 0.045, 0.125, 0.03, 0xefe9e0); bl(0.006, 1, 1, 1, s * 0.017, 0.105, 0.077, 0x1a1a1a); }
+    bl(0.008, 1.2, 0.9, 1, 0, 0.09, 0.08, 0xf2b8c6); }
+}
+
+/* ---------- the painted-on bits: three pictures projected onto the body (front and back: round a post through the car; the hood: from above) ---------- */
+function carHeroBfly(c, s, rot, st) {                                    // a butterfly decal (silver outline) at the current origin, wingspan s (in the current units), turned rot
+  c.save(); c.rotate(rot); c.scale(s / 2, s / 2); c.lineJoin = 'round'; c.lineCap = 'round';
+  const wing = m => { c.beginPath(); c.moveTo(0.06 * m, -0.12); c.bezierCurveTo(0.35 * m, -0.95, 1.05 * m, -0.98, 0.98 * m, -0.5); c.bezierCurveTo(0.95 * m, -0.2, 0.55 * m, -0.04, 0.07 * m, -0.02);
+    c.moveTo(0.07 * m, 0.04); c.bezierCurveTo(0.6 * m, 0.02, 0.9 * m, 0.38, 0.62 * m, 0.72); c.bezierCurveTo(0.42 * m, 0.95, 0.15 * m, 0.6, 0.06 * m, 0.14); };
+  const veins = m => { c.beginPath(); c.moveTo(0.1 * m, -0.08); c.quadraticCurveTo(0.5 * m, -0.55, 0.86 * m, -0.62); c.moveTo(0.12 * m, -0.05); c.quadraticCurveTo(0.55 * m, -0.3, 0.85 * m, -0.32);
+    c.moveTo(0.1 * m, 0.08); c.quadraticCurveTo(0.42 * m, 0.3, 0.55 * m, 0.6); c.moveTo(0.42 * m, -0.62); c.quadraticCurveTo(0.62 * m, -0.6, 0.7 * m, -0.45);
+    c.moveTo(0.52 * m, 0.2); c.arc(0.45 * m, 0.25, 0.08, 0, Math.PI * 2); c.moveTo(0.55 * m, -0.7); c.arc(0.5 * m, -0.68, 0.06, 0, Math.PI * 2); };
+  for (const m of [1, -1]) { wing(m); if (st.fill) { c.fillStyle = st.fill; c.fill(); } }
+  for (const [w, col] of [[st.lw * 2.2, st.edge], [st.lw, st.line]]) { c.strokeStyle = col; c.lineWidth = w;
+    for (const m of [1, -1]) { wing(m); c.stroke(); veins(m); c.lineWidth = w * 0.7; c.stroke(); c.lineWidth = w; }
+    c.beginPath(); c.ellipse(0, 0.02, 0.05, 0.32, 0, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.moveTo(-0.02, -0.28); c.quadraticCurveTo(-0.1, -0.6, -0.26, -0.66); c.moveTo(0.02, -0.28); c.quadraticCurveTo(0.1, -0.6, 0.26, -0.66); c.stroke(); }
+  c.restore();
+}
+function carHeroPlate(c, flip) {                                         // the plate (metres, y down, the middle at the origin): Ontario-style, white with blue letters, a cat pun. No real plate, no dealer frame
+  c.save(); if (flip) c.scale(-1, 1); c.scale(0.001, 0.001);             /* (drawn in millimetres: tiny font sizes don't render well) */
+  c.fillStyle = '#fbfbf8'; c.beginPath(); c.rect(-152.5, -76, 305, 152); c.fill();
+  c.strokeStyle = 'rgba(40,60,110,.35)'; c.lineWidth = 3; c.strokeRect(-150, -73.5, 300, 147);
+  c.fillStyle = '#20408f'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = 'italic 700 22px Georgia, serif'; c.fillText('ONTARIO', 0, -54);
+  c.save(); c.scale(0.84, 1); c.font = '800 72px "Arial Narrow", Arial, sans-serif'; c.fillText('PKR \u{1F496}', 0, 7); c.restore();
+  c.font = 'italic 600 14px Georgia, serif'; c.fillText('YOURS TO PURR-SCOVER', 0, 58); c.restore();
+}
+function carHeroTex(M, lo) {                                             // the pictures: front (grille, headlights, fog lamps, the plate, a butterfly), back (tail lights, plate, reflectors), hood (butterflies)
+  const mk = (w, h) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; return cv; };   /* (a fresh canvas for each: Safari) */
+  const D2 = 180 / Math.PI, out = {};
+  // ---- the front: angle round a post at z 1.30 (198° across), height 0.25..1.05 m
+  { const W = lo ? 1024 : 2048, H = lo ? 256 : 512, cv = mk(W, H), c = cv.getContext('2d'), ZC = 1.30, Y0 = 0.25, YH = 0.8;
+    const X = (x, z) => (Math.atan2(x, z - ZC) * D2 / 198 + 0.5) * W, Y = y => (1 - (y - Y0) / YH) * H;
+    const pt = (q, sx) => q[0] === 'f' ? [X(sx * q[1], M.frontZ(q[1], q[2])), Y(q[2])] : [X(sx * M.sideX(q[1], q[2]), q[1]), Y(q[2])];
+    const pxu = (x, y) => W / 198 * D2 / Math.hypot(x, M.frontZ(x, y) - ZC), pxv = H / YH;
+    const at = (x, y) => { c.setTransform(1, 0, 0, 1, 0, 0); const z = M.frontZ(x, y); c.translate(X(x, z), Y(y)); c.scale(pxu(x, y), pxv); };   // (metres, y down, at that spot)
+    const path = (pts, sx) => { c.setTransform(1, 0, 0, 1, 0, 0); c.beginPath(); const P = pts.map(q => pt(q, sx)); c.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) c.lineTo(P[i][0], P[i][1]); c.closePath(); };
+    // the grille: black honeycomb inside the chrome V
+    { const G = [['f', 0.445, 0.872], ['f', 0.38, 0.905], ['f', 0.2, 0.915], ['f', 0, 0.918]], Vv = [['f', 0.42, 0.845], ['f', 0.33, 0.775], ['f', 0.23, 0.705], ['f', 0.14, 0.65], ['f', 0.06, 0.622], ['f', 0, 0.616]];
+      const P = [...G.map(q => pt(q, 1)), ...G.slice(0, -1).reverse().map(q => pt(q, -1)), ...Vv.map(q => pt(q, -1)), ...Vv.slice(0, -1).reverse().map(q => pt(q, 1))];
+      c.setTransform(1, 0, 0, 1, 0, 0); c.save(); c.beginPath(); c.moveTo(P[0][0], P[0][1]); for (const p of P) c.lineTo(p[0], p[1]); c.closePath(); c.fillStyle = '#0c0d0f'; c.fill(); c.clip();
+      const r = pxv * 0.017, dx = r * 1.732, dy = r * 1.5; c.strokeStyle = '#3a3d42'; c.lineWidth = Math.max(1, r * 0.28);
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const p of P) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+      for (let j = 0, yy = y0 - r; yy < y1 + r; j++, yy += dy) for (let xx = x0 - r + (j % 2) * dx / 2; xx < x1 + r; xx += dx) { c.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 6 + k * Math.PI / 3; c.lineTo(xx + Math.cos(a) * r * 0.86, yy + Math.sin(a) * r * 0.86); } c.closePath(); c.stroke(); }
+      const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, 'rgba(0,0,0,.45)'); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.3)'); c.fillStyle = g; c.fillRect(x0, y0, x1 - x0, y1 - y0); c.restore(); }
+    // the lower intake and the fog lamps' black bezels
+    { c.setTransform(1, 0, 0, 1, 0, 0); const I = [['f', 0.47, 0.312], ['f', 0.5, 0.39], ['f', 0.3, 0.405], ['f', 0, 0.408]], P = [...I.map(q => pt(q, 1)), ...I.slice(0, -1).reverse().map(q => pt(q, -1))];
+      const I2 = [['f', 0, 0.304], ['f', 0.45, 0.30]], Q2 = [...I2.map(q => pt(q, -1)).reverse(), ...I2.slice(1).map(q => pt(q, 1))];
+      c.beginPath(); c.moveTo(P[0][0], P[0][1]); for (const p of P) c.lineTo(p[0], p[1]); for (const p of Q2.slice().reverse()) c.lineTo(p[0], p[1]); c.closePath(); c.fillStyle = '#0a0a0b'; c.fill();
+      c.strokeStyle = '#2c2e31'; c.lineWidth = pxv * 0.008; for (const yy of [0.334, 0.362]) { c.beginPath(); const a = pt(['f', 0.42, yy], -1), b = pt(['f', 0.42, yy], 1); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+      for (const sx of [1, -1]) { at(sx * 0.665, 0.405); c.fillStyle = '#0d0d0e'; c.beginPath(); c.ellipse(0, 0, 0.098, 0.082, 0, 0, Math.PI * 2); c.fill(); } }
+    // the headlights: swept boomerangs, the inner tip low by the grille, wrapping round the corner along the fender; chrome bowls, a chrome strip, an amber side marker (off: it's parked)
+    const HL = [['f', 0.44, 0.872], ['f', 0.53, 0.905], ['f', 0.64, 0.935], ['f', 0.75, 0.953], ['f', 0.83, 0.958], ['s', 1.985, 0.964], ['s', 1.88, 0.968], ['s', 1.76, 0.966], ['s', 1.66, 0.958],
+      ['s', 1.69, 0.93], ['s', 1.79, 0.895], ['s', 1.9, 0.855], ['s', 2.0, 0.82], ['f', 0.8, 0.79], ['f', 0.7, 0.775], ['f', 0.62, 0.79], ['f', 0.56, 0.82], ['f', 0.48, 0.85]];
+    for (const sx of [1, -1]) {
+      c.setTransform(1, 0, 0, 1, 0, 0); path(HL, sx); const P0 = pt(HL[0], sx), P1 = pt(HL[8], sx), g = c.createLinearGradient(P0[0], 0, P1[0], 0);
+      g.addColorStop(0, '#77818c'); g.addColorStop(0.4, '#b9c1c9'); g.addColorStop(0.75, '#9aa3ad'); g.addColorStop(1, '#5d6670'); c.fillStyle = g; c.fill(); c.save(); c.clip();
+      c.strokeStyle = 'rgba(12,14,17,.95)'; c.lineWidth = pxv * 0.018; path(HL, sx); c.stroke(); c.restore();
+      for (const [bx, by, br] of [[0.6, 0.875, 0.04], [0.72, 0.9, 0.038]]) { at(sx * bx, by); const rg = c.createRadialGradient(0, 0, 0, 0, 0, br);
+        rg.addColorStop(0, '#c4cbd2'); rg.addColorStop(0.35, '#eef2f5'); rg.addColorStop(0.55, '#8d96a0'); rg.addColorStop(0.8, '#dfe4e9'); rg.addColorStop(1, '#a7b0b9'); c.fillStyle = rg; c.beginPath(); c.arc(0, 0, br, 0, Math.PI * 2); c.fill();
+        }
+      { at(sx * 0.52, 0.862); c.fillStyle = '#d9dee3'; c.beginPath(); c.ellipse(0, 0, 0.034, 0.013, -0.25 * sx, 0, Math.PI * 2); c.fill(); }   // (the chrome inner blade)
+      c.setTransform(1, 0, 0, 1, 0, 0); c.strokeStyle = '#f4f7fa'; c.lineWidth = pxv * 0.009; c.beginPath();
+      for (const [i, q] of [['f', 0.5, 0.848], ['f', 0.6, 0.8], ['f', 0.7, 0.792], ['f', 0.8, 0.806], ['s', 1.99, 0.836], ['s', 1.88, 0.87]].entries()) { const p = pt(q, sx); if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); } c.stroke();
+      path([['s', 1.67, 0.955], ['s', 1.76, 0.961], ['s', 1.83, 0.958], ['s', 1.835, 0.9], ['s', 1.76, 0.918], ['s', 1.69, 0.933]], sx); c.fillStyle = '#f0901e'; c.fill();
+      c.setTransform(1, 0, 0, 1, 0, 0); path(HL, sx); c.strokeStyle = 'rgba(8,8,10,.9)'; c.lineWidth = pxv * 0.006; c.stroke();
+    }
+    // the plate, and the butterfly decal on the bumper under the driver's side headlight
+    at(0, 0.5); carHeroPlate(c, false);
+    at(0.665, 0.66); carHeroBfly(c, 0.13, 0.35, { line: '#7c8188', edge: 'rgba(30,32,36,.75)', fill: 'rgba(60,64,70,.22)', lw: 0.045 });
+    c.setTransform(1, 0, 0, 1, 0, 0); out.front = cv; }
+  // ---- the back: angle round a post at z -1.45, height 0.25..1.25 m
+  { const W = lo ? 1024 : 2048, H = lo ? 256 : 512, cv = mk(W, H), c = cv.getContext('2d'), ZC = -1.45, Y0 = 0.25, YH = 1.0;
+    const X = (x, z) => (Math.atan2(x, -(z - ZC)) * D2 / 198 + 0.5) * W, Y = y => (1 - (y - Y0) / YH) * H;
+    const pt = (q, sx) => q[0] === 'r' ? [X(sx * q[1], M.rearZ(q[1], q[2])), Y(q[2])] : [X(sx * M.sideX(q[1], q[2]), q[1]), Y(q[2])];
+    const pxu = (x, y) => W / 198 * D2 / Math.hypot(x, M.rearZ(x, y) - ZC), pxv = H / YH;
+    const at = (x, y) => { c.setTransform(1, 0, 0, 1, 0, 0); c.translate(X(x, M.rearZ(x, y)), Y(y)); c.scale(pxu(x, y), pxv); };
+    const path = (pts, sx) => { c.setTransform(1, 0, 0, 1, 0, 0); c.beginPath(); const P = pts.map(q => pt(q, sx)); c.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) c.lineTo(P[i][0], P[i][1]); c.closePath(); };
+    const line = (pts, sx, w, col) => { c.setTransform(1, 0, 0, 1, 0, 0); c.strokeStyle = col; c.lineWidth = w; c.beginPath(); pts.forEach((q, i) => { const p = pt(q, sx); if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }); c.stroke(); };
+    // the hatch's shut lines, the plate recess
+    for (const sx of [1, -1]) line([['r', 0.0, 0.602], ['r', 0.6, 0.602], ['r', 0.63, 0.62], ['r', 0.64, 0.75], ['r', 0.62, 0.93]], sx, pxv * 0.005, 'rgba(25,4,8,.85)');
+    at(0, 0.757); c.fillStyle = 'rgba(70,6,14,.55)'; c.beginPath(); c.rect(-0.19, -0.098, 0.38, 0.196); c.fill(); c.strokeStyle = 'rgba(30,2,6,.6)'; c.lineWidth = 0.004; c.stroke();
+    // the tail lights: wrapping from the hatch round onto the sides, a bright red top, a chrome strip, a darker red below, a clear reversing lamp at the inner end
+    const TL = [['r', 0.36, 1.06], ['r', 0.48, 1.105], ['r', 0.62, 1.125], ['r', 0.74, 1.13], ['s', -2.05, 1.135], ['s', -1.96, 1.15], ['s', -1.86, 1.16], ['s', -1.74, 1.16],
+      ['s', -1.78, 1.1], ['s', -1.88, 1.04], ['s', -1.98, 0.985], ['s', -2.09, 0.93], ['r', 0.77, 0.915], ['r', 0.66, 0.92], ['r', 0.54, 0.95], ['r', 0.42, 1.0]];
+    const TM = [['r', 0.39, 1.035], ['r', 0.56, 1.04], ['r', 0.74, 1.04], ['s', -2.06, 1.05], ['s', -1.95, 1.07], ['s', -1.82, 1.1]];
+    for (const sx of [1, -1]) {
+      path(TL, sx); c.fillStyle = '#6a0710'; c.fill(); c.save(); c.clip();
+      c.setTransform(1, 0, 0, 1, 0, 0); c.beginPath(); TL.slice(0, 8).forEach((q, i) => { const p = pt(q, sx); if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }); TM.slice().reverse().forEach(q => { const p = pt(q, sx); c.lineTo(p[0], p[1]); }); c.closePath();
+      const p0 = pt(TL[0], sx), p1 = pt(TL[7], sx), g = c.createLinearGradient(p0[0], 0, p1[0], 0); g.addColorStop(0, '#d0141f'); g.addColorStop(0.5, '#e8303a'); g.addColorStop(1, '#b30f1b'); c.fillStyle = g; c.fill();
+      line(TM, sx, pxv * 0.009, '#e6e9ec');
+      at(sx * 0.47, 0.985); c.fillStyle = '#d9dbde'; c.beginPath(); c.rect(-0.07, -0.022, 0.12, 0.034); c.fill(); c.fillStyle = '#9fa4aa'; c.fillRect(-0.07, 0.006, 0.12, 0.006);
+      c.restore(); c.setTransform(1, 0, 0, 1, 0, 0); path(TL, sx); c.strokeStyle = 'rgba(20,2,4,.85)'; c.lineWidth = pxv * 0.006; c.stroke();
+      at(sx * 0.66, 0.37); c.fillStyle = '#9a0b17'; c.beginPath(); c.rect(-0.06, -0.014, 0.12, 0.028); c.fill(); c.fillStyle = 'rgba(255,120,120,.35)'; c.fillRect(-0.055, -0.012, 0.11, 0.008);
+      for (const xs of [0.24, 0.5]) { at(sx * xs, 0.5); c.fillStyle = '#151517'; c.beginPath(); c.arc(0, 0, 0.012, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#3a3c40'; c.lineWidth = 0.003; c.stroke(); }
+    }
+    at(0, 0.755); carHeroPlate(c, true);
+    c.setTransform(1, 0, 0, 1, 0, 0); out.rear = cv; }
+  // ---- the hood, from above: x -1..1, z 0.8..2.3. Silver butterfly decals: a big one near the grille, little ones scattered
+  { const W = lo ? 512 : 1024, H = lo ? 384 : 768, cv = mk(W, H), c = cv.getContext('2d');
+    const at = (x, z) => { c.setTransform(1, 0, 0, 1, 0, 0); c.translate((x + 1) / 2 * W, (1 - (z - 0.8) / 1.5) * H); c.scale(W / 2, H / 1.5); };
+    const silver = { line: '#d4d8de', edge: 'rgba(70,74,80,.75)', fill: 'rgba(205,210,216,.18)', lw: 0.035 };
+    at(0.16, 1.86); carHeroBfly(c, 0.25, Math.PI + 0.35, silver);
+    for (const [x, z, s, r] of [[-0.7, 1.7, 0.07, 2.7], [-0.43, 1.77, 0.075, 3.5], [-0.27, 1.55, 0.06, 2.9], [0.27, 1.6, 0.065, 3.6], [0.03, 1.4, 0.05, 3.0]]) { at(x, z); carHeroBfly(c, s, r, silver); }
+    c.setTransform(1, 0, 0, 1, 0, 0); out.top = cv; }
+  return out;
+}
+function carHeroEnvTex() {                                               // a pretend world for the paint to reflect: sky, a sun, clouds, the street's trees and houses, the asphalt
+  const W = 512, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+  let g = c.createLinearGradient(0, 0, 0, H / 2); g.addColorStop(0, '#5f8fc8'); g.addColorStop(0.7, '#a9c6e6'); g.addColorStop(1, '#e8eef3'); c.fillStyle = g; c.fillRect(0, 0, W, H / 2);
+  g = c.createLinearGradient(0, H / 2, 0, H); g.addColorStop(0, '#7d7c78'); g.addColorStop(0.3, '#5a5a5b'); g.addColorStop(1, '#3a3a3c'); c.fillStyle = g; c.fillRect(0, H / 2, W, H / 2);
+  let sd = 7; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 14; i++) { const x = rn() * W, y = 20 + rn() * 70, r = 14 + rn() * 26; const rg = c.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, 'rgba(255,255,255,.75)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = rg; c.fillRect(x - r, y - r, 2 * r, 2 * r); }
+  { const x = W * 0.62, y = H * 0.17, rg = c.createRadialGradient(x, y, 0, x, y, 40); rg.addColorStop(0, 'rgba(255,255,250,1)'); rg.addColorStop(0.15, 'rgba(255,252,235,.9)'); rg.addColorStop(1, 'rgba(255,250,230,0)'); c.fillStyle = rg; c.fillRect(x - 40, y - 40, 80, 80); }
+  for (let x = 0; x < W; x += 6 + rn() * 10) { const h = 6 + rn() * 22, w = 8 + rn() * 26, col = rn() < 0.55 ? ['#3d5a36', '#4a6a3e', '#5a4636'][(rn() * 3) | 0] : ['#b8a58f', '#8f5a44', '#d8d2c4'][(rn() * 3) | 0];
+    c.fillStyle = col; if (col[1] === '3' || col[1] === '4' || col === '#5a4636') { c.beginPath(); c.ellipse(x, H / 2 - h * 0.5, w * 0.5, h * 0.7, 0, 0, Math.PI * 2); c.fill(); } else c.fillRect(x, H / 2 - h, w, h); }
+  c.fillStyle = 'rgba(80,120,60,.35)'; c.fillRect(0, H / 2 + 4, W * 0.3, 18); c.fillRect(W * 0.55, H / 2 + 6, W * 0.25, 16);
+  return cv;
+}
+
+/* ---------- its own little shader: the yard's baked light, a pretend sky in the paint, chrome and glass, the time of day's tint ---------- */
+function carHeroMats(M) {
+  const tex = (cv, mip) => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; if (!mip) { t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; }
+    else { t.minFilter = THREE.LinearMipmapLinearFilter; try { t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); } catch (e) {} } return t; };
+  const env = tex(M.env, false); env.wrapS = THREE.RepeatWrapping;
+  const U = M.uni = { uEnv: { value: env }, uFront: { value: tex(M.tex.front, true) }, uRear: { value: tex(M.tex.rear, true) }, uTop: { value: tex(M.tex.top, true) },
+    uTint: { value: new THREE.Color(1, 1, 1) }, uSun: { value: new THREE.Vector3(-0.45, 0.78, -0.43).normalize() }, uInt: { value: new THREE.Color(0.1, 0.1, 0.11) }, uAlpha: { value: 1 }, uEnvK: { value: 1 } };
+  const vs = `attribute vec3 aCol; attribute vec3 aMat;
+varying vec3 vCol; varying vec3 vMat; varying vec3 vWN; varying vec3 vWP; varying vec3 vLP; varying vec3 vLN;
+void main() { vCol = aCol; vMat = aMat; vLP = position; vLN = normal; vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz; vWN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * wp; }`;
+  const fs = `uniform sampler2D uEnv; uniform sampler2D uFront; uniform sampler2D uRear; uniform sampler2D uTop; uniform vec3 uTint; uniform vec3 uSun; uniform vec3 uInt; uniform float uAlpha; uniform float uEnvK;
+varying vec3 vCol; varying vec3 vMat; varying vec3 vWN; varying vec3 vWP; varying vec3 vLP; varying vec3 vLN;
+vec4 deco(vec3 p, vec3 n) {
+  if (n.y > 0.6 && p.z > 0.93 && p.y > 0.9) return texture2D(uTop, vec2((p.x + 1.0) * 0.5, (p.z - 0.8) / 1.5));
+  if (p.z > 0.95) return texture2D(uFront, vec2(atan(p.x, p.z - 1.3) / 3.4558 + 0.5, (p.y - 0.25) / 0.8));
+  if (p.z < -1.15) return texture2D(uRear, vec2(atan(p.x, -(p.z + 1.45)) / 3.4558 + 0.5, (p.y - 0.25) / 1.0));
+  return vec4(0.0);
+}
+void main() {
+  vec3 n = normalize(vWN), base = vCol, V = normalize(vWP - cameraPosition); float refl = vMat.x;
+  if (vMat.y > 0.5) { vec4 d = deco(vLP, normalize(vLN)); base = mix(base, d.rgb, d.a); refl = mix(refl, 0.12 + 0.4 * dot(d.rgb, vec3(0.333)), d.a); }
+  if (vMat.z > 0.5) { if (!gl_FrontFacing) { base = uInt; refl = 0.0; n = -n; } } else if (dot(n, V) > 0.0) n = -n;
+  float k = 0.6 + 0.42 * max(0.0, dot(n, uSun)) + 0.06 * max(0.0, n.y) - 0.1 * max(0.0, -n.y);
+  vec3 col = base * k, r = reflect(V, n);
+  float fr = pow(1.0 - max(0.0, dot(-V, n)), 3.0);
+  vec3 env = texture2D(uEnv, vec2(atan(r.z, r.x) * 0.159155 + 0.5, asin(clamp(r.y, -1.0, 1.0)) * 0.31831 + 0.5)).rgb * uEnvK;
+  float R = clamp(refl * (0.45 + 0.9 * fr), 0.0, 0.95);
+  col = mix(col, env * (0.55 + 0.5 * refl), R) + env * refl * fr * 0.18;
+  gl_FragColor = vec4(col * uTint, mix(uAlpha, 1.0, R * 0.85));
+}`;
+  M.mat = new THREE.ShaderMaterial({ uniforms: U, vertexShader: vs, fragmentShader: fs, side: THREE.DoubleSide });
+  M.glassMat = new THREE.ShaderMaterial({ uniforms: Object.assign({}, U, { uAlpha: { value: 0.58 } }), vertexShader: vs, fragmentShader: fs, side: THREE.DoubleSide, transparent: true, depthWrite: false });
+  M.mat.userData.noTod = M.glassMat.userData.noTod = true;
+}
+function carHeroMerge(list) {                                            // the parts of one mesh into one geometry: position, normal, colour, [shine, painted-on?, shell?]
+  let n = 0; for (const p of list) n += p.pos.length / 3;
+  const pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3), col = new Float32Array(n * 3), mat = new Float32Array(n * 3); let o = 0;
+  for (const p of list) { const m = p.pos.length / 3; pos.set(p.pos, o * 3); nrm.set(p.nrm, o * 3); for (let i = 0; i < m; i++) { const j = (o + i) * 3; col[j] = p.r; col[j + 1] = p.g; col[j + 2] = p.b; mat[j] = p.refl; mat[j + 1] = p.deco; mat[j + 2] = p.shell; } o += m; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setAttribute('aCol', new THREE.BufferAttribute(col, 3)); g.setAttribute('aMat', new THREE.BufferAttribute(mat, 3)); g.computeBoundingSphere(); g.computeBoundingBox(); return g;
+}
+function carHeroPrep() {                                                 // (once: the shape, the parts, the pictures, the shader; the warm-up does it in idle time)
+  if (CARH.M) return CARH.M;
+  const S = carHeroShape(), M = { S }; M.rings = carHeroStations(S).map(z => carHeroRing(S, z)); carHeroSurf(M); M.rawSideX = M.sideX;
+  const P = carHeroParts(); carHeroLoft(M, P); carHeroParts2(M, P);
+  M.geo = { body: carHeroMerge(P.body), door: carHeroMerge(P.door), glass: carHeroMerge(P.glass) }; M.hinge = { x: 0.86, z: 0.858 };
+  M.tex = carHeroTex(M, typeof devTier === 'function' && devTier() === 'low'); M.env = carHeroEnvTex(); carHeroMats(M);
+  return (CARH.M = M);
+}
+
+/* ---------- out on the driveway: the car, what she bumps into, its shadow ---------- */
+function carHeroBuild() {
+  if (CARH.g || !povEndWall) return CARH.g;
+  const M = carHeroPrep(), P = carHeroPlace(), K = CARH.K;
+  const g = new THREE.Group(); g.userData.name = 'Red car'; g.position.set(P.x, 0, P.z); g.rotation.y = P.ry; g.scale.setScalar(K);
+  const vis = (geo, mat, name) => { const m = new THREE.Mesh(geo, mat); m.userData.noWalk = true; m.userData.name = name; return m; };
+  g.add(vis(M.geo.body, M.mat, 'Red car'));
+  const piv = new THREE.Group(); piv.position.set(M.hinge.x, 0, M.hinge.z); g.add(piv);
+  const dm = vis(M.geo.door, M.mat, 'Red car door'); dm.position.set(-M.hinge.x, 0, -M.hinge.z); piv.add(dm);
+  const gm = vis(M.geo.glass, M.glassMat, 'Red car windscreen'); gm.renderOrder = 2; g.add(gm);
+  const inv = new THREE.MeshBasicMaterial({ visible: false }), cols = [];   // what she bumps into and hops up on (metres, the car's own frame)
+  const box = (x0, x1, y0, y1, z0, z1, rx) => { const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), inv); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); if (rx) m.rotation.x = rx;
+    m.userData.collider = true; m.userData.name = 'Red car'; g.add(m); cols.push(m); };
+  const plank = (za, ya, zb, yb, w) => { const L = Math.hypot(zb - za, yb - ya), m = new THREE.Mesh(new THREE.BoxGeometry(2 * w, 0.12, L), inv); m.position.set(0, (ya + yb) / 2 - 0.06, (za + zb) / 2); m.rotation.x = -Math.atan2(yb - ya, zb - za);
+    m.userData.collider = true; m.userData.name = 'Red car'; g.add(m); cols.push(m); };
+  box(-0.92, 0.92, 0, 0.95, -2.19, 2.19); plank(2.13, 0.99, 0.87, 1.125, 0.9); box(-0.86, 0.86, 0.9, 1.58, -1.25, 0.4); plank(-1.25, 1.58, -1.8, 1.48, 0.86); plank(0.9, 1.12, 0.38, 1.55, 0.8);
+  box(-0.88, 0.88, 0.9, 1.19, -2.19, -1.8); plank(-1.78, 1.47, -2.08, 1.19, 0.8); box(-0.86, 0.86, 0.9, 1.4, -1.8, -1.25);
+  povEndWall.add(g); CARH.g = g; CARH.piv = piv; CARH.cols = cols;
+  CARH.sh = rectShadow(povEndWall, P.x, P.z, 2.05 * K, 4.55 * K, P.ry, 0.55);
+  g.updateMatrixWorld(true); if (walk.meshes && walk.on) for (const m of cols) if (!walk.meshes.includes(m)) walk.meshes.push(m);
+  return g;
+}
+function carHeroSpot() {                                                 // (lotSpotPos) by the driver's door: where the button shows (x, z), where she lands coming back (sx, sz), facing away from the car
+  if (typeof UPPER === 'undefined' || !UPPER || typeof UPPER.zF !== 'number') return null;
+  const P = carHeroPlace(), a = carHeroW(1.36, 0, 0.24), b = carHeroW(1.45, 0, 0.04);
+  return { x: a.x, z: a.z, sx: b.x, sz: b.z, face: P.ry + Math.PI / 2 };
+}
+function carHeroSay(first, tot, pr) {                                    // (lotPill) the discovery line, about the car now
+  if (!CARH.g) return false;
+  showWalkName(first ? '\u{1F697} The red car! Hop in to play Meow Lot' : tot ? '\u{1F697} The red car. Meow Lot: ★ ' + tot + ' of ' + pr.st.length * 3 + '. Hop in and park some more!' : '\u{1F697} Hop in the red car to play Meow Lot!');
+  return true;
+}
+
+/* ---------- hopping in (the door swings open, a leap, the door shuts, a little honk, then Meow Lot), and popping back out ---------- */
+function carHeroSfx(k) {
+  try { if (k === 'open') { noise(0.05, 0.05, 2400); tone(900, 700, 0.04, 'square', 0.012); }
+    else if (k === 'shut') { noise(0.14, 0.12, 260); tone(96, 52, 0.15, 'sine', 0.09); }
+    else if (k === 'honk') { for (const d of [0, 0.17]) { tone(415, 411, 0.12, 'square', 0.028, d); tone(523, 518, 0.12, 'square', 0.02, d); } }
+    else if (k === 'hop') tone(520, 880, 0.12, 'sine', 0.03); } catch (e) {}
+}
+function carHeroHopIn() {                                                // (the 🚗 button) start the hop in; Meow Lot starts when it's done
+  const W = walk.rig; if (!W || !CARH.g || CARH.hop) { lotStart(); return; }
+  CARH.hop = { mode: 'in', t: 0, from: walk.pos.clone(), face0: walk.face, s0: walk.gScale || 1, ev: {} };
+  walk.frozen = true; walk.stick.x = walk.stick.y = 0; walk.vel.set(0, 0, 0); walk.jumpQ = -1; lotPillSet(false);
+  try { if (typeof talkEvent === 'function') talkEvent('car', { first: !CARH.wasIn }); } catch (e) {}
+  CARH.wasIn = true;
+}
+function carHeroHopOut() {                                               // (after lotHandoff) she pops out of the driver's door
+  const W = walk.rig, Ps = carHeroSpot(); if (!W || !CARH.g || !Ps) return;
+  walk.face = Ps.face; W.g.rotation.y = Ps.face;
+  CARH.hop = { mode: 'out', t: 0, to: new THREE.Vector3(Ps.sx, walk.pos.y, Ps.sz), s0: walk.gScale || 1, ev: {} };
+  walk.frozen = true; walk.stick.x = walk.stick.y = 0;
+}
+function carHeroHopEnd(goLot) {                                           // (done, or cut short) she's herself again
+  const H = CARH.hop, W = walk.rig; CARH.hop = null; if (H && H.mode === 'out' || !goLot) CARH.doorWant = 0;
+  if (walk.frozen && !(typeof MW !== 'undefined' && MW.trans)) walk.frozen = false;
+  if (W) { W.g.scale.setScalar(walk.gScale || 1); W.body.rotation.x = 0; if (!goLot) { W.g.visible = !walk.fp; if (W.shadow) W.shadow.visible = true; } }
+  if (goLot) CARH.goLot = true;
+}
+function carHeroPose(dt) {                                               // (after updateWalk) the hop's frame: her pose (over whatever Free roam gave her), the door
+  const H = CARH.hop, W = walk.rig; if (!H || !W) return;
+  H.t += dt; const t = H.t, ev = k => { if (H.ev[k]) return false; H.ev[k] = true; return true; };
+  const O1 = carHeroW(0.93, 0.5, 0.16), O2 = carHeroW(0.45, 0.64, 0.02), s0 = H.s0, K = CARH.K, e = u => u * u * (3 - 2 * u), cl = u => Math.max(0, Math.min(1, u));
+  const put = (x, y, z, yaw, s, pitch) => { W.g.position.set(x, y, z); W.g.rotation.set(0, yaw, 0); W.g.scale.setScalar(Math.max(0.001, s)); W.body.rotation.x = pitch || 0; };
+  if (H.mode === 'in') {
+    if (ev('open')) { CARH.doorWant = 1; carHeroSfx('open'); }
+    const f = H.from, yaw1 = Math.atan2(O1.x - f.x, O1.z - f.z);
+    if (t < 0.45) { const u = e(cl(t / 0.4)); put(f.x, f.y, f.z, H.face0 + Math.atan2(Math.sin(yaw1 - H.face0), Math.cos(yaw1 - H.face0)) * u, s0, 0); }
+    else if (t < 0.95) { const u = (t - 0.45) / 0.5; if (ev('hop')) carHeroSfx('hop'); if (W.shadow) W.shadow.visible = false;
+      put(f.x + (O1.x - f.x) * u, f.y + (O1.y - f.y) * u + 0.6 * K * 4 * u * (1 - u), f.z + (O1.z - f.z) * u, yaw1, s0, -0.35 + 0.6 * u); }
+    else if (t < 1.18) { const u = (t - 0.95) / 0.23, yaw2 = Math.atan2(O2.x - O1.x, O2.z - O1.z); if (W.shadow) W.shadow.visible = false;
+      put(O1.x + (O2.x - O1.x) * u, O1.y + (O2.y - O1.y) * u, O1.z + (O2.z - O1.z) * u, yaw2, s0 * (1 - 0.85 * u), 0.2); }
+    else { W.g.visible = false; if (W.shadow) W.shadow.visible = false; if (t > 1.12 && ev('close')) CARH.doorWant = 0; }
+    if (t > 1.5 && ev('shut')) carHeroSfx('shut');
+    if (t > 1.62 && ev('honk')) carHeroSfx('honk');
+    if (t > 1.95) carHeroHopEnd(true);
+  } else {
+    const to = H.to, P = carHeroSpot();
+    if (!P || Math.hypot(walk.pos.x - to.x, walk.pos.z - to.z) > 0.6) { carHeroHopEnd(false); return; }   /* (she was moved: let her be) */
+    if (ev('open')) { CARH.doorWant = 1; carHeroSfx('open'); }
+    if (t < 0.28) { W.g.visible = false; if (W.shadow) W.shadow.visible = false; }
+    else if (t < 0.52) { const u = (t - 0.28) / 0.24; if (W.shadow) W.shadow.visible = false; put(O2.x + (O1.x - O2.x) * u, O2.y + (O1.y - O2.y) * u, O2.z + (O1.z - O2.z) * u, P.face, s0 * (0.15 + 0.85 * u), 0.15); }
+    else if (t < 0.9) { const u = (t - 0.52) / 0.38; if (ev('hop')) carHeroSfx('hop'); if (W.shadow) W.shadow.visible = u > 0.6;
+      put(O1.x + (to.x - O1.x) * u, O1.y + (to.y - O1.y) * u + 0.35 * K * 4 * u * (1 - u), O1.z + (to.z - O1.z) * u, P.face, s0, 0.3 - 0.5 * u); }
+    else { if (ev('land')) { walk.squash = 0.5; carHeroHopEnd(false); CARH.doorWant = 1; CARH.closeAt = 0.25; } }
+  }
+}
+function carHeroTick(dt) {                                               // (every Free roam frame) the door swinging, the time of day's tint
+  if (!CARH.g) return;
+  if (CARH.closeAt > 0 && !CARH.hop) { CARH.closeAt -= dt; if (CARH.closeAt <= 0) { CARH.doorWant = 0; CARH.shutSnd = true; } }
+  const was = CARH.door; CARH.door += Math.max(-dt / 0.36, Math.min(dt / 0.4, CARH.doorWant - CARH.door));
+  if (was > 0.02 && CARH.door <= 0.02 && CARH.shutSnd) { CARH.shutSnd = false; carHeroSfx('shut'); }
+  if (CARH.door !== was) { const u = CARH.door, k = u * u * (3 - 2 * u); CARH.piv.rotation.y = -1.12 * k; }
+  const M = CARH.M, T = typeof TOD !== 'undefined' && TOD && TOD.tint ? TOD.tint : null;
+  if (M && T) { const s = T.r + T.g + T.b; if (Math.abs(s - CARH.tintSum) > 0.003) { CARH.tintSum = s; M.uni.uTint.value.setRGB(T.r, T.g, T.b); M.uni.uEnvK.value = Math.max(0.3, Math.min(1, s / 3 * 1.15)); } }
+}
+
+/* ---------- the hooks: chained onto Meow Lot's way in from the yard, Free roam's walk, and the warm-up ---------- */
+(function carHeroInstall() {
+  const o = { spotPos: lotSpotPos, near: lotNear, pillMake: lotPillMake, handoff: lotHandoff, frame: lotFrame, walk: updateWalk, warm: warmJobs };
+  lotSpotPos = function () { return carHeroSpot(); };
+  lotSpotBuild = function () { const S = LOT; if (S.spot) return; carHeroBuild(); S.spot = CARH.g || new THREE.Group(); };   // (the valet podium and its jammed toy cars are gone: the red car is the way in)
+  lotNear = function () { if (CARH.hop) return false; return o.near.apply(this, arguments); };
+  lotPillMake = function () { const had = LOT.pill, b = o.pillMake.apply(this, arguments);
+    if (b && !had) { b.innerHTML = '<b>&#x1F697;</b>Hop in'; b.setAttribute('aria-label', 'Hop in the red car and play Meow Lot'); } return b; };
+  lotHandoff = function () { const r = o.handoff.apply(this, arguments);
+    try { if (CARH.g && state === 'playing') { const p = lotProg(), tot = p.st.reduce((a, b) => a + b, 0);
+        showWalkName(tot ? '\u{1F697} Out she hops! Meow Lot: ★ ' + tot + ' of ' + p.st.length * 3 : '\u{1F697} Out she hops!'); carHeroHopOut(); } } catch (e) { console.error(e); }
+    return r; };
+  lotFrame = function (dt) {
+    const S = LOT;
+    if (CARH.goLot) { CARH.goLot = false; if (state === 'playing' && walk.on) { lotStart(); if (state !== 'lot' && walk.rig) { walk.rig.g.visible = true; if (walk.rig.shadow) walk.rig.shadow.visible = true; } } }
+    else if (S.goQ && state === 'playing' && !S.active) { S.goQ = false; if (S.pillOn && CARH.g && walk.rig) carHeroHopIn(); else if (S.pillOn) lotStart(); }
+    if (CARH.hop && (state !== 'playing' || gameMode !== 'walk' || !walk.on)) carHeroHopEnd(false);   /* (paused, or Free roam ended mid-hop: put her back) */
+    return o.frame.apply(this, arguments);
+  };
+  updateWalk = function (dt) { const r = o.walk.apply(this, arguments); try { if (CARH.hop) carHeroPose(dt); carHeroTick(dt); } catch (e) { console.error(e); if (CARH.hop) carHeroHopEnd(false); } return r; };
+  try { for (const sec of ACHIEVEMENTS) for (const row of sec[1] || []) if (row[0] === 'lotFirst') row[3] = 'Clear your first Meow Lot (hop in the red car on our driveway, out front)'; } catch (e) {}
+  warmJobs = function () { const J = o.warm.apply(this, arguments); try { const R = J.find(j => j.id === 'roam'); if (R && R.steps) R.steps.splice(1, 0, () => { carHeroPrep(); }); } catch (e) {} return J; };
+})();
+/* (end of CAR_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
