@@ -10757,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-13 00:33';                                              // stamped when the site is published
+const BUILD = '2026-10-13 00:37';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -37509,7 +37509,7 @@ function wpnTick(dt) {
   if (ZN && ZN.on && !W.held && inOurYard(p.x, p.z)) {                  // zombie night, empty-pawed: a nudge toward the nearest weapon in the yard
     if (!W.zHint) W.zHint = clock + 7; else if (clock > W.zHint && W.hintN < 2) { W.zHint = clock + 40; W.hintN++;
       const near = W.list.filter(o => o.st !== 'held' && o.st !== 'grab' && inOurYard(o.g.position.x, o.g.position.z)).sort((a, b) => a.g.position.distanceTo(p) - b.g.position.distanceTo(p))[0];
-      if (near) showWalkName(near.D.id === 'sword' ? '✨ Psst... the sword in the stone, out in the middle of the lawn!' : `✨ Psst... ${near.D.full} is lying in the yard!`); } }
+      if (near) showWalkName(near.D.id === 'sword' ? ('✨ Psst... the sword in the stone, out in the middle of the lawn!', '✨ Psst... the sword in the stone, tucked in beside the shed!') : `✨ Psst... ${near.D.full} is lying in the yard!`); } }
   else if (!(ZN && ZN.on)) W.zHint = 0;
   wpnChip();
 }
@@ -37555,8 +37555,8 @@ function bbSplash(s) {                                                   // SPLO
   for (let k = 0; k < 3; k++) bbRipple(p.x, p.z, 0.3 + k * 0.15 + s * 0.15, k * 0.12);
   try { splashSound(Math.min(1, 0.35 + s * 0.45)); } catch (e) {}
   bbBirdsOff(); B.wet = true;
-  if (!B.said) { B.said = 1; showWalkName('💦 SPLOOSH! PKR is in the bird bath'); }
-  const W = wpnState(), w = W.held; if (w && w.D.tank && w.tank < w.D.tank) { w.tank = w.D.tank; wpnChip(); showWalkName('💦 Water pistol refilled!'); }
+  B.said = 1; /* (WEAPONS2_V1: no caption) */ if (!B.said) { B.said = 1; showWalkName('💦 SPLOOSH! PKR is in the bird bath'); }
+  const W = wpnState(), w = W.held; if (w && w.D.tank && w.tank < w.D.tank) { w.tank = w.D.tank; wpnChip(); 0 && /* (WEAPONS2_V1: no caption) */ showWalkName('💦 Water pistol refilled!'); }
 }
 function bbBirdMesh() {                                                  // a little sparrow: one body mesh, one pair of wings (a shallow V that flaps by flipping)
   const W = wpnMats(), body = new THREE.Mesh(wpnMerge([[new THREE.SphereGeometry(0.075, 10, 8), 0x8a6a4a, 0, 0, 0, 0, 0, 0, 0.85, 0.8, 1.25], [new THREE.SphereGeometry(0.06, 8, 6), 0xe8dcc4, 0, -0.025, 0.02, 0, 0, 0, 0.8, 0.7, 1],
@@ -37576,7 +37576,7 @@ function bbTick(dt) {
   if (inB && walk.grounded && !B.wasIn && clock > (B.splT || 0)) { B.splT = clock + 0.8; bbSplash(Math.min(1.2, Math.max(0.35, Math.abs(B.vy || 0) / 6))); B.vy = 0; }
   if (inB && walk.grounded) { B.t += dt; const sp = Math.hypot(walk.vel.x, walk.vel.z); if (B.t > (sp > 0.3 ? 0.35 : 1.4)) { B.t = 0; bbRipple(p.x, p.z, sp > 0.3 ? 0.45 : 0.25); if (sp > 0.3 && Math.random() < 0.5) burst(wpnV(p.x, B.y + 0.04, p.z), 0xcfe8ff, 3, 1, 1.4, 0.26); } }
   if (B.wasIn !== (inB && walk.grounded)) B.wasIn = inB && walk.grounded;
-  if (B.wet && !inB && walk.grounded && d > 0.75 && p.y < B.y - 0.2 && !((walk.shakeT || 0) > 0)) { B.wet = false; walk.shakeT = 0.9; walk.wet = 0; noise(0.6, 0.05, 2600); showWalkName('💦 Brrr! PKR shakes off the bird bath'); }
+  if (B.wet && !inB && walk.grounded && d > 0.75 && p.y < B.y - 0.2 && !((walk.shakeT || 0) > 0)) { B.wet = false; walk.shakeT = 0.9; walk.wet = 0; noise(0.6, 0.05, 2600); 0 && /* (WEAPONS2_V1: no caption) */ showWalkName('💦 Brrr! PKR shakes off the bird bath'); }
   if (TOD && TOD.wx === 'rain' && TOD.W > 0.4 && d < 30 && Math.random() < dt * 3) bbRipple(B.x + (Math.random() - 0.5) * 0.8, B.z + (Math.random() - 0.5) * 0.8, 0.12 + Math.random() * 0.1);   /* (rain on the water) */
   for (const r of B.rings) { if (r.t >= r.life) { r.m.visible = false; continue; } r.t += dt; const k = r.t / r.life; r.m.visible = k > 0 && k < 1; if (k > 0) { r.m.scale.setScalar(0.04 + k * r.size); r.m.material.opacity = (1 - k) * 0.9; } }
   const day = TOD && TOD.nightF < 0.4 && !(TOD.wx === 'rain' && TOD.W > 0.2) && !(ZN && ZN.on), near = Math.hypot(p.x - B.x, p.z - B.z) < 3.4 && Math.abs(p.y - 1) < 3;
@@ -38555,6 +38555,366 @@ function cxtInstall() {                                                  // (onc
 }
 cxtInstall();
 /* (end of CROSSY KITTY TEXTURES) */
+/* WEAPONS2_V1 */
+/* =====================================================================
+   WEAPONS2_V1 (2026-10-13): the sword in the stone moves from the middle of the lawn to a nook beside the garden shed;
+   the water pistol floats in the bird bath (bobbing a little, half under) and is remodelled as a chunky toy super-soaker-style
+   blaster (rounded lathe parts, a see-through tank with its water level, a pump grip, accent rings: two meshes); the bird bath's splash and shake-off say
+   nothing on screen any more (the drops, rings, sound and shake are unchanged). Runtime wrappers of wpnInit / wpnTick
+   (WEAPONS_V1's hoisted functions), plus three tiny edits inside WEAPONS_V1 that keep their text and add around it.
+   ===================================================================== */
+function wpn2Spots() { return { sx: -14.55, sz: 44.95, wx: -8.43, wz: 36.63, wy: 1.374 }; }   /* (the shed's south side, clear of its door and the stepping stones; the bath's water at 1.37) */
+function wpn2Place(W) {                                                  // (once, right after the weapons are first built) new homes, and the words that go with them
+  const S = wpn2Spots(), s = W.byId && W.byId.sword, w = W.byId && W.byId.water;
+  if (W.rock) { W.rock.position.set(S.sx, 0, S.sz); W.rock.rotation.y = 0.9; }
+  if (s) { s.home.p.set(S.sx + 0.02, 1.13, S.sz); s.home.q.setFromEuler(new THREE.Euler(Math.PI, 1.2, -0.1));
+    s.D.find = '✨ A sword in a stone, tucked in beside the shed! Walk into it to pull it out'; }
+  if (w) { const Y = new THREE.Vector3(Math.cos(0.55), 0, Math.sin(0.55)), q = wpnBasis(new THREE.Quaternion(), Y, new THREE.Vector3(0, 1, 0));
+    q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.35));   /* (floating upright-ish, tipped a little: the body half under, the tank up out of the water) */
+    w.home.p.set(S.wx, S.wy, S.wz); w.home.q.copy(q);
+    w.D.find = '✨ A water pistol, floating in the bird bath! Hop in (or reach up) to grab it';
+    try { w.mesh.geometry.dispose(); w.mesh.geometry = wpn2SoakerGeo(); const sh = new THREE.Mesh(wpn2TankGeo(), wpn2ShellMat()); sh.userData.name = w.D.name; sh.renderOrder = 2; w.g.add(sh); w.shell = sh; } catch (e) {} }
+}
+function wpn2Lathe(pts, seg) { return new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg || 16); }   /* (round about +Y: the blaster's own axis) */
+function wpn2Pill(r, len) { const P = [[0.0001, -len / 2 - r]]; for (let k = 1; k <= 4; k++) { const a = -Math.PI / 2 + k * Math.PI / 8; P.push([r * Math.cos(a), -len / 2 + r * Math.sin(a)]); }
+  for (let k = 0; k <= 4; k++) { const a = k * Math.PI / 8; P.push([r * Math.cos(a), len / 2 + r * Math.sin(a)]); } P.push([0.0001, len / 2 + r]); return wpn2Lathe(P, 14); }   /* (a capsule: r128 has no CapsuleGeometry) */
+function wpn2SoakerGeo() {                                               // a chunky toy water blaster: grip (her teeth) at the origin, the nozzle up +Y, the tank on top (+Z), the handle and pump below (-Z)
+  const T = (R, r) => new THREE.TorusGeometry(R, r, 6, 18), H = Math.PI / 2, ORG = 0xff7a1a, LIME = 0x8ee23a, BLUE = 0x2f7bff, YEL = 0xffd23a;
+  return wpnMerge([
+    [wpn2Pill(0.05, 0.2), ORG, 0, 0.06, 0, 0, 0, 0, 0.9, 1, 1],                                        // the body: a fat rounded barrel
+    [wpn2Lathe([[0.0001, 0.2], [0.03, 0.2], [0.026, 0.27], [0.02, 0.33], [0.0001, 0.33]]), LIME, 0, 0, 0],   // the long tapered nozzle
+    [T(0.024, 0.008), YEL, 0, 0.33, 0, H, 0, 0], [T(0.053, 0.011), LIME, 0, 0.17, 0, H, 0, 0], [T(0.053, 0.011), LIME, 0, -0.03, 0, H, 0, 0],   // a nozzle tip ring and two chunky accent rings
+    [wpn2Pill(0.026, 0.1), LIME, 0, 0.15, -0.058], [T(0.028, 0.006), 0x5fb02a, 0, 0.12, -0.058, H, 0, 0], [T(0.028, 0.006), 0x5fb02a, 0, 0.15, -0.058, H, 0, 0], [T(0.028, 0.006), 0x5fb02a, 0, 0.18, -0.058, H, 0, 0],   // the pump grip under the barrel, ridged
+    [wpn2Pill(0.024, 0.09), BLUE, 0, -0.04, -0.09, -0.5, 0, 0], [wpn2Pill(0.012, 0.03), YEL, 0, 0.025, -0.06, 0.4, 0, 0],   // the handle (soft and round), the trigger
+    [new THREE.CylinderGeometry(0.024, 0.03, 0.03, 12), LIME, 0, 0.05, 0.055, H, 0, 0],                  // the tank's neck
+    [new THREE.SphereGeometry(0.06, 14, 8, 0, Math.PI * 2, Math.PI * 0.5, Math.PI * 0.5), 0x2a8fe0, 0, 0.05, 0.12, H, 0, 0, 1.25, 1, 1],   // the water in the tank: its lower half...
+    [new THREE.CircleGeometry(0.06, 14), 0x5fb8f0, 0, 0.05, 0.12, 0, 0, 0, 1.25, 1, 1],                   // ...and its level (a flat surface, facing up the tank)
+    [new THREE.CylinderGeometry(0.02, 0.02, 0.022, 10), YEL, 0, 0.05, 0.208, H, 0, 0]]).translate(0, 0.08, -0.025);   // the filler cap (and the whole thing a little forward and down: the tank clear of her nose)
+}
+function wpn2TankGeo() { const g = new THREE.SphereGeometry(0.066, 16, 10); g.scale(1.3, 1, 1); g.rotateX(Math.PI / 2); g.translate(0, 0.05 + 0.08, 0.12 - 0.025); return g; }   /* (the see-through shell round it) */
+function wpn2ShellMat() { const W = wpnState(); return W.shellMat || (W.shellMat = Object.assign(new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.34, depthWrite: false, fog: false }), { userData: { noTod: true, c0: new THREE.Color(0xbfe6ff) } })); }
+function wpn2Tick(dt) {                                                  // the pistol bobs in the bath; from the grass under the bowl she can reach up and snag it
+  const W = wpnState(), w = W.built && W.byId && W.byId.water; if (!w || !walk.on || state !== 'playing') return;
+  if (W.shellMat && W.matOut) W.shellMat.color.copy(W.shellMat.userData.c0).multiply(w.mesh.material === W.matIn ? W.matIn.color : W.matOut.color);   /* (the tank darkens with the night like the rest of it) */
+  if (w.st !== 'home') return;
+  const S = wpn2Spots(), t = clock * 1.7 + w.ph; w.g.position.set(S.wx + Math.sin(t * 0.37) * 0.015, S.wy + Math.sin(t) * 0.006, S.wz + Math.cos(t * 0.31) * 0.015);
+  w.g.quaternion.copy(w.home.q); w.g.rotateZ(Math.sin(t * 0.8) * 0.05);
+  const p = walk.pos; if (W.held === w || w.noPick || !walk.grounded || p.y > 0.5 || Math.hypot(p.x - S.wx, p.z - S.wz) > 1.0) return;
+  if (wpnMouthBusy()) return; wpnPickup(w);
+}
+wpnInit = (function (prev) { return function () { const W = prev.apply(this, arguments); try { if (W && W.built && !W.v2) { W.v2 = true; wpn2Place(W); } } catch (e) {} return W; }; })(wpnInit);
+wpnTick = (function (prev) { return function (dt) { const r = prev.apply(this, arguments); try { wpn2Tick(dt); } catch (e) {} return r; }; })(wpnTick);
+/* (end of WEAPONS2_V1) */
+
+/* CAR2_V1 */
+/* =====================================================================
+   CAR2_V1 (2026-10-13): the red car (CAR_V1), refined from the user's photos. The front no longer reads as a cartoon face: one
+   dark band right across under the hood's edge (honeycomb either side, glossy black inside), a bold chrome V framing it whose arms
+   run up and out and tuck under the headlights' inner corners, slim swept headlights (black housing, a chrome reflector band, a
+   chrome "<" boomerang, two small projectors, an LED strip, an amber marker at the back), a black lower bumper right across with a
+   wide intake and round fog lamps in black pods, the plate mounted on it. Hood: two power-bulge creases converging on the grille.
+   Body: a crisp shoulder crease under the windows and a lower door crease rising to the back. Paint a touch brighter and glossier.
+   These are re-declarations of CAR_V1's functions (the later declaration wins; nothing else is hooked).
+   ===================================================================== */
+function carHeroRing(S, z) {                                             // one section, the +x half, bottom middle to top middle: the lower body (sills, side, shoulder), the side glass, the top
+  const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const yB = S.yB(z), a = S.a(z), ys = S.ys(z), top = S.top(z), inset = 0.068, aG = a - inset;
+  const gh = sm(S.zCowl + 0.01, S.zCowl - 0.06, z) * sm(S.zDeck - 0.01, S.zDeck + 0.07, z);        // (a glasshouse between the cowl and the hatch)
+  const h = Math.max(0, top - 0.062 - ys) * gh, xe = aG - (0.42 + 0.75 * sm(-1.55, -2.05, z)) * h, yq = ys + h;                     // (its sides lean in: tumblehome)
+  const nu = 3.2, nl = 5, yc = yB + 0.58 * (ys - yB), q = Math.pow(1 - Math.pow(aG / a, nu), 1 / nu), bu = (ys - yc) / q, bl = yc - yB;
+  const ts = Math.acos(Math.pow(aG / a, nu / 2)), pts = [], NL = 26, NS = 6, NT = 20;
+  for (let k = 0; k <= NL; k++) {                                        // the lower body: a superellipse, boxy below, rounder above
+    const u = Math.pow(k / NL, 0.72), th = -Math.PI / 2 + (ts + Math.PI / 2) * u, c = Math.cos(th), s = Math.sin(th);
+    const n = s < 0 ? nl : nu, b = s < 0 ? bl : bu;
+    pts.push([a * Math.pow(Math.max(0, c), 2 / n), yc + b * Math.sign(s) * Math.pow(Math.abs(s), 2 / n), 'L']);
+  }
+  pts[NL][0] = aG; pts[NL][1] = ys;
+  { const ysh = ys - 0.115, ycr = 0.5 + 0.1 * sm(0.8, -1.4, z), fs = sm(2.13, 1.95, z) * sm(-2.12, -1.95, z), fl = sm(1.78, 1.6, z) * sm(-1.8, -1.6, z);   // the creases: a crisp shoulder line under the windows, and a lower one along the doors, rising to the back
+    for (let k = 1; k < NL; k++) { const p = pts[k]; if (p[0] < 0.6 * a) continue;
+      p[0] += 0.011 * fs * Math.exp(-Math.pow((p[1] - ysh) / 0.022, 2)) - 0.011 * fl * (1 - sm(ycr - 0.02, ycr + 0.02, p[1])) * sm(yB + 0.04, yB + 0.12, p[1]); } }
+  for (let k = 1; k <= NS; k++) { const t = k / NS; pts.push([aG - (aG - xe) * Math.pow(t, 1.15), ys + h * t, 'S']); }   // the side glass and pillars (a little bowed)
+  const nq = 2.3 + 0.9 * Math.min(1, h / 0.3), hq = top - yq;
+  const hood = sm(S.zCowl - 0.02, S.zCowl + 0.06, z) * sm(2.09, 1.98, z), xr = 0.36 + 0.16 * (2.05 - z) / 1.15;   // (the hood's two power-bulge creases, closer together toward the grille)
+  for (let k = 1; k <= NT; k++) { const ph = k / NT * Math.PI / 2, x = xe * Math.pow(Math.cos(ph), 2 / nq), d = (x - xr) / 0.07;
+    pts.push([x, yq + hq * Math.pow(Math.sin(ph), 2 / nq) + hood * 0.006 * (d > 0 ? Math.exp(-d * d * 1.6) : Math.exp(-d * d * 0.35)), 'T']); }   // the top: hood, windscreen, roof, back glass, hatch
+  pts[pts.length - 1][0] = 0;
+  return { z, pts, yB, a, ys, top, yq, xe, aG, h, NL, NS };
+}
+function carHeroCols() {                                                  // the paint box (base colours; the shader lights them)
+  return { PAINT: 0x931324, CLAD: 0x202022, GLASS: 0x0d1117, PILL: 0x0f0f11, SHUT: 0x3a0c12, WELL: 0x0b0b0c, CHROME: 0xdfe2e6, TYRE: 0x1c1c1d, RIM: 0xc4c7cb, DARK: 0x26282b, INT: 0x2b2c2f, SEAT: 0x303236 };
+}
+function carHeroLoft(M, P) {                                            // the body: section to section, both halves, each face coloured by where it is (the driver's door's faces go to its own mesh)
+  const S = M.S, R = M.rings, Q = carHeroCols(), NL = R[0].NL, NS = R[0].NS;
+  const wTop = (z, r) => z > -1.27 ? r.yq - 0.035 : r.ys + (r.yq - 0.035 - r.ys) * Math.pow(Math.max(0, (z + 1.6) / 0.33), 1.7);   // (the side windows' top edge; the quarter window tapers down at the back)
+  const arch = (z, y) => Math.min(Math.hypot(z - S.AXF, y - S.WR), Math.hypot(z - S.AXR, y - S.WR));
+  const inShut = z => (z > 0.857 && z < 0.867) || (z > -0.401 && z < -0.391) || (z > -1.271 && z < -1.261);
+  const face = (seg, k, zc, yc, sx, pushed, r, xc) => {                     // [colour, shine, painted-on pictures?, bucket]
+    if (seg === 'L') {
+      const dA = arch(zc, yc); if (dA < S.ARC) return null;              // (the wheel arches: open)
+      if (dA < S.ARC + 0.05) return [Q.CLAD, 0.05, 1, 'body'];
+      const door = sx > 0 && zc > -0.392 && zc < 0.858 && yc > 0.49;
+      if (inShut(zc) && yc > 0.49) return [Q.SHUT, 0, 0, 'body'];
+      if (yc < (zc > -1.5 && zc < 0.95 ? 0.49 : 0.45) && zc > -1.86 && zc < 1.82) return [Q.CLAD, 0.05, 1, 'body'];
+      if (zc >= 1.82 && yc < 0.415) return [Q.CLAD, 0.05, 1, 'body'];
+      if (zc <= -1.86 && yc < 0.585) return [Q.CLAD, 0.05, 1, 'body'];
+      return [Q.PAINT, 0.44, 1, door ? 'door' : 'body'];
+    }
+    if (seg === 'S') {
+      const door = sx > 0 && zc > -0.392 && zc < 0.858;
+      if (zc < 0.9 && zc > -1.635 && yc > r.ys + 0.012 && yc < wTop(zc, r)) {
+        if ((zc > -0.47 && zc < -0.355) || (zc > -1.34 && zc < -1.222)) return [Q.PILL, 0.35, 0, door ? 'door' : 'body'];
+        return [Q.GLASS, 0.6, 0, door ? 'door' : 'body'];
+      }
+      return [Q.PAINT, 0.44, 0, door ? 'door' : 'body'];
+    }
+    const edge = k <= NL + NS + 2;                                       // (the top's first cells, round its edge: the A pillars, the roof's edge)
+    if (zc > 0.872 && zc < 0.935) return [Q.CLAD, 0.08, 0, 'body'];     // the cowl (wipers sit on it)
+    if (zc >= 0.935) return [Q.PAINT, 0.44, 1, 'body'];                  // the hood
+    if (zc > S.zRoofF + 0.005 && zc <= 0.872) return edge ? [Q.PAINT, 0.44, 0, 'body'] : [Q.GLASS, 0.6, 0, 'glass'];   // the windscreen (see-through), the A pillars
+    if (zc < S.zRoofR - 0.005 && zc > S.zDeck + 0.006) return edge || xc > 0.5 + (1.4 - yc) * 0.25 ? [Q.PAINT, 0.44, 0, 'body'] : [Q.GLASS, 0.6, 0, 'body'];   // the back glass (thick D pillars either side)
+    if (zc <= S.zDeck + 0.006) return [Q.PAINT, 0.44, 1, 'body'];        // the hatch below it
+    return [Q.PAINT, 0.46, 0, 'body'];                                   // the roof
+  };
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), Cc = new THREE.Vector3(), U = new THREE.Vector3(), V = new THREE.Vector3();
+  const nI = R.length, nK = R[0].pts.length;
+  for (const sx of [1, -1]) {
+    const G = [], N = [], PU = [];
+    for (let i = 0; i < nI; i++) { const r = R[i], row = [], pu = []; for (let k = 0; k < nK; k++) { const p = r.pts[k]; let x = p[0];
+        const isP = false;
+        row.push([sx * x, p[1], r.z]); pu.push(isP); }
+      G.push(row); PU.push(pu); }
+    for (let i = 0; i < nI; i++) { const nr = []; for (let k = 0; k < nK; k++) {                 // smooth normals off the grid
+        const a = G[Math.max(0, i - 1)][k], b = G[Math.min(nI - 1, i + 1)][k], c = G[i][Math.max(0, k - 1)], d = G[i][Math.min(nK - 1, k + 1)];
+        U.set(d[0] - c[0], d[1] - c[1], d[2] - c[2]); V.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); A.crossVectors(U, V); if (sx < 0) A.negate();
+        if (k === 0 || k === nK - 1) A.x = 0; if (A.lengthSq() < 1e-14) A.set(sx, 0, 0); A.normalize(); nr.push([A.x, A.y, A.z]); }   /* (on the middle line: straight up, down or out the end) */
+      N.push(nr); }
+    const bk = { body: [[], []], door: [[], []], glass: [[], []] }, meta = {};
+    const tri = (b, p0, p1, p2, n0, n1, n2, f) => {
+      A.set(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]); B.set(p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]); if (Cc.crossVectors(A, B).lengthSq() < 1e-16) return;
+      const key = b + '|' + f[0] + '|' + f[1] + '|' + f[2]; let L = meta[key]; if (!L) L = meta[key] = { b, f, pos: [], nrm: [] };
+      L.pos.push(...p0, ...p1, ...p2); L.nrm.push(...n0, ...n1, ...n2);
+    };
+    for (let i = 0; i < nI - 1; i++) for (let k = 0; k < nK - 1; k++) {
+      const p00 = G[i][k], p01 = G[i][k + 1], p10 = G[i + 1][k], p11 = G[i + 1][k + 1], seg = R[i].pts[k + 1][2];
+      const zc = (p00[2] + p10[2]) / 2, yc = (p00[1] + p01[1] + p10[1] + p11[1]) / 4, pushed = PU[i][k] || PU[i][k + 1] || PU[i + 1][k] || PU[i + 1][k + 1];
+      const f = face(seg, k, zc, yc, sx, pushed, R[i], Math.abs(p00[0] + p01[0] + p10[0] + p11[0]) / 4); if (!f) continue;
+      if (sx > 0) { tri(f[3], p00, p01, p10, N[i][k], N[i][k + 1], N[i + 1][k], f); tri(f[3], p01, p11, p10, N[i][k + 1], N[i + 1][k + 1], N[i + 1][k], f); }
+      else { tri(f[3], p00, p10, p01, N[i][k], N[i + 1][k], N[i][k + 1], f); tri(f[3], p01, p10, p11, N[i][k + 1], N[i + 1][k], N[i + 1][k + 1], f); }
+    }
+    for (const key in meta) { const L = meta[key]; P.push(L.b, L.pos, L.nrm, L.f[0], L.f[1], L.f[2], true); }
+    if (sx > 0) M.grid = G;
+  }
+  for (const end of [0, nI - 1]) {                                       // the two ends: strips across, both halves
+    const r = R[end], fz = end ? 1 : -1, nz = [0, 0, fz];
+    for (let k = 0; k < nK - 1; k++) { const a = r.pts[k], b = r.pts[k + 1], yc = (a[1] + b[1]) / 2, col = yc < (fz > 0 ? 0.415 : 0.585) ? [Q.CLAD, 0.05] : [Q.PAINT, 0.3];
+      const pa = [a[0], a[1], r.z], pb = [b[0], b[1], r.z], qa = [-a[0], a[1], r.z], qb = [-b[0], b[1], r.z];
+      const pos = fz > 0 ? [...pa, ...qa, ...pb, ...qa, ...qb, ...pb] : [...pa, ...pb, ...qa, ...qa, ...pb, ...qb];
+      P.push('body', pos, [].concat(nz, nz, nz, nz, nz, nz), col[0], col[1], 1, true); }
+  }
+}
+function carHeroParts2(M, P) {                                          // everything that isn't the shell: wheels, arches, glass trim, mirrors, handles, spoiler, lamps' chrome, plates, the inside
+  const S = M.S, Q = carHeroCols(), sideX = M.rawSideX, V3 = THREE.Vector3;
+  // -- the wheels: tyres, 5 twin spoke silver alloys
+  for (const zA of [S.AXF, S.AXR]) for (const sx of [1, -1]) {
+    const parts = [], put = (g, col, refl) => parts.push([g, col, refl]);
+    const lathe = (pts, seg) => { const g = new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg || 28); g.rotateZ(-Math.PI / 2); return g; };
+    put(lathe([[0.205, -0.113], [0.27, -0.119], [0.322, -0.111], [0.346, -0.086], [0.352, -0.05], [0.352, 0.05], [0.346, 0.086], [0.322, 0.111], [0.27, 0.119], [0.205, 0.113]]), Q.TYRE, 0.04);
+    put(lathe([[0.196, 0.06], [0.206, 0.104], [0.217, 0.114], [0.222, 0.108], [0.213, 0.09]]), Q.RIM, 0.55);
+    { const g = new THREE.CircleGeometry(0.205, 24); g.rotateY(Math.PI / 2); g.translate(0.035, 0, 0); put(g, Q.DARK, 0.05); }
+    for (let i = 0; i < 5; i++) for (const t of [-1, 1]) {               // (twin spokes, a little dished)
+      const a0 = i * Math.PI * 2 / 5 + 0.3, ah = a0 + t * 0.07, ar = a0 + t * 0.2, A = new THREE.Vector3(0.106, 0.066 * Math.cos(ah), 0.066 * Math.sin(ah)), B = new THREE.Vector3(0.094, 0.208 * Math.cos(ar), 0.208 * Math.sin(ar));
+      const d = B.clone().sub(A), L = d.length(); d.normalize(); const n = new THREE.Vector3(1, 0, 0), sd = new THREE.Vector3().crossVectors(d, n).normalize(); n.crossVectors(sd, d).normalize();
+      const g = new THREE.BoxGeometry(0.019, L, 0.026); g.applyMatrix4(new THREE.Matrix4().makeBasis(sd, d, n)); g.translate((A.x + B.x) / 2, (A.y + B.y) / 2, (A.z + B.z) / 2); put(g, Q.RIM, 0.55); }   /* (slim twin spokes, apart at the rim, close at the hub) */
+    { const g = new THREE.CylinderGeometry(0.072, 0.078, 0.03, 18); g.rotateZ(Math.PI / 2); g.translate(0.1, 0, 0); put(g, Q.RIM, 0.5); }
+    { const g = new THREE.CylinderGeometry(0.046, 0.046, 0.012, 18); g.rotateZ(Math.PI / 2); g.translate(0.118, 0, 0); put(g, 0xd6d9dd, 0.7); }
+    { const g = new THREE.TorusGeometry(0.03, 0.004, 5, 16); g.scale(1, 0.75, 1); g.rotateY(Math.PI / 2); g.translate(0.124, 0, 0); put(g, 0x55595e, 0.3); }
+    for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5 + 0.3 + Math.PI / 5, g = new THREE.CylinderGeometry(0.009, 0.009, 0.02, 6); g.rotateZ(Math.PI / 2); g.translate(0.112, 0.052 * Math.cos(a), 0.052 * Math.sin(a)); put(g, 0x9a9ea3, 0.5); }
+    for (const [g, col, refl] of parts) { g.translate(S.TW, S.WR, zA); const h = sx < 0 ? carHeroMirrorX(g) : g; P.geo('body', h, col, refl, 0); }
+  }
+  // -- black cladding round the wheel arches (a lip into the well, a flare out over the paint)
+  for (const zA of [S.AXF, S.AXR]) for (const sx of [1, -1]) {
+    const N = 26, t0 = Math.asin((0.405 - S.WR) / (S.ARC + 0.1)), rings = [[S.ARC - 0.03, -0.08], [S.ARC - 0.036, 0.006], [S.ARC + 0.0, 0.022], [S.ARC + 0.085, 0.017], [S.ARC + 0.1, 0.002]], pos = [], idx = [];
+    for (let j = 0; j <= N; j++) { const th = t0 + (Math.PI - 2 * t0) * j / N, c = Math.cos(th), s = Math.sin(th);
+      for (const [r, dx] of rings) { const z = zA + r * c, y = Math.max(0.33, S.WR + r * s); pos.push(sx * (sideX(z, Math.max(0.42, y)) + dx), y, z); } }
+    const nr = rings.length; for (let j = 0; j < N; j++) for (let q = 0; q < nr - 1; q++) { const a = j * nr + q, b = a + 1, c = a + nr, d = c + 1; if (sx > 0) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); P.geo('body', g, Q.CLAD, 0.06, 0);
+    { const lp = [], li = [], r = S.ARC + 0.004, xs = [S.TW - 0.16, 0.5 * (S.TW - 0.16) + 0.5 * 0.86, 0.86];   // the wheel well's liner (no seeing into the car through the arch)
+      for (let j = 0; j <= N; j++) { const th = t0 * 0.5 + (Math.PI - t0) * j / N, z = zA + r * Math.cos(th), y = Math.max(0.3, S.WR + r * Math.sin(th)); for (const x of xs) lp.push(sx * Math.min(x, sideX(z, Math.max(0.42, y)) - 0.03), y, z); lp.push(sx * (S.TW - 0.16), S.WR, zA); }
+      const n2 = xs.length + 1; for (let j = 0; j < N; j++) { for (let q = 0; q < xs.length - 1; q++) { const a = j * n2 + q, b = a + 1, c = a + n2, d = c + 1; li.push(a, b, c, b, d, c); } const a = j * n2, c = a + n2, m = j * n2 + xs.length; li.push(a, m, c); }
+      const h = new THREE.BufferGeometry(); h.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3)); h.setIndex(li); h.computeVertexNormals(); P.geo('body', h, 0x0c0c0d, 0.02, 0); }
+  }
+  // -- the chrome line round the side windows, and the black sill trim
+  for (const sx of [1, -1]) {
+    const pts = [], R = M.ringAt;
+    for (let z = 0.86; z >= -1.6001; z -= 0.08) pts.push([z, R(z).ys + 0.004]);
+    const top = []; for (let z = 0.86; z >= 0.4; z -= 0.046) { const r = R(z); top.push([z, Math.max(r.ys, r.yq - 0.03)]); }
+    for (let z = 0.36; z >= -1.27; z -= 0.12) top.push([z, R(z).yq - 0.03]);
+    for (let z = -1.27; z >= -1.6001; z -= 0.055) { const r = R(z); top.push([z, r.ys + (r.yq - 0.03 - r.ys) * Math.pow(Math.max(0, (z + 1.6) / 0.33), 1.7)]); }
+    for (const line of [pts, top]) for (let i = 0; i + 1 < line.length; i++) {
+      const [z0, y0] = line[i], [z1, y1] = line[i + 1], a = [sx * (sideX(z0, y0) + 0.003), y0, z0], c = [sx * (sideX(z1, y1) + 0.003), y1, z1];
+      const zm = (z0 + z1) / 2, b = sx > 0 && zm > -0.395 && zm < 0.86 ? 'door' : 'body'; carHeroBar(P, b, a, c, 0.017, 0.012, [sx, 0.25, 0], Q.CHROME, 0.85, 0); }
+  }
+  // -- the mirrors (on the doors: body colour, a turn signal along the front), the handles (body colour)
+  for (const sx of [1, -1]) {
+    const b = sx > 0 ? 'door' : 'body', zb = 0.7, yb = M.ringAt(zb).ys + 0.04, xb = sideX(zb, yb);
+    carHeroBox(P, b, 0.07, 0.065, 0.15, sx * (xb + 0.02), yb, zb + 0.01, Q.CLAD, 0.1, 0);
+    { const g = new THREE.SphereGeometry(1, 16, 10); g.scale(0.085, 0.07, 0.12); g.translate(sx * (xb + 0.135), yb + 0.05, zb - 0.04); P.geo(b, g, Q.PAINT, 0.32, 0); }
+    { const g = new THREE.CircleGeometry(1, 18); g.scale(0.075, 0.058, 1); g.rotateY(Math.PI); g.translate(sx * (xb + 0.14), yb + 0.05, zb - 0.155); P.geo(b, g, 0x1b232c, 0.7, 0); }
+    carHeroBox(P, b, 0.075, 0.014, 0.05, sx * (xb + 0.16), yb + 0.006, zb + 0.06, 0xff8a1e, 0.25, 0, 0, sx * 0.35, 0);
+    for (const [zh, hb] of [[-0.2, sx > 0 ? 'door' : 'body'], [-1.08, 'body']]) { const yh = 0.985, xh = sideX(zh, yh);
+      carHeroBox(P, hb, 0.006, 0.042, 0.14, sx * (xh + 0.002), yh, zh, 0x3d0b12, 0.1, 0);
+      carHeroBox(P, hb, 0.026, 0.028, 0.12, sx * (xh + 0.016), yh + 0.002, zh, Q.PAINT, 0.34, 0); }
+  }
+  // -- the roof spoiler (a brake light along its back edge), the antenna mast, the wipers
+  { const sh = new THREE.Shape([[-1.58, 1.535], [-1.99, 1.49], [-2.008, 1.462], [-1.97, 1.44], [-1.86, 1.43], [-1.70, 1.486], [-1.58, 1.508]].map(([z, y]) => new THREE.Vector2(z, y)));
+    const g = new THREE.ExtrudeGeometry(sh, { depth: 1.16, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.008, bevelSegments: 1, curveSegments: 2 });
+    g.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -0.58, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1)); P.geo('body', g, Q.PAINT, 0.32, 0);
+    carHeroBox(P, 'body', 0.34, 0.018, 0.02, 0, 1.455, -1.995, 0xb30f1c, 0.3, 0);
+    for (const sx of [1, -1]) carHeroBox(P, 'body', 0.03, 0.06, 0.3, sx * 0.575, 1.47, -1.86, Q.PAINT, 0.44, 0, 0.12, 0, 0); }   /* (its side fins) */
+  { const zr = -1.5, yr = M.ringAt(zr).top; carHeroBox(P, 'body', 0.05, 0.03, 0.08, 0, yr + 0.01, zr, Q.CLAD, 0.1, 0);
+    const g = new THREE.CylinderGeometry(0.0035, 0.005, 0.3, 6); g.translate(0, 0.15, 0); g.rotateX(-0.45); g.translate(0, yr + 0.02, zr); P.geo('body', g, 0x111112, 0.2, 0); }
+  { const yw = 1.16, zw = 0.865; carHeroBar(P, 'body', [0.6, yw, zw + 0.012], [-0.02, yw + 0.015, zw - 0.004], 0.022, 0.016, [0, 0.6, 0.8], 0x141416, 0.15, 0);
+    carHeroBar(P, 'body', [-0.08, yw + 0.005, zw + 0.004], [-0.66, yw - 0.005, zw + 0.016], 0.022, 0.016, [0, 0.6, 0.8], 0x141416, 0.15, 0);
+    const zb = M.rearZ(0, 1.235) - 0.012; carHeroBar(P, 'body', [0.02, 1.232, zb], [-0.4, 1.238, zb + 0.01], 0.02, 0.016, [0, 0.5, -0.86], 0x141416, 0.15, 0);
+    carHeroBox(P, 'body', 0.04, 0.04, 0.03, 0, 1.228, zb - 0.004, 0x141416, 0.15, 0); }
+  // -- the front: the chrome V round the grille, the oval emblem (no lettering), round fog lamps with chrome rings, the plate
+  const fN = (x, y) => { const e = 0.03, dx = (M.frontZ(x + e, y) - M.frontZ(x - e, y)) / (2 * e), dy = (M.frontZ(x, y + e) - M.frontZ(x, y - e)) / (2 * e); return new V3(-Math.max(-2.5, Math.min(2.5, dx)), -Math.max(-0.4, Math.min(0.4, dy)), 1).normalize(); };   /* (smoothed: the nose is made of sections, its slope steps) */
+  const rN = (x, y) => { const e = 0.03, dx = (M.rearZ(x + e, y) - M.rearZ(x - e, y)) / (2 * e), dy = (M.rearZ(x, y + e) - M.rearZ(x, y - e)) / (2 * e); return new V3(dx, dy, -1).normalize(); };
+  const onF = (x, y, o) => { const n = fN(x, y); return [x + n.x * o, y + n.y * o, M.frontZ(x, y) + n.z * o]; };
+  const onR = (x, y, o) => { const n = rN(x, y); return [x + n.x * o, y + n.y * o, M.rearZ(x, y) + n.z * o]; };
+  for (const sx of [1, -1]) { const V = [[0.42, 0.903], [0.345, 0.906], [0.315, 0.878], [0.21, 0.738], [0.14, 0.652], [0.07, 0.624], [0.0, 0.619]];
+    const fz = (x, y) => Math.max(M.frontZ(x, y), M.frontZ(x, y + 0.03), M.frontZ(x, y - 0.03)) + 0.012;   /* (a chrome strip standing on the face, facing forward) */
+    for (let i = 0; i + 1 < V.length; i++) { const x0 = sx * V[i][0], x1 = sx * V[i + 1][0], a = [x0, V[i][1], fz(x0, V[i][1])], c = [x1, V[i + 1][1], fz(x1, V[i + 1][1])], xm = (x0 + x1) / 2;
+      carHeroBar(P, 'body', a, c, i < 1 ? 0.026 : 0.058 - i * 0.002, i < 1 ? 0.012 : 0.026, [xm * 0.5, 0.05, 1], Q.CHROME, 0.88, 0); } }
+  const disc = (p, n, rx, ry, col, refl) => { const g = new THREE.CircleGeometry(1, 22); g.scale(rx, ry, 1); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), n))); g.translate(...p); P.geo('body', g, col, refl, 0); };
+  const ring = (p, n, rx, ry, tube, col, refl) => { const g = new THREE.TorusGeometry(1, tube, 6, 28); g.scale(rx, ry, (rx + ry) / 2); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), n))); g.translate(...p); P.geo('body', g, col, refl, 0); };
+  { const n = fN(0, 0.805); ring(onF(0, 0.805, 0.018), n, 0.068, 0.056, 0.13, Q.CHROME, 0.9); disc(onF(0, 0.805, 0.014), n, 0.062, 0.05, 0x5c6168, 0.7); }
+  for (const sx of [1, -1]) { const x = sx * 0.69, y = 0.42, n = fN(x, y); ring(onF(x, y, 0.01), n, 0.052, 0.046, 0.16, Q.CHROME, 0.9); disc(onF(x, y, 0.004), n, 0.046, 0.04, 0x9aa4ae, 0.6); disc(onF(x, y, 0.007), n, 0.026, 0.022, 0xdfe5ea, 0.4); }
+  { const n = fN(0, 0.465), p = onF(0, 0.465, 0.008), g = new THREE.BoxGeometry(0.305, 0.152, 0.008); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), n))); g.translate(...p); P.geo('body', g, 0xffffff, 0.2, 1); }
+  // -- the back: the oval emblem, the plate in its recess
+  { const n = rN(0, 0.975); ring(onR(0, 0.975, 0.016), n, 0.062, 0.048, 0.15, Q.CHROME, 0.9); disc(onR(0, 0.975, 0.012), n, 0.056, 0.042, 0x9ea4aa, 0.6); }
+  { const n = rN(0, 0.755), p = onR(0, 0.755, 0.006), g = new THREE.BoxGeometry(0.305, 0.152, 0.008); g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), n))); g.translate(...p); P.geo('body', g, 0xffffff, 0.2, 1); }
+  // -- inside (seen through the windscreen and the open door): dash, wheel, seats, the mirror with its dreamcatcher, a little white plush
+  const IN = Q.INT, SE = Q.SEAT;
+  carHeroBox(P, 'body', 1.62, 0.16, 0.36, 0, 0.99, 0.74, IN, 0.08, 0); carHeroBox(P, 'body', 1.5, 0.3, 0.25, 0, 0.82, 0.62, IN, 0.05, 0);
+  carHeroBox(P, 'body', 0.36, 0.08, 0.14, 0.37, 1.09, 0.63, 0x1e1f21, 0.1, 0); carHeroBox(P, 'body', 0.22, 0.36, 0.55, 0, 0.6, 0.2, IN, 0.05, 0);
+  { const g = new THREE.TorusGeometry(0.17, 0.02, 6, 20); g.rotateX(-0.45); g.translate(0.37, 1.0, 0.47); P.geo('body', g, 0x1a1a1c, 0.1, 0); carHeroBox(P, 'body', 0.06, 0.06, 0.2, 0.37, 0.97, 0.56, 0x1a1a1c, 0.1, 0, -0.45); }
+  carHeroBox(P, 'body', 1.7, 0.06, 2.6, 0, 0.36, -0.5, 0x1d1d1f, 0, 0);
+  for (const sx of [1, -1]) { const x = sx * 0.37;
+    carHeroBox(P, 'body', 0.5, 0.13, 0.52, x, 0.6, 0.02, SE, 0.06, 0); carHeroBox(P, 'body', 0.5, 0.66, 0.13, x, 0.98, -0.3, SE, 0.06, 0, -0.2);
+    carHeroBox(P, 'body', 0.27, 0.19, 0.11, x, 1.38, -0.4, SE, 0.06, 0, -0.15); }
+  carHeroBox(P, 'body', 1.45, 0.14, 0.5, 0, 0.62, -1.0, SE, 0.06, 0); carHeroBox(P, 'body', 1.45, 0.6, 0.13, 0, 0.95, -1.3, SE, 0.06, 0, -0.25);
+  for (const x of [-0.5, 0, 0.5]) carHeroBox(P, 'body', 0.25, 0.16, 0.1, x, 1.33, -1.4, SE, 0.06, 0, -0.2);
+  carHeroBox(P, 'body', 0.025, 0.05, 0.025, 0, 1.465, 0.39, 0x222224, 0.1, 0); carHeroBox(P, 'body', 0.25, 0.065, 0.035, 0, 1.425, 0.405, 0x232427, 0.2, 0);
+  { const yR = 1.27, zR = 0.41;                                          // the dreamcatcher: a string, a ring with its web and beads, a pink tassel
+    carHeroBox(P, 'body', 0.004, 0.1, 0.004, 0, 1.345, zR, 0xf0e8f0, 0, 0);
+    { const g = new THREE.TorusGeometry(0.036, 0.004, 5, 18); g.translate(0, yR, zR); P.geo('body', g, 0xe9e1d2, 0.35, 0); }
+    for (let k = 0; k < 4; k++) carHeroBox(P, 'body', 0.068, 0.0025, 0.002, 0, yR, zR, 0xf4eef4, 0, 0, 0, 0, k * Math.PI / 4);
+    { const g = new THREE.SphereGeometry(0.008, 8, 6); g.translate(0, yR, zR + 0.002); P.geo('body', g, 0xff6fae, 0.3, 0); }
+    carHeroBox(P, 'body', 0.003, 0.03, 0.003, 0, yR - 0.05, zR, 0xf0e8f0, 0, 0);
+    { const g = new THREE.SphereGeometry(0.009, 8, 6); g.translate(0, yR - 0.068, zR); P.geo('body', g, 0xffffff, 0.3, 0); }
+    { const g = new THREE.CylinderGeometry(0.006, 0.017, 0.085, 8); g.translate(0, yR - 0.12, zR); P.geo('body', g, 0xff4f9a, 0.1, 0); } }
+  { const x = 0.13, y = 1.075, z = 0.78;                                 // the plush on the dash: a fluffy white lamb-ish thing, looking out
+    const bl = (r, sx, sy, sz, px, py, pz, col) => { const g = new THREE.SphereGeometry(r, 10, 8); g.scale(sx, sy, sz); g.translate(x + px, y + py, z + pz); P.geo('body', g, col, 0.04, 0); };
+    bl(0.06, 1.15, 0.8, 1, 0, 0.045, 0, 0xf4f1ea); bl(0.045, 1, 0.95, 1, 0, 0.1, 0.035, 0xf7f4ee);
+    for (const s of [-1, 1]) { bl(0.018, 1.4, 0.6, 0.8, s * 0.045, 0.125, 0.03, 0xefe9e0); bl(0.006, 1, 1, 1, s * 0.017, 0.105, 0.077, 0x1a1a1a); }
+    bl(0.008, 1.2, 0.9, 1, 0, 0.09, 0.08, 0xf2b8c6); }
+}
+function carHeroTex(M, lo) {                                             // the pictures: front (grille, headlights, fog lamps, the plate, a butterfly), back (tail lights, plate, reflectors), hood (butterflies)
+  const mk = (w, h) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; return cv; };   /* (a fresh canvas for each: Safari) */
+  const D2 = 180 / Math.PI, out = {};
+  // ---- the front: angle round a post at z 1.30 (198° across), height 0.25..1.05 m
+  { const W = lo ? 1024 : 2048, H = lo ? 256 : 512, cv = mk(W, H), c = cv.getContext('2d'), ZC = 1.30, Y0 = 0.25, YH = 0.8;
+    const X = (x, z) => (Math.atan2(x, z - ZC) * D2 / 198 + 0.5) * W, Y = y => (1 - (y - Y0) / YH) * H;
+    const pt = (q, sx) => q[0] === 'f' ? [X(sx * q[1], M.frontZ(q[1], q[2])), Y(q[2])] : [X(sx * M.sideX(q[1], q[2]), q[1]), Y(q[2])];
+    const pxu = (x, y) => W / 198 * D2 / Math.hypot(x, M.frontZ(x, y) - ZC), pxv = H / YH;
+    const at = (x, y) => { c.setTransform(1, 0, 0, 1, 0, 0); const z = M.frontZ(x, y); c.translate(X(x, z), Y(y)); c.scale(pxu(x, y), pxv); };   // (metres, y down, at that spot)
+    const path = (pts, sx) => { c.setTransform(1, 0, 0, 1, 0, 0); c.beginPath(); const P = pts.map(q => pt(q, sx)); c.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) c.lineTo(P[i][0], P[i][1]); c.closePath(); };
+    const poly = (pts, sx) => pts.map(q => pt(q, sx)), fillP = (P, col) => { c.setTransform(1, 0, 0, 1, 0, 0); c.beginPath(); c.moveTo(P[0][0], P[0][1]); for (const p of P) c.lineTo(p[0], p[1]); c.closePath(); if (col) { c.fillStyle = col; c.fill(); } };
+    const both = pts => [...poly(pts, 1), ...poly(pts.slice(1, -1).reverse(), -1)];    // (a shape across the middle: the +x half out, the -x half back)
+    const hex = (P, r, line, w) => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const p of P) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+      const dx = r * 1.732, dy = r * 1.5; c.strokeStyle = line; c.lineWidth = w;
+      for (let j = 0, yy = y0 - r; yy < y1 + r; j++, yy += dy) for (let xx = x0 - r + (j % 2) * dx / 2; xx < x1 + r; xx += dx) { c.beginPath(); for (let k = 0; k < 6; k++) { const a = Math.PI / 6 + k * Math.PI / 3; c.lineTo(xx + Math.cos(a) * r * 0.84, yy + Math.sin(a) * r * 0.84); } c.closePath(); c.stroke(); } return [x0, y0, x1, y1]; };
+    // the grille: one dark band right across under the hood's edge, between the headlights: honeycomb either side of the chrome V, glossy black inside it
+    { const G = both([['f', 0, 0.919], ['f', 0.3, 0.916], ['f', 0.6, 0.906], ['f', 0.58, 0.85], ['f', 0.545, 0.81], ['f', 0.24, 0.7], ['f', 0.15, 0.638], ['f', 0.07, 0.61], ['f', 0, 0.605]]);
+      fillP(G, '#0b0c0e'); c.save(); c.clip(); const bb = hex(G, pxv * 0.0175, '#3b3f45', Math.max(1, pxv * 0.0045));
+      const g = c.createLinearGradient(0, bb[1], 0, bb[3]); g.addColorStop(0, 'rgba(0,0,0,.55)'); g.addColorStop(0.4, 'rgba(0,0,0,.1)'); g.addColorStop(1, 'rgba(0,0,0,.35)'); c.fillStyle = g; c.fillRect(bb[0], bb[1], bb[2] - bb[0], bb[3] - bb[1]); c.restore();
+      const T = both([['f', 0, 0.916], ['f', 0.33, 0.912], ['f', 0.2, 0.745], ['f', 0.12, 0.655], ['f', 0, 0.64]]); fillP(T, '#08090a'); c.save(); c.clip();
+      c.strokeStyle = 'rgba(70,74,80,.55)'; c.lineWidth = Math.max(1, pxv * 0.003); for (let yy = 0.66; yy < 0.92; yy += 0.016) { const L = pt(['f', 0.4, yy], -1), Rr = pt(['f', 0.4, yy], 1); c.beginPath(); c.moveTo(L[0], L[1]); c.lineTo(Rr[0], Rr[1]); c.stroke(); }
+      const g2 = c.createLinearGradient(0, pt(['f', 0, 0.916], 1)[1], 0, pt(['f', 0, 0.65], 1)[1]); g2.addColorStop(0, 'rgba(120,128,138,.35)'); g2.addColorStop(0.5, 'rgba(0,0,0,0)'); c.fillStyle = g2; c.fillRect(0, 0, W, H); c.restore(); }
+    // the lower bumper: black right across, a wide intake (two slats), round fog lamps in black pods at the corners; the plate sits on top of it
+    { fillP(both([['f', 0, 0.536], ['f', 0.3, 0.531], ['f', 0.5, 0.512], ['f', 0.6, 0.498], ['f', 0.7, 0.515], ['f', 0.78, 0.49], ['f', 0.81, 0.42], ['f', 0.8, 0.3], ['f', 0.4, 0.29], ['f', 0, 0.29]]), '#111214');
+      fillP(both([['f', 0, 0.468], ['f', 0.42, 0.462], ['f', 0.53, 0.43], ['f', 0.56, 0.37], ['f', 0.5, 0.345], ['f', 0, 0.342]]), '#060607');
+      c.strokeStyle = '#2b2d31'; c.lineWidth = pxv * 0.007; for (const yy of [0.39, 0.425]) { const L = pt(['f', 0.5, yy], -1), Rr = pt(['f', 0.5, yy], 1); c.beginPath(); c.moveTo(L[0], L[1]); c.lineTo(Rr[0], Rr[1]); c.stroke(); }
+      c.strokeStyle = 'rgba(150,20,30,.9)'; c.lineWidth = pxv * 0.006; { const P = both([['f', 0, 0.54], ['f', 0.3, 0.535], ['f', 0.5, 0.516], ['f', 0.6, 0.502], ['f', 0.7, 0.519], ['f', 0.78, 0.494]]); c.setTransform(1, 0, 0, 1, 0, 0); c.beginPath(); P.slice(0, 6).reverse().forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); P.slice(6).forEach(p => c.lineTo(p[0], p[1])); c.stroke(); }
+      for (const sx of [1, -1]) { at(sx * 0.69, 0.42); c.fillStyle = '#0a0a0b'; c.beginPath(); c.ellipse(0, 0, 0.085, 0.07, 0, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#26282c'; c.lineWidth = 0.006; c.stroke(); } }
+    // the headlights: slim and swept, from the grille's corner up along the hood's edge and back round the fender. Black housing, a chrome reflector band, a chrome "<" (the boomerang light), two small projectors, an LED strip along the bottom, an amber marker at the back (off: it's parked)
+    const HL = [['f', 0.552, 0.828], ['f', 0.6, 0.896], ['f', 0.72, 0.928], ['f', 0.82, 0.944], ['s', 1.985, 0.955], ['s', 1.88, 0.962], ['s', 1.78, 0.962], ['s', 1.7, 0.957],
+      ['s', 1.73, 0.93], ['s', 1.83, 0.893], ['s', 1.93, 0.855], ['s', 2.0, 0.83], ['f', 0.82, 0.806], ['f', 0.72, 0.792], ['f', 0.63, 0.797], ['f', 0.58, 0.808]];
+    for (const sx of [1, -1]) {
+      const P = poly(HL, sx); fillP(P); const g = c.createLinearGradient(0, Y(0.95), 0, Y(0.83)); g.addColorStop(0, '#9aa4ae'); g.addColorStop(0.6, '#5d666f'); g.addColorStop(1, '#3a4148'); c.fillStyle = g; c.fill(); c.save(); c.clip();
+      fillP(poly([['f', 0.58, 0.88], ['f', 0.72, 0.93], ['f', 0.82, 0.946], ['s', 1.985, 0.958], ['s', 1.8, 0.966], ['s', 1.8, 0.93], ['s', 1.95, 0.9], ['f', 0.82, 0.875], ['f', 0.72, 0.862], ['f', 0.62, 0.855]], sx));
+      const g2 = c.createLinearGradient(0, Y(0.95), 0, Y(0.87)); g2.addColorStop(0, '#f1f4f6'); g2.addColorStop(0.5, '#c2cad1'); g2.addColorStop(1, '#8c959e'); c.fillStyle = g2; c.fill();
+      for (const [bx, by] of [[0.695, 0.858], [0.785, 0.874]]) { at(sx * bx, by); const rg = c.createRadialGradient(0, 0, 0.004, 0, 0, 0.026); rg.addColorStop(0, '#6a737d'); rg.addColorStop(0.5, '#3a4148'); rg.addColorStop(0.72, '#c9d0d6'); rg.addColorStop(1, '#8b949d'); c.fillStyle = rg; c.beginPath(); c.arc(0, 0, 0.026, 0, Math.PI * 2); c.fill(); }
+      c.setTransform(1, 0, 0, 1, 0, 0); c.strokeStyle = '#dfe5ea'; c.lineWidth = pxv * 0.006; c.lineJoin = 'miter'; c.beginPath(); poly([['f', 0.635, 0.858], ['f', 0.588, 0.828], ['f', 0.635, 0.812]], sx).forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
+      c.lineWidth = pxv * 0.0055; c.strokeStyle = '#f4f7fa'; c.beginPath(); poly([['f', 0.62, 0.808], ['f', 0.72, 0.801], ['f', 0.82, 0.814], ['s', 1.985, 0.84], ['s', 1.9, 0.864]], sx).forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
+      fillP(poly([['s', 1.7, 0.958], ['s', 1.79, 0.964], ['s', 1.8, 0.915], ['s', 1.735, 0.934]], sx), '#ee8a1a'); c.restore();
+      fillP(P); c.strokeStyle = 'rgba(6,6,8,.95)'; c.lineWidth = pxv * 0.006; c.stroke(); c.strokeStyle = 'rgba(230,236,242,.5)'; c.lineWidth = pxv * 0.002; c.stroke();
+    }
+    // the plate, and the butterfly decal on the bumper under the driver's side headlight
+    at(0, 0.465); carHeroPlate(c, false);
+    at(0.665, 0.66); carHeroBfly(c, 0.13, 0.35, { line: '#7c8188', edge: 'rgba(30,32,36,.75)', fill: 'rgba(60,64,70,.22)', lw: 0.045 });
+    c.setTransform(1, 0, 0, 1, 0, 0); out.front = cv; }
+  // ---- the back: angle round a post at z -1.45, height 0.25..1.25 m
+  { const W = lo ? 1024 : 2048, H = lo ? 256 : 512, cv = mk(W, H), c = cv.getContext('2d'), ZC = -1.45, Y0 = 0.25, YH = 1.0;
+    const X = (x, z) => (Math.atan2(x, -(z - ZC)) * D2 / 198 + 0.5) * W, Y = y => (1 - (y - Y0) / YH) * H;
+    const pt = (q, sx) => q[0] === 'r' ? [X(sx * q[1], M.rearZ(q[1], q[2])), Y(q[2])] : [X(sx * M.sideX(q[1], q[2]), q[1]), Y(q[2])];
+    const pxu = (x, y) => W / 198 * D2 / Math.hypot(x, M.rearZ(x, y) - ZC), pxv = H / YH;
+    const at = (x, y) => { c.setTransform(1, 0, 0, 1, 0, 0); c.translate(X(x, M.rearZ(x, y)), Y(y)); c.scale(pxu(x, y), pxv); };
+    const path = (pts, sx) => { c.setTransform(1, 0, 0, 1, 0, 0); c.beginPath(); const P = pts.map(q => pt(q, sx)); c.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) c.lineTo(P[i][0], P[i][1]); c.closePath(); };
+    const line = (pts, sx, w, col) => { c.setTransform(1, 0, 0, 1, 0, 0); c.strokeStyle = col; c.lineWidth = w; c.beginPath(); pts.forEach((q, i) => { const p = pt(q, sx); if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }); c.stroke(); };
+    // the hatch's shut lines, the plate recess
+    for (const sx of [1, -1]) line([['r', 0.0, 0.602], ['r', 0.6, 0.602], ['r', 0.63, 0.62], ['r', 0.64, 0.75], ['r', 0.62, 0.93]], sx, pxv * 0.005, 'rgba(25,4,8,.85)');
+    for (const sx of [1, -1]) { line([['r', 0.0, 0.875], ['r', 0.3, 0.872], ['r', 0.5, 0.9]], sx, pxv * 0.006, 'rgba(255,210,215,.28)'); line([['r', 0.0, 0.866], ['r', 0.3, 0.863], ['r', 0.5, 0.89]], sx, pxv * 0.006, 'rgba(40,4,10,.35)'); }   /* (the hatch's crease) */
+    at(0, 0.757); c.fillStyle = 'rgba(70,6,14,.55)'; c.beginPath(); c.rect(-0.19, -0.098, 0.38, 0.196); c.fill(); c.strokeStyle = 'rgba(30,2,6,.6)'; c.lineWidth = 0.004; c.stroke();
+    // the tail lights: wrapping from the hatch round onto the sides, a bright red top, a chrome strip, a darker red below, a clear reversing lamp at the inner end
+    const TL = [['r', 0.36, 1.06], ['r', 0.48, 1.105], ['r', 0.62, 1.125], ['r', 0.74, 1.13], ['s', -2.05, 1.135], ['s', -1.96, 1.15], ['s', -1.86, 1.16], ['s', -1.74, 1.16],
+      ['s', -1.78, 1.1], ['s', -1.88, 1.04], ['s', -1.98, 0.985], ['s', -2.09, 0.93], ['r', 0.77, 0.915], ['r', 0.66, 0.92], ['r', 0.54, 0.95], ['r', 0.42, 1.0]];
+    const TM = [['r', 0.39, 1.035], ['r', 0.56, 1.04], ['r', 0.74, 1.04], ['s', -2.06, 1.05], ['s', -1.95, 1.07], ['s', -1.82, 1.1]];
+    for (const sx of [1, -1]) {
+      path(TL, sx); c.fillStyle = '#6a0710'; c.fill(); c.save(); c.clip();
+      c.setTransform(1, 0, 0, 1, 0, 0); c.beginPath(); TL.slice(0, 8).forEach((q, i) => { const p = pt(q, sx); if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }); TM.slice().reverse().forEach(q => { const p = pt(q, sx); c.lineTo(p[0], p[1]); }); c.closePath();
+      const p0 = pt(TL[0], sx), p1 = pt(TL[7], sx), g = c.createLinearGradient(p0[0], 0, p1[0], 0); g.addColorStop(0, '#d0141f'); g.addColorStop(0.5, '#e8303a'); g.addColorStop(1, '#b30f1b'); c.fillStyle = g; c.fill();
+      line(TM, sx, pxv * 0.009, '#e6e9ec');
+      at(sx * 0.47, 0.985); c.fillStyle = '#d9dbde'; c.beginPath(); c.rect(-0.07, -0.022, 0.12, 0.034); c.fill(); c.fillStyle = '#9fa4aa'; c.fillRect(-0.07, 0.006, 0.12, 0.006);
+      c.restore(); c.setTransform(1, 0, 0, 1, 0, 0); path(TL, sx); c.strokeStyle = 'rgba(20,2,4,.85)'; c.lineWidth = pxv * 0.006; c.stroke();
+      at(sx * 0.66, 0.37); c.fillStyle = '#9a0b17'; c.beginPath(); c.rect(-0.06, -0.014, 0.12, 0.028); c.fill(); c.fillStyle = 'rgba(255,120,120,.35)'; c.fillRect(-0.055, -0.012, 0.11, 0.008);
+      for (const xs of [0.24, 0.5]) { at(sx * xs, 0.5); c.fillStyle = '#151517'; c.beginPath(); c.arc(0, 0, 0.012, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#3a3c40'; c.lineWidth = 0.003; c.stroke(); }
+    }
+    at(0, 0.755); carHeroPlate(c, true);
+    c.setTransform(1, 0, 0, 1, 0, 0); out.rear = cv; }
+  // ---- the hood, from above: x -1..1, z 0.8..2.3. Silver butterfly decals: a big one near the grille, little ones scattered
+  { const W = lo ? 512 : 1024, H = lo ? 384 : 768, cv = mk(W, H), c = cv.getContext('2d');
+    const at = (x, z) => { c.setTransform(1, 0, 0, 1, 0, 0); c.translate((x + 1) / 2 * W, (1 - (z - 0.8) / 1.5) * H); c.scale(W / 2, H / 1.5); };
+    const silver = { line: '#d4d8de', edge: 'rgba(70,74,80,.75)', fill: 'rgba(205,210,216,.18)', lw: 0.035 };
+    at(0.16, 1.86); carHeroBfly(c, 0.25, Math.PI + 0.35, silver);
+    for (const [x, z, s, r] of [[-0.7, 1.7, 0.07, 2.7], [-0.43, 1.77, 0.075, 3.5], [-0.27, 1.55, 0.06, 2.9], [0.27, 1.6, 0.065, 3.6], [0.03, 1.4, 0.05, 3.0]]) { at(x, z); carHeroBfly(c, s, r, silver); }
+    c.setTransform(1, 0, 0, 1, 0, 0); out.top = cv; }
+  return out;
+}
+function carHeroEnvTex() {                                               // a pretend world for the paint to reflect: sky, a sun, clouds, the street's trees and houses, the asphalt
+  const W = 512, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+  let g = c.createLinearGradient(0, 0, 0, H / 2); g.addColorStop(0, '#5f8fc8'); g.addColorStop(0.7, '#a9c6e6'); g.addColorStop(1, '#e8eef3'); c.fillStyle = g; c.fillRect(0, 0, W, H / 2);
+  g = c.createLinearGradient(0, H / 2, 0, H); g.addColorStop(0, '#7d7c78'); g.addColorStop(0.3, '#5a5a5b'); g.addColorStop(1, '#3a3a3c'); c.fillStyle = g; c.fillRect(0, H / 2, W, H / 2);
+  let sd = 7; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 14; i++) { const x = rn() * W, y = 20 + rn() * 70, r = 14 + rn() * 26; const rg = c.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, 'rgba(255,255,255,.75)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = rg; c.fillRect(x - r, y - r, 2 * r, 2 * r); }
+  { const x = W * 0.62, y = H * 0.17, rg = c.createRadialGradient(x, y, 0, x, y, 40); rg.addColorStop(0, 'rgba(255,255,250,1)'); rg.addColorStop(0.15, 'rgba(255,252,235,.9)'); rg.addColorStop(1, 'rgba(255,250,230,0)'); c.fillStyle = rg; c.fillRect(x - 40, y - 40, 80, 80); }
+  for (let x = 0; x < W; x += 6 + rn() * 10) { const h = 6 + rn() * 22, w = 8 + rn() * 26, col = rn() < 0.55 ? ['#3d5a36', '#4a6a3e', '#5a4636'][(rn() * 3) | 0] : ['#b8a58f', '#8f5a44', '#d8d2c4'][(rn() * 3) | 0];
+    c.fillStyle = col; c.globalAlpha = 0.45; if (col[1] === '3' || col[1] === '4' || col === '#5a4636') { c.beginPath(); c.ellipse(x, H / 2 - h * 0.5, w * 0.5, h * 0.7, 0, 0, Math.PI * 2); c.fill(); } else c.fillRect(x, H / 2 - h, w, h); }
+  c.globalAlpha = 1; c.fillStyle = 'rgba(80,120,60,.35)'; c.fillRect(0, H / 2 + 4, W * 0.3, 18); c.fillRect(W * 0.55, H / 2 + 6, W * 0.25, 16);
+  return cv;
+}
+/* (end of CAR2_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
