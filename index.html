@@ -10757,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-13 11:12';                                              // stamped when the site is published
+const BUILD = '2026-10-13 17:07';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -42327,6 +42327,1048 @@ function tcInstall() {
 }
 tcInstall();
 /* (end of TAIL_V1) */
+/* DRS_V1 */
+/* =====================================================================
+   DRS_V1 (2026-10-13): dresses, skirts, capes and outfit neck trims.
+   SKIRTS: one shared skirt builder (drsTier) on FIT_V1's fitted shape. Every skirt is sewn to the fitted top's own hem
+     (sh.back, the FIT hem ring) with a sash over the seam, so there is one waistline; each column hangs from its own hem
+     point and flares along that point's outward normal (her oval, not a lampshade), is pushed clear of her body and back
+     legs, covers her rump with a slit for her tail, stops at the front-leg cut-out (no flaps) and is open underneath; the
+     hem sits at about y 0.20-0.30 so her paws show. A skirt is its own skinned mesh (drsSkin) bound to her body, her two
+     back legs and a sway bone, so the hem follows her back legs and has a small spring sway (her speed, turns, jumps and
+     landings); clones made with .clone(true) find and bind their own body and legs; on a card it draws in its rest pose.
+     It is baked into the item's geometry set (G.drsM / drsS / drsL), so CK5B colourways dye it with the rest.
+     gown (two tiers), evDress (swing skirt, navy waist band), fdApron (apron bib and panels, pink bow, ruffle skirt),
+     fdStrawDress (bubble skirt, bigger seeds), tutu (three flat tulle discs all round), fanRobe (one long robe skirt, no
+     flaps), fanMermaid (scallop scales, a fin peplum), fanCoat (its coat tails swing now).
+   CAPES: the sheet is re-draped (drsCapeAt, in place of ck5CapeAt for every cape shape): its top edge is gathered round
+     her neck at the collar plane and closes at her throat, it falls over her shoulders and down her flanks to elbow height,
+     longer over her rump, with soft folds; the old chain across her chest is gone and the brooch is moved to her throat
+     on a gathered neck band. The sheet ripples as before (ckCapeStep). evDenim / popFurCoat get a throat fastening.
+   NECK TRIMS: fanCoat, fanArmour, seaSilkJacket and the gown's gold neck rolls are half as thick.
+   How it plugs in: drsInstall() (the one guarded call below) chains runtime wrappers onto ckPacksRun (drsReg: new builds
+   for the dresses and wrapped builds for the capes, after FIT_V1 and TAIL_V1 have registered), ckInstance (an outfit's
+   skirt mesh), closetDress (tags her body and back legs), ck5CapeAt, ckCapeGeo and ckCapeClasp. No lights.
+   ===================================================================== */
+function drsInstall() {
+  if (drsInstall.done) return; drsInstall.done = true;
+  const ok = f => typeof f === 'function';
+  try { CK_CAPE.cols = 24; CK_CAPE.rows = 16; } catch (e) { drsErr(e); }   /* (a finer sheet: it folds round her neck now) */
+  try { const T = ck5CapeShapes(); if (!T.drsPlain) T.drsPlain = {}; } catch (e) { drsErr(e); }
+  if (ok(ck5CapeAt)) { const f0 = ck5CapeAt; ck5CapeAt = function (sh, u, v, out) { try { return drsCapeAt(sh, u, v, out); } catch (e) { drsErr(e); return f0(sh, u, v, out); } }; }
+  if (ok(ckCapeGeo)) { const f0 = ckCapeGeo; ckCapeGeo = function (spec) { return f0(spec && !spec.shape ? Object.assign({}, spec, { shape: 'drsPlain' }) : spec); }; }
+  if (ok(ckCapeClasp)) { const f0 = ckCapeClasp; ckCapeClasp = function (sheet, kind) { try { return drsCapeClasp(sheet, kind); } catch (e) { drsErr(e); return f0(sheet, kind); } }; }
+  if (ok(ckInstance)) { const f0 = ckInstance; ckInstance = function (it) { const inst = f0.apply(this, arguments); try { if (it && it.slot === 'outfit' && inst) drsSkirtInst(it, inst); } catch (e) { drsErr(e); } return inst; }; }
+  if (ok(closetDress)) { const f0 = closetDress; closetDress = function (R) { try { drsTag(R); } catch (e) {} return f0.apply(this, arguments); }; }
+  if (ok(ckPacksRun)) { const f0 = ckPacksRun; ckPacksRun = function () { const r = f0.apply(this, arguments); drsReg(); return r; }; }
+  try { if (ckState.S) { drsReg(); drsRedress(); } } catch (e) { drsErr(e); }
+}
+function drsErr(e) { if (!drsErr.n) { drsErr.n = 1; console.error(e); } }
+function drsNow() { try { return clock; } catch (e) { return performance.now() / 1000; } }
+function drsSs(a, b, x) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+function drsTag(R) {                                                     // her body and back legs, tagged (numbers only: a clone copies them), so a skirt finds what to follow
+  if (!R || !R.body || !R.legs) return; R.body.userData.drsBody = 1;
+  R.legs.forEach((L, i) => { if (L && L.userData) L.userData.drsLeg = i; });
+}
+function drsRedress() {                                                  // (only if she was dressed before this ran) her outfit and cape again, the new way
+  for (const R of [walk && walk.rig, typeof CK !== 'undefined' && CK.rig]) { try { if (!R || !R.ck) continue; let any = false;
+    for (const s of ['outfit', 'cape']) if (R.ck[s]) { R.ck[s].id = '#'; any = true; }
+    if (any) closetDress(R, R === walk.rig ? ckState().outfit : CK.prev); } catch (e) {} }
+}
+function drsReg() {                                                      // (ckPacksRun, after every pack, FIT_V1 and TAIL_V1) the new builds
+  if (drsReg.done) return; drsReg.done = true;
+  try {
+    const I = CK_BY_ID, put = (id, fn) => { const it = I[id]; if (!it || !it.build) return; if (it.fitB0) it.fitB0 = fn; else it.build = fn; drsFresh(it); };
+    put('gown', B => drsGown(B)); put('evDress', B => drsEvDress(B)); put('fdApron', B => drsApron(B)); put('fdStrawDress', B => drsStraw(B));
+    put('tutu', B => drsTutu(B)); put('fanRobe', B => drsRobe(B)); put('fanMermaid', B => drsMermaid(B));
+    if (I.fanRobe && I.fanRobe.fitP) I.fanRobe.fitP.skirt = 0;          /* (the robe's own skirt, below: no side flaps) */
+    if (I.fanCoat && I.fanCoat.fitP) { I.fanCoat.fitP.tails = 0; const it = I.fanCoat, b0 = it.fitB0 || it.build, nb = B => drsCoatTails(B, drsThinNeck(B, b0)); if (it.fitB0) it.fitB0 = nb; else it.build = nb; drsFresh(it); }
+    for (const id of ['fanArmour', 'seaSilkJacket']) { const it = I[id]; if (!it || !it.build) continue; const b0 = it.fitB0 || it.build, nb = B => drsThinNeck(B, b0); if (it.fitB0) it.fitB0 = nb; else it.build = nb; drsFresh(it); }
+    for (const it of CK_ITEMS) { if (it.slot !== 'cape' || !it.build || it.drsB0) continue; const b0 = it.drsB0 = it.build; it.build = B => { b0(B); drsCapeFix(B, it); }; drsFresh(it); }
+    const R = ck5bRules();
+    for (const r of drsRules()) if (!R.some(q => q.a === r.a && q.b === r.b)) R.push(r);
+  } catch (e) { drsErr(e); }
+}
+function drsFresh(it) { delete it.geo; delete it.ck5bV; delete it.ck5bP; delete it.ck5bH; delete it.ck5bVs; if (it.fitSt !== undefined) delete it.fitSt; }
+function drsRules() {                                                    // a bag or cup at her side would vanish in a skirt
+  const L = [], why = { evTote: 'the skirt would hide the bag at her side', evChainBag: 'the skirt would hide the bag at her side', popTumbler: 'the skirt would hide the cup at her side' };
+  for (const a of ['evDress', 'fdApron', 'fdStrawDress', 'fanRobe']) for (const b of ['evTote', 'evChainBag', 'popTumbler']) L.push({ a, b, why: why[b] });
+  return L;
+}
+
+/* ---------- capes: gathered round her neck, closed at her throat, over her shoulders and down her flanks ---------- */
+function drsCapeSp() {                                                   // her spine for the drape: the collar plane's middle back to her rump
+  return drsCapeSp.C || (drsCapeSp.C = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0.575, 0.279), new THREE.Vector3(0, 0.5, 0.17), new THREE.Vector3(0, 0.45, 0.02), new THREE.Vector3(0, 0.43, -0.15), new THREE.Vector3(0, 0.43, -0.33)], false, 'centripetal'));
+}
+function drsSect(s, th, m, out) {                                        // a point m out from her: spine position s (0 the collar plane .. 1 her rump), th round it (0 up, ±π under); out [x, y, z, dx, dy, dz]
+  const C = drsSect.c || (drsSect.c = new THREE.Vector3()); drsCapeSp().getPoint(Math.max(0, Math.min(1, s)), C);
+  const a0 = 0.5354, al = a0 + (Math.PI / 2 - a0) * drsSs(0, 0.4, s), uy = Math.sin(al), uz = -Math.cos(al);   /* (the collar plane leans back; further down, upright sections) */
+  const d = [Math.sin(th), Math.cos(th) * uy, Math.cos(th) * uz], o = [C.x, C.y, C.z], r = fitHit(o, d, m, Math.min(0.6, s / 0.05 * 0.3), 0.12);
+  out[0] = o[0] + d[0] * r; out[1] = o[1] + d[1] * r; out[2] = o[2] + d[2] * r; out[3] = d[0]; out[4] = d[1]; out[5] = d[2]; return out;
+}
+function drsCapeAt(sh, u, v, out) {                                      // (in place of ck5CapeAt) one point of a cape: u -1..1 across (±1 at her throat), v 0 at the neck .. 1 at the hem
+  const L = sh && sh.len ? sh.len(u) : 1, sd = sh && sh.side ? sh.side(v, u) : 1, au = Math.abs(u);
+  const s = v * (1 - 0.3 * Math.pow(au, 1.6)) * L, sb = Math.min(1, s), b = drsSs(0, 0.24, v);
+  const T0 = Math.PI - 0.2, Ts = (1.68 + 0.5 * drsSs(0.22, 0.55, sb)) * sd, th = u * (T0 + (Ts - T0) * b);
+  const m = 0.034 + (0.022 + 0.01 * v - 0.034) * drsSs(0, 0.2, v);
+  drsSect(sb, th, m, out);
+  const fold = 0.0065 * drsSs(0.1, 0.6, v) * Math.sin(u * Math.PI * 4.5 + 0.6) + 0.012 * v * au * au;   /* (soft folds, and the sides fall a little away from her) */
+  out[0] += out[3] * fold; out[1] += out[4] * fold; out[2] += out[5] * fold;
+  if (s > 1) { const e = (s - 1) * 0.5; out[2] -= e * 0.75; out[1] -= e * 0.6; out[0] *= 1 + (s - 1) * ((sh && sh.flare) || 0.6); }   /* (past her rump: a train falls back and down) */
+  return out;
+}
+function drsThroat() {                                                   // where a cape closes: at her throat, on the collar plane, a touch out over a roll neck
+  if (drsThroat.T) return drsThroat.T; const q = drsSect(0, Math.PI, 0.04, [0, 0, 0, 0, 0, 0]);
+  return (drsThroat.T = { p: new THREE.Vector3(q[0], q[1], q[2]), n: new THREE.Vector3(q[3], q[4], q[5]) });
+}
+function drsDeep(hex) { const c = new THREE.Color(hex); c.multiplyScalar(0.85); return c.getHex(); }
+function drsNeckBand(r, col, h) {                                        // the cape's gathered top edge: a soft cord round the back of her neck to the clasp at her throat
+  const q = [0, 0, 0, 0, 0, 0], pts = [], T = drsThroat();
+  pts.push(T.p.clone().addScaledVector(new THREE.Vector3(-1, 0, 0), 0.004));
+  for (let i = 0; i <= 36; i++) { drsCapeAt(null, -1 + 2 * i / 36, 0, q); pts.push(new THREE.Vector3(q[0] + q[3] * (h || 0.006), q[1] + q[4] * (h || 0.006), q[2] + q[5] * (h || 0.006))); }
+  pts.push(T.p.clone().addScaledVector(new THREE.Vector3(1, 0, 0), 0.004));
+  const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 120, r, 6, false), a = g.attributes.position, cu = g.parameters.path, c = new THREE.Vector3();
+  for (let i = 0; i <= 120; i++) { cu.getPointAt(i / 120, c); const k = 1 + 0.22 * Math.sin(i * 1.7); for (let j = 0; j <= 6; j++) { const q = i * 7 + j; a.setXYZ(q, c.x + (a.getX(q) - c.x) * k, c.y + (a.getY(q) - c.y) * k, c.z + (a.getZ(q) - c.z) * k); } }   /* (gathered) */
+  g.computeVertexNormals(); return g;
+}
+function drsClaspM(from) {                                               // a brooch moved from the old chest clasp to her throat, turned to face forward
+  const T = drsThroat(), f = new THREE.Vector3().fromArray(from);
+  return new THREE.Matrix4().makeTranslation(T.p.x, T.p.y + 0.002, T.p.z + 0.006).multiply(new THREE.Matrix4().makeRotationX(0.55)).multiply(new THREE.Matrix4().makeTranslation(-f.x, -f.y, -f.z));
+}
+function drsCapeFix(B, it) {                                             // (a cape's build, after) no chain across her chest; the brooch at her throat on a gathered band
+  const box = new THREE.Box3(), c = new THREE.Vector3(), s = new THREE.Vector3(), OLD = new THREE.Vector3(0, 0.45, 0.405); let chain = null, moved = 0;
+  const Mv = drsClaspM([0, 0.45, 0.405]);
+  for (const k of ['m', 's', 'g', 'l']) B.parts[k] = B.parts[k].filter(part => {
+    const g = part[0]; if (!g || !g.attributes || !g.attributes.position) return true; if (!g.boundingBox) g.computeBoundingBox(); box.copy(g.boundingBox).applyMatrix4(part[2]); box.getCenter(c); box.getSize(s);
+    if (Math.abs(c.x) < 0.012 && c.y > 0.43 && c.y < 0.51 && c.z > 0.27 && c.z < 0.33 && s.x > 0.33 && s.x < 0.45 && s.y < 0.08) { if (chain == null) chain = part[1]; return false; }   /* (the chain across her chest) */
+    if (c.distanceTo(OLD) < 0.05 && Math.max(s.x, s.y, s.z) < 0.08) { part[2] = Mv.clone().multiply(part[2]); moved++; }   /* (the brooch and its bits) */
+    return true; });
+  if (it.id === 'evDenim' || it.id === 'popFurCoat') drsCoatClasp(B, it.id);
+  else if (chain != null || moved) { let c = 0xf2c14a; try { if (B.cape && B.cape.col) c = drsDeep(B.cape.col(0, 0.06, 0)); } catch (e) {} B.s(drsNeckBand(0.0075), c); }   /* (the cape's own cloth, gathered: not a gold hoop) */
+  const p0 = B.post; if (B.cape) B.post = (G, it2) => { if (p0) p0(G, it2); drsCapePost(G); };
+}
+function drsCapePost(G) {                                                // a magic cape's brooch glow follows the brooch to her throat
+  const g = G && G.g, S = g && g.userData && g.userData.tw; if (!S) return; const M = drsClaspM([0, 0.45, 0.406]), v = new THREE.Vector3(), P = g.attributes.position.array;
+  for (let i = 0; i < S.n; i++) { if (S.md[i] !== 4) continue; const j = i * 3;
+    v.set(S.rest[j], S.rest[j + 1], S.rest[j + 2]).applyMatrix4(M); S.rest[j] = v.x; S.rest[j + 1] = v.y; S.rest[j + 2] = v.z; P[j] = v.x; P[j + 1] = v.y; P[j + 2] = v.z;
+    v.set(S.ctr[j], S.ctr[j + 1], S.ctr[j + 2]).applyMatrix4(M); S.ctr[j] = v.x; S.ctr[j + 1] = v.y; S.ctr[j + 2] = v.z; }
+  g.attributes.position.needsUpdate = true; g.computeBoundingSphere();
+}
+function drsCapeClasp(sheet, kind) {                                     // (in place of ckCapeClasp) a magic cape's brooch at her throat on a gathered band, added onto its sheet (still; a collar hides it)
+  const M = drsClaspM([0, 0.45, 0.406]), gold = 0xf2c14a, mid = drsThroat().p.toArray();
+  const C0 = sheet.attributes.color, band = C0 ? new THREE.Color(C0.getX(0), C0.getY(0), C0.getZ(0)).getHex() : gold, cc = drsDeep(band), parts = [[drsNeckBand(0.0075), new THREE.Matrix4(), cc]];
+  if (kind === 'firefly') parts.push([CKG.tor(0.017, 0.0038, 6, 20), M.clone().multiply(ckM4([0, 0.45, 0.406], [-0.35, 0, 0])), gold], [CKG.sph(0.015, 12, 9), M.clone().multiply(ckM4([0, 0.4495, 0.4065], [-0.35, 0, 0], [1, 1, 0.45])), 0x1f3a16]);
+  else parts.push([ckFlat(ckStarPts(0.03), 0.008), M.clone().multiply(ckM4([0, 0.45, 0.406], [-0.35, 0, 0])), gold]);
+  const n0 = sheet.attributes.position.count, P = Array.from(sheet.attributes.position.array), C = Array.from(sheet.attributes.color.array), I = Array.from(sheet.index.array), v = new THREE.Vector3(), c = new THREE.Color();
+  for (const [g, Mx, col] of parts) { const o = P.length / 3, p = g.attributes.position, ix = g.index; c.set(col);
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(Mx); P.push(v.x, v.y, v.z); C.push(c.r, c.g, c.b); }
+    for (let k = 0; k < (ix ? ix.count : p.count); k++) I.push(o + (ix ? ix.getX(k) : k)); g.dispose(); }
+  sheet.setAttribute('position', new THREE.BufferAttribute(new Float32Array(P), 3)); sheet.setAttribute('color', new THREE.BufferAttribute(new Float32Array(C), 3)); sheet.setIndex(I); sheet.deleteAttribute('normal'); sheet.computeVertexNormals();
+  sheet.userData.ck.clasp = { from: n0, rest: new Float32Array(P.slice(n0 * 3)), at: mid };
+}
+function drsCoatClasp(B, id) {                                           // the draped coats: fastened at her throat (a brass-buttoned sherpa tab; a short gold chain to a clasp)
+  const T = drsThroat(), o = id === 'evDenim' ? { m: 0.042, nd: 0.018, zb: -0.14, zbB: -0.03, f0: -2.05, f1: 2.05, cols: 44, rows: 18 } : { m: 0.036, nd: 0.014, zb: -0.2, zbB: -0.06, f0: -2.15, f1: 2.15, cols: 48, rows: 18 };
+  const sh = ck5bShell(o), a = sh.front[0], b = sh.front[sh.front.length - 1], c = T.p.clone().add(new THREE.Vector3(0, -0.004, 0.004));
+  if (id === 'evDenim') {
+    for (const e of [a, b]) { const pts = [e, e.clone().lerp(c, 0.5).add(new THREE.Vector3(0, -0.006, 0.012)), c]; B.m(ckFluff(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 20, 0.011, 6, false), 0.03, 4), 0xf3e9d6); }
+    B.s(CKG.cyl(0.011, 0.011, 0.006, 14), 0xc89a3a, [c.x, c.y, c.z + 0.008], [Math.PI / 2 - 0.5, 0, 0]);
+  } else {
+    B.parts.s = B.parts.s.filter(part => { const g = part[0]; if (!g || g.type !== 'TorusGeometry') return true; const p = new THREE.Vector3().setFromMatrixPosition(part[2]); return !(p.y < 0.4 && p.z > 0.33); });   /* (the old chain swag across her chest) */
+    for (const e of [a, b]) { const cu = new THREE.CatmullRomCurve3([e.clone(), e.clone().lerp(c, 0.5).add(new THREE.Vector3(0, -0.012, 0.016)), c]);
+      for (let i = 0; i <= 12; i++) { const p = cu.getPointAt(i / 12), tg = cu.getTangentAt(i / 12), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), tg), eu = new THREE.Euler().setFromQuaternion(q);
+        B.s(CKG.tor(0.0058, 0.0018, 5, 12), i % 2 ? 0xf2c14a : 0xc8901f, [p.x, p.y, p.z], [eu.x + (i % 2 ? Math.PI / 2 : 0), eu.y, eu.z], [1.4, 1, 1]); } }
+    B.s(CKG.sph(0.013, 12, 10), 0xf2c14a, [c.x, c.y, c.z + 0.006], null, [1, 1, 0.6]);
+  }
+}
+
+/* ---------- the skirt builder: hung from the fitted top's hem ---------- */
+function drsHem(sh, f) {                                                 // the fitted top's hem at angle f round her (0 over her rump, ±π under her): [point, normal]
+  const n = sh.cols, kf = (f - sh.f0) / (sh.f1 - sh.f0) * n, k0 = Math.max(0, Math.min(n - 1, Math.floor(kf))), w = Math.max(0, Math.min(1, kf - k0));
+  const p = sh.back[k0].clone().lerp(sh.back[k0 + 1], w), q = sh.backN[k0].clone().lerp(sh.backN[k0 + 1], w).normalize(); return [p, q];
+}
+function drsClear(x, y, z, m) {                                          // is (x, y, z) at least m clear of her (body and back legs)?
+  if (fitF(x, y, z, 0.6) < m) return false;
+  if (y < 0.44) for (const lx of [-0.1, 0.1]) { const d = Math.hypot(x - lx, z + 0.26); if (d < 0.064 + m) return false; }
+  return true;
+}
+function drsTier(o) {                                                    // one skirt tier: o.sh the top, o.fa how far round (each side), o.yH hem height, o.out(t) flare, o.col(t, f) colour; -> { g, t, hem }
+  const sh = o.sh, fa = o.fa || 2.32, R = o.rows || 12, NC = o.cols || 30, slT = o.slT == null ? 0.46 : o.slT, slB = o.slB == null ? 0.08 : o.slB, gap = o.gap || 0.004;
+  const out = o.out || (t => (o.flare || 0.08) * Math.pow(t, 1.3)), wav = o.wav || 0, nw = o.nw || 9, Lmin = o.Lmin || 0.05;
+  const panels = o.range ? [[-o.range[1], -o.range[0]], [o.range[0], o.range[1]]] : o.full ? [[-fa, fa]] : [[-fa, -1], [1, fa]], P = [], C = [], TT = [], I = [], hem = [], pts = [], OUT = [];
+  let pi = -1;
+  for (const [a, b] of panels) {
+    pi++; const base = P.length / 3, c = new THREE.Color(), PT = []; pts.push(PT);
+    for (let k = 0; k <= NC; k++) {
+      const g = k / NC; let push = 0; const col = [], CT = []; PT.push(CT);
+      for (let j = 0; j <= R; j++) {
+        const t = j / R, sl = slB + (slT - slB) * (1 - drsSs(0.2, 0.62, t));
+        const f = o.full || o.range ? a + (b - a) * g : a < 0 ? -fa + (fa - sl) * g : sl + (fa - sl) * g;
+        const [p0, n0] = drsHem(sh, f), hh = new THREE.Vector3(n0.x, 0, n0.z); if (hh.lengthSq() < 1e-6) hh.set(Math.sign(p0.x) || 1, 0, 0); hh.normalize();
+        const yH = (o.yH == null ? 0.26 : o.yH) + (o.yF || 0) * Math.pow(Math.abs(f) / fa, 3) + (o.hy ? o.hy(f) : 0), L = o.drop != null ? o.drop : Math.max(Lmin, p0.y - yH);
+        const tt = o.pt ? Math.pow(t, o.pt) : t, w = wav * Math.sin(f * nw + (o.ph || 0)) * Math.pow(t, 0.8);
+        const ft = o.range ? 1 : 1 - (o.ft == null ? 0.75 : o.ft) * drsSs(fa - 0.75, fa, Math.abs(f));   /* (toward the front edge it hugs her: no flaps by her front legs) */
+        const bx = p0.x + n0.x * gap, by = p0.y + n0.y * gap - L * tt - (o.dy || 0) + (o.wy || 0) * Math.sin(f * (o.nwy || 17) + (o.ph || 0)) * t, bz = p0.z + n0.z * gap, m = (o.m || 0.012) + 0.008 * t, base0 = (out(t) + w) * ft;
+        let x = bx + hh.x * (base0 + push), z = bz + hh.z * (base0 + push), n = 0;
+        while (!drsClear(x, by, z, m) && n++ < 60) { push += 0.003; x = bx + hh.x * (base0 + push); z = bz + hh.z * (base0 + push); }
+        P.push(x, by, z); TT.push(t); OUT.push(hh.x, hh.z); col.push(o.col ? o.col(t, f, j, k) : 0xffffff); CT.push({ p: new THREE.Vector3(x, by, z), n: hh.clone(), t, f });
+        if (j === R) hem.push([new THREE.Vector3(x, by, z), hh.clone(), f, pi]);
+      }
+      for (let j = 0; j <= R; j++) { c.set(col[j]); C.push(c.r, c.g, c.b); }
+    }
+    for (let k = 0; k < NC; k++) for (let j = 0; j < R; j++) { const p = base + k * (R + 1) + j, q = p + R + 1; I.push(p, q, p + 1, p + 1, q, q + 1); }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+  { const N = g.attributes.normal; let d = 0; for (let i = 0; i < N.count; i++) d += N.getX(i) * OUT[i * 2] + N.getZ(i) * OUT[i * 2 + 1];   /* (wound outward) */
+    if (d < 0) { const J = I.slice(); for (let k = 0; k < J.length; k += 3) { const q = J[k + 1]; J[k + 1] = J[k + 2]; J[k + 2] = q; } g.setIndex(J); g.computeVertexNormals(); } }
+  return { g: drsTwo(g, C, 0.8), t: Float32Array.from(TT.concat(TT)), hem, pts };
+}
+function drsTwo(g, C, dk) {                                              // a sheet drawn from both sides (the inside a little darker); colours as an attribute
+  const p = g.attributes.position, n = g.attributes.normal, cnt = p.count, idx = Array.from(g.index.array), P = new Float32Array(cnt * 6), N = new Float32Array(cnt * 6), CC = new Float32Array(cnt * 6);
+  P.set(p.array); P.set(p.array, cnt * 3); N.set(n.array); for (let i = 0; i < cnt * 3; i++) N[cnt * 3 + i] = -n.array[i];
+  CC.set(C); for (let i = 0; i < cnt * 3; i++) CC[cnt * 3 + i] = C[i] * (dk || 1);
+  const I = idx.slice(); for (let k = 0; k < idx.length; k += 3) I.push(idx[k] + cnt, idx[k + 2] + cnt, idx[k + 1] + cnt);
+  const o = new THREE.BufferGeometry(); o.setAttribute('position', new THREE.BufferAttribute(P, 3)); o.setAttribute('normal', new THREE.BufferAttribute(N, 3)); o.setAttribute('color', new THREE.BufferAttribute(CC, 3)); o.setIndex(I); g.dispose(); return o;
+}
+function drsFrill(hem, col, len, fl, waves, two) {                       // a gathered petticoat edge just under a tier's hem
+  const n = hem.length, P = [], C = [], T = [], I = [], c = new THREE.Color(col), rows = 2;
+  for (let i = 0; i < n; i++) { const [p, h] = hem[i], w = Math.sin(i * Math.PI * 2 / 6) * 0.004;
+    for (let j = 0; j <= rows; j++) { const t = j / rows; P.push(p.x + h.x * (0.002 + fl * t + w * t), p.y + 0.008 - len * t, p.z + h.z * (0.002 + fl * t + w * t)); C.push(c.r, c.g, c.b); T.push(1); } }
+  for (let i = 0; i < n - 1; i++) { if (hem[i][3] !== hem[i + 1][3]) continue; for (let j = 0; j < rows; j++) { const a = i * (rows + 1) + j, b = a + rows + 1; I.push(a, b, a + 1, a + 1, b, b + 1); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+  return { g: drsTwo(g, C, 0.85), t: Float32Array.from(T.concat(T)) };
+}
+function drsSash(sh, r, col, fa) {                                       // a band over the seam where the skirt is sewn on (round the whole hem, or ±fa)
+  const pts = [], full = !fa; for (let i = 0; i <= 64; i++) { const f = full ? -Math.PI + i / 64 * Math.PI * 2 : -fa + i / 64 * 2 * fa, [p, n] = drsHem(sh, f); pts.push(p.addScaledVector(n, r * 0.7 + 0.004)); }
+  if (full) pts.pop();
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, full, 'centripetal'), 128, r, 7, full);
+}
+function drsBow(S, k, sh, col, s, f) {                                   // a bow on the waist seam (two loops, a knot, two tails that hang into the skirt and swing with it)
+  const [p, n] = drsHem(sh, f || 0), up = n.clone(), q = p.clone().addScaledVector(n, 0.012), back = new THREE.Vector3(0, 0, -1), side = new THREE.Vector3(1, 0, 0);
+  const M = new THREE.Matrix4().makeBasis(side, new THREE.Vector3().crossVectors(up, side), up).setPosition(q);   /* (its +z out from her, +x across) */
+  for (const sx of [-1, 1]) S.add(k, CKG.tor(0.03 * s, 0.0095 * s, 7, 18), col, M.clone().multiply(ckM4([sx * 0.032 * s, 0.004, 0], [0, 0, sx * 0.25], [1, 0.55, 0.75])), 0);
+  S.add(k, CKG.sph(0.013 * s, 10, 8), col, M.clone().multiply(ckM4([0, 0, 0.004])), 0);
+  for (const sx of [-1, 1]) { const a = q.clone().add(new THREE.Vector3(sx * 0.008, -0.004, 0)), b = a.clone().add(new THREE.Vector3(sx * 0.018 * s, -0.05 * s, -0.012)).addScaledVector(n, 0.012), c2 = b.clone().add(new THREE.Vector3(sx * 0.01 * s, -0.04 * s, -0.008));
+    S.add(k, ckTaper([a.toArray(), b.toArray(), c2.toArray()], 0.0075 * s, 0.0105 * s, 16, 6), col, null, [0, 0.6, q.y]); }
+}
+function drsSet() {                                                      // a collector for a skirt's parts: S.add(bucket, geo, col, M, t), then S.post(B) bakes them as G.drsM / drsS / drsL
+  const S = { L: { m: [], s: [], l: [] } };
+  S.add = (k, g, col, M, t) => { S.L[k].push({ g, col, M: M || null, t: t == null ? 0 : t }); };
+  S.tier = (k, r) => { S.add(k, r.g, null, null, r.t); return r; };
+  S.post = B => { const p0 = B.post; B.post = (G, it) => { if (p0) p0(G, it); for (const k of ['m', 's', 'l']) { const g = drsMerge(S.L[k]); if (g) G['drs' + k.toUpperCase()] = g; } }; };
+  return S;
+}
+function drsMerge(list) {                                                // parts -> one indexed geometry: position, normal, colour, and her skin (body, back legs, sway) from each vertex's depth t
+  if (!list.length) return null;
+  let nv = 0, ni = 0; for (const q of list) { nv += q.g.attributes.position.count; ni += q.g.index ? q.g.index.count : q.g.attributes.position.count; }
+  const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3), C = new Float32Array(nv * 3), SI = new Float32Array(nv * 4), SW = new Float32Array(nv * 4), I = nv > 65000 ? new Uint32Array(ni) : new Uint16Array(ni);
+  const v = new THREE.Vector3(), nm = new THREE.Matrix3(), c = new THREE.Color(), w = [0, 0, 0, 0]; let vo = 0, io = 0;
+  for (const q of list) { const g = q.g, pa = g.attributes.position, na = g.attributes.normal, ca = g.attributes.color, n = pa.count, M = q.M, fn = typeof q.col === 'function';
+    if (!na) { g.computeVertexNormals(); }
+    const nn = g.attributes.normal; if (M) nm.getNormalMatrix(M); const flip = M && M.determinant() < 0; if (!fn && q.col != null && !ca) c.set(q.col);
+    for (let i = 0; i < n; i++) { const o = (vo + i) * 3;
+      v.fromBufferAttribute(pa, i); if (fn) c.set(q.col(v.x, v.y, v.z, i)); else if (ca && q.col == null) c.setRGB(ca.getX(i), ca.getY(i), ca.getZ(i));
+      C[o] = c.r; C[o + 1] = c.g; C[o + 2] = c.b; if (M) v.applyMatrix4(M); P[o] = v.x; P[o + 1] = v.y; P[o + 2] = v.z;
+      const t = typeof q.t === 'number' ? q.t : Array.isArray(q.t) ? q.t[0] + (q.t[1] - q.t[0]) * Math.max(0, Math.min(1, (q.t[2] - v.y) / 0.1)) : q.t[i];
+      drsSkinW(v.x, v.y, v.z, t, w); for (let k = 0; k < 4; k++) { SI[(vo + i) * 4 + k] = k; SW[(vo + i) * 4 + k] = w[k]; }
+      v.fromBufferAttribute(nn, i); if (M) v.applyMatrix3(nm).normalize(); N[o] = v.x; N[o + 1] = v.y; N[o + 2] = v.z; }
+    const cnt = g.index ? g.index.count : n;
+    for (let k = 0; k < cnt; k += 3) { const a = g.index ? g.index.getX(k) : k, b = g.index ? g.index.getX(k + 1) : k + 1, d = g.index ? g.index.getX(k + 2) : k + 2; I[io++] = a + vo; I[io++] = (flip ? d : b) + vo; I[io++] = (flip ? b : d) + vo; }
+    vo += n; g.dispose(); }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(P, 3)); out.setAttribute('normal', new THREE.BufferAttribute(N, 3)); out.setAttribute('color', new THREE.BufferAttribute(C, 3));
+  out.setAttribute('skinIndex', new THREE.BufferAttribute(SI, 4)); out.setAttribute('skinWeight', new THREE.BufferAttribute(SW, 4)); out.setIndex(new THREE.BufferAttribute(I, 1)); out.computeBoundingSphere(); return out;
+}
+function drsSkinW(x, y, z, t, w) {                                       // how much each bone moves a skirt vertex: body; left / right back leg (near it, lower down); the sway (lower down)
+  const tl = Math.pow(Math.max(0, t), 1.2); let wl = 0, wr = 0;
+  if (y < 0.46 && z < 0.06) { for (const lx of [-0.1, 0.1]) { const d = Math.hypot(x - lx, z + 0.26), k = 0.5 * tl * Math.max(0, Math.min(1, 1 - (d - 0.08) / 0.15)); if (lx < 0) wl = k; else wr = k; } }
+  let ws = 0.85 * Math.pow(Math.max(0, t), 1.5), s = wl + wr + ws; if (s > 0.95) { const k = 0.95 / s; wl *= k; wr *= k; ws *= k; s = 0.95; }
+  w[0] = 1 - s; w[1] = wl; w[2] = wr; w[3] = ws;
+}
+
+/* ---------- the skirt on her: a skinned mesh that binds to whichever body and back legs it's on ---------- */
+function drsCls() {
+  if (drsCls.C) return drsCls.C;
+  class DrsSkin extends THREE.SkinnedMesh {
+    updateMatrixWorld(force) { try { drsBind(this); drsSway(this); } catch (e) { drsErr(e); } super.updateMatrixWorld(force); }
+  }
+  return (drsCls.C = DrsSkin);
+}
+function drsSkinMat(k) { const C = drsSkinMat.C || (drsSkinMat.C = {}); if (C[k]) return C[k]; const m = ckMat()[k].clone(); m.skinning = true; return (C[k] = m); }
+function drsSkirtInst(it, inst) {                                        // (ckInstance, after) an outfit's skirt meshes
+  const G = ckBake(it); if (!G) return;
+  for (const k of ['m', 's', 'l']) { const g = G['drs' + k.toUpperCase()]; if (!g) continue; const Cl = drsCls(), m = new Cl(g, drsSkinMat(k)); m.frustumCulled = false; m.userData.drsSkirt = 1; if (k === 'l') m.renderOrder = 2;
+    const b = new THREE.Object3D(); b.position.set(0, 0.5, -0.1); b.userData.drsSway = 1; m.add(b); drsSkel(m, null); inst.obj.add(m); }
+}
+function drsBody(m) { for (let o = m.parent, i = 0; o && i < 8; o = o.parent, i++) if (o.userData && o.userData.drsBody) return o; return null; }
+function drsBind(m) {
+  const body = drsBody(m), sk = m.skeleton;
+  if (sk && sk.drsOwn === m && sk.drsBody === body) return;
+  drsSkel(m, body);
+}
+function drsSkel(m, body) {                                              // bones: her body, her left and right back legs, the sway bone (or, on a card, itself)
+  const sw = m.children.find(c => c.userData && c.userData.drsSway) || (() => { const b = new THREE.Object3D(); b.position.set(0, 0.5, -0.1); b.userData.drsSway = 1; m.add(b); return b; })();
+  const bones = [], inv = [];
+  const legs = body ? [2, 3].map(i => body.children.find(c => c.userData && c.userData.drsLeg === i)) : [];
+  if (body && legs[0] && legs[1]) {
+    const rel = new THREE.Matrix4(); for (let o = m; o && o !== body; o = o.parent) { o.updateMatrix(); rel.premultiply(o.matrix); }   /* (the skirt in her body's own space: usually nothing) */
+    bones.push(body, legs[0], legs[1], sw); inv.push(rel.clone(), new THREE.Matrix4().makeTranslation(-legs[0].position.x, -legs[0].position.y, -legs[0].position.z).multiply(rel), new THREE.Matrix4().makeTranslation(-legs[1].position.x, -legs[1].position.y, -legs[1].position.z).multiply(rel), new THREE.Matrix4().makeTranslation(-sw.position.x, -sw.position.y, -sw.position.z));
+  } else { bones.push(m, m, m, sw); inv.push(new THREE.Matrix4(), new THREE.Matrix4(), new THREE.Matrix4(), new THREE.Matrix4().makeTranslation(-sw.position.x, -sw.position.y, -sw.position.z)); body = null; }
+  if (m.skeleton && m.skeleton.drsOwn === m && m.skeleton.dispose) try { m.skeleton.dispose(); } catch (e) {}
+  const sk = new THREE.Skeleton(bones, inv); sk.drsOwn = m; sk.drsBody = body; m.bind(sk, new THREE.Matrix4());
+}
+function drsSway(m) {                                                    // (each frame) a spring: the hem lags her speeding up and turning, hangs down when she tips, floats up in the air and bounces on landing
+  const sw = m.skeleton && m.skeleton.bones[3]; if (!sw || !m.parent) return;
+  const now = drsNow(), S = m.drsS || (m.drsS = { ok: false, now: -1, p: new THREE.Vector3(), v: new THREE.Vector3(), a: [0, 0, 0], va: [0, 0, 0] });
+  if (S.now === now) return;
+  const e = m.parent.matrixWorld.elements, sc = Math.hypot(e[0], e[1], e[2]) || 1, px = e[12], py = e[13], pz = e[14];
+  const gx = -e[1] / sc, gy = -e[5] / sc, gz = -e[9] / sc, tgx = Math.atan2(-gz, -gy), tgz = Math.atan2(gx, -gy);   /* (which way is down, in her own space) */
+  let dt = now - S.now;
+  if (!S.ok || !(dt > 0) || dt > 0.25 || Math.hypot(px - S.p.x, py - S.p.y, pz - S.p.z) > 1.5 * sc) {
+    S.ok = true; S.p.set(px, py, pz); S.v.set(0, 0, 0); S.a = [tgx, tgz, 0]; S.va = [0, 0, 0];
+  } else {
+    const vx = (px - S.p.x) / dt / sc, vy = (py - S.p.y) / dt / sc, vz = (pz - S.p.z) / dt / sc, ax = (vx - S.v.x) / dt, ay = (vy - S.v.y) / dt, az = (vz - S.v.z) / dt;
+    S.v.set(vx, vy, vz); S.p.set(px, py, pz);
+    const lx = (e[0] * ax + e[1] * ay + e[2] * az) / sc, ly = (e[4] * ax + e[5] * ay + e[6] * az) / sc, lz = (e[8] * ax + e[9] * ay + e[10] * az) / sc;
+    const T = [Math.max(-0.5, Math.min(0.5, tgx + 0.011 * lz)), Math.max(-0.4, Math.min(0.4, tgz - 0.011 * lx)), Math.max(-0.22, Math.min(0.42, -0.016 * ly))];
+    const n = Math.min(12, Math.max(1, Math.ceil(dt / 0.008))), h = dt / n, K = 70, D = 8;
+    for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) { S.va[k] += ((T[k] - S.a[k]) * K - S.va[k] * D) * h; S.a[k] += S.va[k] * h; }
+  }
+  S.now = now; const lf = S.a[2];
+  sw.rotation.set(S.a[0], 0, S.a[1]); sw.scale.set(1 + 0.35 * lf, 1 - 0.45 * lf, 1 + 0.35 * lf);
+}
+
+/* ---------- neck trims half as thick (fanCoat, fanArmour, seaSilkJacket; the gown below) ---------- */
+function drsThinNeck(B, b0) {
+  const s0 = ck5bShell, h0 = ck5bHem; let F = null, SH = null;
+  ck5bShell = o => { const r = s0(o); if (!SH) { SH = r; F = r.front; } return r; };
+  ck5bHem = (pts, closed, r, out) => h0(pts, closed, pts === F ? r * 0.5 : r, out);
+  try { b0(B); } finally { ck5bShell = s0; ck5bHem = h0; }
+  return SH;
+}
+function drsCoatTails(B, sh) {                                           // the captain's coat tails: two split tails over her rump, gold-edged, that swing as she walks
+  if (!sh || !sh.backN) return; const S = drsSet(), bur = 0x7a1e2c, bur2 = 0x6a1824, gold = 0xf2c14a;
+  S.tier('m', drsTier({ sh, fa: 1.75, slT: 0.32, slB: 0.32, yH: 0.33, Lmin: 0.07, rows: 8, cols: 18, out: t => 0.025 * t, m: 0.016, col: (t, f, j, k) => j >= 7 ? gold : (k + j) % 2 ? bur : bur2 }));
+  S.add('m', drsSash(sh, 0.005, gold, 1.75), gold, null, 0);
+  S.post(B);
+}
+
+/* ---------- the dresses ---------- */
+function drsFlatOn(S, k, geo, col, q, t, spin, s) {                      // a flat thing (+z out) on a skirt point q { p, n }
+  const M = new THREE.Matrix4().compose(q.p.clone().addScaledVector(q.n, 0.003), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), q.n).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), spin || 0)), new THREE.Vector3(s || 1, s || 1, s || 1));
+  S.add(k, geo, col, M, t);
+}
+function drsGown(B) {                                                    // a rose satin bodice, a fine gold neck roll, two tiers (a long underskirt, a scalloped overskirt), a petticoat edge, a gold sash and a bow
+  const rose = 0xf27aa8, rose2 = 0xe7659a, gold = 0xf2c14a, c = new THREE.Color(), a0 = new THREE.Color(0xf9b4d1), a1 = new THREE.Color(0xd84a86), b0 = new THREE.Color(0xf590bb), b1 = new THREE.Color(0xe0558f);
+  const sh = ck5bShell({ m: 0.013, nd: 0.035, zb: -0.36, zbB: -0.12, cols: 48, rows: 20, col: (u, f, k, j) => j % 4 === 0 ? rose2 : rose });
+  B.s(sh.g, sh.c); B.s(ck5bHem(sh.front, true, 0.0045, 0.0015), gold);
+  { const g = sh.at(0, Math.PI, 0.012); B.s(CKG.sph(0.011, 10, 8), 0xff3f7f, [g.x, g.y - 0.004, g.z + 0.008]); }
+  if (!sh.backN) return; const S = drsSet();
+  const under = S.tier('m', drsTier({ sh, yH: 0.2, rows: 13, out: t => 0.12 * Math.pow(t, 1.25), wav: 0.011, nw: 11, col: (t, f, j) => j >= 12 ? gold : c.copy(a0).lerp(a1, 0.2 + 0.65 * t).getHex() }));
+  S.tier('m', drsTier({ sh, yH: 0.275, rows: 8, m: 0.024, gap: 0.008, out: t => 0.012 + 0.11 * Math.pow(t, 1.1), hy: f => 0.028 * (1 - Math.abs(Math.sin(f * 4.5))), col: (t, f, j) => j >= 8 ? gold : c.copy(b0).lerp(b1, t).getHex() }));
+  S.tier('m', drsFrill(under.hem, 0xfff1f7, 0.016, 0.012));
+  S.add('m', drsSash(sh, 0.0075, gold), gold, null, 0);
+  drsBow(S, 'm', sh, rose2, 1.15);
+  S.post(B);
+}
+function drsEvDress(B) {                                                 // a cherry polka-dot swing dress: fitted bodice, Peter Pan collar, a navy waist band and bow, a full circle skirt (soft godets), a white petticoat edge
+  const red = 0xd8283a, red2 = 0xc61f31, wh = 0xfff8f0, navy = 0x23305e, cR = new THREE.Color(red), cD = new THREE.Color(0xb41a2b), c = new THREE.Color();
+  const sh = ck5bShell({ m: 0.014, nd: 0.035, zb: -0.3, zbB: -0.12, cols: 48, rows: 20, col: (u, f, k, j) => j % 5 === 0 ? red2 : red });
+  B.m(sh.g, sh.c);
+  for (let a = 0; a < 6; a++) for (let b = 0; b < 10; b++) { const u = 0.12 + a * 0.15, f = -Math.PI + (b + (a % 2) * 0.5) * (2 * Math.PI / 10); if (u > 0.8 && Math.abs(f) > 1.2) continue;
+    ck5bOn(B, 'm', ckFlat(ckSnDisc(0.0095, 0.0095, 12), 0.002), wh, sh.at(u, f, 0.0035), evV3(Math.sin(f), Math.cos(f), 0), 0); }
+  for (const sx of [-1, 1]) { const f = Math.PI - sx * 0.5, p = sh.at(0.01, f, 0.01), n = evV3(Math.sin(f), Math.cos(f), 0.4); ck5bOn(B, 'm', ckFlat(ckSnDisc(0.03, 0.021, 16), 0.004), wh, p, n, sx * 0.3); }   // the collar
+  if (!sh.backN) return; const S = drsSet();
+  const sk = S.tier('m', drsTier({ sh, yH: 0.28, rows: 12, out: t => 0.1 * Math.pow(t, 1.15), wav: 0.016, nw: 8, ph: 0.4, col: (t, f) => c.copy(cR).lerp(cD, 0.4 * (0.5 + 0.5 * Math.sin(f * 8 + 0.4)) * t).getHex() }));
+  for (const PT of sk.pts) for (let k = 1; k < PT.length - 1; k += 2) for (let j = 2; j < PT[k].length - 1; j += 3) { const q = PT[k][(j + (k % 4 === 1 ? 1 : 0))]; if (!q) continue;
+    drsFlatOn(S, 'm', ckFlat(ckSnDisc(0.0095, 0.0095, 12), 0.002), wh, q, q.t); }
+  S.tier('m', drsFrill(sk.hem, 0xffffff, 0.014, 0.01));
+  S.add('m', drsSash(sh, 0.0085, navy), navy, null, 0);
+  drsBow(S, 'm', sh, navy, 1);
+  S.post(B);
+}
+function drsApron(B) {                                                   // a baker's dress: pink gingham with a gingham ruffle skirt; a white apron (a lace-edged bib and a panel down each side, heart pockets, a whisk); its ties in a big pink bow at the back
+  const wh = 0xfffafc, lace = 0xffe6f0, pk = 0xff7fae, pk2 = 0xffc2da, bowPk = 0xff5f9e;
+  const ging = (a, b) => (a && b ? pk : a || b ? pk2 : wh);
+  const sh = ck5bShell({ m: 0.02, nd: 0.032, zb: -0.3, zbB: -0.16, cols: 64, rows: 28, bump: (u, f, k, j) => 0.0012 * Math.sin(k * 2.1) * Math.sin(j * 2.7),
+    col: (u, f, k, j) => ging(Math.floor(k / 2) % 2, Math.floor(j / 2) % 2) });
+  B.m(sh.g, sh.c);
+  B.m(ck5bHem(sh.front, true, 0.0095, 0.004), (x, y, z, i) => (i >> 1) % 3 ? wh : lace);                       // lace at the neck
+  { const cols = 14, rows = 12, P = new Float32Array((cols + 1) * (rows + 1) * 3), E = [];                         // the bib: a white panel on her chest, lace round it
+    for (let j = 0; j <= rows; j++) for (let k = 0; k <= cols; k++) { const u = 0.05 + 0.5 * j / rows, w = 0.36 + 0.12 * j / rows, f = Math.PI + (k / cols * 2 - 1) * w, p = sh.at(u, f > Math.PI ? f - 2 * Math.PI : f, 0.005), i = (j * (cols + 1) + k) * 3;
+      P[i] = p.x; P[i + 1] = p.y; P[i + 2] = p.z; }
+    B.m(ckTwoSided(ck5bGrid(P, cols, rows, true)), wh);
+    for (let k = 0; k <= cols; k++) { const i = k * 3; E.push(new THREE.Vector3(P[i], P[i + 1], P[i + 2])); }
+    const sideL = [], sideR = []; for (let j = 0; j <= rows; j++) { const a = (j * (cols + 1)) * 3, b = (j * (cols + 1) + cols) * 3; sideL.push(new THREE.Vector3(P[a], P[a + 1], P[a + 2])); sideR.push(new THREE.Vector3(P[b], P[b + 1], P[b + 2])); }
+    const bottom = []; for (let k = cols; k >= 0; k--) { const i = (rows * (cols + 1) + k) * 3; bottom.push(new THREE.Vector3(P[i], P[i + 1], P[i + 2])); }
+    const ring = sideL.slice().reverse().concat(E.slice(1), sideR.slice(1), bottom.slice(1, -1));
+    B.m(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ring, true, 'centripetal'), 120, 0.0045, 5, true), (x, y, z, i) => (i >> 2) % 2 ? wh : lace); }
+  if (!sh.backN) return; const S = drsSet();
+  const sk = S.tier('m', drsTier({ sh, yH: 0.3, rows: 10, out: t => 0.075 * Math.pow(t, 1.2), wav: 0.009, nw: 18, col: (t, f, j, k) => ging(Math.floor(k / 1) % 2, Math.floor(j / 2) % 2) }));
+  S.tier('m', drsFrill(sk.hem, wh, 0.012, 0.008));
+  const ap = S.tier('m', drsTier({ sh, range: [1.1, 2.4], yH: 0.3, Lmin: 0.09, rows: 9, cols: 16, m: 0.03, gap: 0.009, out: t => 0.016 + 0.07 * Math.pow(t, 1.2), col: (t, f, j) => j >= 9 ? lace : wh }));
+  for (const PT of ap.pts) { const q = PT[8][4], sx = Math.sign(q.f);                                             // heart pockets on the apron, bigger, a whisk in one
+    drsFlatOn(S, 'm', fdSoft(ckHeartPts(0.054, 40), 0.003, 0.0022, 2), 0xff6fa5, q, q.t, Math.PI, 1);
+    drsFlatOn(S, 'm', fdSoft(ckHeartPts(0.02, 30), 0.002, 0.0012, 2), wh, { p: q.p.clone().addScaledVector(q.n, 0.003), n: q.n }, q.t, Math.PI, 1);
+    if (sx > 0) { const a = q.p.clone().addScaledVector(q.n, 0.01).add(new THREE.Vector3(0, 0.02, 0.012)), b = a.clone().add(new THREE.Vector3(0.003, 0.028, 0.02));
+      S.add('m', ckTaper([a.toArray(), b.toArray()], 0.006, 0.006, 6, 8), 0xff86b4, null, q.t);
+      for (let w = 0; w < 4; w++) S.add('m', CKG.tor(0.016, 0.0015, 4, 20), 0xdfe4ea, new THREE.Matrix4().compose(b.clone().add(new THREE.Vector3(0.001, 0.016, 0.01)), new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.5, w / 4 * Math.PI, 0)), new THREE.Vector3(0.62, 1.15, 1)), q.t); } }
+  S.add('m', drsSash(sh, 0.0065, wh), wh, null, 0);
+  drsBow(S, 'm', sh, bowPk, 1.7);
+  S.post(B);
+}
+function drsStraw(B) {                                                   // a strawberry dress: juicy red with big golden seeds, a leafy collar, a red bubble skirt, a white frill under it
+  const red = 0xe8263f, red2 = 0xd41c36, seed = 0xffd84a, leaf = 0x4caf50, leaf2 = 0x3d9a42;
+  const sh = ck5bShell({ m: 0.017, nd: 0.036, zb: -0.3, zbB: -0.15, cols: 64, rows: 30, bump: (u, f, k, j) => 0.004 * u * u * (0.6 + 0.4 * Math.sin(f * 6)),
+    col: (u, f, k, j) => fdLerp(red, red2, Math.max(0, u - 0.55) * 2) });
+  B.s(sh.g, sh.c);
+  for (let j = 0; j < 6; j++) for (let k = 0; k < 12; k++) { const u = 0.15 + j * 0.13, f = -Math.PI + (k + (j % 2) * 0.5) / 12 * Math.PI * 2;   // golden seeds, twice the size
+    const p = sh.at(u, f, 0.0008), n = new THREE.Vector3(Math.sin(f), Math.cos(f), 0); fdOn(B, 's', CKG.sph(1, 8, 6), seed, p, n, new THREE.Vector3(0, 0, -1), null);
+    B.parts.s[B.parts.s.length - 1][2].multiply(new THREE.Matrix4().makeScale(0.0068, 0.0112, 0.0036)); }
+  for (let k = 0; k < 10; k++) { const f = -Math.PI + (k + 0.5) / 10 * Math.PI * 2, p0 = sh.at(0, f, 0.004), p1 = sh.at(0.16, f, 0.004), n = new THREE.Vector3(Math.sin(f), Math.cos(f), 0);   // the leafy collar
+    const L = [[0, 0.004], [0.012, 0.012], [0.019, 0.032], [0.014, 0.052], [0, 0.072], [-0.014, 0.052], [-0.019, 0.032], [-0.012, 0.012]];
+    fdOn(B, 'm', fdSoft(L, 0.002, 0.0016, 2), (x, y) => Math.abs(x) < 0.0018 ? leaf2 : leaf, p0.clone().addScaledVector(n, 0.002), n, p1.clone().sub(p0)); }
+  B.m(ck5bHem(sh.front, true, 0.008, 0.003), leaf2);
+  if (!sh.backN) return; const S = drsSet();
+  const sk = S.tier('s', drsTier({ sh, yH: 0.29, rows: 12, out: t => 0.012 + 0.078 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 0.86)), 0.75) - 0.02 * t, col: t => fdLerp(red, red2, t * 0.7) }));
+  for (const PT of sk.pts) for (let k = 1; k < PT.length - 1; k += 2) for (let j = 2; j < PT[k].length - 2; j += 3) { const q = PT[k][j + (k % 4 === 1 ? 1 : 0)]; if (!q) continue;
+    const M = new THREE.Matrix4().compose(q.p.clone().addScaledVector(q.n, 0.002), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), q.n), new THREE.Vector3(0.0068, 0.0112, 0.0036)); S.add('s', CKG.sph(1, 8, 6), seed, M, q.t); }
+  S.tier('s', drsFrill(sk.hem, 0xfffafc, 0.02, 0.012));
+  S.add('s', drsSash(sh, 0.0055, red2), red2, null, 0);
+  S.post(B);
+}
+function drsTutu(B) {                                                    // a satin leotard; three flat layers of frothy tulle standing out all round her waist (a gap for her belly, a slit for her tail); a bow
+  const pink = 0xffa8cc, pink2 = 0xff8fbf, L = [0xffd9ea, 0xffc0dc, 0xffa3cd], c = new THREE.Color();
+  const sh = ck5bShell({ m: 0.012, nd: 0.035, zb: -0.31, zbB: -0.14, cols: 48, rows: 20, col: (u, f, k, j) => j % 5 === 0 ? pink2 : pink });
+  B.s(sh.g, sh.c); B.s(ck5bHem(sh.front, true, 0.008, 0.002), pink2);
+  if (!sh.backN) return; const S = drsSet();
+  [0.125, 0.105, 0.085].forEach((R, l) => {
+    S.tier('m', drsTier({ sh, fa: 2.55, ft: 0.2, slT: 0.4, slB: 0.4, drop: 0.036 + 0.012 * l, pt: 1.5, dy: 0.012 * l, rows: 5, cols: 40, m: 0.014 + 0.006 * l, gap: 0.004 + 0.004 * l, wav: 0.014, nw: 15, wy: 0.012, nwy: 19, ph: l * 1.3,
+      out: t => R * t, col: (t, f, j, k) => ck5bHash(k + l * 31, j + 7) > 0.88 ? 0xffffff : c.setHex(L[l]).lerp(new THREE.Color(0xffffff), 0.25 * (1 - t)).getHex() }));
+  });
+  S.add('m', drsSash(sh, 0.0075, pink2), pink2, null, 0);
+  drsBow(S, 'm', sh, pink2, 0.95);
+  S.post(B);
+}
+function drsRobe(B) {                                                    // a wizard's robe: midnight blue, silver stars, a gold moon on the back, a gold rope belt at the waist, one long robe skirt with a silver hem
+  const blue = 0x25317a, blue2 = 0x1f2a6a, silver = 0xdfe6f2, gold = 0xf2c14a, pat = (k, j) => (k * 5 + j * 3) % 13 === 0 ? 0x3a48a0 : (k + j) % 2 ? blue : blue2;
+  const sh = ck5bShell({ m: 0.02, nd: 0.03, zb: -0.38, zbB: -0.2, cols: 56, rows: 26, col: (u, f, k, j) => pat(k, j) });
+  B.m(sh.g, sh.c);
+  B.s(ck5bHem(sh.front, true, 0.012, 0.004), silver);
+  for (let i = 0; i < 20; i++) { const u = 0.1 + ((i * 0.618) % 1) * 0.78, f = -2.8 + ((i * 0.382 + 0.17) % 1) * 5.6; if (Math.abs(f) < 0.5 && u > 0.25 && u < 0.6) continue;
+    const p = sh.at(u, f, 0.003), n = new THREE.Vector3(Math.sin(f), Math.cos(f), 0); ck5bOn(B, 's', ckFlat(ckStarPts(0.011 + (i % 3) * 0.004, 0.45), 0.003), silver, p, n, i * 0.7); }
+  { const p = sh.at(0.42, 0, 0.004); ck5bOn(B, 's', ckFlat(fanMoonPts(0.06), 0.004), gold, p, new THREE.Vector3(0, 1, 0.05), Math.PI / 2 + 0.3); }
+  if (!sh.backN) return; const S = drsSet();
+  const sk = S.tier('m', drsTier({ sh, yH: 0.24, rows: 12, slB: 0.06, out: t => 0.05 * Math.pow(t, 1.2), wav: 0.006, nw: 10, col: (t, f, j, k) => j >= 11 ? silver : pat(k, j) }));
+  for (const PT of sk.pts) for (let n = 0; n < 4; n++) { const q = PT[3 + n * 7] && PT[3 + n * 7][3 + (n % 2) * 4]; if (!q) continue; drsFlatOn(S, 'm', ckFlat(ckStarPts(0.012 + (n % 2) * 0.004, 0.45), 0.003), silver, q, q.t, n * 0.9); }
+  S.add('m', drsSash(sh, 0.0065, null), (x, y, z, i) => (i >> 3) % 2 ? gold : 0xd9a520, null, 0);
+  { const [p, n] = drsHem(sh, 1.45), q = p.clone().addScaledVector(n, 0.014); S.add('m', CKG.sph(0.011, 10, 8), gold, ckM4([q.x, q.y, q.z]), 0);   // the rope's knot and two tasselled ends
+    for (const dz of [-0.012, 0.012]) S.add('m', ckTaper([[q.x, q.y, q.z + dz * 0.4], [q.x + 0.02, q.y - 0.045, q.z + dz], [q.x + 0.026, q.y - 0.085, q.z + dz * 1.4]], 0.004, 0.0032, 8, 5), gold, null, [0, 0.5, q.y]); }
+  S.post(B);
+}
+function drsMermaid(B) {                                                 // a mermaid princess's top: overlapping scallop scales from teal to violet (darker rims, a pearly shine), a pearl neckline, a gold star, a translucent fin peplum
+  const a = new THREE.Color(0x26b8b0), b = new THREE.Color(0x7a5fd8), c = new THREE.Color(), W = new THREE.Color(0xffffff), K = new THREE.Color(0x0b3344);
+  const sh = ck5bShell({ m: 0.018, nd: 0.03, zb: -0.17, zbB: -0.07, cols: 64, rows: 26, col: (u) => c.copy(a).lerp(b, Math.min(1, u * 1.1)).lerp(K, 0.45).getHex() });
+  B.s(sh.g, sh.c);
+  { const r = 0.031, NR = 12;   /* (each scale a half-disc, its round edge toward her tail: a dark rim, a pearly shine at its root) */
+    for (let row = 0; row < NR; row++) { const u = 0.06 + row * 0.063, n = 22, base = c.copy(a).lerp(b, Math.min(1, u * 1.05)).clone();
+      for (let k = 0; k < n; k++) { const f = -Math.PI + (k + (row % 2) * 0.5 + 0.5) / n * Math.PI * 2, p = sh.at(u, f, 0.0016 + 0.0009 * (NR - row)), nr = new THREE.Vector3(Math.sin(f), Math.cos(f), 0);
+        const ty = new THREE.Vector3(0, 0, 1).addScaledVector(nr, -nr.z).normalize(), tx = new THREE.Vector3().crossVectors(ty, nr);
+        const M = B.M.clone().multiply(new THREE.Matrix4().makeBasis(tx, ty, nr).setPosition(p)), rim = c.copy(base).lerp(K, 0.55).getHex(), hi = base.clone().lerp(W, 0.6), lo = base.clone().lerp(W, 0.08);
+        B.parts.s.push([new THREE.RingGeometry(r * 0.76, r, 12, 1, Math.PI, Math.PI), rim, M]);
+        B.parts.s.push([new THREE.CircleGeometry(r * 0.77, 12, Math.PI, Math.PI), (x, y) => c.copy(hi).lerp(lo, Math.min(1, Math.hypot(x, y) / (r * 0.77))).getHex(), M.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, 0.0004))]); } } }
+  const F = sh.front; for (let i = 0; i < F.length - 1; i++) { const p = F[i], d = new THREE.Vector3(p.x, p.y - 0.45, 0).normalize(); B.s(CKG.sph(0.0072, 8, 6), i % 6 === 0 ? 0xffd8ec : 0xfff8f0, [p.x + d.x * 0.006, p.y + d.y * 0.006, p.z + 0.004]); }
+  { const s = sh.at(0.05, Math.PI, 0.012); B.s(ckFlat(ckStarPts(0.016, 0.5), 0.005), 0xf2c14a, [s.x, s.y, s.z + 0.01], [0.4, 0, 0]); }
+  if (!sh.backN) return; const S = drsSet();
+  S.tier('l', drsTier({ sh, yH: 0.31, Lmin: 0.06, rows: 7, cols: 34, out: t => 0.07 * Math.pow(t, 1.1), wav: 0.012, nw: 14, hy: f => 0.02 * Math.abs(Math.sin(f * 7)),
+    col: (t, f) => c.copy(a).lerp(b, 0.5 + 0.5 * Math.sin(f * 3)).lerp(W, 0.15 + 0.45 * t).getHex() }));
+  S.add('s', drsSash(sh, 0.006, 0xfff8f0), (x, y, z, i) => (i >> 2) % 2 ? 0xfff8f0 : 0xffd8ec, null, 0);
+  S.post(B);
+}
+
+try { drsInstall(); } catch (e) { console.error(e); }   /* (DRS_V1: the one call at load: wraps ckPacksRun, ckInstance, closetDress, ck5CapeAt, ckCapeGeo, ckCapeClasp) */
+/* (end of DRS_V1) */
+/* HEAD_V1 */
+/* =====================================================================
+   HEAD_V1 (2026-10-13): the head and neck things read. PKR's Closet: the ears, hat, specs and collar slots.
+   EARRINGS: every earring now hangs from the lower outer base of her ear (on the ear, below the crown band), 2-2.5x bigger, and
+     swings (EARS2_V1's sway, about the new hang point). How: ears2Frame is chained: while an earring's builder runs (its build,
+     evBuild or popBuild, wrapped after ckPacksRun) the ear frame it asks for is moved to the hang point, turned to hang down
+     along her head, and scaled; everything else ears2Pair does (the stud, the swinging part, its pivot) follows. Climbers and
+     cuffs stay up the ear's edge, just bigger. Plain studs get a little drop that swings. The double-knot earrings are rebuilt
+     to match the reference (three straight, parallel polished tubes in a block, two thick interlocked rings hanging behind and
+     below it; gold, silver, gold-and-silver, rose gold). Her own crown is nudged back a touch while earrings are on.
+   Everything is a hoisted function declaration; hdInstall() runs once when this block is reached: it chains runtime wrappers
+   onto ears2Frame, closetDress and ckPacksRun and swaps in new builders. Items keep their ids, names, prices, blurbs, sets,
+   perks and colourways. No lights; each item is still one mesh per material.
+   ===================================================================== */
+function hdK() {
+  return hdK.K || (hdK.K = { ES: 0.3, ET: 0.05, EH: 0.011, EF: 0.35, EG: 0.75, HA: 0.1728, HB: 0.152, HC: 0.1568 });
+}
+function hdErr(e) { if (!hdErr.n) { hdErr.n = 1; console.error(e); } }
+function hdV(x, y, z) { return new THREE.Vector3(x, y, z); }
+function hdHeadN(p) { const K = hdK(); return hdV(p.x / (K.HA * K.HA), p.y / (K.HB * K.HB), p.z / (K.HC * K.HC)).normalize(); }   // her head's outward normal at p (head space)
+function hdCnt(B, k) { return B.parts[k || 's'].reduce((n, [g]) => n + g.attributes.position.count, 0); }
+
+/* ---------- earrings: where they hang ---------- */
+function hdEar() { return hdEar; }                                       // (hdEar.cur: the earring being built, while its builder runs)
+function hdHang(sx, up) {                                                // the hang point at the lower outer base of the ear, and its frame: +y up (along her head), +z out, +x across
+  const C = hdHang.C || (hdHang.C = {}), key = sx + ':' + (up || 0); if (C[key]) return C[key];
+  const K = hdK(), f0 = hdEarFrame.f0, s = K.ES + Math.max(0, up || 0) * 0.85, F = f0(sx, s, K.ET, 0), N = hdHeadN(F.O);
+  const g = hdV(0, -1, 0), D = g.clone().addScaledVector(N, -g.dot(N)).normalize().addScaledVector(g, K.EG).normalize();   /* (down her head, a little more toward straight down) */
+  const Y = D.clone().negate(), Z = N.clone().add(hdV(0, 0, K.EF)); Z.addScaledVector(Y, -Z.dot(Y)).normalize();
+  const Xr = hdV(0, 0, 0).crossVectors(Y, Z), X = Xr.clone().multiplyScalar(sx), O = F.O.clone().addScaledVector(N, K.EH + (up <= -0.5 ? 0.024 : 0));   /* (under a helmet or a toque: out over it) */
+  return (C[key] = { O, X, Y, Z, Xr });
+}
+function hdEarFrame(sx, s, t, h) {                                       // (chained onto ears2Frame) the ear frame an earring asks for, moved to the hang point while one is being built
+  const F0 = hdEarFrame.f0(sx, s, t, h), c = hdEar.cur; if (!c) return F0;
+  if (c.mode === 'ear') { const k = c.k; return { O: F0.O, X: F0.X, Y: F0.Y, Z: F0.Z, Xr: F0.Xr, M: F0.M.clone().multiply(new THREE.Matrix4().makeScale(k, k, k)) }; }   /* (a climber: it stays up the ear's edge, bigger) */
+  const up = ears2Pair.up || 0, ref = c.ref || (c.ref = {}); if (!ref[sx]) ref[sx] = hdEarFrame.f0(sx, s, t, 0);   /* (the first spot asked for on this ear is the earring's own) */
+  const R = ref[sx], d = F0.O.clone().sub(R.O), lx = d.dot(R.X), ly = d.dot(R.Y), lz = d.dot(R.Z), H = hdHang(sx, up), k = c.k;
+  const O = H.O.clone().addScaledVector(H.X, lx * k).addScaledVector(H.Y, ly * k).addScaledVector(H.Z, lz * k);
+  const M = new THREE.Matrix4().makeBasis(H.X, H.Y, H.Z).multiply(new THREE.Matrix4().makeScale(k, k, k)).setPosition(O);
+  return { O, X: H.X, Y: H.Y, Z: H.Z, Xr: H.Xr, M };
+}
+function hdEarSpecs() {                                                  // per earring: mode (hang / ear), size, a drop for a plain stud
+  if (hdEarSpecs.S) return hdEarSpecs.S;
+  const S = { def: { mode: 'hang', k: 2.1 } }, set = (ids, o) => ids.forEach(id => { S[id] = Object.assign({ mode: 'hang', k: 2.1 }, o); });
+  set(['evPearlStuds', 'evMaple', 'evPearlDrop', 'natLadyEars', 'calForecastEars', 'fdMacEars', 'calTulipEars', 'calPencilEars'], { k: 2.4 });
+  set(['spiderEars', 'acornEars', 'seaCloverEars', 'fanPlanetEars', 'natBeeEars', 'seaBurstEars', 'jhumkas'], { k: 2.0 });
+  set(['hoops'], { k: 1.9 });
+  S.evPearlStuds.drop = { r: 0.0058, pearl: 1 }; S.evMaple.drop = { r: 0.0042, col: 0xd9232f };
+  S.evGoldDots = { mode: 'ear', k: 2.1 }; S.evClimber = { mode: 'ear', k: 2.0 }; S.fanElfCuffs = { mode: 'ear', k: 1.8, thick: 2.8 };
+  return (hdEarSpecs.S = S);
+}
+function hdEarWrap(it) {                                                 // (after ckPacksRun) an earring's builders run with the hang frame in place
+  const sp = hdEarSpecs()[it.id] || hdEarSpecs().def;
+  for (const key of ['build', 'evBuild', 'popBuild']) { const f = it[key]; if (typeof f !== 'function' || f.hdW) continue;
+    const w = function (B, v) { const prev = hdEar.cur; hdEar.cur = { mode: sp.mode, k: sp.k, ref: null };
+      try { return f.apply(this, arguments); } finally { try { hdEarPost(B, sp, key === 'build' ? 0 : v || 0); } catch (e) { hdErr(e); } hdEar.cur = prev; } };
+    w.hdW = 1; it[key] = w; }
+  it.thumbDir = it.id === 'hoops' ? (H => H.Xr.clone().add(H.Z.clone().multiplyScalar(0.45)).add(hdV(0, 0.15, 0)).normalize().toArray())(hdHang(1, 0)) : hdEarThumbDir();
+}
+function hdEarThumbDir() { const H = hdHang(1, 0); return H.Z.clone().multiplyScalar(1).add(hdV(0.25, 0.05, 0.75)).normalize().toArray(); }   // a card looks at the right earring's face, from a little in front
+function hdEarPost(B, sp, v) {                                           // after an earring is built: a plain stud gets a little drop; a fine climber gets thicker
+  if (sp.thick) hdThicken(B, 0.0026, sp.thick);
+  if (!sp.drop || sp.mode !== 'hang') return;
+  const fx = B.fx || (B.fx = {}), sw = fx.sway || (fx.sway = { k: 's', groups: [] }); if (sw.k !== 's') return;
+  const up = ears2Pair.up || 0, kk = sp.k * 1.45 * (up > 0 ? 0.86 : 1), metal = typeof evMetal === 'function' ? evMetal(v)[0] : 0xf2c14a;
+  const bead = sp.drop.pearl && typeof evPearl === 'function' ? evPearl(v) : sp.drop.col || metal;
+  for (const sx of [1, -1]) { const H = hdHang(sx, up), M = new THREE.Matrix4().makeBasis(H.X, H.Y, H.Z).multiply(new THREE.Matrix4().makeScale(kk, kk, kk)).setPosition(H.O);
+    B.M = M; const a = hdCnt(B, 's'), r = sp.drop.r;
+    B.s(ckTaper([[0, -0.004, 0.003], [0, -0.008, 0.0045], [0, -0.012, 0.005]], 0.0009, 0.0009, 6, 4), metal);
+    B.s(CKG.sph(0.0018, 6, 5), metal, [0, -0.0125, 0.005]);
+    B.s(CKG.sph(r, 12, 9), bead, [0, -0.0135 - r, 0.005], null, [1, 1.12, 1]);
+    B.frame(); sw.groups.push({ c: hdV(0, -0.004, 0.003).applyMatrix4(M).toArray(), a, b: hdCnt(B, 's'), sx, ph: sx > 0 ? 0.3 : 2.2, e2: { n: H.Z.toArray(), x: H.Xr.toArray() } }); }
+}
+function hdThicken(B, maxR, k) {                                          // fine tubes (chains, wire) rebuilt k times thicker, same path and colours
+  for (const key of ['m', 's', 'g', 'l']) for (const P of B.parts[key]) { const g = P[0], q = g.parameters;
+    if (g.type !== 'TubeGeometry' || !q || !q.path || q.radius > maxR) continue;
+    P[0] = new THREE.TubeGeometry(q.path, q.tubularSegments, q.radius * k, q.radialSegments, q.closed); g.dispose(); }
+}
+
+/* ---------- generic: move a built item (all its parts, and what moves on its own) ---------- */
+function hdRotKeys(B) { const S = new Set(); if (B.fx && B.fx.rot) for (const r of B.fx.rot) S.add(r.k); return S; }
+function hdXform(B, M) {                                                 // every part through M (a part that spins on its own pivot: only M's turn and scale, its pivot through M)
+  const rk = hdRotKeys(B), L = new THREE.Matrix4().extractRotation(M), sc = new THREE.Vector3().setFromMatrixScale(M), Ls = L.clone().scale(sc);
+  for (const k of ['m', 's', 'g', 'l', 'f']) for (const P of B.parts[k]) P[2] = (rk.has(k) ? Ls : M).clone().multiply(P[2]);
+  const fx = B.fx, pt = a => hdV(a[0], a[1], a[2]).applyMatrix4(M).toArray();
+  if (fx && fx.rot) for (const r of fx.rot) r.pivot = pt(r.pivot);
+  if (fx && fx.sway) for (const q of fx.sway.groups) q.c = pt(q.c);
+  if (B.sprite && B.sprite.pos) { B.sprite.pos = pt(B.sprite.pos); B.sprite.scale *= sc.x; }
+  if (B.flamePivot) B.flamePivot = pt(B.flamePivot);
+}
+function hdBox(B) {                                                      // the built item's bounds (its own space)
+  const b = new THREE.Box3(), t = new THREE.Box3();
+  for (const k of ['m', 's', 'g', 'l']) for (const [g, , M] of B.parts[k]) { if (!g.boundingBox) g.computeBoundingBox(); t.copy(g.boundingBox).applyMatrix4(M); b.union(t); }
+  return b;
+}
+function hdWarp(B, fn, skip) {                                           // every part bent through fn(v) (in place); skip(part) leaves a part as it is; colours kept
+  const rk = hdRotKeys(B), c = new THREE.Color(), nm = new THREE.Matrix3(), v = hdV(0, 0, 0), w = hdV(0, 0, 0), n = hdV(0, 0, 0);
+  for (const k of ['m', 's', 'g', 'l', 'f']) { if (rk.has(k)) continue;
+    B.parts[k] = B.parts[k].map(P => { const [g0, col, M] = P; if (skip && skip(P)) return P;
+      const g = g0.index ? g0.clone() : g0.clone(), pa = g.attributes.position, na = g.attributes.normal, cnt = pa.count, cols = new Array(cnt), fnc = typeof col === 'function';
+      nm.getNormalMatrix(M);
+      for (let i = 0; i < cnt; i++) { v.fromBufferAttribute(pa, i); cols[i] = fnc ? col(v.x, v.y, v.z, i) : col; v.applyMatrix4(M);
+        n.fromBufferAttribute(na, i).applyMatrix3(nm).normalize(); w.copy(v).addScaledVector(n, 0.002); fn(v); fn(w); n.subVectors(w, v).normalize();
+        pa.setXYZ(i, v.x, v.y, v.z); na.setXYZ(i, n.x, n.y, n.z); }
+      if (M.determinant() < 0 && g.index) { const I = g.index.array; for (let q = 0; q < I.length; q += 3) { const t = I[q + 1]; I[q + 1] = I[q + 2]; I[q + 2] = t; } }
+      g0.dispose(); return [g, (x, y, z, i) => cols[i], new THREE.Matrix4()]; }); }
+  const fx = B.fx, pt = a => { const p = hdV(a[0], a[1], a[2]); fn(p); return p.toArray(); };
+  if (fx && fx.rot) for (const r of fx.rot) r.pivot = pt(r.pivot);
+  if (fx && fx.sway) for (const q of fx.sway.groups) q.c = pt(q.c);
+}
+function hdWrap(it, post) {                                              // run post(B, v) after each of the item's builders
+  for (const key of ['build', 'evBuild', 'popBuild']) { const f = it[key]; if (typeof f !== 'function') continue;
+    const w = function (B, v) { const r = f.apply(this, arguments); try { post(B, key === 'build' ? 0 : v || 0); } catch (e) { hdErr(e); } return r; };
+    w.hdW = f.hdW; it[key] = w; }
+}
+
+/* ---------- hats: the small ones a size up, sat on her head ---------- */
+function hdHatSpecs() {
+  return hdHatSpecs.S || (hdHatSpecs.S = { party: 1.45, chef: 1.35, witch: 1.4, pirate: 1.4, seaLepHat: 1.4, ratCrown: 1.3, darkCrown: 1.35, sweepHat: 1.4, noodleHat: 1.45,
+    moonCrown: 1.35, pumpkinHat: 1.45, fdTartHat: 1.5, fdMakiHat: 1.45, calPancakeHat: 1.4, calHogHat: 1.4 });
+}
+function hdHatPost(B, k) {                                               // scaled about the middle of its base, where it sits on her head
+  const b = hdBox(B); if (b.isEmpty()) return; const c = b.getCenter(hdV(0, 0, 0)), p = hdV(c.x, b.min.y, c.z);
+  hdXform(B, new THREE.Matrix4().makeTranslation(p.x, p.y + 0.004, p.z).multiply(new THREE.Matrix4().makeScale(k, k, k)).multiply(new THREE.Matrix4().makeTranslation(-p.x, -p.y, -p.z)));
+}
+
+/* ---------- headbands: the band tucked in behind her ears, not down round her cheeks ---------- */
+function hdBandSpecs() {
+  if (hdBandSpecs.S) return hdBandSpecs.S;
+  const T = (C, rx, o) => Object.assign({ C, rx, torus: 1 }, o || {});
+  return (hdBandSpecs.S = {
+    natAntennae: T([0, 0.012, 0.04], 0.16), bunny: T([0, 0.012, 0.04], 0.16), seaBoppers: T([0, 0.012, 0.035], 0.14),
+    antlers: T([0, 0.012, 0.03], 0.1, { skip: P => P[2].elements[13] < 0 && P[2].elements[14] > 0.15 }),                                   /* (Rudolph's nose stays on her nose) */
+    cupidBand: T([0, 0.012, 0.035], 0.14, { skip: P => Math.abs(P[2].elements[12]) > 0.15 }),                                               /* (the arrow stays straight through her head) */
+    evHeadband: { C: hdV(0, -0.015, 0.072).applyAxisAngle(hdV(1, 0, 0), -0.18).toArray(), rx: -0.18, m0: 0.007 },
+  });
+}
+function hdHeadHit(C, e, m) {                                            // how far from C along e her head (plus m) ends
+  const K = hdK(), a = K.HA + m, b = K.HB + m, c = K.HC + m, A = (e.x / a) ** 2 + (e.y / b) ** 2 + (e.z / c) ** 2, Bq = 2 * (C.x * e.x / (a * a) + C.y * e.y / (b * b) + C.z * e.z / (c * c)), Cq = (C.x / a) ** 2 + (C.y / b) ** 2 + (C.z / c) ** 2 - 1;
+  const d = Bq * Bq - 4 * A * Cq; return d < 0 ? 0 : (-Bq + Math.sqrt(d)) / (2 * A);
+}
+function hdBandPost(B, sp) {
+  const K = { dz: -0.075, T: 0.16, th0: 0.6, cf: 0.5, m: sp.torus ? 0.0115 : 0.007 }, X = hdV(1, 0, 0), C0 = hdV(sp.C[0], sp.C[1], sp.C[2]), C1 = C0.clone().add(hdV(0, 0, K.dz)), r1 = sp.rx - K.T;
+  const u = hdV(0, 0, 0), e = hdV(0, 0, 0);
+  const rho0 = th => sp.torus ? 1 / Math.sqrt((Math.sin(th) / 0.176) ** 2 + (Math.cos(th) / 0.1584) ** 2) : hdHeadHit(C0, e.set(Math.sin(th), Math.cos(th), 0).applyAxisAngle(X, sp.rx), sp.m0);
+  const memo = new Map(), rhoS = th => { const q = Math.round(th * 200); if (memo.has(q)) return memo.get(q); const r = hdHeadHit(C1, e.set(Math.sin(q / 200), Math.cos(q / 200), 0).applyAxisAngle(X, r1), K.m); memo.set(q, r); return r; };
+  const memo0 = new Map(), rho0m = th => { const q = Math.round(th * 200); if (!memo0.has(q)) memo0.set(q, rho0(q / 200)); return memo0.get(q); };
+  hdWarp(B, p => {
+    u.copy(p).sub(C0).applyAxisAngle(X, -sp.rx); const th = Math.atan2(u.x, u.y), rho = Math.hypot(u.x, u.y), a = Math.abs(th);
+    const th2 = Math.sign(th) * (a > K.th0 ? K.th0 + (a - K.th0) * K.cf : a), r2 = rhoS(th2) + rho - rho0m(th);
+    p.set(r2 * Math.sin(th2), r2 * Math.cos(th2), u.z).applyAxisAngle(X, r1).add(C1);
+  }, sp.skip);
+}
+
+/* ---------- glasses: arms that curve along her head to just under her ears ---------- */
+function hdArmPts(sx, y0) {                                              // (head space) from the hinge at the lens's outer corner, back round her cheek, ending just below the ear's base
+  const C = hdArmPts.C || (hdArmPts.C = {}), key = sx + ':' + y0; if (C[key]) return C[key];
+  const P = [[sx * 0.108, y0, 0.166], [sx * 0.126, y0 + 0.001, 0.126]], O = hdV(0, 0, 0), d = hdV(0, 0, 0);
+  for (let i = 0; i <= 6; i++) { const t = i / 6, ph = 0.98 + t * 0.78, y = y0 + 0.004 + 0.016 * t * t; d.set(Math.sin(ph) * sx, y / 0.16, Math.cos(ph)).normalize(); const r = hdHeadHit(O, d, 0.0048 - 0.002 * t); P.push([d.x * r, d.y * r, d.z * r]); }
+  return (C[key] = P);
+}
+function hdTemples(B, add, col, inner, r) {                              // (ckTemples) the arms: round her head, not straight out into the air
+  const r0 = r || 0.0037; for (const sx of [-1, 1]) add(ckTaper(hdArmPts(sx, 0.03), r0, r0 * 0.85, 28, 6), col);
+  if (inner) add(CKG.cyl(0.0045, 0.0045, inner, 6), col, [0, 0.034, 0.181], [0, 0, Math.PI / 2]);
+}
+function hdSpecsPost(B) {                                                // a pair with its own straight box arms: those swapped for curved ones, in the same colour
+  for (const k of ['m', 's']) { const keep = [], cols = [];
+    for (const P of B.parts[k]) { const q = P[0].parameters, e = P[2].elements;
+      if (P[0].type === 'BoxGeometry' && q && q.depth >= 0.1 && q.width < 0.01 && Math.abs(e[12]) > 0.12) cols.push([P[1], Math.max(q.width, q.height) * 0.5]); else keep.push(P); }
+    if (cols.length) { B.parts[k] = keep; hdTemples(B, B[k], cols[0][0], 0, Math.max(0.0037, cols[0][1])); } }
+}
+function hdGogglesPost(B) {                                              // the racing goggles' leather strap, refitted snug round the back of her head
+  const dk = 0x3d2617, i = B.parts.s.findIndex(P => P[1] === dk && P[0].type === 'BufferGeometry' && P[0].attributes.position.count > 100); if (i < 0) return;
+  B.parts.s.splice(i, 1); const pts = [hdV(0.117, 0.03, 0.142)], O = hdV(0, 0, 0), d = hdV(0, 0, 0);
+  for (let k = 0; k <= 20; k++) { const ph = 1.02 + k / 20 * (2 * Math.PI - 2.04); d.set(Math.sin(ph), 0.24 + 0.05 * Math.sin(k / 20 * Math.PI), Math.cos(ph)).normalize(); const r = hdHeadHit(O, d, 0.0045); pts.push(d.clone().multiplyScalar(r)); }
+  pts.push(hdV(-0.117, 0.03, 0.142));
+  B.s(ckStrip(new THREE.CatmullRomCurve3(pts), hdV(0, 1, 0), 0.015, 0.004, 72), dk);
+}
+function hdHalfMoonsPost(B) {                                            // the wizard's half-moons, not the readers: lavender lenses, a gold star at each hinge and on each chain
+  for (const P of B.parts.l) P[1] = 0xd7c8ff;
+  const st = ckStarPts(0.0085, 0.45);
+  for (const sx of [-1, 1]) { B.s(ckFlat(st, 0.0025), 0xffd75e, [sx * 0.106, 0.012, 0.168], [0, sx * 0.3, 0]); B.s(ckFlat(ckStarPts(0.0075, 0.45), 0.0025), 0xffd75e, [sx * 0.16, -0.1, 0.07], [0, sx * 1.3, 0]); }
+}
+function hdShieldPost(B) {                                               // the sport shield: a warm fire-mirror lens (sunset gold to magenta), far from the robot visor's cyan
+  const c = new THREE.Color(), c2 = new THREE.Color();
+  for (const P of B.parts.l) P[1] = (x, y) => { const t = (y + 0.028) / 0.056; c.setHex(0xffb02e).lerp(c2.setHex(0xff5a3c), Math.min(1, t * 1.5)); if (t > 0.62) c.lerp(c2.setHex(0xd43aa0), (t - 0.62) * 2.4); c.lerp(c2.setHex(0xffe08a), Math.max(0, Math.abs(x) / 0.15 - 0.7) * 0.9); return c.getHex(); };
+}
+function hdVisorPost(B) {                                                // the robot visor: two glowing pixel eyes on its band, so it reads as a robot
+  const z0 = 0.184, k = 4.2;
+  for (const sx of [-1, 1]) { const x = sx * 0.052, z = z0 - k * x * x + 0.0045, R = [];
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, c = Math.cos(a), s = Math.sin(a); R.push([Math.sign(c) * Math.pow(Math.abs(c), 0.4) * 0.016, Math.sign(s) * Math.pow(Math.abs(s), 0.4) * 0.011]); }
+    B.g(ckFlat(R, 0.002), 0xf4ffff, [x, 0.026, z], [0, Math.atan(2 * k * x), 0]);
+    for (const dy of [-0.0045, 0.0045]) B.g(CKG.box(0.03, 0.0012, 0.0012), 0x9ff0ff, [x, 0.026 + dy, z + 0.0012], [0, Math.atan(2 * k * x), 0]); }
+}
+
+/* ---------- necklaces: thicker chains, bigger pendants ---------- */
+function hdNeckSpecs() {
+  return hdNeckSpecs.S || (hdNeckSpecs.S = { natOwlPendant: { k: 1.5 }, layeredLocket: { k: 1.5 }, locket: { k: 1.45, ch: 1.5 }, fanAmulet: { k: 1.35 }, evNameplate: { k: 1.3 }, natShellNecklace: { self: 1.35, ch: 1.6 } });
+}
+function hdNeckPost(B, sp) {
+  hdThicken(B, 0.0034, sp.ch || 2.1);
+  const chain = [], parts = []; for (const k of ['m', 's', 'g', 'l']) for (const P of B.parts[k]) { const q = P[0].parameters; if (P[0].type === 'TubeGeometry' && q && q.closed) for (let i = 0; i < 160; i++) chain.push(q.path.getPointAt(i / 160).applyMatrix4(P[2])); }
+  const onChain = p => chain.some(c => c.distanceToSquared(p) < 0.00008);   /* (beads strung on the chain stay where they are) */
+  for (const k of ['m', 's', 'g', 'l']) for (const P of B.parts[k]) { const q = P[0].parameters; if (P[0].type === 'TubeGeometry' && q && q.closed) continue; if (onChain(hdV(P[2].elements[12], P[2].elements[13], P[2].elements[14]))) continue; parts.push(P); }
+  if (sp.self) { for (const P of parts) P[2] = P[2].clone().multiply(new THREE.Matrix4().makeScale(sp.self, sp.self, sp.self)); return; }   /* (shells and beads: each a size up where it is) */
+  const pos = parts.map(P => hdV(P[2].elements[12], P[2].elements[13], P[2].elements[14])), grp = parts.map((_, i) => i);   /* (pendants: the parts near each other, each group scaled about its bail) */
+  const find = i => grp[i] === i ? i : (grp[i] = find(grp[i]));
+  for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) if (pos[i].distanceTo(pos[j]) < 0.03) grp[find(i)] = find(j);
+  const G = new Map(); parts.forEach((P, i) => { const r = find(i); if (!G.has(r)) G.set(r, []); G.get(r).push(P); });
+  const b = new THREE.Box3(), t = new THREE.Box3(), M = new THREE.Matrix4(), k = sp.k;
+  for (const L of G.values()) { b.makeEmpty(); for (const [g, , m] of L) { if (!g.boundingBox) g.computeBoundingBox(); t.copy(g.boundingBox).applyMatrix4(m); b.union(t); }
+    const c = b.getCenter(hdV(0, 0, 0)), p = hdV(c.x, b.max.y, b.min.z);
+    M.makeTranslation(p.x, p.y, p.z).multiply(new THREE.Matrix4().makeScale(k, k, k)).multiply(new THREE.Matrix4().makeTranslation(-p.x, -p.y, -p.z));
+    for (const P of L) P[2] = M.clone().multiply(P[2]); }
+}
+
+/* ---------- 🧣 the aviator and Sky Ace scarves: one soft wrap with a real knot and short tails (no stacked rings), and different ---------- */
+function hdScarfWrap(B, N, o) {                                          // a soft, flattened, gently bunched wrap round her neck
+  const S = 96, R = 12, P = [], I = [], C = [], c = hdV(0, 0, 0), tg = hdV(0, 0, 0), up = N.n.clone().normalize(), out = hdV(0, 0, 0), col = new THREE.Color();
+  for (let i = 0; i <= S; i++) { const u = i / S; N.curve.getPointAt(u % 1, c); N.curve.getTangentAt(u % 1, tg); out.crossVectors(tg, up).normalize(); if (out.dot(hdV(c.x, 0, c.z - 0.3)) < 0) out.negate();
+    const bunch = 1 + 0.16 * Math.sin(u * Math.PI * 2 * 7) + 0.08 * Math.sin(u * Math.PI * 2 * 17 + 1);
+    for (let j = 0; j <= R; j++) { const a = j / R * Math.PI * 2, w = o.w * bunch, th = o.t * (0.85 + 0.3 * Math.max(0, Math.cos(a)));
+      const x = c.x + out.x * Math.cos(a) * th + up.x * Math.sin(a) * w, y = c.y + out.y * Math.cos(a) * th + up.y * Math.sin(a) * w, z = c.z + out.z * Math.cos(a) * th + up.z * Math.sin(a) * w; P.push(x, y, z);
+      const edge = Math.abs(Math.sin(a)) > 0.9, fold = Math.sin(u * Math.PI * 2 * 7) < -0.55 || (Math.cos(a) < 0.2 && !edge);
+      col.setHex(edge ? o.edge : fold ? o.shade : o.base); C.push(col.r, col.g, col.b); } }
+  for (let i = 0; i < S; i++) for (let j = 0; j < R; j++) { const a = i * (R + 1) + j, b = a + 1, d = a + R + 1, e = d + 1; I.push(a, d, b, b, d, e); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals();
+  B.s(g, (x, y, z, i) => (col.setRGB(C[i * 3], C[i * 3 + 1], C[i * 3 + 2]), col.getHex()));
+}
+function hdScarfTail(B, a, dir, len, w, o, lean) {                       // a short silk tail hanging from the knot, narrowing to a point, a little wave in it
+  const pts = []; for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push(hdV(a.x + dir.x * len * t + Math.sin(t * 5) * 0.003, a.y + dir.y * len * t, a.z + dir.z * len * t + lean * t * t)); }
+  const cu = new THREE.CatmullRomCurve3(pts), g = ckStrip(cu, hdV(dir.z, 0, -dir.x).normalize().lerp(hdV(1, 0, 0), 0.4).normalize(), w, 0.003, 24), P = g.attributes.position, cc = hdV(0, 0, 0);
+  for (let i = 0; i <= 24; i++) { cu.getPointAt(i / 24, cc); const k = 1 - 0.75 * Math.pow(i / 24, 1.5); for (let q = 0; q < 4; q++) { const n = i * 4 + q; P.setXYZ(n, cc.x + (P.getX(n) - cc.x) * k, cc.y + (P.getY(n) - cc.y) * k, cc.z + (P.getZ(n) - cc.z) * k); } }
+  g.computeVertexNormals(); B.s(ckTwoSided(g), (x, y, z, i) => (Math.floor(i / 4) % 24) > 20 ? o.edge : (i % 4) === 0 || (i % 4) === 3 ? o.shade : o.base);
+}
+function hdAviatorScarf(B) {                                             // white silk, a red edge, wrapped once, knotted at her side, two soft tails down her shoulder (its long end still streams out behind)
+  const o = { base: 0xf8faff, shade: 0xdfe6f3, edge: 0xd8343c, w: 0.019, t: 0.011 }, N = ckNeck(0.02, 0.03);
+  hdScarfWrap(B, N, o);
+  const k = ckOnCurve(N.curve, 0.6), kp = hdV(k.x - 0.004, k.y - 0.006, k.z + 0.01);
+  B.s(ckFluff(CKG.sph(0.021, 14, 10), 0.18, 3), o.base, kp.toArray(), [0, 0, 0.5], [0.9, 1.05, 1.1]);
+  B.s(ckFluff(CKG.sph(0.013, 10, 8), 0.15, 7), o.shade, [kp.x - 0.012, kp.y + 0.012, kp.z + 0.006]);
+  hdScarfTail(B, hdV(kp.x - 0.01, kp.y - 0.012, kp.z + 0.004), hdV(-0.35, -1, 0.1).normalize(), 0.07, 0.024, o, -0.004);
+  hdScarfTail(B, hdV(kp.x - 0.004, kp.y - 0.014, kp.z + 0.012), hdV(-0.1, -1, 0.3).normalize(), 0.055, 0.02, o, 0.004);
+  B.post = G => { G.cape = ckScarfGeo(); };
+  B.fx = { silk: 1 };
+}
+function hdAceScarf(B) {                                                 // crimson silk with gold edges, wound round her neck, knotted at her throat with two pointed tails and a gold wing badge (its long end still streams)
+  const o = { base: 0xc8193a, shade: 0x9e1028, edge: 0xf2c14a, w: 0.021, t: 0.012 }, N = ckNeck(0.02, 0.045);
+  hdScarfWrap(B, N, o);
+  const f = ckFrontOf(N, 0.75), kp = f.p.clone().addScaledVector(f.out, 0.012).add(hdV(0.006, -0.008, 0));
+  B.s(ckFluff(CKG.sph(0.02, 14, 10), 0.14, 5), o.base, kp.toArray(), null, [1.15, 0.95, 0.8]);
+  for (const sx of [-1, 1]) hdScarfTail(B, hdV(kp.x + sx * 0.006, kp.y - 0.012, kp.z + 0.002), hdV(sx * 0.32, -1, 0.35).normalize(), 0.06, 0.026, o, 0.002);
+  B.frame([kp.x, kp.y + 0.002, kp.z + 0.016], [Math.atan2(-f.out.y, f.out.z) - 0.2, 0, 0]);   // the badge: a gold disc with a red star, a wing either side
+  B.s(CKG.cyl(0.011, 0.011, 0.004, 20), 0xf2c14a, [0, 0, 0], [Math.PI / 2, 0, 0]);
+  B.s(ckFlat(ckStarPts(0.0075, 0.45), 0.002), 0xd8283a, [0, 0, 0.0028]);
+  for (const sx of [-1, 1]) B.s(ckFlat([[0, 0.004], [0.012, 0.009], [0.026, 0.008], [0.02, 0.003], [0.025, 0.0], [0.017, -0.003], [0.02, -0.006], [0, -0.004]].map(([x, y]) => [sx * (x + 0.009), y]), 0.0022), 0xf7d36a, [0, 0, 0.001]);
+  B.frame();
+  B.post = G => { const g = G.cape = ckScarfGeo(), Cc = g.attributes.color, U = g.userData.ck.uv, c = new THREE.Color();
+    for (let i = 0; i < Cc.count; i++) { const u = U[i * 2], v = U[i * 2 + 1]; c.set(v > 0.93 ? (i % 2 ? 0xffd86a : 0xf2b632) : Math.abs(u) > 0.8 ? 0xf2c14a : Math.abs(u) > 0.55 ? 0xb3142e : 0xd01d3d); Cc.setXYZ(i, c.r, c.g, c.b); } };
+  B.fx = { silk: 1 };
+}
+
+/* ---------- 🪢 the double-knot earrings, rebuilt to the reference ---------- */
+function hdKnotCols(v) {                                                 // [block base, block shine, block deep, ring base, ring shine, ring deep]: 0 gold, 1 silver, 2 gold block and silver rings, 3 rose gold
+  const G = [0xecb63c, 0xfff2c0, 0xa8771a], S = [0xd9dde4, 0xffffff, 0x8d949f], R = [0xe8a888, 0xffe4d6, 0xb0705a];
+  const P = [[G, G], [S, S], [G, S], [R, R]][v] || [G, G]; return P[0].concat(P[1]);
+}
+function hdKnot(B, v) {                                                  // (ears2Knot) three straight, parallel, chunky polished tubes in a block on the ear; two thick rings knotted together, hanging behind and below it
+  /* (to the reference: tube diameter ~0.33 of the block's width, the tubes nearly touching; ring tube as thick as the block's tubes; block height ~0.9 of the
+     rings' outer diameter; two rings nearly concentric (centres ~17% of their diameter apart), centred under the block, their tops passing behind it) */
+  const C = hdKnotCols(v), u = 1.4 / 1.45, rt = 0.0045 * u, rr = rt, D = 0.042 * u, R = D / 2 - rr, Lh = (0.9 * D - 2 * rt) / 2, bow = 0.0024 * u, zr = rr + 0.0016 * u, zc = zr + rr + rt + 0.0042 * u;
+  const cy = -Lh - rt, dx = 0.0031 * u, dy = 0.0018 * u, prev = hdEar.cur;
+  const zAt = y => zc + bow * Math.sin(Math.PI * Math.min(1, Math.max(0, (y + Lh) / (2 * Lh))));
+  hdEar.cur = { mode: 'hang', k: 1, ref: null };
+  try {
+    ears2Pair(B, { s: 0.6, t: 0.14, pv: [0, cy + R * 0.85, zr], ph: 0.5 }, b => {
+      for (const i of [-1, 0, 1]) {                                      // the block: three tubes side by side, straight up and down, bowed a touch out from the ear like a cuff, rounded ends
+        const x0 = i * rt * 1.99, pts = []; for (let k = 0; k <= 10; k++) { const y = Lh - 2 * Lh * k / 10; pts.push(hdV(x0, y, zAt(y))); }
+        const col = (x, y, z) => { const nx = (x - x0) / rt, nz = (z - zAt(y)) / rt; return nz > 0.55 && nx > -0.62 && nx < 0.12 ? C[1] : nz < 0.2 || (Math.abs(nx) > 0.86) ? C[2] : C[0]; };
+        b.s(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, rt, 14, false), col);
+        for (const e of [pts[0], pts[10]]) b.s(CKG.sph(rt, 14, 10), (x, y, z) => { const nz = z / rt, nx = x / rt; return nz > 0.55 && nx > -0.62 && nx < 0.12 ? C[1] : nz < 0.2 ? C[2] : C[0]; }, [e.x, e.y, e.z]);
+      }
+    }, b => {                                                            // the knot: two thick round rings linked through each other, offset, their tops passing behind the block
+      const ring = (x, y, z) => { const q = Math.hypot(x, y) || 1, nr = (q - R) / rr, nz = z / rr; return nz > 0.5 && nr > -0.55 && nr < 0.35 ? C[4] : nz < -0.1 || Math.abs(nr) > 0.88 ? C[5] : C[3]; };
+      b.s(CKG.tor(R, rr, 14, 60), ring, [-dx, cy + dy, zr], [0.05, 0.17, 0.12]);
+      b.s(CKG.tor(R, rr, 14, 60), ring, [dx, cy - dy, zr], [-0.05, -0.17, -0.12]);
+    });
+  } finally { hdEar.cur = prev; }
+}
+
+function hdCovers(W) {                                                  // (chained onto ears2Covers) a helmet or a snug knit over her ear bases: the earrings hang out over it
+  const r = hdCovers.f0(W); if (r) return r;
+  const h = W.hat && W.hat.it && W.hat.it.id; return h && /^(aceHelmet|crashHelmet|fanKnight|toque|harvestToque|santaHat|propBeanie)$/.test(h) ? -0.5 : 0;
+}
+/* ---------- worn: her crown steps back a touch from the earrings ---------- */
+function hdDressEnd(R) {
+  try {
+    const W = R && R.ck; if (!W || !R.crown) return;
+    const u = R.crown.userData; if (u.hdZ == null) u.hdZ = R.crown.position.z;
+    R.crown.position.z = u.hdZ - (W.ears ? 0.014 : 0);
+  } catch (e) { hdErr(e); }
+}
+
+/* ---------- registering ---------- */
+function hdPrepAll() {                                                   // (after ckPacksRun) once: every item in these slots gets its new builder / wrapper
+  if (hdPrepAll.done) return; hdPrepAll.done = true;
+  try { for (const it of CK_ITEMS) if (it.slot === 'ears' && it.id !== 'doubleKnot') hdEarWrap(it);
+    const H = hdHatSpecs(); for (const id in H) { const it = CK_BY_ID[id]; if (it) hdWrap(it, B => hdHatPost(B, H[id])); }
+    const Bd = hdBandSpecs(); for (const id in Bd) { const it = CK_BY_ID[id]; if (it) hdWrap(it, B => hdBandPost(B, Bd[id])); }
+    for (const it of CK_ITEMS) if (it.slot === 'specs' && it.build) hdWrap(it, B => hdSpecsPost(B));
+    const I = CK_BY_ID; if (I.popOval) hdWrap(I.popOval, B => hdXform(B, new THREE.Matrix4().makeTranslation(0, -0.019, 0.002)));
+    if (I.fanHalfMoons) hdWrap(I.fanHalfMoons, B => hdHalfMoonsPost(B)); if (I.raceGoggles) hdWrap(I.raceGoggles, B => hdGogglesPost(B)); if (I.evShield) hdWrap(I.evShield, B => hdShieldPost(B)); if (I.fanVisor) hdWrap(I.fanVisor, B => hdVisorPost(B));
+    const Nk = hdNeckSpecs(); for (const id in Nk) { const it = I[id]; if (it) hdWrap(it, B => hdNeckPost(B, Nk[id])); }
+    if (I.aviatorScarf) I.aviatorScarf.build = B => hdAviatorScarf(B); if (I.aceScarf) I.aceScarf.build = B => hdAceScarf(B);
+    if (I.aceScarf) I.aceScarf.blurb = 'Crimson silk with gold edges, knotted at her throat with a gold wing badge, its long end streaming out behind her as she runs. Only for the pilot who took down the Rat King. 🏆 Earn it: in Sky Paws, storm Casa Loma and beat the Rat King.';
+    const K = CK_BY_ID.doubleKnot; if (K) { K.thumbDir = hdEarThumbDir(); K.blurb = 'Chunky, high-shine statement earrings: three plump polished tubes side by side on each ear, and two thick rings knotted together hanging just below. Liquid gold. Very main character.'; }
+  } catch (e) { hdErr(e); }
+}
+function hdInstall() {
+  if (hdInstall.done) return; hdInstall.done = true;
+  const ok = f => typeof f === 'function';
+  if (ok(ears2Frame)) { hdEarFrame.f0 = ears2Frame; ears2Frame = hdEarFrame; }
+  if (ok(ears2Knot)) ears2Knot = hdKnot;
+  if (ok(ckTemples)) ckTemples = hdTemples;
+  if (ok(ears2Covers)) { hdCovers.f0 = ears2Covers; ears2Covers = hdCovers; }
+  if (ok(closetDress)) { const f0 = closetDress; closetDress = function (R) { const r = f0.apply(this, arguments); hdDressEnd(R); return r; }; }
+  if (ok(ckPacksRun)) { const f0 = ckPacksRun; ckPacksRun = function () { const r = f0.apply(this, arguments); hdPrepAll(); return r; }; }
+  try { if (ckState.S) hdPrepAll(); } catch (e) {}
+}
+try { hdInstall(); } catch (e) { console.error(e); }
+/* (end of HEAD_V1) */
+/* POL_V1 */
+/* =====================================================================
+   POL_V1 (2026-10-13): Closet polish (cards, bags, readability, trails, near-twins).
+   - Cards: every top (slot 'outfit', all but the ghost sheet) is photographed on a soft dress form, a headless PKR-shaped
+     mannequin (her own body blobs, a neck and four leg stubs, one merged mesh), from a 3/4 front angle, so the card reads
+     as clothes on a body, not a hollow shell seen through the neck hole. Generic: it wraps ck5bThumb for that slot, so
+     whatever builds a top (FIT_V1 now, or anyone later) is photographed the same way. Every card of every slot also gets
+     a framing check (ckThumbPut is wrapped): a picture whose thing runs thickly off the edge of the card is taken again,
+     zoomed out a step or two, so nothing is cut off.
+   - Quilted chain bag: 1.6x bigger, hung on her left hip (the side the Closet and the side-on yard camera show), on a real
+     crossbody chain from its two rings, and it swings (CK sway: walk, run, jump, the Closet hop, the clones that run fx).
+   - Pizza backpack: the slice stands up 36 degrees from her back in a little pizza-box cradle, so you see its face, not its edge.
+     Foam finger: sits in a holster on her back (it floated). Belt bag: on her left hip on a waist belt, 1.4x.
+     Parasol card: from the side, so the stalk and gills show (it was a bottle cap).
+   - Mermaid tail fin: tapering scaled sleeve of overlapping fish scales (no rings), soft teal-to-violet, and a fan fin about
+     1.7x bigger with ribs and a V, so it reads from the side too. Dino tail spikes: no green skin over her tail (it read
+     as a pickle); bold amber stegosaurus plates along the top of her own tail, a green root cuff and a spiky tip (TAIL_V1's cover builders
+     are swapped, so the skinning, curl and cards are TAIL_V1's).
+   - Sparse trails (11): about twice as many sprites, 1.3x bigger; the sprite pool is 128 (64 on 'low' stays 24 + half rate).
+   - Moon boots: puffy quilted silver with chunky navy soles, a gold crescent moon on the front and stars on the sides, so
+     they no longer look like the mitten boots.
+   Ids, names, prices, sets, perks and colourways are kept (colourways rebuild from the new shapes). No lights. Draw calls:
+   chain bag 1 (was 2), the rest unchanged or one fewer. Everything is a hoisted function declaration; polInstall() runs once
+   here and chains runtime wrappers onto ckPacksRun, ck5bThumb, ckThumbPut and ck5bTrailSys. Nothing else in the file is edited.
+   ===================================================================== */
+function polErr(e) { if (!polErr.n) { polErr.n = 1; console.error(e); } }
+function polInstall() {
+  if (polInstall.done) return; polInstall.done = true;
+  const ok = f => typeof f === 'function';
+  try { if (ok(ckPacksRun)) { const f0 = ckPacksRun; ckPacksRun = function () { const r = f0.apply(this, arguments); polReg(); return r; }; } } catch (e) { polErr(e); }
+  try { if (ok(ck5bThumb)) { const f0 = ck5bThumb; ck5bThumb = function (it, T) { if (polFormFor(it)) { try { if (polOutfitThumb(it, T)) return true; } catch (e) { polErr(e); } } return f0.apply(this, arguments); }; } } catch (e) { polErr(e); }
+  try { if (ok(ckThumbPut)) { const f0 = ckThumbPut; ckThumbPut = function (it, card, src) { let s = src; try { s = polRefit(it, src) || src; } catch (e) { polErr(e); } return f0.call(this, it, card, s); }; } } catch (e) { polErr(e); }
+  try { if (ok(ck5bTrailSys)) { const f0 = ck5bTrailSys; ck5bTrailSys = function (sc, n) { return f0.call(this, sc, n >= 64 ? 128 : n); }; } } catch (e) { polErr(e); }
+  try { if (ckState.S) { polReg(); polRedress(); } } catch (e) { polErr(e); }
+}
+function polReg() {                                                      // (ckPacksRun, after every pack and FIT/TAIL) the new builds, cards and trail tuning
+  if (polReg.done) return; polReg.done = true;
+  const I = CK_BY_ID, kill = it => { it.geo = null; delete it.ck5bV; delete it.ck5bP; delete it.ck5bH; delete it.ck5bVs; it.fx = null; it.tcTh = null; };
+  try { for (const it of CK_ITEMS) if (polFormFor(it)) { if (!it.thumbDir || String(it.thumbDir) === '0.75,0.55,0.9') it.thumbDir = [1, 0.36, 0.5];
+      if (!Object.prototype.hasOwnProperty.call(it, 'thumb')) Object.defineProperty(it, 'thumb', { get() { return this.polTh || null; }, configurable: true }); } } catch (e) { polErr(e); }   /* (framed tight on the top and its form: polOutfitThumb measures it) */
+  try { const it = I.evChainBag; if (it && it.evV) { it.evBuild = polChainBag; it.build = B => polChainBag(B, 0); kill(it); evVarsSet(it, it, 0); it.thumbDir = [-1, 0.34, 0.16]; } } catch (e) { polErr(e); }
+  try { const it = I.pizza; if (it) { it.build = B => polPizza(B); kill(it); delete it.thumb; it.thumbDir = [-0.85, 0.62, -0.45]; } } catch (e) { polErr(e); }
+  try { const it = I.foamFinger; if (it) { it.build = B => polFinger(B); kill(it); } } catch (e) { polErr(e); }
+  try { const it = I.evBeltBag; if (it) { it.build = B => polBeltBag(B); kill(it); it.thumbDir = [-1, 0.42, 0.35]; it.blurb = 'A mint belt bag buckled on at her hip: a curved pouch, a front pocket, a zip and a clip buckle. Snacks within reach at all times.'; } } catch (e) { polErr(e); }
+  try { const it = I.parasol; if (it) it.thumbDir = [0.92, 0.18, 0.55]; } catch (e) { polErr(e); }
+  try { const it = I.fanMoonBoots; if (it) { it.build = B => polMoonBoots(B); kill(it); it.blurb = 'Puffy quilted silver moon boots with chunky navy soles, a gold crescent moon on the front and stars up the sides. Bouncy on any planet.'; } } catch (e) { polErr(e); }
+  try { if (typeof tcSpecs === 'function') { const S = tcSpecs();
+      if (S.natFinTail && I.natFinTail) { S.natFinTail.fn = polFin; kill(I.natFinTail); }
+      if (S.fanDinoSpikes && I.fanDinoSpikes) { S.fanDinoSpikes.fn = polDino; kill(I.fanDinoSpikes); I.fanDinoSpikes.blurb = 'Bold amber stegosaurus plates marching up the top of her tail, a scaly green cuff and a spiky tip. Extinct? Not this one.'; } } } catch (e) { polErr(e); }
+  try { const sp = ck5bTrailDef('sparkles');
+    for (const id of ['natPetals', 'seaClovers', 'natBees', 'seaEggTrail', 'seaConfetti', 'natFireflies', 'fanRainbow', 'fanComet', 'embers', 'evPearlTrail', 'pumpkinTrail']) {
+      const it = I[id]; if (!it || it.slot !== 'trail') continue; const D = ck5bTrailDef(it.trail || id); if (!D || D === sp || D.polX) continue;
+      D.polX = 1; D.rate = (D.rate || 16) * 2; if (D.size) D.size = [D.size[0] * 1.3, D.size[1] * 1.3]; }
+  } catch (e) { polErr(e); }
+  try { if (typeof seaTrailHook === 'function') seaTrailHook.cur = null; if (typeof natTrailHook === 'function') natTrailHook.cur = null; } catch (e) {}   /* (their one-shot def -> material hand-off: nothing pending) */
+}
+function polRedress() {                                                  // (only if she was dressed before this ran) the new builds on
+  for (const R of [walk && walk.rig, typeof CK !== 'undefined' && CK.rig]) { try { if (!R || !R.ck) continue; for (const s of ['pack', 'paws', 'tail']) if (R.ck[s]) R.ck[s].id = '#'; closetDress(R, R === walk.rig ? ckState().outfit : CK.prev); } catch (e) {} }
+}
+
+/* ---------- cards: a top on a soft dress form; a picture cut off at the edges taken again, a step further out ---------- */
+function polFormFor(it) { return !!it && it.slot === 'outfit' && !!it.build && it.k5 !== 'sheet'; }
+function polForm() {                                                     // (cached) a headless dress form of her body: her blobs, a capped neck, four leg stubs
+  if (polForm.g) return polForm.g;
+  const B = ckB(), c0 = 0xd8cdc8, c1 = 0xc2b5b0;
+  for (const e of CK_BODY) B.m(CKG.sph(1, 28, 18), c0, [e[0], e[1], e[2]], null, [e[3] * 0.97, e[4] * 0.97, e[5] * 0.97]);
+  B.m(CKG.cyl(0.082, 0.104, 0.17, 24), c0, [0, 0.575, 0.282], [0.66, 0, 0]);
+  B.m(CKG.sph(1, 24, 12), c1, [0, 0.645, 0.335], [0.66, 0, 0], [0.082, 0.018, 0.082]);
+  for (const [x, z] of [[-0.1, 0.24], [0.1, 0.24], [-0.1, -0.26], [0.1, -0.26]]) { B.m(CKG.cyl(0.05, 0.046, 0.17, 18), c0, [x, 0.315, z]); B.m(CKG.sph(1, 16, 10), c1, [x, 0.23, z], null, [0.046, 0.02, 0.046]); }
+  return (polForm.g = ckMerge(B.parts.m));
+}
+function polOutfitThumb(it, T) {                                         // (ck5bThumb, for tops) the top, its sleeves (and hood, trouser legs) where her legs are, on the form
+  if (T.ck5g) { T.ck5g.forEach(g => g.dispose()); T.ck5g = null; }
+  const inst = ckInstance(it), o = new THREE.Group(); o.add(inst.obj); T.fxInst = inst;
+  const LP = [[-0.1, 0.42, 0.24], [0.1, 0.42, 0.24], [-0.1, 0.42, -0.26], [0.1, 0.42, -0.26]];
+  try { const R = CK.rig; if (R && R.legs && R.legs.length === 4) R.legs.forEach((L, i) => { LP[i] = L.position.toArray(); }); } catch (e) {}
+  if (it.head) { const h = ck5bPart(it, 'head', 0); h.position.set(0, 0.68, 0.36); o.add(h); }
+  if (it.legs) for (const li of (it.legsOn || [0, 1, 2, 3])) { if (!LP[li]) continue; const h = ck5bPart(it, 'legs', 0); h.position.fromArray(LP[li]); o.add(h); }
+  if (it.fitLegsB) for (const li of [2, 3]) { const h = ck5bPart(it, 'fitLegsB', 0); h.position.fromArray(LP[li]); o.add(h); }
+  o.add(new THREE.Mesh(polForm(), ckMat().m));
+  it.polTh = polFrame(o, it.thumbDir || [1, 0.36, 0.5]);
+  T.ck5o = o; return true;
+}
+function polFrame(o, dir) {                                              // [x, y, z, r]: the middle of o, and how big a ball the card must hold to show all of it from dir
+  o.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(o), c = b.getCenter(new THREE.Vector3()), d = new THREE.Vector3().fromArray(dir).normalize();
+  const u = Math.abs(d.y) > 0.95 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0), x = new THREE.Vector3().crossVectors(u, d).normalize(), y = new THREE.Vector3().crossVectors(d, x), p = new THREE.Vector3(); let r = 0.02;
+  for (let i = 0; i < 8; i++) { p.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).sub(c); r = Math.max(r, Math.abs(p.dot(x)), Math.abs(p.dot(y))); }
+  return [c.x, c.y, c.z, r * 0.96];   /* (box corners stick out past a round body: a hair under them still shows it all) */
+}
+function polEdge(cv) {                                                   // how much of a picture touches its edges (opaque pixels in the outer two rows and columns)
+  const W = cv.width, d = cv.getContext('2d').getImageData(0, 0, W, W).data; let n = 0;
+  for (let i = 0; i < W; i++) for (const k of [i, W + i, (W - 1) * W + i, (W - 2) * W + i, i * W, i * W + 1, i * W + W - 1, i * W + W - 2]) if (d[k * 4 + 3] > 90) n++;
+  return n;
+}
+function polRefit(it, src) {                                             // (ckThumbPut) a card cut off at its edges: the same picture, zoomed out a step (up to three)
+  const T = CK.th; if (!T || !T.holder || !T.holder.children.length || !src || !src.getContext || !it || it.slot === 'trail') return null;   /* (a trail's card is a swoosh off the edge on purpose) */
+  let e = polEdge(src); if (polRefit.log) polRefit.log.push([it.id, e]); if (e < 60) return null;
+  const f0 = T.cam.fov; let out = null;
+  try { for (let k = 1; k <= 3 && e >= 60; k++) { T.cam.fov = f0 * Math.pow(1.17, k); T.cam.updateProjectionMatrix(); out = polGrab(T); e = polEdge(out); } }
+  finally { T.cam.fov = f0; T.cam.updateProjectionMatrix(); }
+  if (polRefit.log) polRefit.log.push([it.id + '>', e]);
+  return out;
+}
+function polGrab(T) {                                                    // (polRefit) the thumbnail scene again, into a fresh canvas
+  renderer.setRenderTarget(T.rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(T.scene, T.cam);
+  renderer.readRenderTargetPixels(T.rt, 0, 0, 256, 256, T.buf); renderer.setRenderTarget(null);
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), im = g.createImageData(256, 256), row = 256 * 4;
+  for (let y = 0; y < 256; y++) im.data.set(T.buf.subarray((255 - y) * row, (256 - y) * row), y * row);
+  g.putImageData(im, 0, 0); return c;
+}
+
+/* ---------- packs ---------- */
+function polChainBag(B, v) {                                             // a quilted bag on her left hip, 1.6x, a gold heart turn-lock, on a crossbody chain from its two rings; it swings
+  const M = evMetal(v === 1 ? 1 : v === 3 ? 3 : 0), bag = [0xf7b8ca, 0xf7b8ca, 0xf6efe4, 0x2a2730][v] || 0xf7b8ca, groove = [0xe596ae, 0xe596ae, 0xdcd2c4, 0x17151b][v] || 0xe596ae;
+  const S = 1.6, F = B.mat([-0.262, 0.345, -0.12], [0, 0, -0.07], S), rF = evV3(0, 0.05, 0.06).applyMatrix4(F), rB = evV3(0, 0.05, -0.06).applyMatrix4(F), top = evV3(0, 0.05, 0).applyMatrix4(F);
+  if (!ckStraps.off) { const pts = [rF.clone()], N = 44;   /* (front ring, up her left side, over her back, down her right, under her, back up to the back ring) */
+    for (let i = 1; i < N; i++) { const t = i / N, a = 1.5 * Math.PI + 0.42 + t * (2 * Math.PI - 0.84), z = rF.z + (rB.z - rF.z) * t + 0.22 * Math.sin(Math.PI * t), d = [Math.sin(a), Math.cos(a), 0], r = ckReach([0, 0.42, z], d, CK_BODY, 0.012, 0.45) || 0.2;
+      pts.push(evV3(d[0] * r, 0.42 + d[1] * r, z)); }
+    pts.push(rB.clone()); evChainLinks(B, new THREE.CatmullRomCurve3(pts, false, 'centripetal'), 96, M[0], M[1], 0.0062); }
+  const a = B.parts.s.reduce((n, [g]) => n + g.attributes.position.count, 0);
+  B.M = F.clone();
+  const quilt = (x, y, z) => { const p = ((y + z) / 0.028 % 1 + 1) % 1, q = ((y - z) / 0.028 % 1 + 1) % 1; return Math.min(p, 1 - p, q, 1 - q) < 0.12 ? groove : bag; };
+  { const g = ck4RBox(0.034, 0.095, 0.125, 0.013, 18), P = g.attributes.position;
+    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i); if (x < 0.005) continue; const p = ((y + z) / 0.028 % 1 + 1) % 1, q = ((y - z) / 0.028 % 1 + 1) % 1, gr = Math.min(p, 1 - p, q, 1 - q); P.setX(i, x - 0.0026 * Math.max(0, 0.18 - gr) / 0.18); }
+    g.computeVertexNormals(); g.rotateY(Math.PI); B.s(g, quilt); }
+  B.s(ck4RBox(0.012, 0.05, 0.13, 0.006, 6), groove, [-0.017, 0.026, 0], [0, 0, -0.06]);                       // the flap
+  B.s(ckFlat(ckHeartPts(0.0105), 0.004), M[0], [-0.025, 0.003, 0], [0, -Math.PI / 2, 0]);                    // the heart turn-lock
+  for (const z of [-0.06, 0.06]) B.s(CKG.tor(0.006, 0.0018, 5, 12), M[0], [0, 0.05, z], [0, Math.PI / 2, 0]);
+  B.frame();
+  const b = B.parts.s.reduce((n, [g]) => n + g.attributes.position.count, 0);
+  B.fx = { sway: { k: 's', groups: [{ a, b, c: [top.x, top.y, top.z], ph: 0.7, sx: -1 }] } };   /* (it swings out from her side, never into it) */
+}
+function polPizza(B) {                                                   // a slice standing up from her back, its point in a little pizza-box cradle, leaning out to her left: you see its face
+  { const Z = evV3(0, 0.6, 0.8).normalize(), Y = evV3(-0.72, 0.52, -0.38), X = new THREE.Vector3(); Y.addScaledVector(Z, -Y.dot(Z)).normalize(); X.crossVectors(Y, Z);   /* (point down in the cradle, crust up toward her head, its face turned out to her left side and back) */
+    B.M = new THREE.Matrix4().makeBasis(X, Y, Z).scale(evV3(1.22, 1.22, 1.22)).setPosition(evV3(0, 0.618, -0.21)); }
+  B.m(new THREE.CylinderGeometry(0.21, 0.21, 0.026, 10, 1, false, -0.4, 0.8), (x, y) => y > 0.011 ? 0xffd35a : 0xf2b35c, [0, 0, 0]);
+  B.m(CKG.tor(0.205, 0.016, 6, 12, 0.8), 0xd98a3a, [0, 0.008, 0], [Math.PI / 2, 0, Math.PI / 2 - 0.4]);
+  for (const [a, r] of [[0.12, 0.14], [-0.15, 0.1], [0.02, 0.06], [-0.05, 0.17]]) B.m(CKG.cyl(0.019, 0.019, 0.006, 14), 0xd8342e, [Math.sin(a) * r, 0.016, Math.cos(a) * r]);
+  B.m(CKG.sph(0.012, 8, 6), 0x3f9a3f, [0.07, 0.016, 0.1], null, [1.4, 0.3, 0.8]);
+  B.frame([0, 0.622, -0.2], [0.1, 0, 0]);
+  B.m(ck4RBox(0.13, 0.036, 0.1, 0.008, 3), (x, y, z) => y > 0.013 ? 0xd9ad74 : 0xc99a62);                     // the cradle: a little pizza box, open at the top
+  B.m(ck4RBox(0.1, 0.012, 0.07, 0.004, 2), 0x9a6e3c, [0, 0.014, 0]);
+  B.m(CKG.cyl(0.016, 0.016, 0.003, 16), 0xd8342e, [0, 0, -0.051], [Math.PI / 2, 0, 0]);                      // its red sticker, at the back
+  B.frame(); ckStraps(B, 0xd98a3a);
+}
+function polFinger(B) {                                                  // a giant foam finger standing in a holster on her back (it floated)
+  const blue = 0x2a5fc4, white = 0xf4f6fb, navy = 0x16408a;
+  B.frame([0, 0.672, -0.08], [-0.28, 0, 0]);
+  B.m(ck4RBox(0.12, 0.1, 0.05, 0.022, 3), blue, [0, 0.05, 0]);                                                   // the hand
+  for (let i = 0; i < 3; i++) B.m(ck4RBox(0.032, 0.04, 0.05, 0.014, 3), blue, [-0.04 + i * 0.036 + 0.012, 0.1, 0.006], [-0.3, 0, 0]);   // three curled fingers
+  B.m(ck4RBox(0.036, 0.14, 0.046, 0.017, 3), blue, [-0.042, 0.16, 0]);                                           // the pointing finger
+  B.m(ck4RBox(0.03, 0.06, 0.04, 0.013, 3), blue, [0.072, 0.05, 0.004], [0, 0, -0.6]);                            // the thumb
+  B.m(ckFlat(ckStarPts(0.03, 0.45), 0.006), white, [0.012, 0.045, 0.027]);
+  B.m(ck4RBox(0.13, 0.02, 0.055, 0.008, 2), white, [0, -0.005, 0]);                                              // a white cuff
+  B.m(ck4RBox(0.152, 0.058, 0.078, 0.016, 3), navy, [0, -0.034, 0]);                                             // the holster it stands in
+  B.m(ck4RBox(0.158, 0.012, 0.084, 0.005, 2), white, [0, -0.003, 0]);                                            // its white rim
+  B.m(ckFlat(ckStarPts(0.014, 0.45), 0.004), white, [0, -0.036, 0.04]);
+  B.frame(); ckStraps(B, navy);
+}
+function polBeltBag(B) {                                                 // a mint belt bag at her left hip, 1.4x, on a waist belt with a clip buckle on her other side
+  const mint = 0x8fe0c8, mint2 = 0x76cdb3, pk = 0xb6f0de, blk = 0x2a2a30, sil = 0xdfe2ea, z0 = -0.1, y0 = 0.425;
+  const loop = evBodyLoop(z0, 0.02, 0.009, y0);
+  if (!ckStraps.off) { B.m(ckBand(loop, evV3(0, 0, 1), 0.024, 0.006, 96), blk);
+    const p = ckOnCurve(loop, 0.25); B.m(ck4RBox(0.012, 0.04, 0.034, 0.004, 3), 0x3a3a42, [p.x + 0.006, p.y, p.z]); }
+  const r = ckReach([0, y0, z0], [-1, 0, 0], CK_BODY, 0.009, 0.45) || 0.2;
+  B.frame([-(r + 0.04), y0, z0], [0, Math.PI / 2, 0], [1.35, 1.4, 0.95]);
+  { const g = ck4RBox(0.17, 0.056, 0.074, 0.026, 8), P = g.attributes.position; for (let i = 0; i < P.count; i++) { const x = P.getX(i); P.setY(i, P.getY(i) - 0.02 * Math.pow(x / 0.085, 2)); } g.computeVertexNormals(); B.m(g, mint); }
+  { const g = ck4RBox(0.11, 0.03, 0.01, 0.008, 4), P = g.attributes.position; for (let i = 0; i < P.count; i++) { const x = P.getX(i); P.setY(i, P.getY(i) - 0.02 * Math.pow(x / 0.085, 2)); } g.computeVertexNormals(); B.m(g, pk, [0, -0.002, -0.036]); }
+  const zp = []; for (let i = 0; i <= 12; i++) { const x = -0.07 + 0.14 * i / 12; zp.push([x, 0.0275 - 0.02 * Math.pow(x / 0.085, 2), 0]); }
+  B.s(ckTaper(zp, 0.0025, 0.0025, 24, 5), mint2);
+  B.s(CKG.box(0.012, 0.008, 0.004), sil, [0.055, 0.03 - 0.02 * Math.pow(0.055 / 0.085, 2), -0.012]);
+  B.frame();
+}
+
+/* ---------- tail covers (TAIL_V1 builds, skins and curls them; in her tail's rest frame: z 0 at the root, -z to the tip, -y on top) ---------- */
+function polFin(B) {                                                     // a mermaid's tail: a tapering sleeve of overlapping fish scales, a pearly band, a big ribbed fan fin
+  const z0 = -0.07, zt = -0.49, NC = 14, nA = NC * 6, NR = 190, R = 0.64;
+  const rad = z => { const s = tcTailR(z) + 0.0062, lin = 0.0385 + (0.0115 - 0.0385) * Math.max(0, Math.min(1, (-0.42 - z) / 0.07)); return z < -0.42 ? Math.max(s, lin) : s; };
+  const V = [0]; for (let i = 1; i <= NR; i++) { const za = z0 + (zt - z0) * (i - 1) / NR, zb = z0 + (zt - z0) * i / NR, rr = rad((za + zb) / 2); V.push(V[i - 1] + Math.abs(zb - za) / Math.max(0.006, 0.78 * 2 * Math.PI * rr / NC)); }   /* (rows: as tall as the scales are wide, so they shrink to the tip) */
+  const sc = new Array((NR + 1) * (nA + 1));
+  const scale = (u, v) => { const r0 = Math.floor(v);
+    for (let r = r0 - 1; r <= r0 + 1; r++) { const off = (r & 1) * 0.5, base = Math.floor(u - off); let best = null;
+      for (let c = base - 1; c <= base + 1; c++) { const cu = c + 0.5 + off; let du = u - cu; du -= Math.round(du / NC) * NC; const dv = v - (r + 0.42), d = Math.hypot(du, dv) / R; if (d < 1 && (!best || d < best.d)) best = { d, dv: dv / R, id: r * 64 + ((c % NC) + NC) % NC }; }
+      if (best) return best; }
+    return { d: 1, dv: 0, id: 0 }; };
+  const rings = [];
+  for (let i = 0; i <= NR; i++) { const z = z0 + (zt - z0) * i / NR, rr = rad(z), v = V[i];
+    rings.push({ z, r: i === NR ? 0.003 : (th, j) => { const s = sc[i * (nA + 1) + j] = scale(j / nA * NC, v), h = Math.max(0, Math.min(1, 0.5 + 0.5 * s.dv)) * (s.d > 0.86 ? Math.max(0, (1 - s.d) / 0.14) : 1);
+      return rr + 0.0026 * h; } }); }
+  const g = tcTube(rings, nA, false, true), W = nA + 1;
+  B.s(g, (x, y, z, i) => { const ri = Math.floor(i / W); if (ri > NR) return 0x6f7cf0; const j = i % W % nA, s = sc[ri * W + j] || { d: 1, dv: 0, id: 0 }, t = ri / NR;
+    let c = t < 0.5 ? tcMix(0x34c4b8, 0x3fa6e0, t / 0.5) : tcMix(0x3fa6e0, 0x8f7cf2, (t - 0.5) / 0.5);
+    const k = tcH(s.id, 3); c = tcMix(c, k > 0.5 ? 0xffffff : 0x1d5f8a, Math.abs(k - 0.5) * 0.28);   /* (each scale its own shade) */
+    if (s.d < 0.62) c = tcMix(c, 0xeafffb, 0.3 * (1 - s.d / 0.62) * (s.dv < 0.2 ? 1 : 0.5));                    /* (a pearly sheen in the middle) */
+    if (s.d > 0.8) c = tcMix(c, 0x1f6a86, 0.36 * Math.min(1, (s.d - 0.8) / 0.18));                              /* (a soft darker rim) */
+    return c; });
+  const r0 = rad(z0);
+  B.s(CKG.tor(r0 + 0.0035, 0.0045, 8, 36), (x, y, z, i) => tcH(i, 9) > 0.5 ? 0xe8fbff : 0xd6f0ff, [0, 0, z0]);
+  for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; B.s(CKG.sph(0.005, 8, 6), 0xf6f2ff, [Math.cos(a) * (r0 + 0.0075), Math.sin(a) * (r0 + 0.0075), z0 + 0.003]); }
+  const a = tcCnt(B, 'm'), zf = zt + 0.004, L = 0.15;
+  B.m(CKG.cyl(0.0105, 0.016, 0.03, 14), 0x5fd8d6, [0, 0, zf - 0.008], [Math.PI / 2, 0, 0]);
+  for (const sx of [-1, 1]) { const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, sx * 0.42, 0)), m = new THREE.Matrix4().compose(evV3(0, 0, zf - 0.018), q, evV3(1, 1, 1));
+    B.parts.m.push([polFan(L, sx), (x, y) => { const f = Math.min(1, Math.hypot(x, y) / L), ang = Math.atan2(Math.abs(x), y), rib = Math.floor(ang * 11) % 2;
+      return f > 0.9 ? 0xe9f6ff : tcMix(rib ? 0x46d6cc : 0x2fbfc4, rib ? 0xa98cff : 0x8466f0, f); }, B.M.clone().multiply(m)]); }
+  tcFlPost(B, { rot: { k: 'm', list: [{ a, b: tcCnt(B, 'm'), c: [0, 0, zf], ax: [1, 0, 0], amp: 0.22, w: 4.6 }] } });
+}
+function polFan(L, sx) {                                                 // one lobe of the fin: a ribbed fan from the tail tip out to one side (+y along the tail, sx: which side), both faces
+  const NS = 22, NRr = 6, P = [], N = [], I = [], W = NS + 1;
+  for (let s = 0; s <= 1; s++) { const o = P.length / 3, sg = s ? -1 : 1;
+    for (let k = 0; k <= NRr; k++) { const f = k / NRr;
+      for (let j = 0; j <= NS; j++) { const u = j / NS, ang = 0.06 + u * 1.32, edge = L * (0.72 + 0.32 * Math.sin(u * Math.PI * 0.92)) * (1 - 0.05 * (1 - Math.cos(u * Math.PI * 12))), rr = edge * f,
+        pl = 0.0045 * f * Math.sin(u * Math.PI * 11) + 0.006 * f * f;   /* (pleats, and a soft cup) */
+        P.push(sx * Math.sin(ang) * rr, Math.cos(ang) * rr, pl + sg * 0.0012); N.push(0, 0, sg); } }
+    for (let k = 0; k < NRr; k++) for (let j = 0; j < NS; j++) { const a = o + k * W + j, b = a + W; if ((sx > 0) === !s) I.push(a, b, a + 1, a + 1, b, b + 1); else I.push(a, a + 1, b, a + 1, b + 1, b); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setIndex(I);
+  g.computeVertexNormals(); return g;
+}
+function polDino(B) {                                                    // stegosaurus plates: no skin over her tail (it read as a pickle); a scaly green cuff at the root, bold amber plates up the top, a spiky tip
+  const z0 = -0.05, gr = 0x4fae3c, gr2 = 0x3a8f2e, o1 = 0xe0581c, o2 = 0xf58a26, o3 = 0xffc63a;
+  B.m(CKG.tor(tcTailR(z0) + 0.004, 0.0085, 8, 32), (x, y, z, i) => tcH(i, 4) > 0.6 ? gr2 : gr, [0, 0, z0]);
+  const n = 7;
+  for (let k = 0; k < n; k++) { const u = k / (n - 1), z = -0.085 - u * 0.31, h = 0.094 - u * 0.044, w = 0.064 - u * 0.024, R = tcTailR(z), sx = k % 2 ? 1 : -1;
+    const pts = [[-w / 2, 0], [w / 2, 0], [w * 0.47, h * 0.42], [w * 0.2, h * 0.86], [0, h], [-w * 0.2, h * 0.86], [-w * 0.47, h * 0.42]];
+    B.m(ckFlat(pts, 0.014), (x, y) => y > h * 0.7 ? o3 : y > h * 0.3 ? o2 : o1, [sx * 0.007, -R + 0.007, z], [0, Math.PI / 2, Math.PI + sx * 0.2]); }
+  const zt = -0.44, Rt = tcTailR(zt);
+  for (const [sx, dz] of [[-1, 0], [1, 0], [-1, -0.024], [1, -0.024]]) { const d = evV3(sx, -0.55, -0.45).normalize(), q = new THREE.Quaternion().setFromUnitVectors(evV3(0, 1, 0), d);
+    B.parts.m.push([CKG.cone(0.0078, 0.044, 8), (x, y) => y > 0.008 ? 0xfff0c8 : 0xe8c27a, B.M.clone().multiply(new THREE.Matrix4().compose(evV3(sx * Rt * 0.8, -Rt * 0.5, zt + dz).addScaledVector(d, 0.018), q, evV3(1, 1, 1)))]); }
+}
+
+/* ---------- paws ---------- */
+function polCrescent(r) {                                                // a crescent moon outline (opening to the right)
+  const p = [], d = 0.45, r2 = 0.85, a1 = 1.009, b1 = 1.473;
+  for (let i = 0; i <= 20; i++) { const a = a1 + (2 * Math.PI - 2 * a1) * i / 20; p.push([Math.cos(a) * r, Math.sin(a) * r]); }
+  for (let i = 1; i < 16; i++) { const a = (2 * Math.PI - b1) - (2 * Math.PI - 2 * b1) * i / 16; p.push([(d + Math.cos(a) * r2) * r, Math.sin(a) * r2 * r]); }
+  return p;
+}
+function polMoonBoots(B) {                                               // moon boots: puffy quilted silver, a navy cuff and chunky sole, a gold crescent moon in front, stars up the sides
+  const sil = 0xcfd5e2, sil2 = 0x8c96ad, sole = 0x2e3466, sole2 = 0x454d8c, navy = 0x3a4186, gold = 0xf5c542, top = -0.215, Q = 0.027;
+  const g = ck6Boot(top, { room: 0.024, foot: 1.16, flare: 0.004 }), P = g.attributes.position;
+  for (let i = 0; i < P.count; i++) { const y = P.getY(i); if (y > -0.38 && y < top - 0.003) { const k = 1 + 0.075 * Math.pow(Math.abs(Math.sin((y - top) / Q * Math.PI)), 0.6) * Math.min(1, (top - y) / 0.012); P.setX(i, P.getX(i) * k); P.setZ(i, P.getZ(i) * k); } }
+  g.computeVertexNormals();
+  B.s(g, (x, y) => y < -0.39 ? (y < -0.405 ? sole : sole2) : y > -0.38 && Math.abs(Math.sin((y - top) / Q * Math.PI)) < 0.22 ? sil2 : sil);
+  const cr = ck5bLegR(top) + 0.029;
+  B.s(ckFluff(CKG.tor(cr, 0.016, 10, 30), 0.12, 5), navy, [0, top - 0.002, 0], [Math.PI / 2, 0, 0]);   /* (a puffy navy cuff; all one shiny mesh, so a colourway tints the silver) */
+  const rr = y => (ck5bLegR(y) + 0.024) * 1.075 + 0.0035;
+  ck5bOn(B, 's', ckFlat(polCrescent(0.021), 0.004), gold, evV3(0, -0.292, rr(-0.292)), evV3(0, 0, 1), 0.35);
+  for (const sx of [-1, 1]) { ck5bOn(B, 's', ckFlat(ckStarPts(0.012, 0.45), 0.003), gold, evV3(sx * rr(-0.262), -0.262, 0.012), evV3(sx, 0, 0.2), 0.2);
+    ck5bOn(B, 's', ckFlat(ckStarPts(0.008, 0.45), 0.003), gold, evV3(sx * rr(-0.318), -0.318, -0.012), evV3(sx, 0, -0.1), -0.3); }
+}
+try { polInstall(); } catch (e) { console.error(e); }   /* (POL_V1: the one call at load: wraps ckPacksRun, ck5bThumb, ckThumbPut, ck5bTrailSys) */
+/* (end of POL_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
