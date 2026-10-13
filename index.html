@@ -10757,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-13 08:14';                                              // stamped when the site is published
+const BUILD = '2026-10-13 08:54';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -40773,6 +40773,776 @@ function ckuiGone(S) {                                                  // (ckSt
 }
 try { ckuiInstall(); } catch (e) { console.error(e); }
 /* (end of CKUI_V1) */
+/* BIRDS_V1 */
+/* =====================================================================
+   BIRD PATROL (BIRDS_V1, 2026-10-13): a Free-roam mini-game with the super-soaker. Cheeky birds keep raiding the back yard:
+   Aunty-ji's veggie patch (tomatoes and a pot of green chillies), the plate of samosas she left on the bistro table, the basket of
+   fresh laundry, and the bird bath (a "pool party"). With the soaker in her mouth anywhere in our back yard (or standing by the bird
+   bath, where it floats: tapping hands it to her), a 💦 "Bird Patrol" pill shows in the shared bottom-right spot; tap it and a round
+   starts right there, in Free roam (joystick, 🐾 / E to squirt (hold it to keep spraying), Jump). Six waves:
+     🐦 sparrows (quick, small, in flocks, hop about; one squirt) · 🕊️ pigeons (land on the lawn and strut up, bobbing; two squirts)
+     · 🐦‍⬛ crows (out of the big trees; dodge the first squirt, go for the samosas, steal fast) · 🌊 seagulls (big swoops in from
+     the off-ramp side, hover and grab; two squirts) · and the finale, 👑 Big Gus, a giant pigeon in a little gold crown (24 squirts;
+     every fifth one he flaps a gust that shoves PKR back, then waddles off to raid somewhere else; sparrows escort him).
+   A bird that sits on its target long enough steals (a tomato, a chilli, a samosa, a sock, or makes a mess of the bath): a ❤️ off
+   (five per round; none left and the birds win). Squirting a bird on its target sets it back. A soaked bird is never hurt: it puffs
+   up, shakes, drips, squawks something grumpy and flaps off to sulk. The jet auto-aims at the best bird in a wide cone in front of
+   her (range 12 m) and turns her to it, so it works with a thumb; the water arcs to it. Combo (hits without a miss, 4.5 s apart at
+   most) multiplies the points (x1.5 at 5, up to x2.5 at 15); mid-air soaks +50; the tank is the soaker's own 24 squirts: hop into the bird
+   bath for a full refill (a cannonball soaks any birds sitting on it) or top up slowly at the rain barrel by the shed.
+   Score → 🐟 (about 50 a minute for a decent player, ECON_V1's rate) plus one-time bonuses (first patrol, first full defence, first
+   Big Gus); 🍀 luck perk on top. Saved in catguard.birds (best, rounds, clears, perfects, soaked, bosses, best combo, paid flags).
+   A "Bird Patrol" section of ten achievements; the neighbours notice (talkEvent 'birds', plus the game in TALK_V1's bests);
+   an upbeat loop through the SOUND_V1 director (its own for Big Gus); a WARM_V1 job builds the birds and compiles the spray.
+   Draws: 2 per bird in flight (body + wings; at most 8 at once, 6 on low phones), one merged mesh for the round's props, one
+   Points object for the water, four alarm sprites. No lights. Everything is a hoisted function declaration; bpInstall() (run once,
+   when this block is reached) chains runtime wrappers onto wpnSquirt, wpnTick, bbSplash, sndWant, sndSong, warmJobs, talkGames,
+   talkBestVal, talkBusyCls, talkMake, talkLines, econHost and econUp, and pushes the achievements. Nothing else is edited.
+   ===================================================================== */
+function bpS() {
+  return bpS.s || (bpS.s = { built: false, on: false, phase: 'off', t: 0, err: 0, pill: null, pillOn: false, goQ: false, visit: null, ui: null, root: null, props: null,
+    birds: [], pool: [], wave: -1, waveT: 0, q: [], breakT: 0, hearts: 5, score: 0, combo: 0, comboT: 0, bestCombo: 0, soaked: 0, squirts: 0, aimed: 0, hits: 0, stolen: 0, crows: 0,
+    boss: null, bossDone: false, escortT: 0, refills: 0, cannon: 0, hold: { btn: false, key: false, id: null, t0: 0 }, quitArm: 0, endT: 0, result: null, bank: null, low: false,
+    said: {}, tmp: {}, pend: [], jets: [], outT: 0, nagT: 0, quipT: 0, barT: 0, hud: {}, warm: false, T: null }); }
+function bpK() {
+  return bpK.k || (bpK.k = { HEARTS: 5, RANGE: 12, CONE: 0.9, CAP: 8, CAP_LOW: 6, COMBO_T: 4.5, AIR: 50, CANNON: 100, CLEAR_PTS: 1000, HEART_PTS: 300,
+    FISH_PER: 260, FISH_CAP: 160, FIRST: 15, CLEAR1: 50, BOSS1: 25, GUST_EVERY: 5 });
+}
+function bpTypes() {
+  return bpTypes.T || (bpTypes.T = {
+    sparrow: { id: 'sparrow', name: 'Sparrow', ic: '🐦', hp: 1, pts: 100, speed: 9.5, dwell: 3.4, sc: 1.55, from: 'side', flap: 46, walk: 0,
+      quips: ['Tweet?! RUDE!', 'Brrr!', 'My feathers!', 'Not the face!', 'Cheep! Cold!', 'I’m telling my mum!'] },
+    pigeon: { id: 'pigeon', name: 'Pigeon', ic: '🕊️', hp: 2, pts: 150, speed: 7, dwell: 3.8, sc: 1.3, from: 'roof', flap: 34, walk: 0.85, strut: true,
+      quips: ['Coo-RUDE!', 'Coo-ld!', 'Hmph. Coo.', 'Wet pigeon, sad pigeon', 'I just did my feathers!'] },
+    crow: { id: 'crow', name: 'Crow', ic: '🐦‍⬛', hp: 1, pts: 250, speed: 8.5, dwell: 2.6, sc: 1.25, from: 'tree', flap: 30, walk: 0, dodge: true,
+      quips: ['CAW-ful!', 'Caw! Not fair!', 'I’ll remember this...', 'Fine. Keep your samosas.', 'Ca-a-aw! Soggy!'] },
+    gull: { id: 'gull', name: 'Seagull', ic: '🌊', hp: 2, pts: 200, speed: 12, dwell: 2.2, sc: 1.2, from: 'ramp', flap: 22, walk: 0, swoop: true,
+      quips: ['MINE! ...nope.', 'Squawk! Fresh water?! Gross!', 'Back to the lake, then!', 'MY CHIPS! ...wrong yard.'] },
+    gus: { id: 'gus', name: 'Big Gus', ic: '👑', hp: 24, pts: 1500, speed: 6, dwell: 6, sc: 4.2, from: 'roof', flap: 16, walk: 1.5, strut: true, boss: true,
+      quips: ['COOOOO!!', 'Big Gus... is... SOAKED.', 'This isn’t over, kitty!'] },
+  });
+}
+function bpWaves() {
+  return bpWaves.W || (bpWaves.W = [
+    { name: 'Sparrow squad', ic: '🐦', sub: 'Quick little raiders: one squirt each', list: [[0, 'sparrow'], [0.4, 'sparrow'], [0.8, 'sparrow'], [4, 'sparrow'], [4.4, 'sparrow'], [4.8, 'sparrow'], [8, 'sparrow'], [8.5, 'sparrow']] },
+    { name: 'Pigeon parade', ic: '🕊️', sub: 'They strut in on foot. Two squirts each', list: [[0, 'pigeon'], [1, 'sparrow'], [2, 'pigeon'], [3, 'sparrow'], [4, 'pigeon'], [5.5, 'sparrow'], [6, 'pigeon'], [7.5, 'sparrow'], [8, 'pigeon']] },
+    { name: 'Crow caper', ic: '🐦‍⬛', sub: 'Crows dodge the first squirt. Mind the samosas!', list: [[0, 'crow'], [1, 'sparrow'], [2, 'crow'], [3, 'pigeon'], [4, 'crow'], [5, 'sparrow'], [6, 'crow'], [7, 'pigeon'], [8, 'crow'], [9, 'sparrow']] },
+    { name: 'Gull storm', ic: '🌊', sub: 'Seagulls swoop in from the off-ramp!', list: [[0, 'gull'], [1, 'sparrow'], [1.8, 'gull'], [2.5, 'crow'], [3.6, 'gull'], [4.5, 'sparrow'], [5.4, 'gull'], [6, 'crow'], [7.2, 'gull'], [8, 'sparrow']] },
+    { name: 'Everybody at once!', ic: '🌪️', sub: 'The whole flock. Keep that tank topped up', list: [[0, 'sparrow'], [0.7, 'pigeon'], [1.4, 'gull'], [2.1, 'crow'], [2.8, 'sparrow'], [3.5, 'pigeon'], [4.2, 'gull'], [4.9, 'sparrow'], [5.6, 'crow'], [6.3, 'pigeon'], [7, 'gull'], [7.7, 'sparrow'], [8.4, 'crow'], [9.1, 'sparrow'], [9.8, 'gull'], [10.5, 'pigeon']] },
+    { name: 'Big Gus!', ic: '👑', sub: 'The biggest pigeon in Toronto. Soak him!', boss: true, list: [[0, 'gus']] },
+  ]);
+}
+function bpV(x, y, z) { return new THREE.Vector3(x || 0, y || 0, z || 0); }
+function bpLoad() {
+  let o = null; try { o = JSON.parse(localStorage.getItem('catguard.birds') || 'null'); } catch (e) { o = null; }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) o = {};
+  for (const k of ['best', 'rounds', 'clears', 'perfects', 'soaked', 'bosses', 'bestCombo']) o[k] = Math.max(0, Math.floor(+o[k] || 0));
+  if (!o.paid || typeof o.paid !== 'object' || Array.isArray(o.paid)) o.paid = {};
+  return o;
+}
+function bpSave(o) { try { localStorage.setItem('catguard.birds', JSON.stringify(o)); } catch (e) {} }
+
+/* ---------- the targets: what the birds are after ---------- */
+function bpBarrel() { const bz = YARD.FZ - 11 + 3.3; return { x: yardXL(bz) + 1.0, z: bz }; }   /* (the rain barrel by the shed, as the yard builder places it) */
+function bpTargets() {
+  const S = bpS(); if (S.T) return S.T;
+  const V = bpV, B = bbWater.st, bx = B ? B.x : -8.6, bz = B ? B.z : ROOM.visDepth + 13.5, by = B ? B.y : 1.37;
+  const ring = (cx, cz, r, y, n, a0) => Array.from({ length: n }, (_, i) => { const a = (a0 || 0) + i * Math.PI * 2 / n; return V(cx + Math.sin(a) * r, y, cz + Math.cos(a) * r); });
+  const T = [
+    { id: 'veg', ic: '🍅', name: 'Aunty-ji’s veggie patch', c: V(12.4, 0.62, 35.0), loot: ['tomato', 'chilli'],
+      perches: [V(12.12, 0.63, 32.9), V(12.66, 0.63, 33.9), V(12.66, 0.63, 35.0), V(12.66, 0.63, 36.1), V(12.12, 0.63, 36.7), V(12.66, 0.63, 37.3)],
+      steal: ['🍅 A {b} made off with one of Aunty-ji’s tomatoes!', '🌶️ A {b} nicked a green chilli from Aunty-ji’s pot!'], w: { sparrow: 1.4, pigeon: 1.6, crow: 0.8, gull: 0.6, gus: 1 } },
+    { id: 'samosa', ic: '🥟', name: 'the samosa plate', c: V(-5.43, 1.62, 26.62), loot: ['samosa'], perches: ring(-5.43, 26.62, 0.44, 1.625, 5, 0.3),
+      steal: ['🥟 A {b} swiped a samosa off the table!', '🥟 A {b} pecked a hole in a samosa!'], w: { sparrow: 1, pigeon: 0.8, crow: 3, gull: 1.6, gus: 1 } },
+    { id: 'bath', ic: '🛁', name: 'the bird bath', c: V(bx, by, bz), loot: [], perches: ring(bx, bz, 0.64, by + 0.04, 6, 0.2),
+      steal: ['🛁 Pool party! A {b} splashed half the bird bath out', '🛁 A {b} turned the bird bath into a mud bath!'], w: { sparrow: 2, pigeon: 1.4, crow: 0.6, gull: 0.8, gus: 1 } },
+    { id: 'laundry', ic: '🧺', name: 'the fresh laundry', c: V(6.4, 0.5, 27.4), loot: ['sock'], perches: ring(6.4, 27.4, 0.33, 0.52, 4, 0.5),
+      steal: ['🧦 A {b} flew off with one of Aunty-ji’s socks!', '🧺 A {b} made a mess of the fresh laundry!'], w: { sparrow: 1, pigeon: 1, crow: 1.2, gull: 1.6, gus: 1 } },
+  ];
+  const mid = V(1, 0, 38);
+  T.forEach(t => { t.use = t.perches.map(() => 0); t.alarm = 0; t.n = 0;
+    const d = V(mid.x - t.c.x, 0, mid.z - t.c.z).normalize(); t.gus = V(t.c.x + d.x * 1.75, 0, t.c.z + d.z * 1.75); t.out = d; });
+  return (S.T = T);
+}
+
+/* ---------- the birds' shapes (merged, vertex-coloured, like the weapons) ---------- */
+function bpEyes(hc, hr, er, white, pupil) {                              // a pair of round cartoon eyes on the head's sides, a little forward; their pupils and a glint
+  const out = [], S = (r, a, b) => new THREE.SphereGeometry(r, a || 8, b || 6);
+  for (const s of [-1, 1]) { const n = bpV(s * 0.62, 0.22, 0.75).normalize(), e = hc.clone().addScaledVector(n, hr * 0.92);
+    out.push([S(er), white, e.x, e.y, e.z, 0, 0, 0, 1, 1, 1, 1]); const pp = e.clone().addScaledVector(n, er * 0.62); out.push([S(er * 0.58, 6, 4), pupil, pp.x, pp.y, pp.z, 0, 0, 0, 1, 1, 1, 1]);
+    const gl = pp.clone().addScaledVector(n, er * 0.42); gl.y += er * 0.25; out.push([S(er * 0.2, 4, 3), 0xffffff, gl.x, gl.y, gl.z, 0, 0, 0, 1, 1, 1, 1]); }
+  return out;
+}
+function bpWingGeo(span, chord, h, cRoot, cTip) {                       // two wings in one geometry: tips at height h (flapped by scaling Y between +1 and -1)
+  const P = [], C = [], a = new THREE.Color(cRoot), b = new THREE.Color(cTip), m = a.clone().lerp(b, 0.45);
+  for (const s of [-1, 1]) {
+    const A = [0, 0, chord * 0.5], Bk = [0, 0, -chord * 0.5], E = [s * span * 0.55, h * 0.55, chord * 0.32], F = [s * span * 0.55, h * 0.55, -chord * 0.62], Tp = [s * span, h, -chord * 0.2];
+    for (const [v, c] of [[A, a], [Bk, a], [E, m], [Bk, a], [F, m], [E, m], [E, m], [F, m], [Tp, b]]) { P.push(v[0], v[1], v[2]); C.push(c.r, c.g, c.b); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.computeVertexNormals(); g.computeBoundingSphere(); return g;
+}
+function bpGeoCache(kind) {
+  const C = bpGeoCache.c || (bpGeoCache.c = {}); if (C[kind]) return C[kind];
+  const S = (r, a, b) => new THREE.SphereGeometry(r, a || 12, b || 9), Cy = (rt, rb, h, s) => new THREE.CylinderGeometry(rt, rb, h, s || 8), K = (r, h, s) => new THREE.ConeGeometry(r, h, s || 8), B = (w, h, d) => new THREE.BoxGeometry(w, h, d), H = Math.PI / 2;
+  const legs = (x, h, col, z) => [[Cy(0.009, 0.009, h, 5), col, x, h / 2, z || 0.01], [Cy(0.009, 0.009, h, 5), col, -x, h / 2, z || 0.01], [B(0.03, 0.007, 0.04), col, x, 0.004, (z || 0.01) + 0.012], [B(0.03, 0.007, 0.04), col, -x, 0.004, (z || 0.01) + 0.012]];
+  let p, out;
+  if (kind === 'sparrow') {
+    p = [[S(0.1), 0x8a6440, 0, 0.14, 0, 0, 0, 0, 0.85, 0.8, 1.3], [S(0.085), 0xeadfc8, 0, 0.115, 0.035, 0, 0, 0, 0.8, 0.72, 1.05], [B(0.12, 0.02, 0.1), 0x5a3f28, 0, 0.212, -0.03, 0.15, 0, 0],
+      [S(0.075), 0x8a6440, 0, 0.24, 0.1], [S(0.062), 0x77777a, 0, 0.27, 0.09, 0, 0, 0, 1, 0.62, 1.05], [S(0.04), 0xf2ede2, 0.042, 0.228, 0.122], [S(0.04), 0xf2ede2, -0.042, 0.228, 0.122],
+      [K(0.022, 0.055), 0xe8a828, 0, 0.234, 0.185, H, 0, 0], [B(0.085, 0.016, 0.14), 0x5a3f28, 0, 0.155, -0.165, -0.35, 0, 0], ...legs(0.03, 0.07, 0xd08a3a), ...bpEyes(bpV(0, 0.245, 0.1), 0.075, 0.021, 0xffffff, 0x111111)];
+    out = { wings: bpWingGeo(0.24, 0.13, 0.11, 0x7a5634, 0x3e2a1a), sh: bpV(0, 0.19, 0.0), beak: bpV(0, 0.205, 0.2), mid: 0.16 };
+  } else if (kind === 'pigeon' || kind === 'gus') {
+    p = [[S(0.13), 0x8f97a6, 0, 0.18, 0, 0, 0, 0, 0.9, 0.85, 1.35], [S(0.11), 0x9ea6b6, 0, 0.2, 0.075], [S(0.083), 0x5e9a84, 0, 0.285, 0.1, 0, 0, 0, 1, 1.12, 1], [S(0.072), 0x8a64a8, 0, 0.262, 0.125],
+      [S(0.072), 0x7f8798, 0, 0.35, 0.15], [K(0.018, 0.052), 0x40404a, 0, 0.338, 0.222, H, 0, 0], [S(0.017), 0xf2f2f2, 0, 0.354, 0.198],
+      [B(0.022, 0.016, 0.12), 0x3a3f4a, 0.112, 0.205, -0.035], [B(0.022, 0.016, 0.12), 0x3a3f4a, -0.112, 0.205, -0.035], [B(0.022, 0.016, 0.12), 0x3a3f4a, 0.108, 0.18, -0.06], [B(0.022, 0.016, 0.12), 0x3a3f4a, -0.108, 0.18, -0.06],
+      [B(0.13, 0.022, 0.17), 0x5a606e, 0, 0.18, -0.215, -0.15, 0, 0], [B(0.132, 0.024, 0.045), 0x2e323a, 0, 0.17, -0.285, -0.15, 0, 0], ...legs(0.035, 0.085, 0xd9707e), ...bpEyes(bpV(0, 0.355, 0.15), 0.072, 0.02, 0xff9a3a, 0x111111)];
+    if (kind === 'gus') {                                                // a little gold crown, a bit crooked; a chain of office (very serious pigeon)
+      p.push([Cy(0.045, 0.052, 0.035, 10), 0xffc928, 0.01, 0.43, 0.13, 0, 0, 0.18]); for (let k = 0; k < 5; k++) { const a = k * Math.PI * 2 / 5; p.push([K(0.012, 0.035, 4), 0xffe066, 0.01 + Math.sin(a) * 0.045, 0.462 + Math.sin(a) * 0.008, 0.13 + Math.cos(a) * 0.045, 0, 0, 0.18]); }
+      p.push([S(0.012, 6, 4), 0xd8323a, 0.01, 0.44, 0.18]); p.push([new THREE.TorusGeometry(0.075, 0.008, 5, 18), 0xffd23a, 0, 0.255, 0.1, 1.2, 0, 0]); }
+    out = { wings: bpWingGeo(0.32, 0.17, 0.14, 0x8a92a2, 0x40464f), sh: bpV(0, 0.245, 0.0), beak: bpV(0, 0.32, 0.24), mid: 0.22 };
+  } else if (kind === 'crow') {
+    p = [[S(0.14), 0x1e2028, 0, 0.2, 0, 0, 0, 0, 0.85, 0.82, 1.4], [S(0.1), 0x2c3a5a, 0, 0.255, -0.02, 0, 0, 0, 0.8, 0.5, 1.2], [S(0.088), 0x22242c, 0, 0.33, 0.14],
+      [K(0.03, 0.11, 8), 0x16171b, 0, 0.318, 0.255, H, 0, 0], [B(0.014, 0.012, 0.07), 0x30323a, 0, 0.338, 0.225],
+      [B(0.05, 0.012, 0.012), 0x0c0c10, 0.052, 0.388, 0.2, 0, 0.3, -0.45], [B(0.05, 0.012, 0.012), 0x0c0c10, -0.052, 0.388, 0.2, 0, -0.3, 0.45],
+      [B(0.15, 0.02, 0.21), 0x15161c, 0, 0.2, -0.255, -0.2, 0, 0], ...legs(0.035, 0.09, 0x3a3a42), ...bpEyes(bpV(0, 0.335, 0.14), 0.088, 0.024, 0xffffff, 0x111111)];
+    out = { wings: bpWingGeo(0.36, 0.19, 0.15, 0x24262e, 0x0c0d12), sh: bpV(0, 0.265, 0.0), beak: bpV(0, 0.29, 0.3), mid: 0.24 };
+  } else {                                                               // the seagull
+    p = [[S(0.15), 0xf4f5f7, 0, 0.2, 0, 0, 0, 0, 0.85, 0.8, 1.45], [S(0.12), 0xa9b4c0, 0, 0.25, -0.03, 0, 0, 0, 0.98, 0.52, 1.4], [S(0.09), 0xf8f9fb, 0, 0.34, 0.17],
+      [K(0.022, 0.12), 0xf2c418, 0, 0.33, 0.29, H, 0, 0], [S(0.013, 6, 4), 0xd8302a, 0, 0.322, 0.305], [B(0.04, 0.01, 0.012), 0x8a8f96, 0.05, 0.385, 0.225, 0, 0.3, -0.35], [B(0.04, 0.01, 0.012), 0x8a8f96, -0.05, 0.385, 0.225, 0, -0.3, 0.35],
+      [B(0.15, 0.022, 0.15), 0xf0f2f4, 0, 0.21, -0.26, -0.12, 0, 0], [B(0.152, 0.024, 0.05), 0x1c1c20, 0, 0.2, -0.32, -0.12, 0, 0], ...legs(0.04, 0.09, 0xe0909a), ...bpEyes(bpV(0, 0.345, 0.17), 0.09, 0.02, 0xf6e05a, 0x111111)];
+    out = { wings: bpWingGeo(0.58, 0.2, 0.16, 0xb2bcc8, 0x1e1e22), sh: bpV(0, 0.265, 0.0), beak: bpV(0, 0.3, 0.33), mid: 0.24 };
+  }
+  out.body = wpnMerge(p); return (C[kind] = out);
+}
+function bpLootGeo(kind) {
+  const C = bpLootGeo.c || (bpLootGeo.c = {}); if (C[kind]) return C[kind];
+  const S = (r, a, b) => new THREE.SphereGeometry(r, a || 10, b || 8), Cy = (rt, rb, h, s) => new THREE.CylinderGeometry(rt, rb, h, s || 8);
+  let p;
+  if (kind === 'tomato') p = [[S(0.045), 0xd9392b, 0, -0.04, 0], [Cy(0.004, 0.004, 0.03, 4), 0x3f8a2a, 0, 0.0, 0], [Cy(0.02, 0.02, 0.006, 5), 0x4f9a3a, 0, -0.005, 0]];
+  else if (kind === 'chilli') p = [[Cy(0.012, 0.004, 0.1, 6), 0x3f9a2a, 0, -0.06, 0], [Cy(0.008, 0.008, 0.02, 5), 0x2f6a1a, 0, -0.005, 0]];
+  else if (kind === 'samosa') p = [[new THREE.ConeGeometry(0.05, 0.065, 3), 0xd99a3a, 0, -0.04, 0, Math.PI, 0, 0]];
+  else p = [[new THREE.BoxGeometry(0.04, 0.11, 0.03), 0xff8fc0, 0, -0.06, 0], [new THREE.BoxGeometry(0.04, 0.03, 0.06), 0xff8fc0, 0, -0.11, 0.02], [new THREE.BoxGeometry(0.042, 0.02, 0.032), 0xffffff, 0, -0.01, 0]];
+  return (C[kind] = wpnMerge(p));
+}
+function bpPropsGeo() {                                                  // the round's props, one merged mesh: Aunty-ji's samosas, the laundry basket, her pot of green chillies
+  const S = (r, a, b) => new THREE.SphereGeometry(r, a || 12, b || 8), Cy = (rt, rb, h, s) => new THREE.CylinderGeometry(rt, rb, h, s || 14), K = (r, h, s) => new THREE.ConeGeometry(r, h, s || 8), B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+  const p = [], px = -5.43, py = 1.612, pz = 26.62;
+  p.push([Cy(0.25, 0.2, 0.025, 22), 0xf6f3ec, px, py + 0.012, pz], [new THREE.TorusGeometry(0.235, 0.012, 5, 22), 0x3f7fd0, px, py + 0.026, pz, Math.PI / 2, 0, 0]);
+  for (let k = 0; k < 5; k++) { const a = k * 1.256 + 0.3; p.push([K(0.07, 0.085, 3), k % 2 ? 0xe0a548 : 0xd4963a, px + Math.sin(a) * 0.12, py + 0.07, pz + Math.cos(a) * 0.12, 0, a * 1.7, 0]); }
+  p.push([Cy(0.05, 0.038, 0.035, 12), 0xf6f3ec, px + 0.17, py + 0.02, pz - 0.16], [Cy(0.042, 0.042, 0.006, 12), 0x5aa83a, px + 0.17, py + 0.036, pz - 0.16]);   // (a little bowl of green chutney)
+  const lx = 6.4, lz = 27.4;
+  p.push([Cy(0.33, 0.27, 0.44, 16), 0xc9a46a, lx, 0.22, lz], [new THREE.TorusGeometry(0.33, 0.032, 6, 20), 0xa9844a, lx, 0.44, lz, Math.PI / 2, 0, 0]);
+  for (let k = 0; k < 3; k++) p.push([new THREE.TorusGeometry(0.3 - k * 0.012, 0.012, 4, 20), 0xb08a52, lx, 0.1 + k * 0.11, lz, Math.PI / 2, 0, 0]);
+  p.push([S(0.24), 0xf4f4f8, lx - 0.03, 0.44, lz, 0, 0, 0, 1.1, 0.42, 1.1], [S(0.13), 0xff9fc4, lx + 0.1, 0.5, lz - 0.08, 0, 0, 0, 1.2, 0.55, 1], [S(0.12), 0x7fb2ff, lx - 0.12, 0.5, lz + 0.08, 0, 0, 0, 1.2, 0.5, 1],
+    [B(0.06, 0.03, 0.2), 0xffd84a, lx + 0.33, 0.37, lz + 0.02, 0, 0, 1.0], [B(0.06, 0.03, 0.17), 0x9a7aff, lx - 0.2, 0.4, lz - 0.3, 0.9, 0.4, 0]);
+  const cx = 12.12, cy = 0.615, cz = 37.75;
+  p.push([Cy(0.17, 0.13, 0.26, 12), 0xb8643a, cx, cy + 0.13, cz], [Cy(0.16, 0.16, 0.02, 12), 0x4a3526, cx, cy + 0.255, cz], [S(0.19), 0x4d8f3a, cx, cy + 0.43, cz, 0, 0, 0, 1, 0.8, 1], [S(0.12), 0x5c9a42, cx + 0.08, cy + 0.56, cz - 0.05]);
+  for (let k = 0; k < 7; k++) { const a = k * 0.9; p.push([Cy(0.016, 0.005, 0.12, 6), k % 3 === 2 ? 0xd9232f : 0x3f9a2a, cx + Math.sin(a) * 0.17, cy + 0.36 + (k % 2) * 0.07, cz + Math.cos(a) * 0.17, 0.2, 0, Math.sin(a) * 0.3]); }
+  return wpnMerge(p);
+}
+function bpTex() {                                                       // the water's droplets (additive: black adds nothing) and the alarm's "!" badge
+  const S = bpS(); if (S.dropTex) return S;
+  S.dropTex = canvasTex(32, 32, (c, w, h) => { c.fillStyle = '#000'; c.fillRect(0, 0, w, h); const g = c.createRadialGradient(16, 16, 0, 16, 16, 15); g.addColorStop(0, '#fff'); g.addColorStop(0.45, '#9fdcff'); g.addColorStop(1, '#000'); c.fillStyle = g; c.fillRect(0, 0, w, h); }, 1, 1);
+  S.dropTex.wrapS = S.dropTex.wrapT = THREE.ClampToEdgeWrapping;
+  S.alarmTex = canvasTex(64, 64, (c, w, h) => { c.clearRect(0, 0, w, h); c.fillStyle = '#ffffff'; c.beginPath(); c.arc(32, 32, 28, 0, Math.PI * 2); c.fill(); c.lineWidth = 4; c.strokeStyle = '#5a1020'; c.stroke();
+    c.fillStyle = '#5a1020'; c.fillRect(28, 13, 8, 26); c.beginPath(); c.arc(32, 47, 5, 0, Math.PI * 2); c.fill(); }, 1, 1);
+  S.alarmTex.wrapS = S.alarmTex.wrapT = THREE.ClampToEdgeWrapping;
+  return S;
+}
+function bpBuild() {                                                     // (lazily: the first round, or WARM_V1) the pool's home, the props, the water, the alarms
+  const S = bpS(); if (S.built) return S; const W = wpnMats(); bpTex();
+  S.low = devTier() === 'low';
+  S.root = new THREE.Group(); S.root.userData.noWalk = true; S.root.userData.name = 'Bird Patrol'; scene.add(S.root);
+  S.wetMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }); S.wetMat.userData.noTod = true;
+  S.props = new THREE.Mesh(bpPropsGeo(), W.matOut); S.props.userData.noWalk = true; S.props.userData.name = 'Bird Patrol props'; S.props.visible = false; S.root.add(S.props);
+  const NJ = 4, NP = 14, geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NJ * NP * 3), 3)); geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(NJ * NP * 3), 3));
+  S.drops = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.2, map: S.dropTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, sizeAttenuation: true }));
+  S.drops.material.userData.noTod = true; S.drops.frustumCulled = false; S.drops.visible = false; S.drops.renderOrder = 6; S.drops.userData.noWalk = true; S.root.add(S.drops);
+  S.jets = []; for (let i = 0; i < NJ; i++) S.jets.push({ on: false, t: 0, a: bpV(), c: bpV(), b: bpV(), hit: false });
+  S.NP = NP; S.alarms = [];
+  for (let i = 0; i < 4; i++) { const m = new THREE.SpriteMaterial({ map: S.alarmTex, transparent: true, depthWrite: false, depthTest: false, fog: false }); m.userData.noTod = true;
+    const sp = new THREE.Sprite(m); sp.visible = false; sp.renderOrder = 9; sp.userData.noWalk = true; S.root.add(sp); S.alarms.push(sp); }
+  for (const k of ['sparrow', 'pigeon', 'crow', 'gull', 'gus']) bpGeoCache(k);
+  ['tomato', 'chilli', 'samosa', 'sock'].forEach(bpLootGeo);
+  S.built = true; return S;
+}
+function bpBirdNew(kind) {
+  const S = bpS(), W = wpnMats(); let b = S.pool.find(o => !o.on && o.kind === kind);
+  if (!b) {
+    const G = bpGeoCache(kind), g = new THREE.Group(); g.userData.name = 'Bird Patrol ' + kind; g.userData.noWalk = true; g.rotation.order = 'YXZ';
+    const body = new THREE.Mesh(G.body, W.matOut), wings = new THREE.Mesh(G.wings, W.matDS), loot = new THREE.Mesh(bpLootGeo('tomato'), W.matOut);
+    body.userData.noWalk = wings.userData.noWalk = loot.userData.noWalk = true; wings.position.copy(G.sh); loot.position.copy(G.beak); loot.visible = false;
+    g.add(body, wings, loot); g.visible = false; S.root.add(g);
+    b = { kind, T: bpTypes()[kind], G, g, body, wings, loot, pos: bpV(), prev: bpV(), p0: bpV(), p1: bpV(), pc: bpV(), to: bpV(), from: bpV(), vel: bpV(), on: false };
+    S.pool.push(b);
+  }
+  Object.assign(b, { on: true, st: 'in', t: 0, dur: 1, hp: b.T.hp, dwell: 0, dodged: false, ti: -1, pi: -1, lastTi: -1, ruff: 0, hits: 0, yaw: 0, pitch: 0, roll: 0, ph: Math.random() * 6.28, hopT: 1 + Math.random(), quip: false, air: false, next: '', esc: false, gustDone: false, landH: 0.25 });
+  b.body.material = W.matOut; b.body.scale.set(1, 1, 1); b.body.rotation.set(0, 0, 0); b.wings.scale.set(1, 1, 1); b.loot.visible = false; b.g.scale.setScalar(b.T.sc); b.g.rotation.set(0, 0, 0); b.g.visible = true;
+  return b;
+}
+function bpBez(a, c, b, t, out) { const u = 1 - t; return out.set(u * u * a.x + 2 * u * t * c.x + t * t * b.x, u * u * a.y + 2 * u * t * c.y + t * t * b.y, u * u * a.z + 2 * u * t * c.z + t * t * b.z); }
+function bpAimPt(b, out) { const k = b.T.sc * (b.T.boss ? 1 + b.hits * 0.03 : 1); return out.set(b.pos.x, b.pos.y + b.G.mid * k, b.pos.z); }
+function bpHittable(b) { return b.on && /^(in|land|strut|hop|peck|hover|dodge|gust)$/.test(b.st); }
+function bpThreat(b) { return b.on && !/^(soak|flee|steal)$/.test(b.st); }
+
+/* ---------- where they come from, where they go ---------- */
+function bpSpawnPt(T, out) {
+  const r = Math.random;
+  if (T.from === 'side') return out.set(r() < 0.5 ? -26 : 23, 7 + r() * 3, 29 + r() * 22);
+  if (T.from === 'roof') return out.set(-4 + r() * 14, 11.5 + r() * 2, 15 + r() * 4);
+  if (T.from === 'tree') { const t = r() < 0.5 ? [-13.8, 8.6, 55.4] : [9.3, 9.2, 54.6]; return out.set(t[0] + (r() - 0.5) * 3, t[1] + r(), t[2] + (r() - 0.5) * 3); }
+  return out.set(-10 + r() * 20, 15 + r() * 3, 80 + r() * 6);           /* (the seagulls: in over the bank, from the off-ramp side) */
+}
+function bpPick(kind) {                                                  // a target (weighted by taste, less by how busy it is) and its least-used perch
+  const T = bpTargets(); let tot = 0; const w = T.map(t => { const v = (t.w[kind] || 1) / (1 + t.n * 0.8); tot += v; return v; });
+  let r = Math.random() * tot, ti = 0; for (; ti < T.length - 1; ti++) { r -= w[ti]; if (r <= 0) break; }
+  const t = T[ti]; let pi = 0; for (let i = 1; i < t.use.length; i++) if (t.use[i] < t.use[pi] || (t.use[i] === t.use[pi] && Math.random() < 0.4)) pi = i;
+  return [ti, pi];
+}
+function bpClaim(b, ti, pi) { const T = bpTargets(); bpRelease(b); b.ti = ti; b.pi = pi; if (ti >= 0) { T[ti].n++; if (pi >= 0) T[ti].use[pi]++; } }
+function bpRelease(b) { const T = bpTargets(); if (b.ti >= 0) { b.lastTi = b.ti; const t = T[b.ti]; t.n = Math.max(0, t.n - 1); if (b.pi >= 0) t.use[b.pi] = Math.max(0, t.use[b.pi] - 1); } b.ti = -1; b.pi = -1; }
+function bpFlyTo(b, to, ctrlUp, lat) {                                   // a curved flight from where it is to 'to'
+  b.p0.copy(b.pos); b.p1.copy(to); const m = b.p0.clone().add(to).multiplyScalar(0.5), d = b.p1.clone().sub(b.p0), L = d.length();
+  const side = bpV(-d.z, 0, d.x).normalize().multiplyScalar(lat === undefined ? (Math.random() - 0.5) * L * 0.4 : lat);
+  b.pc.copy(m).add(side); b.pc.y += ctrlUp === undefined ? Math.min(4, L * 0.15) : ctrlUp;
+  b.dur = Math.max(0.5, (L * 1.12) / b.T.speed); b.t = 0; b.st = 'in';
+}
+function bpSpawn(kind, esc) {
+  const S = bpS(), b = bpBirdNew(kind), T = b.T, Tg = bpTargets(); b.esc = !!esc;
+  const [ti, pi] = bpPick(kind); bpClaim(b, ti, pi); const t = Tg[ti];
+  bpSpawnPt(T, b.pos); b.prev.copy(b.pos);
+  if (T.boss) { bpFlyTo(b, bpV(1.5, 0.6, 37.5), 3, 0); b.next = 'strut'; b.to.copy(t.gus); b.landAt = bpV(1.5, 0, 37.5); }
+  else if (T.strut) { const P = t.perches[pi], d = bpV(P.x - t.c.x, 0, P.z - t.c.z); if (d.lengthSq() < 0.01) d.set(t.out.x, 0, t.out.z); d.normalize(); if (t.id === 'veg') d.set(-1, 0, 0);
+    const reach = t.id === 'veg' ? 0.85 : t.id === 'laundry' ? 0.42 : 0.5, gx = P.x + d.x * reach, gz = P.z + d.z * reach, a = Math.random() * 1.6 - 0.8, ca = Math.cos(a), sa = Math.sin(a), gdx = d.x * ca - d.z * sa, gdz = d.x * sa + d.z * ca;
+    b.landAt = bpV(gx + gdx * 2.2, 0, gz + gdz * 2.2); b.to.set(gx, 0, gz); bpFlyTo(b, b.landAt.clone().setY(0.7), undefined); b.next = 'strut'; }
+  else if (T.swoop) { const P = t.perches[pi]; b.to.copy(P).setY(P.y + 0.42); bpFlyTo(b, b.to, -6, (Math.random() < 0.5 ? -1 : 1) * 7); b.pc.y = Math.max(P.y + 1.2, b.pc.y); b.next = 'hover'; }
+  else { const P = t.perches[pi]; b.to.copy(P); bpFlyTo(b, P.clone().setY(P.y + 0.35), undefined); b.next = 'perch'; }
+  if (T.boss) S.boss = b;
+  S.birds.push(b); return b;
+}
+function bpArrive(b) {                                                   // the end of its flight in: land (on the target, or the lawn), hover, or (Big Gus) thump down
+  b.from.copy(b.pos); b.t = 0;
+  if (b.next === 'perch') { b.st = 'land'; b.dur = 0.28; b.after = 'peck'; }
+  else if (b.next === 'hover') { b.st = 'hover'; }
+  else if (b.next === 'strut') { b.st = 'land'; b.dur = b.T.boss ? 0.5 : 0.3; b.after = 'strut'; b.landTo = b.landAt.clone(); }
+}
+
+/* ---------- the round ---------- */
+function bpOn() { const S = bpS(); return S.on; }
+function bpRoundLive() { const S = bpS(); return S.on && (S.phase === 'intro' || S.phase === 'wave' || S.phase === 'break'); }
+function bpSoaker() { const W = wpnState(); return W.built && W.byId ? W.byId.water : null; }
+function bpStart() {
+  const S = bpS(), K = bpK(), W = wpnState(), w = bpSoaker(); if (!w || S.on) return false;
+  if (W.held !== w) { const why = wpnMouthBusy(); if (why) { showWalkName(why + ': put that down first'); return false; } wpnPickup(w); showWalkName('💦 PKR grabs the super-soaker!'); }
+  w.tank = w.D.tank; wpnChip();
+  bpBuild(); bpUI(); bpReset();
+  S.on = true; S.phase = 'intro'; S.t = 0; S.props.visible = true; S.propT = 0;
+  try { bbBirdsOff(); const B = bbWater.st; if (B) B.away = clock + 1e6; } catch (e) {}
+  document.body.classList.add('birding'); bpPillSet(false);
+  const P = bpLoad(), first = !P.rounds;
+  bpBanner('💦 Bird Patrol!', first ? 'Defend the yard from the cheeky birds' : 'Best ⭐ ' + bpFmt(P.best));
+  bpHint(true);
+  showWalkName(['👵 "PKR! Those cheeky birds are after my tomatoes again! Shoo them, beta!"', '👵 "My samosas! My laundry! Princess, get them!"', '👵 "Arre, the birds are back! Water them, PKR!"'][first ? 0 : (Math.random() * 3) | 0]);
+  bpSfx('start'); return true;
+}
+function bpReset() {
+  const S = bpS(), K = bpK();
+  for (const b of S.birds) { b.on = false; b.g.visible = false; } S.birds.length = 0; S.pend.length = 0; S.boss = null;
+  for (const t of bpTargets()) { t.use.fill(0); t.n = 0; t.alarm = 0; }
+  Object.assign(S, { wave: -1, waveT: 0, q: [], breakT: 0, hearts: K.HEARTS, score: 0, combo: 0, comboT: 0, bestCombo: 0, soaked: 0, squirts: 0, aimed: 0, hits: 0, stolen: 0, crows: 0,
+    bossDone: false, escortT: 0, refills: 0, cannon: 0, quitArm: 0, endT: 0, result: null, bank: null, said: {}, outT: 0, nagT: 0, barT: 0, quipT: 0, hud: {}, comboShown: 0 });
+  for (const j of S.jets) j.on = false;
+}
+function bpWaveStart(i) {
+  const S = bpS(), Wv = bpWaves()[i]; S.wave = i; S.waveT = 0; S.phase = 'wave'; S.q = Wv.list.map(x => x.slice()); S.escortT = 0;
+  bpBanner(Wv.ic + ' Wave ' + (i + 1) + ': ' + Wv.name, Wv.sub); bpSfx(Wv.boss ? 'boss' : 'wave');
+  if (Wv.boss) showWalkName('🐦 COO. A huge shadow over the yard... it’s BIG GUS!');
+}
+function bpCap() { const S = bpS(), K = bpK(); return S.low ? K.CAP_LOW : K.CAP; }
+function bpTick(dt) {                                                    // (after wpnTick, every frame) the pill, and the round
+  const S = bpS(); if (!S.on) { bpPill(); return; }
+  const live = walk.on && gameMode === 'walk';
+  if (!live) { bpOff(); return; }
+  if (ZN && ZN.on) { if (S.phase !== 'card' && S.phase !== 'end') { showWalkName('🧟 Zombie night! The birds scatter: Bird Patrol’s off'); bpOff(); } return; }
+  if (state !== 'playing') { bpHudTick(); return; }
+  dt = Math.min(dt, 0.05); S.t += dt;
+  const K = bpK(), W = wpnState(), w = bpSoaker(), p = walk.pos;
+  if (S.phase === 'intro') { if (S.t > 3.4) { bpHint(false); bpWaveStart(0); } }
+  else if (S.phase === 'wave') {
+    S.waveT += dt; const Wv = bpWaves()[S.wave];
+    while (S.q.length && S.q[0][0] <= S.waveT && S.birds.filter(bpThreat).length < bpCap()) { const [, k] = S.q.shift(); bpSpawn(k); }
+    if (Wv.boss && S.boss && bpThreat(S.boss)) { S.escortT += dt; if (S.escortT > 4.5 && S.birds.filter(b => b.esc && bpThreat(b)).length < 3 && S.birds.filter(bpThreat).length < bpCap()) { S.escortT = 0; bpSpawn('sparrow', true); } }
+    if (!S.q.length && !S.birds.some(bpThreat)) { if (S.wave >= bpWaves().length - 1) bpEnd('won'); else { S.phase = 'break'; S.breakT = 2.4; bpBanner('✨ Wave ' + (S.wave + 1) + ' cleared!', S.stolen ? '' : 'Nothing stolen yet!'); bpSfx('clear'); } }
+  } else if (S.phase === 'break') { S.breakT -= dt; if (S.breakT <= 0) bpWaveStart(S.wave + 1); }
+  else if (S.phase === 'end') { S.endT += dt; if (S.endT > 1.8) bpCard(); }
+  if (S.comboT > 0) { S.comboT -= dt; if (S.comboT <= 0) S.combo = 0; }
+  for (let i = S.pend.length - 1; i >= 0; i--) { const q = S.pend[i]; q.t -= dt; if (q.t <= 0) { S.pend.splice(i, 1); if (bpHittable(q.b)) bpHit(q.b, 1, 'jet'); } }
+  for (const b of S.birds) if (b.on) bpBirdTick(b, dt);
+  for (let i = S.birds.length - 1; i >= 0; i--) if (!S.birds[i].on) S.birds.splice(i, 1);
+  bpJetsTick(dt); bpAlarms(dt);
+  if (S.props) S.props.visible = !!povEndWall && povEndWall.visible;
+  if (S.dropT === undefined) S.dropT = 0;
+  if (bpRoundLive()) {
+    if (S.hold.btn || S.hold.key) { if (clock - S.hold.t0 > 0.22 && W.held === w && w && w.st === 'held' && clock >= W.ready) walkSwipe(); }
+    const out = !inOurYard(p.x, p.z) && !(p.z > YARD.FZ - 0.5 && p.z < YARD.FZ + 4);   /* (up on the fence or the bank behind: close enough) */
+    S.outT = out ? S.outT + dt : 0; if (S.outT > 1.2 && clock > S.nagT) { S.nagT = clock + 7; showWalkName('🏡 Back to the yard, PKR! The birds are raiding it'); }
+    if (W.held !== w && clock > S.nagT) { S.nagT = clock + 7; showWalkName('💦 Grab the super-soaker! (it’s where she put it down)'); }
+    const R = bpBarrel(); if (w && W.held === w && walk.grounded && w.tank < w.D.tank && Math.hypot(p.x - R.x, p.z - R.z) < 1.55) { S.barT += dt; if (S.barT > 0.16) { S.barT = 0; w.tank++; wpnChip(); tone(300 + w.tank * 18, 360 + w.tank * 18, 0.05, 'sine', 0.015); if (!S.said.barrel) { S.said.barrel = 1; showWalkName('🛢️ Topping up at the rain barrel...'); } } }
+  }
+  bpHudTick();
+}
+function bpEnd(kind) {
+  const S = bpS(), K = bpK(); if (!S.on || S.phase === 'end' || S.phase === 'card') return;
+  S.phase = 'end'; S.endT = 0; S.result = kind; S.hold.btn = S.hold.key = false;
+  if (kind === 'won') S.score += K.CLEAR_PTS + S.hearts * K.HEART_PTS;
+  for (const b of S.birds) if (bpThreat(b)) bpFlee(b, false);
+  bpBanner(kind === 'won' ? (S.stolen ? '🏡 Yard saved!' : '🛡️ Not a crumb taken!') : kind === 'lost' ? '🐦 The birds win this round!' : '💦 Patrol over', kind === 'won' ? '+' + bpFmt(K.CLEAR_PTS + S.hearts * K.HEART_PTS) + ' defence bonus' : '');
+  bpSfx(kind === 'won' ? 'win' : 'lose'); bpBank();
+}
+function bpBank() {                                                      // the round's fish, saves, trophies, and a word from the neighbours: all at the whistle (nothing waits on the card)
+  const S = bpS(), K = bpK(), P = bpLoad(), won = S.result === 'won', perfect = won && S.stolen === 0;
+  let fish = Math.min(K.FISH_CAP, Math.round(S.score / K.FISH_PER)); const bon = [];
+  if (!P.paid.first) { P.paid.first = 1; fish += K.FIRST; bon.push('first patrol +' + K.FIRST); }
+  if (won && !P.paid.clear) { P.paid.clear = 1; fish += K.CLEAR1; bon.push('first full defence +' + K.CLEAR1); }
+  if (S.bossDone && !P.paid.boss) { P.paid.boss = 1; fish += K.BOSS1; bon.push('Big Gus +' + K.BOSS1); }
+  try { ckSetWallet(ckWallet() + fish); if (typeof ckDot === 'function') ckDot(); } catch (e) {}
+  let luck = 0; try { if (typeof pkLuckBonus === 'function') luck = pkLuckBonus(fish, 'birds') || 0; } catch (e) {}
+  const prevBest = P.best, newBest = S.score > P.best && P.rounds > 0;
+  P.rounds++; if (won) P.clears++; if (perfect) P.perfects++; P.soaked += S.soaked; if (S.bossDone) P.bosses++; P.best = Math.max(P.best, S.score); P.bestCombo = Math.max(P.bestCombo, S.bestCombo); bpSave(P);
+  const acc = S.aimed ? Math.round(100 * Math.min(1, S.hits / S.aimed)) : 0;
+  S.bank = { fish, luck, bon, newBest, prevBest, perfect, won, acc, P };
+  unlock('birdFirst'); if (won) unlock('birdClear'); if (perfect) unlock('birdPerfect'); if (S.soaked >= 35) unlock('bird35'); if (S.score >= 20000) unlock('birdScore');
+  if (P.soaked >= 250) unlock('birdTotal'); if (S.crows >= 5) unlock('birdCrow');
+  try { if (typeof talkEvent === 'function') talkEvent('birds', { kind: perfect ? 'perfect' : won ? (P.clears === 1 ? 'first' : 'clear') : S.result === 'lost' ? 'lost' : 'quit', n: S.score }); } catch (e) {}
+}
+function bpOff() {                                                       // the round's gone (back to the yard, out of Free roam, zombie night)
+  const S = bpS(); S.on = false; S.phase = 'off'; S.hold.btn = S.hold.key = false;
+  for (const b of S.birds) { bpRelease(b); b.on = false; b.g.visible = false; } S.birds.length = 0; S.pend.length = 0; S.boss = null;
+  for (const j of S.jets) j.on = false; if (S.drops) S.drops.visible = false; if (S.props) S.props.visible = false; if (S.alarms) S.alarms.forEach(a => { a.visible = false; });
+  document.body.classList.remove('birding'); const u = S.ui; if (u) { u.hud.classList.remove('on'); u.over.classList.remove('on'); u.hint.classList.remove('on'); u.ban.className = 'bp-ban'; }
+  try { const B = bbWater.st; if (B) B.away = clock + 20; } catch (e) {}
+}
+
+/* ---------- each bird, every frame ---------- */
+function bpFace(b, dt, fly) {
+  const d = b.pos.clone().sub(b.prev); const h = Math.hypot(d.x, d.z);
+  if (h > 1e-4) { let want = Math.atan2(d.x, d.z), dd = want - b.yaw; dd = Math.atan2(Math.sin(dd), Math.cos(dd)); b.yaw += dd * Math.min(1, dt * (fly ? 10 : 8)); }
+  if (fly) { const sp = d.length() / Math.max(1e-4, dt); b.pitch += ((h > 1e-4 ? -Math.atan2(d.y, h) * 0.6 : 0) - b.pitch) * Math.min(1, dt * 6); b.sp = sp; } else b.pitch += (0 - b.pitch) * Math.min(1, dt * 8);
+}
+function bpFaceTo(b, x, z, dt) { let want = Math.atan2(x - b.pos.x, z - b.pos.z), dd = want - b.yaw; dd = Math.atan2(Math.sin(dd), Math.cos(dd)); b.yaw += dd * Math.min(1, dt * 8); }
+function bpBirdTick(b, dt) {
+  const S = bpS(), T = b.T, Tg = bpTargets(), tg = b.ti >= 0 ? Tg[b.ti] : null; b.t += dt; b.prev.copy(b.pos);
+  const flap = (sp, amp) => b.wings.scale.set(1, Math.sin(clock * sp + b.ph) * (amp === undefined ? 1 : amp), 1), fold = () => b.wings.scale.set(0.22, 0.25, 0.9);
+  let peck = 0, roll = 0;
+  switch (b.st) {
+    case 'in': { const k = Math.min(1, b.t / b.dur), e = 1 - Math.pow(1 - k, 1.6); bpBez(b.p0, b.pc, b.p1, e, b.pos); bpFace(b, dt, true);
+      if (T.swoop && k < 0.75) flap(T.flap, 0.18 + 0.12 * Math.sin(clock * 3 + b.ph)); else flap(T.flap, 1);
+      if (k >= 1) bpArrive(b); break; }
+    case 'land': { const k = Math.min(1, b.t / b.dur), e = k * k * (3 - 2 * k), to = b.after === 'strut' ? b.landTo : b.to;
+      b.pos.lerpVectors(b.from, to, e); b.pos.y += Math.sin(k * Math.PI) * b.landH; flap(T.flap * 1.2, 1 - k * 0.6); bpFace(b, dt, false);
+      if (k >= 1) { b.pos.copy(to); b.t = 0; if (b.after === 'strut') { b.st = 'strut'; if (T.boss) { bpSfx('gusLand'); shake = Math.max(shake, reduceMotion ? 0.03 : 0.25); burst(b.pos.clone().setY(0.2), 0xb9c79a, 10, 3, 1.6, 0.35); } } else { b.st = b.after || 'peck'; } } break; }
+    case 'strut': { fold(); const dx = b.to.x - b.pos.x, dz = b.to.z - b.pos.z, d = Math.hypot(dx, dz), sp = T.walk * (T.boss ? 1 : 1);
+      if (d < 0.04) { b.t = 0; if (T.boss) { b.st = 'peck'; } else { b.st = 'hop'; b.from.copy(b.pos); b.dur = 0.36; } break; }
+      const st = Math.min(d, sp * dt); b.pos.x += dx / d * st; b.pos.z += dz / d * st; b.pos.y = 0; bpFace(b, dt, false);
+      const ph = clock * (T.boss ? 5 : 9) + b.ph; peck = Math.max(0, Math.sin(ph)) * 0.35; roll = Math.sin(ph * 0.5) * (T.boss ? 0.14 : 0.1); b.pos.y += Math.abs(Math.sin(ph)) * (T.boss ? 0.06 : 0.015); break; }
+    case 'hop': { const k = Math.min(1, b.t / b.dur), P = tg.perches[b.pi]; b.pos.lerpVectors(b.from, P, k); b.pos.y = b.from.y + (P.y - b.from.y) * k + Math.sin(k * Math.PI) * 0.35; flap(T.flap * 1.3, 1); bpFaceTo(b, P.x, P.z, dt);
+      if (k >= 1) { b.pos.copy(P); b.st = 'peck'; b.t = 0; } break; }
+    case 'peck': { fold(); b.dwell += dt; if (tg) bpFaceTo(b, tg.c.x, tg.c.z, dt);
+      const pp = T.boss ? 3 : T.id === 'pigeon' ? 6 : 9; peck = Math.pow(Math.max(0, Math.sin(b.t * pp + b.ph)), 4) * (T.boss ? 0.5 : 0.75);
+      if (T.id === 'sparrow' && (b.hopT -= dt) <= 0 && tg) { b.hopT = 0.9 + Math.random() * 0.8; let ni = (b.pi + 1 + ((Math.random() * (tg.perches.length - 1)) | 0)) % tg.perches.length; if (tg.use[ni] > 0) ni = b.pi;
+        if (ni !== b.pi) { tg.use[b.pi]--; tg.use[ni]++; b.pi = ni; } b.from.copy(b.pos); b.to.copy(tg.perches[b.pi]); b.st = 'land'; b.after = 'peck'; b.dur = 0.22; b.landH = 0.12; b.t = 0; }
+      if (T.boss && Math.random() < dt * 0.25) bpSfx('coo', b);
+      if (b.dwell >= T.dwell) bpSteal(b); break; }
+    case 'hover': { const P = tg ? tg.perches[b.pi] : b.to; b.dwell += dt; b.pos.set(P.x + Math.sin(clock * 2.1 + b.ph) * 0.12, P.y + 0.42 + Math.sin(clock * 5 + b.ph) * 0.07, P.z + Math.cos(clock * 1.7 + b.ph) * 0.12);
+      if (tg) bpFaceTo(b, tg.c.x, tg.c.z, dt); flap(T.flap * 1.4, 1); b.pitch += (-0.35 - b.pitch) * Math.min(1, dt * 5);
+      if (b.dwell >= T.dwell) bpSteal(b); break; }
+    case 'dodge': { const k = Math.min(1, b.t / 0.36), e = 1 - Math.pow(1 - k, 2); b.pos.lerpVectors(b.from, b.to, e); b.pos.y += Math.sin(k * Math.PI) * 0.45; flap(T.flap * 1.5, 1); roll = Math.sin(k * Math.PI) * 0.7 * b.dodS;
+      if (k >= 1) { b.t = 0; const P = tg ? tg.perches[b.pi] : null;
+        if (b.after === 'in' && P) { bpFlyTo(b, P.clone().setY(P.y + 0.35), 1.2); b.next = 'perch'; b.to.copy(P); }
+        else if (P) { b.from.copy(b.pos); b.to.copy(P); b.st = 'land'; b.after = 'peck'; b.dur = 0.3; b.landH = 0.25; }
+        else bpFlee(b, false); } break; }
+    case 'gust': { flap(T.flap * 1.6, 1.25); b.pos.y = Math.sin(Math.min(1, b.t / 0.8) * Math.PI) * 0.6;
+      if (!b.gustDone && b.t > 0.28) { b.gustDone = true; bpGustPush(b); }
+      if (b.t > 0.85) { b.pos.y = 0; b.gustDone = false; const Tg2 = bpTargets(); const base = b.ti >= 0 ? b.ti : b.lastTi >= 0 ? b.lastTi : 0; let ni = (base + 1 + ((Math.random() * (Tg2.length - 1)) | 0)) % Tg2.length; bpClaim(b, ni, -1); b.to.copy(Tg2[ni].gus); b.st = 'strut'; b.dwell = 0; b.t = 0;
+        showWalkName('👑 Big Gus waddles off to raid ' + Tg2[ni].name + '!'); } break; }
+    case 'soak': { const k = Math.min(1, b.t / 1.1), pu = T.boss ? 1.6 : 1.62, s = 1 + (pu - 1) * Math.min(1, b.t / 0.18) * (1 + 0.15 * Math.sin(b.t * 14) * (1 - k));
+      b.body.scale.set(s, s * 1.05, s * 0.92); fold(); b.wings.scale.set(0.5 + 0.3 * Math.sin(b.t * 30), Math.sin(b.t * 40) * 0.6, 1); roll = Math.sin(b.t * 42) * 0.38 * (1 - k) * (reduceMotion ? 0.3 : 1);
+      if ((b.dripT = (b.dripT || 0) - dt) <= 0) { b.dripT = 0.09; burst(bpV(b.pos.x, b.pos.y + b.G.mid * T.sc * 0.4, b.pos.z), 0x9fd8ff, S.low ? 1 : 3, 0.9 * Math.sqrt(T.sc), 0.6, 0.11 * Math.sqrt(T.sc)); }
+      if (b.t > 0.35 && !b.quip) { b.quip = true; bpQuip(b); }
+      if (b.t >= 1.1) bpFlee(b, true); break; }
+    case 'flee': case 'steal': { const k = b.t; b.vel.y += dt * (b.st === 'steal' ? 4 : 3); const sp = Math.min(T.boss ? 6 : 11, (T.boss ? 1.2 : 2.5) + k * (T.boss ? 2.5 : 5)); const hd = Math.hypot(b.vel.x, b.vel.z) || 1;
+      b.pos.x += b.vel.x / hd * sp * dt; b.pos.z += b.vel.z / hd * sp * dt; b.pos.y += Math.min(6, b.vel.y) * dt; bpFace(b, dt, true); flap(T.flap * (b.st === 'flee' ? 1.25 : 1), 1);
+      if (b.st === 'flee') { const s0 = b.body.scale.x, s1 = s0 + (1.15 - s0) * Math.min(1, dt * 0.8); b.body.scale.set(s1, s1, s1 * 0.95); if ((b.dripT = (b.dripT || 0) - dt) <= 0 && k < 1.2) { b.dripT = 0.16; burst(b.pos.clone(), 0x9fd8ff, 1, 0.3, 0.2, 0.08 * Math.sqrt(T.sc)); } }
+      if (k > (T.boss ? 6 : 3.6) || b.pos.y > 22) { b.on = false; b.g.visible = false; } break; }
+  }
+  if (b.ruff > 0) { b.ruff = Math.max(0, b.ruff - dt * 2.2); roll += Math.sin(clock * 38) * 0.22 * b.ruff; if (b.st !== 'soak' && b.st !== 'flee') { const s = 1 + 0.2 * b.ruff + (T.boss ? b.hits * 0.03 : 0); b.body.scale.set(s, s, s); } }
+  else if (T.boss && b.st !== 'soak' && b.st !== 'flee') { const s = 1 + b.hits * 0.03; b.body.scale.set(s, s, s); }
+  b.roll += (roll - b.roll) * Math.min(1, dt * 20); b.body.rotation.x = peck;
+  b.g.position.copy(b.pos); b.g.rotation.set(b.pitch, b.yaw, b.roll);
+  b.g.visible = b.on && (!povEndWall || povEndWall.visible || camera.position.y > UPPER.CH);
+}
+function bpFlee(b, wet) {                                                // off it goes: up, and away from PKR
+  const p = walk.pos; let dx = b.pos.x - p.x, dz = b.pos.z - p.z; const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
+  const a = (Math.random() - 0.5) * 1.2, ca = Math.cos(a), sa = Math.sin(a); b.vel.set(dx * ca - dz * sa, wet ? 1.2 : 2, dx * sa + dz * ca);
+  bpRelease(b); b.st = 'flee'; b.t = 0;
+}
+function bpQuip(b) {
+  const S = bpS(); if (clock < S.quipT) return; S.quipT = clock + 0.7;
+  const q = b.T.quips[(Math.random() * b.T.quips.length) | 0]; try { floatText(bpV(b.pos.x, b.pos.y + b.G.mid * b.T.sc + 0.45 * Math.sqrt(b.T.sc), b.pos.z), '💢 ' + q, 'name'); } catch (e) {}
+}
+function bpSteal(b) {
+  const S = bpS(), Tg = bpTargets(), t = b.ti >= 0 ? Tg[b.ti] : null; if (!t || !bpRoundLive()) { bpFlee(b, false); return; }
+  S.hearts = Math.max(0, S.hearts - 1); S.stolen++; S.combo = 0; S.comboT = 0; S.heartPop = clock;
+  const nm = b.T.boss ? 'Big Gus' : b.T.name.toLowerCase(); showWalkName(t.steal[(Math.random() * t.steal.length) | 0].replace('{b}', nm).replace('A Big Gus', 'Big Gus'));
+  bpSfx('steal'); try { floatText(bpV(t.c.x, t.c.y + 0.9, t.c.z), '💔', 'bad'); } catch (e) {}
+  if (t.id === 'bath') { try { for (let k = 0; k < 2; k++) bbRipple(t.c.x + (Math.random() - 0.5) * 0.4, t.c.z + (Math.random() - 0.5) * 0.4, 0.5, k * 0.15); burst(t.c.clone().setY(t.c.y + 0.1), 0xbfe2ff, 8, 1.8, 2.4, 0.3); } catch (e) {} }
+  if (b.T.boss) { b.dwell = 0; const ni = (b.ti + 1 + ((Math.random() * (Tg.length - 1)) | 0)) % Tg.length; bpClaim(b, ni, -1); b.to.copy(Tg[ni].gus); b.st = 'strut'; b.t = 0; }
+  else { if (t.loot.length) { b.loot.geometry = bpLootGeo(t.loot[(Math.random() * t.loot.length) | 0]); b.loot.visible = true; } bpRelease(b); const p = walk.pos;
+    let dx = b.pos.x - p.x, dz = b.pos.z - p.z; const d = Math.hypot(dx, dz) || 1; b.vel.set(dx / d, 2.5, dz / d); b.st = 'steal'; b.t = 0; tone(2800, 3600, 0.08, 'sine', 0.012); }
+  if (S.hearts <= 0) bpEnd('lost');
+}
+function bpGustPush(b) {                                                 // Big Gus flaps: a gust that shoves PKR back (and blows the droplets about)
+  const p = walk.pos, dx = p.x - b.pos.x, dz = p.z - b.pos.z, d = Math.hypot(dx, dz) || 1;
+  bpSfx('gust'); try { floatText(bpV(b.pos.x, 2.6, b.pos.z), 'WHOOSH!', 'warn'); } catch (e) {}
+  burst(bpV(b.pos.x, 0.3, b.pos.z), 0xb9c79a, 12, 5, 1.2, 0.3); burst(bpV(b.pos.x, 1.2, b.pos.z), 0xe6e9ef, 8, 4, 1.5, 0.3);
+  if (d < 4.6 && walk.on) { const f = 8.5 * (1 - d / 6); walk.vel.set(dx / d * f, 0, dz / d * f); walk.flingT = clock + 0.35; if (walk.grounded) { walk.vy = 3.2; walk.grounded = false; } shake = Math.max(shake, reduceMotion ? 0.03 : 0.2); }
+}
+
+/* ---------- the squirt (wpnSquirt, while a round is on) ---------- */
+function bpSquirt(w) {
+  const S = bpS(), K = bpK(), m = wpnMouth(wpnV()); w.tank = Math.max(0, w.tank - 1); wpnChip(); S.squirts++;
+  const f = walk.face, fx = Math.sin(f), fz = Math.cos(f), v = S.tmp.v || (S.tmp.v = bpV()); let best = null, bs = 1e9, pb = null, ps = 1e9;
+  for (const b of S.birds) { if (!bpHittable(b)) continue; bpAimPt(b, v); const dx = v.x - m.x, dy = v.y - m.y, dz = v.z - m.z, hd = Math.hypot(dx, dz), d = Math.hypot(hd, dy);
+    if (d > K.RANGE * (b.T.boss ? 1.15 : 1)) continue; const ang = hd < 0.8 ? 0 : Math.acos(Math.max(-1, Math.min(1, (dx * fx + dz * fz) / hd))); if (ang > K.CONE) continue;
+    const sc = ang * 6 + d * 0.3 - (b.dwell / b.T.dwell) * 2;
+    if (S.pend.some(q => q.b === b && q.b.hp <= 1)) { if (sc < ps) { ps = sc; pb = b; } continue; }   /* (already as good as soaked: the next one along, if there is one) */
+    if (sc < bs) { bs = sc; best = b; } }
+  const threat = S.birds.some(bpHittable); if (threat && (best || !pb)) S.aimed++;
+  const nz = m.clone().add(bpV(fx * 0.25, 0.04, fz * 0.25)); let end;
+  if (!best && pb) { end = bpAimPt(pb, bpV()); bpJet(nz, end, Math.min(0.22, nz.distanceTo(end) / 45), false); }   /* (held down on one bird: the extra water just lands on it; not a miss) */
+  else if (best) { end = bpAimPt(best, bpV()); walk.face = Math.atan2(end.x - walk.pos.x, end.z - walk.pos.z); walk.look = end.clone().setY(walk.pos.y); }
+  else { end = bpV(m.x + fx * 7.5, 0, m.z + fz * 7.5); end.y = Math.max(wpnGround(end.x, end.z, m.y + 0.5) + 0.05, m.y - 0.7); }
+  const tt = Math.min(0.22, nz.distanceTo(end) / 45);
+  if (!best && pb) { /* (drawn above) */ }
+  else if (best && best.T.dodge && !best.dodged) { bpDodge(best); bpJet(nz, end, tt, true); }
+  else if (best) { bpJet(nz, end, tt, false); S.pend.push({ b: best, t: tt }); }
+  else { bpJet(nz, end, tt, true); if (threat) { S.combo = 0; S.comboT = 0; } }
+  if (w.tank === 0) showWalkName('💦 Out of water! Hop in the bird bath (or top up at the rain barrel by the shed)');
+  else if (w.tank === 6 && !S.said.low) { S.said.low = 1; showWalkName('💧 Running low! One hop in the bird bath fills her right up'); }
+}
+function bpDodge(b) {
+  const p = walk.pos; let dx = b.pos.x - p.x, dz = b.pos.z - p.z; const d = Math.hypot(dx, dz) || 1; const s = Math.random() < 0.5 ? -1 : 1;
+  b.dodged = true; b.dodS = s; b.after = b.st === 'in' ? 'in' : 'perch'; b.from.copy(b.pos); b.to.set(b.pos.x + (-dz / d) * s * 1.0, b.pos.y + 0.2, b.pos.z + (dx / d) * s * 1.0); b.st = 'dodge'; b.t = 0;
+  bpSfx('caw', b); try { floatText(bpV(b.pos.x, b.pos.y + 0.9, b.pos.z), ['😏 Missed me!', 'Too slow!', 'Caw-caw! Nope!'][(Math.random() * 3) | 0], 'name'); } catch (e) {}
+  if (!bpS().said.dodge) { bpS().said.dodge = 1; showWalkName('🐦‍⬛ Crows dodge the first squirt: hit it again, quick!'); }
+}
+function bpHit(b, dmg, how) {
+  const S = bpS(), K = bpK(), T = b.T; if (!bpHittable(b)) return false;
+  const air = !T.boss && (b.st === 'in' || b.st === 'hover' || (b.st === 'dodge' && b.after === 'in')), at = bpAimPt(b, bpV());
+  S.hits++; S.combo++; S.comboT = K.COMBO_T; S.bestCombo = Math.max(S.bestCombo, S.combo); if (S.combo >= 15) unlock('birdCombo');
+  burst(at, 0xa8e0ff, S.low ? 6 : 10, 3.2 * Math.sqrt(T.sc / 1.3), 2.6, 0.34); burst(at, 0xffffff, S.low ? 2 : 4, 2, 2, 0.24); try { wpnFlash(at, 0xa8e4ff); } catch (e) {}
+  b.hp -= dmg; bpSfx('hit');
+  if (b.hp > 0) {
+    b.ruff = 1; b.dwell = Math.max(0, b.dwell - (T.boss ? 0.9 : 1.6)); bpSfx('squawk', b);
+    try { floatText(bpV(at.x, at.y + 0.35 * Math.sqrt(T.sc), at.z), T.boss ? 'SPLASH! ' + b.hp : 'SPLISH!', 'bp-spl'); } catch (e) {}
+    if (T.boss) { b.hits++; S.score += Math.round(20 * bpMult()); if (b.hits % K.GUST_EVERY === 0 && b.st !== 'gust' && b.st !== 'land') { bpRelease(b); b.st = 'gust'; b.t = 0; b.gustDone = false; } }
+    return true;
+  }
+  const pts = Math.round((T.pts + (air ? K.AIR : 0) + (how === 'splash' ? K.CANNON : 0)) * bpMult()); S.score += pts; S.soaked++; if (T.id === 'crow') S.crows++;
+  try { floatText(bpV(at.x, at.y + 0.5 * Math.sqrt(T.sc), at.z), how === 'splash' ? 'CANNONBALL!' : 'SPLOOSH!', 'bp-spl'); floatText(bpV(at.x, at.y + 0.1, at.z), '+' + bpFmt(pts) + (air ? ' mid-air!' : ''), 'bp-pts'); } catch (e) {}
+  if (T.id === 'gull' && air) unlock('birdGull');
+  bpRelease(b); b.st = 'soak'; b.t = 0; b.quip = false; b.dripT = 0; b.body.material = S.wetMat; b.loot.visible = false; bpSfx('squawk', b);
+  if (T.boss) { S.bossDone = true; unlock('birdBoss'); showWalkName('👑 Big Gus is SOAKED! He puffs up like a beach ball and flaps off in a huff'); shake = Math.max(shake, reduceMotion ? 0.03 : 0.3);
+    burst(bpV(b.pos.x, 2, b.pos.z), 0xa8e0ff, 24, 5, 4, 0.5); try { if (typeof talkEvent === 'function') talkEvent('birds', { kind: 'boss', n: S.score }); } catch (e) {} }
+  else if (!S.said.first) { S.said.first = 1; showWalkName('💦 SPLOOSH! Soaked, grumpy, and not hurt one bit'); }
+  return true;
+}
+function bpMult() { const c = bpS().combo; return 1 + Math.min(1.5, Math.floor(c / 5) * 0.5); }
+function bpCannon() {                                                    // (bbSplash, mid-round) PKR cannonballs into the bird bath: anyone sitting on it gets it too
+  const S = bpS(), B = bbWater.st; if (!B || !bpRoundLive()) return;
+  for (const b of S.birds) { if (!bpHittable(b)) continue; if (Math.hypot(b.pos.x - B.x, b.pos.z - B.z) < (b.T.boss ? 2.6 : 1.5) && b.pos.y > (b.T.boss ? -1 : 0.8)) { S.cannon++; bpHit(b, b.T.boss ? 3 : b.hp, 'splash'); } }
+}
+function bpJet(a, b, tt, miss) {                                         // the water's arc: a stream of drops from the nozzle to where it lands
+  const S = bpS(); let j = S.jets.find(x => !x.on); if (!j) j = S.jets.reduce((x, y) => (x.t > y.t ? x : y));
+  const L = a.distanceTo(b); j.on = true; j.t = 0; j.tt = Math.max(0.06, tt); j.a.copy(a); j.b.copy(b); j.c.copy(a).add(b).multiplyScalar(0.5); j.c.y += 0.12 * L + 0.2; j.miss = miss; j.land = false;
+}
+function bpJetsTick(dt) {
+  const S = bpS(); if (!S.drops) return; const P = S.drops.geometry.attributes.position, C = S.drops.geometry.attributes.color, NP = S.NP, v = S.tmp.j || (S.tmp.j = bpV()); let any = false;
+  S.jets.forEach((j, ji) => {
+    for (let i = 0; i < NP; i++) C.setXYZ(ji * NP + i, 0, 0, 0);
+    if (!j.on) return; j.t += dt; const head = Math.min(1, j.t / j.tt), tail = Math.max(0, (j.t - j.tt * 0.7) / 0.13), fade = Math.max(0, 1 - Math.max(0, j.t - j.tt - 0.06) / 0.1);
+    if (head >= 1 && !j.land) { j.land = true; if (j.miss) burst(j.b, 0xa8e0ff, 6, 1.6, 1.4, 0.28); }
+    if (tail >= 1 || fade <= 0) { j.on = false; return; } any = true;
+    for (let i = 0; i < NP; i++) { const u = tail + (head - tail) * (i / (NP - 1)); bpBez(j.a, j.c, j.b, u, v); const jit = 0.025 + 0.04 * u; P.setXYZ(ji * NP + i, v.x + (Math.random() - 0.5) * jit, v.y + (Math.random() - 0.5) * jit, v.z + (Math.random() - 0.5) * jit);
+      const k = fade * (0.55 + 0.45 * Math.sin(i * 1.7 + j.t * 40)); C.setXYZ(ji * NP + i, 0.62 * k, 0.86 * k, 1 * k); } });
+  P.needsUpdate = C.needsUpdate = true; S.drops.visible = any;
+  if (S.wetMat) { const W = wpnMats(); S.wetMat.color.copy(W.matOut.color).multiply(S.tmp.wc || (S.tmp.wc = new THREE.Color(0.6, 0.78, 1.12))); }
+}
+function bpAlarms(dt) {                                                  // a "!" over each target under attack (yellow → red as the thief gets closer to getting away with it)
+  const S = bpS(), Tg = bpTargets(); if (!S.alarms) return;
+  Tg.forEach((t, i) => { let a = 0; for (const b of S.birds) if (b.on && b.ti === i && (b.st === 'peck' || b.st === 'hover')) a = Math.max(a, b.dwell / b.T.dwell); t.alarm = bpRoundLive() ? a : 0;
+    const sp = S.alarms[i]; sp.visible = t.alarm > 0.02 && (!povEndWall || povEndWall.visible); if (!sp.visible) return;
+    const pu = 1 + 0.18 * Math.sin(clock * (8 + t.alarm * 10)); sp.position.set(t.c.x, t.c.y + (t.id === 'veg' ? 1.9 : 1.15), t.c.z); sp.scale.setScalar(0.62 * pu);
+    sp.material.color.setRGB(1, 0.95 - 0.7 * t.alarm, 0.25 - 0.15 * t.alarm); });
+}
+
+/* ---------- sounds (the game's own tone() / noise(): the effects switch covers them) ---------- */
+function bpSfx(n, b) {
+  try {
+    const k = b && b.T ? b.T.id : '';
+    if (n === 'hit') { noise(0.12, 0.045, 2400); tone(520, 300, 0.07, 'sine', 0.018); }
+    else if (n === 'squawk' || n === 'caw' || n === 'coo') {
+      const r = 0.9 + Math.random() * 0.2;
+      if (k === 'sparrow') { tone(3300 * r, 4300 * r, 0.06, 'square', 0.01); tone(3600 * r, 2800 * r, 0.07, 'square', 0.01, 0.08); }
+      else if (k === 'pigeon') { tone(430 * r, 360 * r, 0.16, 'sine', 0.03); tone(390 * r, 300 * r, 0.2, 'sine', 0.026, 0.18); }
+      else if (k === 'crow') { tone(760 * r, 520 * r, 0.15, 'sawtooth', 0.016); tone(720 * r, 480 * r, 0.17, 'sawtooth', 0.014, 0.2); }
+      else if (k === 'gull') { tone(1500 * r, 900 * r, 0.22, 'triangle', 0.02); tone(1650 * r, 1000 * r, 0.18, 'triangle', 0.016, 0.24); }
+      else if (k === 'gus') { tone(230 * r, 170 * r, 0.42, 'sawtooth', 0.022); tone(200 * r, 150 * r, 0.5, 'sine', 0.035, 0.3); } }
+    else if (n === 'steal') { tone(520, 330, 0.22, 'triangle', 0.03); tone(330, 220, 0.3, 'triangle', 0.025, 0.18); }
+    else if (n === 'start') [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.03, i * 0.09));
+    else if (n === 'wave') [659, 784].forEach((f, i) => tone(f, f * 1.01, 0.14, 'triangle', 0.03, i * 0.1));
+    else if (n === 'boss') { tone(196, 147, 0.5, 'sawtooth', 0.02); tone(147, 110, 0.6, 'sine', 0.035, 0.35); }
+    else if (n === 'clear') [784, 988, 1175].forEach((f, i) => tone(f, f, 0.12, 'triangle', 0.028, i * 0.08));
+    else if (n === 'win') [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f, 0.18, 'triangle', 0.032, i * 0.1));
+    else if (n === 'lose') [523, 440, 349, 262].forEach((f, i) => tone(f, f * 0.98, 0.2, 'triangle', 0.028, i * 0.14));
+    else if (n === 'gust') { noise(0.6, 0.07, 700); tone(160, 90, 0.4, 'sine', 0.03); }
+    else if (n === 'gusLand') { tone(110, 60, 0.3, 'sine', 0.05); noise(0.2, 0.06, 500); }
+  } catch (e) {}
+}
+
+/* ---------- the screens: the pill, the HUD, the banner, the hint, the results card ---------- */
+function bpFmt(n) { try { return Math.round(n).toLocaleString('en-US'); } catch (e) { return String(Math.round(n)); } }
+function bpNear() {
+  if (state !== 'playing' || gameMode !== 'walk' || !walk.on || !walk.rig || mirrorWorld || walk.climb || walk.napT > 0 || walk.frozen) return false;
+  if ((ZN && ZN.on) || (typeof yardOpen === 'function' && !yardOpen())) return false;
+  const p = walk.pos; if (!inOurYard(p.x, p.z) || p.y > 2.6) return false;
+  const W = wpnState(), w = bpSoaker(); if (!w) return false;
+  if (W.held === w && w.st === 'held') return true;
+  const B = bbWater.st; return !!B && Math.hypot(p.x - B.x, p.z - B.z) < 4.5;
+}
+function bpPill() {
+  const S = bpS();
+  if (!walk.on || !povEndWall) { if (S.pillOn) bpPillSet(false); return; }
+  let on = bpNear() && (walk.grounded || S.pillOn);
+  if (on && document.querySelector('#sledPill.on,#jetPill.on,#hopPill.on,#chimPill.on,#lotPill.on,#crossyPill.on,#scopePill.on,#runPill.on,#chimSootPill.on')) on = false;   /* (another button's there: that one first) */
+  if (S.goQ) { S.goQ = false; if (S.pillOn && on) { bpStart(); return; } }
+  if (on && S.visit !== walk.treesSeen) { S.visit = walk.treesSeen; const P = bpLoad();
+    showWalkName(!P.rounds ? '💦 Cheeky birds keep raiding the yard! Tap “Bird Patrol” to defend it with the super-soaker' : '💦 Bird Patrol: best ⭐ ' + bpFmt(P.best) + '. Tap to defend the yard again!'); }
+  if (on !== S.pillOn) bpPillSet(on);
+}
+function bpPillSet(on) { const S = bpS(); S.pillOn = on; if (!S.pill && !on) return; (S.pill || bpPillMake()).classList.toggle('on', on); document.body.classList.toggle('bp-pill', on); }
+function bpPillMake() {
+  const S = bpS(); if (S.pill) return S.pill; bpCss();
+  const b = S.pill = document.createElement('button'); b.id = 'bpPill'; b.type = 'button'; b.innerHTML = '<b>&#x1F4A6;</b>Bird Patrol'; b.setAttribute('aria-label', 'Bird Patrol: spray the birds raiding the yard');
+  (document.getElementById('walkUI') || document.body).appendChild(b);
+  b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (bpS().pillOn) bpS().goQ = true; });
+  b.addEventListener('pointerup', e => e.stopPropagation());
+  return b;
+}
+function bpCss() {
+  if (document.getElementById('bpCss')) return; const st = document.createElement('style'); st.id = 'bpCss';
+  st.textContent = `
+#bpPill{position:fixed;right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(236px + env(safe-area-inset-bottom,0px));z-index:6;display:none;align-items:center;gap:6px;padding:9px 16px 9px 12px;border-radius:999px;background:#1d9be0;color:#fff;font:800 16px var(--body);border:3px solid #fff4f8;box-shadow:0 5px 0 #0c5f8f,0 10px 18px rgba(0,0,0,.3);touch-action:none;cursor:pointer;white-space:nowrap}
+#bpPill b{font-size:20px;line-height:1}
+#bpPill.on{display:flex;animation:bpPillIn .45s cubic-bezier(.2,1.6,.4,1),bpPillBob 1.8s ease-in-out .5s infinite}
+body.heist-ui #bpPill,body.hopping #bpPill,body.biking #bpPill,body.chimneying #bpPill,body.jetting #bpPill,body.jet-intro #bpPill,body.sledding #bpPill,body.lotting #bpPill,body.crossing #bpPill,body.rooftopping #bpPill,body.birding #bpPill{display:none}
+body.birding #runPill,body.birding #hopPill,body.birding #jetPill,body.birding #scopePill,body.birding #sledPill,body.birding #lotPill,body.birding #crossyPill,body.birding #chimSootPill,body.birding #chimPill{display:none!important}
+body.birding #walkCaption{top:calc(env(safe-area-inset-top,0px) + 140px)}
+body.birding .ach-toast{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 170px)}
+@keyframes bpPillIn{from{transform:scale(.4);opacity:0}}
+@keyframes bpPillBob{50%{transform:translateY(-4px)}}
+#bpHud{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 58px);transform:translateX(-50%);z-index:7;display:none;flex-direction:column;align-items:center;gap:5px;pointer-events:none;font:800 14px var(--body);color:#fff;-webkit-user-select:none;user-select:none;max-width:calc(100vw - 16px)}
+body.birding #bpHud.on{display:flex}
+#bpHud .bp-row{display:flex;align-items:center;gap:9px;background:rgba(10,38,62,.76);border-radius:999px;padding:4px 6px 4px 12px;box-shadow:0 3px 10px rgba(0,0,0,.25);white-space:nowrap}
+#bpHud .bp-row.r2{padding:4px 10px;gap:8px}
+#bpHud .bp-hearts{font-size:15px;letter-spacing:1px;line-height:1}
+#bpHud .bp-hearts i{font-style:normal;display:inline-block}#bpHud .bp-hearts i.off{filter:grayscale(1);opacity:.32}#bpHud .bp-hearts i.pop{animation:bpHeart .6s ease-out}
+#bpHud .bp-score{font:400 22px var(--display);min-width:58px;text-align:center;line-height:1.1;font-variant-numeric:tabular-nums}#bpHud .bp-score.bump{animation:bpBump .3s cubic-bezier(.2,1.6,.4,1)}
+#bpHud .bp-wave{font-size:12.5px;opacity:.92}
+#bpHud .bp-x{pointer-events:auto;border:0;min-width:28px;height:28px;border-radius:14px;background:rgba(255,255,255,.16);color:#fff;font:800 13px var(--body);cursor:pointer;padding:0 8px;touch-action:manipulation}
+#bpHud .bp-x.arm{background:#ff5a6e}
+#bpHud .bp-tank{display:flex;align-items:center;gap:5px;font-size:13px}
+#bpHud .bp-tank s{display:block;position:relative;width:70px;height:8px;border-radius:4px;background:rgba(255,255,255,.2);overflow:hidden;text-decoration:none}
+#bpHud .bp-tank s u{position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(90deg,#5fd0ff,#2a8cff);border-radius:4px;transition:width .12s}
+#bpHud .bp-tank.low s u{background:linear-gradient(90deg,#ffb15a,#ff5a6e)}#bpHud .bp-tank.low{animation:bpBlink .7s infinite}
+#bpHud .bp-combo{display:none;background:linear-gradient(90deg,#ffd23a,#ff8a2a);color:#3a1a00;border-radius:999px;padding:1px 8px;font-size:12.5px}
+#bpHud .bp-combo.on{display:inline-block}#bpHud .bp-combo.bump{animation:bpBump .3s cubic-bezier(.2,1.6,.4,1)}
+#bpHud .bp-tg{display:flex;gap:4px}
+#bpHud .bp-tg i{font-style:normal;font-size:14px;width:23px;height:23px;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.12)}
+#bpHud .bp-tg i.hot{background:#ffb02e;animation:bpBlink .55s infinite}#bpHud .bp-tg i.hot2{background:#ff3f5a;animation:bpBlink .3s infinite}
+.bp-ban{position:fixed;left:0;right:0;top:30%;z-index:8;text-align:center;pointer-events:none;color:#fff;font:400 clamp(28px,7.4vw,48px)/1.05 var(--display);text-shadow:0 4px 0 #0c5f8f,0 0 22px rgba(80,180,255,.8);opacity:0;padding:0 16px}
+.bp-ban small{display:block;font:800 clamp(14px,3.6vw,18px) var(--body);margin-top:6px;text-shadow:0 1px 4px #000}
+.bp-ban.pop{animation:bpBan 2.4s ease-out forwards}
+#bpHint{position:fixed;left:50%;top:44%;transform:translateX(-50%);z-index:8;display:none;flex-direction:column;align-items:center;gap:3px;background:rgba(10,38,62,.88);border-radius:18px;padding:10px 18px;color:#fff;font:800 14px/1.35 var(--body);text-align:center;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.3);width:max-content;max-width:calc(100vw - 32px)}
+#bpHint.on{display:flex;animation:bpIn .35s cubic-bezier(.2,1.4,.4,1)}#bpHint b{font:400 19px var(--display)}
+#bpOver{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(6,20,40,.5);padding:env(safe-area-inset-top,0px) 16px env(safe-area-inset-bottom,0px);font-family:var(--display)}
+#bpOver.on{display:flex}
+#bpOver .bp-card{position:relative;background:#f2faff;color:#0e2a44;border-radius:16px;padding:18px 20px 14px;width:min(340px,100%);max-height:calc(100% - 12px);overflow-y:auto;overscroll-behavior:contain;text-align:center;box-shadow:0 8px 0 #0c5f8f,0 20px 44px rgba(0,0,0,.5);animation:bpIn .35s cubic-bezier(.2,1.4,.4,1)}
+#bpOver h2{margin:0;font-size:30px;font-weight:400;color:#1d7fc4;line-height:1.1}
+#bpOver .bp-sub{font:700 14px var(--body);opacity:.78;margin-top:4px}
+#bpOver .bp-big{display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:4px}#bpOver .bp-big b{font-size:54px;font-weight:400;line-height:1.1}#bpOver .bp-big span{font-size:22px}
+#bpOver .bp-stats{display:flex;justify-content:space-around;margin:8px 0 2px}#bpOver .bp-stats b{display:block;font-size:22px;font-weight:400}#bpOver .bp-stats span{font:600 12px var(--body);opacity:.65}
+#bpOver .bp-badge{display:none;margin:8px auto 2px;padding:5px 16px 4px;border-radius:14px;color:#fff;font-size:20px;background:linear-gradient(90deg,#2fb4ff,#7a6bff);box-shadow:0 4px 0 #0e2a44;width:max-content;max-width:100%;transform:rotate(-2deg);animation:bpStamp .6s cubic-bezier(.2,1.7,.4,1) both}
+#bpOver .bp-badge.on{display:block}
+#bpOver .bp-bank{font:800 14px var(--body);color:#1d6fc4;margin-top:8px;line-height:1.4}
+#bpOver .bp-wal{font:700 12px var(--body);opacity:.6;margin-top:8px}
+#bpOver button.bp-btn{display:block;width:100%;margin-top:10px;padding:12px;border:0;border-radius:16px;background:#1d9be0;color:#fff;font:400 19px var(--display);box-shadow:0 4px 0 #0c5f8f;cursor:pointer;touch-action:manipulation}
+#bpOver button.bp-btn.alt{background:#0e2a44;box-shadow:0 4px 0 #000;font-size:16px}
+#bpOver button.bp-btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+.float.bp-spl{color:#d4f1ff;font-size:25px;text-shadow:0 2px 0 #0c5f8f,0 0 10px rgba(80,180,255,.8)}
+.float.bp-pts{color:#ffe27a;font-size:17px;text-shadow:0 2px 0 #7a4a10}
+@keyframes bpHeart{0%{transform:scale(1.8)}40%{transform:scale(.7) rotate(-15deg)}100%{transform:none}}
+@keyframes bpBump{from{transform:scale(1.35)}}
+@keyframes bpBlink{50%{opacity:.45}}
+@keyframes bpIn{from{transform:translateX(-50%) scale(.7);opacity:0}}
+#bpOver .bp-card{animation-name:bpCardIn}@keyframes bpCardIn{from{transform:scale(.7);opacity:0}}
+@keyframes bpBan{0%{opacity:0;transform:translateY(-30px) scale(.8)}10%{opacity:1;transform:none}78%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+@keyframes bpStamp{0%{transform:scale(2.4) rotate(-12deg);opacity:0}100%{transform:scale(1) rotate(-2deg);opacity:1}}
+@media (max-width:420px){#bpHud{font-size:13px}#bpHud .bp-score{font-size:20px;min-width:50px}#bpHud .bp-tank s{width:52px}#bpHud .bp-row{gap:7px}#bpHint{font-size:13px}}
+@media (max-height:520px){#bpHud{top:calc(env(safe-area-inset-top,0px) + 8px);left:calc(env(safe-area-inset-left,0px) + 12px);transform:none;flex-direction:row;gap:6px}#bpHud .bp-row{padding-top:3px;padding-bottom:3px}body.birding #walkCaption{top:calc(env(safe-area-inset-top,0px) + 58px)}.bp-ban{top:34%}#bpHint{top:46%}
+  #bpOver .bp-card{padding:10px 16px;width:min(560px,100%);display:grid;grid-template-columns:1fr 1fr;column-gap:16px;align-items:center}#bpOver h2{font-size:24px}#bpOver .bp-big b{font-size:36px}#bpOver button.bp-btn{padding:8px;margin-top:6px;font-size:16px}#bpOver .bp-bank{margin-top:4px}}`;
+  document.head.appendChild(st);
+}
+function bpUI() {
+  const S = bpS(); if (S.ui) return S.ui; bpCss();
+  const hud = document.createElement('div'); hud.id = 'bpHud';
+  hud.innerHTML = '<div class="bp-row"><span class="bp-hearts"></span><span class="bp-score">0</span><span class="bp-wave"></span><button type="button" class="bp-x" aria-label="Stop the patrol">✕</button></div>'
+    + '<div class="bp-row r2"><span class="bp-tank">💧<s><u></u></s></span><span class="bp-combo"></span><span class="bp-tg"></span></div>';
+  document.body.appendChild(hud);
+  const ban = document.createElement('div'); ban.className = 'bp-ban'; document.body.appendChild(ban);
+  const hint = document.createElement('div'); hint.id = 'bpHint';
+  hint.innerHTML = '<b>💦 Defend the yard!</b><span>🐾 (or E) squirts the nearest bird in front of PKR · hold it to keep spraying</span><span>🛁 Hop into the bird bath to refill · don’t let them steal!</span>';
+  document.body.appendChild(hint);
+  const over = document.createElement('div'); over.id = 'bpOver';
+  over.innerHTML = '<div class="bp-card"><div class="bp-left"><h2 id="bpTitle">Yard saved!</h2><div class="bp-sub" id="bpSub"></div><div class="bp-big"><b id="bpScore">0</b><span>pts</span></div>'
+    + '<div class="bp-stats"><div><b id="bpSoaked">0</b><span>soaked</span></div><div><b id="bpAcc">0%</b><span>accuracy</span></div><div><b id="bpCombo">0</b><span>best combo</span></div></div>'
+    + '<div class="bp-badge" id="bpBadge">NEW BEST!</div><div class="bp-bank" id="bpBank"></div></div>'
+    + '<div class="bp-right"><button type="button" class="bp-btn" id="bpAgain">💦 Patrol again</button><button type="button" class="bp-btn alt" id="bpHome">Back to the yard</button><div class="bp-wal" id="bpWal"></div></div></div>';
+  document.body.appendChild(over);
+  for (const t of ['pointerdown', 'touchstart', 'mousedown', 'pointerup']) over.addEventListener(t, e => e.stopPropagation(), { passive: true });
+  const q = id => over.querySelector('#' + id);
+  S.ui = { hud, ban, hint, over, hearts: hud.querySelector('.bp-hearts'), score: hud.querySelector('.bp-score'), wave: hud.querySelector('.bp-wave'), x: hud.querySelector('.bp-x'), tank: hud.querySelector('.bp-tank'), tankU: hud.querySelector('.bp-tank u'),
+    combo: hud.querySelector('.bp-combo'), tg: hud.querySelector('.bp-tg'), title: q('bpTitle'), sub: q('bpSub'), oScore: q('bpScore'), oSoaked: q('bpSoaked'), oAcc: q('bpAcc'), oCombo: q('bpCombo'), badge: q('bpBadge'), bank: q('bpBank'), wal: q('bpWal'), again: q('bpAgain'), home: q('bpHome') };
+  const u = S.ui;
+  u.tg.innerHTML = bpTargets().map(t => '<i title="' + t.name + '">' + t.ic + '</i>').join(''); u.tgI = Array.from(u.tg.children);
+  u.x.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); const S2 = bpS(); if (!bpRoundLive()) return;
+    if (clock < S2.quitArm) { S2.quitArm = 0; bpEnd('quit'); } else { S2.quitArm = clock + 2.2; u.x.classList.add('arm'); u.x.textContent = 'Stop?'; } });
+  u.again.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); bpOff(); bpStart(); });
+  u.home.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); bpOff(); showWalkName('💦 Back to the yard. The birds are sulking on the roof... for now'); });
+  const sw = document.getElementById('walkSwipe');                       // hold 🐾 (or E) to keep spraying
+  if (sw) { sw.addEventListener('pointerdown', e => { const H = bpS().hold; H.btn = true; H.id = e.pointerId; H.t0 = clock; });
+    const up = e => { const H = bpS().hold; if (H.btn && (H.id === null || e.pointerId === H.id)) { H.btn = false; H.id = null; } };
+    window.addEventListener('pointerup', up, true); window.addEventListener('pointercancel', up, true); }
+  window.addEventListener('keydown', e => { const k = (e.key || '').toLowerCase(); if ((k === 'e' || k === 'f') && !e.repeat) { const H = bpS().hold; H.key = true; H.t0 = clock; } });
+  window.addEventListener('keyup', e => { const k = (e.key || '').toLowerCase(); if (k === 'e' || k === 'f') bpS().hold.key = false; });
+  window.addEventListener('blur', () => { const H = bpS().hold; H.key = H.btn = false; });
+  return u;
+}
+function bpBanner(big, small) { const u = bpS().ui; if (!u) return; u.ban.innerHTML = big + (small ? '<small>' + small + '</small>' : ''); u.ban.className = 'bp-ban'; void u.ban.offsetWidth; u.ban.className = 'bp-ban pop'; }
+function bpHint(on) { const u = bpS().ui; if (u) u.hint.classList.toggle('on', on); }
+function bpHudTick() {
+  const S = bpS(), u = S.ui; if (!u) return; const H = S.hud, live = S.on && S.phase !== 'card';
+  u.hud.classList.toggle('on', live); if (!live) return;
+  const K = bpK(), hk = S.hearts + '|' + (S.heartPop || 0);
+  if (H.h !== hk) { const lost = H.hn !== undefined && S.hearts < H.hn; H.h = hk; H.hn = S.hearts; u.hearts.innerHTML = Array.from({ length: K.HEARTS }, (_, i) => '<i class="' + (i < S.hearts ? '' : 'off') + (lost && i === S.hearts ? ' pop' : '') + '">❤️</i>').join(''); }
+  if (H.s !== S.score) { H.s = S.score; u.score.textContent = bpFmt(S.score); u.score.classList.remove('bump'); void u.score.offsetWidth; u.score.classList.add('bump'); }
+  const wv = S.wave < 0 ? 'Get ready!' : '🌊 ' + (S.wave + 1) + '/' + bpWaves().length; if (H.w !== wv) { H.w = wv; u.wave.textContent = wv; }
+  if (S.quitArm && clock > S.quitArm) { S.quitArm = 0; u.x.classList.remove('arm'); u.x.textContent = '✕'; }
+  const w = bpSoaker(), held = w && wpnState().held === w, tk = held ? w.tank : -1;
+  if (H.t !== tk) { H.t = tk; u.tankU.style.width = (tk < 0 ? 0 : Math.round(100 * tk / (w.D.tank || 24))) + '%'; u.tank.classList.toggle('low', tk >= 0 && tk <= 5); }
+  const c = S.combo >= 2 ? '🔥 ' + S.combo + (bpMult() > 1 ? ' ×' + bpMult() : '') : '';
+  if (H.c !== c) { const up = c && (!H.c || S.combo > (H.cn || 0)); H.c = c; H.cn = S.combo; u.combo.textContent = c; u.combo.classList.toggle('on', !!c); if (up) { u.combo.classList.remove('bump'); void u.combo.offsetWidth; u.combo.classList.add('bump'); } }
+  const Tg = bpTargets(); Tg.forEach((t, i) => { const el = u.tgI[i], cl = t.alarm > 0.6 ? 'hot2' : t.alarm > 0.02 ? 'hot' : ''; if (el && el.className !== cl) el.className = cl; });
+}
+function bpCard() {
+  const S = bpS(), u = S.ui, B = S.bank; if (!u || !B || S.phase === 'card') return; S.phase = 'card';
+  const won = B.won, lines = won ? (B.perfect ? ['👵 “Not ONE tomato lost! Shabash, PKR, you are my garden guard now.”', '👵 “My samosas, all safe! You deserve the biggest one, Princess.”']
+      : ['👵 “You saved my veggie patch! Well, most of it. Shabash, beta!”', '🐕 Porter barks his approval over the fence.', '🦝 The raccoon cheers from the roof: “Get ’em, roomie!”'])
+    : S.result === 'lost' ? ['👵 “Hai, my chillies... Never mind, beta. Tomorrow we fight.”', '🐦 The birds are celebrating on the shed roof. Rude.'] : ['💦 The birds will be back. They always come back.'];
+  u.title.textContent = won ? (B.perfect ? 'Not a crumb taken!' : 'Yard saved!') : S.result === 'lost' ? 'The birds win this round' : 'Patrol called off';
+  u.sub.textContent = lines[(Math.random() * lines.length) | 0];
+  u.oScore.textContent = bpFmt(S.score); u.oSoaked.textContent = S.soaked; u.oAcc.textContent = B.acc + '%'; u.oCombo.textContent = S.bestCombo;
+  u.badge.classList.toggle('on', B.newBest); u.badge.textContent = B.perfect ? '🛡️ PERFECT DEFENCE' : 'NEW BEST!'; if (B.perfect) u.badge.classList.add('on');
+  u.bank.innerHTML = '+' + B.fish + ' 🐟' + (B.bon.length ? '<br><small>' + B.bon.join(' · ') + '</small>' : '') + (S.stolen ? '<br><small>Stolen: ' + S.stolen + ' · Wave ' + Math.max(1, S.wave + 1) + ' of ' + bpWaves().length + '</small>' : '');
+  u.wal.textContent = '🐟 ' + bpFmt(typeof ckWallet === 'function' ? ckWallet() : 0) + ' in the piggy bank · best ⭐ ' + bpFmt(B.P.best);
+  u.over.classList.add('on'); u.hud.classList.remove('on'); u.hint.classList.remove('on');
+  try { if (typeof econCard === 'function') setTimeout(() => econCard('birds'), 0); } catch (e) {}
+}
+
+/* ---------- the neighbours, the music, the warm-up ---------- */
+function bpTalkLines() {
+  return {
+    'birds.first': { aunty: ['PKR saved my veggie patch from those little thieves! Shabash, beta! Tonight you get the good fish.'], porter: ['Porter watched the whole Bird Patrol through the fence. He is now your biggest fan. Woof!'],
+      coon: ['Roomie! I saw that from the roof. Pew pew, splash splash! You’re a legend.'] },
+    'birds.clear': { aunty: ['My tomatoes are safe again! The birds can go eat at the neighbour’s. Not my problem.', 'You know, beta, in my village we used a scarecrow. You are much better than a scarecrow.'],
+      porter: ['Porter barks at the sky every time a bird flies over now. He’s on patrol too.'], coon: ['Those birds were going for MY samosa stash too. I owe you one, roomie.'] },
+    'birds.perfect': { aunty: ['Not ONE tomato lost! Not one sock! Princess, you are hired. Pay is samosas.'], coon: ['Perfect defence?! I’ve never seen a yard that clean. Not even when I’m not in it.'],
+      porter: ['Porter does a happy zoomie lap of his yard. Perfect patrol!'] },
+    'birds.boss': { coon: ['You soaked BIG GUS?! Roomie, that pigeon has been bullying me since forever.'], aunty: ['That giant pigeon with the crown? He stole my whole paratha last week. Serves him right!'],
+      porter: ['Porter barked at Big Gus once. Big Gus barked back. Porter is very glad you soaked him.'] },
+    'birds.lost': { aunty: ['The birds took my chillies again... Never mind, beta. Tomorrow we fight.'], coon: ['Tough crowd up there, roomie. Hop in the bird bath more: that tank runs dry fast.'] },
+    'birds.quit': { porter: ['Porter is still barking at the birds. Somebody has to.'] },
+    'best.birds': { aunty: ['{n} points on Bird Patrol! My veggie patch has never been so safe, beta.'], coon: ['{n} on Bird Patrol? The pigeons on the roof are talking about you, roomie. Nervously.'],
+      porter: ['Porter heard about your {n} points on Bird Patrol. He wants a super-soaker too.'] },
+    'back.birds': { aunty: ['All those birds gone? Good. Now nobody touch my samosas. Including you, raccoon.'] },
+  };
+}
+function bpSong(id) {                                                    // (sndSong) an upbeat garden-party loop; a stompier one for Big Gus
+  const boss = id === 'birds:1';
+  const MA = "5 . 3 5 1' . 7 6 | 5 . 3 . 2 . 3 . | 4 . 6 . 5 . 3 . | 2 - - - . . 5 6 | 5 . 3 5 1' . 2' . | 3' . 2' 1' 7 . 5 . | 6 . 5 4 3 . 2 . | 1 - - - . . . .";
+  const MB = "1' . 1' 7 6 . 5 . | 6 . 6 5 4 . 3 . | 4 . 4 3 2 . 3 4 | 5 - - - . . . . | 1' . 1' 7 6 . 5 . | 4 . 5 6 5 . 3 . | 2 . 3 4 5 . 7 . | 1' - - - . . . .";
+  const GA = "1 . 1 . 5, . 5, . | b7, . 1 . 2 . 4 . | 4 . 4 . 3 . 2 . | 1 - - - . . . . | 1 . 1 . 5, . 5, . | b7, . 1 . 4 . 5 . | 6 . 5 . 4 . 2 . | 1 - - - . . . .";
+  if (boss) return { bpm: 128, key: 57, sc: 'dor', ch: '1 1 4 5 | 1 b7 4 5', echo: 0.14, vol: 0.88, dr: { k: 'x...x...x...x...', c: '....x.......x...', h: '..x...x...x...x.' }, B: 'R.R.O.R.R.R.O.R.', A: '0.2.4.2.1.3.4.3.', P: 1,
+    M: [null, GA, GA], ins: { B: 'sbass', A: 'pluck', M: 'saw' }, oct: { A: 1, M: 0 }, v: { A: 0.6, B: 0.8, P: 0.6, M: 0.85 } };
+  return { bpm: 136, key: 67, sc: 'maj', ch: '1 4 5 1 | 6 4 2^ 5', echo: 0.12, vol: 0.85, dr: { k: 'x...x...x...x...', c: '....x.......x...', h: '..x...x...x...x.' }, B: 'R.R.O.R.R.R.O.R.', A: '0.2.4.2.1.3.4.3.', P: 1,
+    M: [null, MA, MB], ins: { B: 'sbass', A: 'pluck', M: 'bell' }, oct: { A: 1 }, v: { A: 0.7, B: 0.75, P: 0.6, M: 1.05 } };
+}
+function bpWarmStep() { const S = bpBuild(); return S; }
+function bpWarmGet() {                                                   // (warmCompileStep) the round's things, lit as the yard is: the birds (one of each), the water, the props, the alarm
+  const S = bpBuild(); if (!S.warmSet) { S.warmSet = new THREE.Group(); const W = wpnMats();
+    for (const k of ['sparrow', 'pigeon', 'crow', 'gull', 'gus']) { const G = bpGeoCache(k); S.warmSet.add(new THREE.Mesh(G.body, W.matOut), new THREE.Mesh(G.wings, W.matDS), new THREE.Mesh(G.body, S.wetMat)); } }
+  return { S: { isScene: true, fog: scene.fog, environment: scene.environment || null, traverseVisible: f => scene.traverseVisible(f), traverse: f => { S.root.traverse(f); S.warmSet.traverse(f); } }, cam: camera };
+}
+
+/* ---------- hooked in (chained runtime wrappers of hoisted functions; run once, as this block is reached) ---------- */
+function bpInstall() {
+  const ok = f => typeof f === 'function';
+  if (ok(wpnSquirt)) { const f0 = wpnSquirt; wpnSquirt = function (w) { try { if (bpRoundLive() && w && w.D && w.D.id === 'water' && !(ZN && ZN.on)) return bpSquirt(w); } catch (e) { const S = bpS(); if (S.err++ < 3) console.warn('BIRDS_V1', e); } return f0.apply(this, arguments); }; }
+  if (ok(wpnTick)) { const f0 = wpnTick; wpnTick = function (dt) { const r = f0.apply(this, arguments); try { bpTick(dt); } catch (e) { const S = bpS(); if (S.err++ < 3) console.warn('BIRDS_V1', e); } return r; }; }
+  if (ok(bbSplash)) { const f0 = bbSplash; bbSplash = function () { const w = bpSoaker(), t0 = w ? w.tank : 0, r = f0.apply(this, arguments);
+    try { const S = bpS(); if (bpRoundLive()) { bpCannon(); if (w && w.tank > t0 && wpnState().held === w) { S.refills++; unlock('birdRefill'); try { floatText(bpV(walk.pos.x, walk.pos.y + 1.4, walk.pos.z), '💧 Refilled!', 'bp-spl'); } catch (e) {} } } } catch (e) {} return r; }; }
+  if (ok(sndWant)) { const f0 = sndWant; sndWant = function () { const r = f0.apply(this, arguments); try { const S = bpS(); if (S.on && S.phase !== 'card' && S.phase !== 'end' && typeof r === 'string' && r.indexOf('roam:') === 0) return 'birds:' + (S.wave >= 0 && bpWaves()[S.wave] && bpWaves()[S.wave].boss ? 1 : 0); } catch (e) {} return r; }; }
+  if (ok(sndSong)) { const f0 = sndSong; sndSong = function (id) { if (typeof id === 'string' && id.indexOf('birds:') === 0) { const C = bpSong.c || (bpSong.c = {}); if (C[id] === undefined) { try { C[id] = sndCompile(bpSong(id)); } catch (e) { C[id] = null; } } return C[id]; } return f0.apply(this, arguments); }; }
+  if (ok(warmJobs)) { const f0 = warmJobs; warmJobs = function () { const J = f0.apply(this, arguments); try {
+      const job = { id: 'birds', built: () => bpS().built && bpS().warm, steps: [() => { bpBuild(); }, J0 => { const d = warmCompileStep(J0, bpWarmGet, warmSt().budget); if (d) bpS().warm = true; return d; }] };
+      const i = J.findIndex(j => j.id === 'roam'); J.splice(i < 0 ? 0 : i + 1, 0, job); } catch (e) {} return J; }; }
+  if (ok(talkGames)) { const f0 = talkGames; talkGames = function () { const L = f0.apply(this, arguments); if (!L.some(g => g.id === 'birds')) L.push({ id: 'birds', name: 'Bird Patrol', key: 'catguard.birds', json: 'birds', cls: 'birding' }); return L; }; }
+  if (ok(talkBestVal)) { const f0 = talkBestVal; talkBestVal = function (g) { if (g && g.json === 'birds') { try { return bpLoad().best; } catch (e) { return 0; } } return f0.apply(this, arguments); }; }
+  if (ok(talkBusyCls)) { const f0 = talkBusyCls; talkBusyCls = function () { const L = f0.apply(this, arguments); if (L.indexOf('birding') < 0) L.push('birding'); return L; }; }
+  if (ok(talkMake)) { const f0 = talkMake; talkMake = function (name, d) {
+      if (name === 'birds' && d) { const k = String(d.kind || 'clear'); return { id: 'birds', pri: /^(perfect|boss|first)$/.test(k) ? 2 : 1, ctx: 'roam', exp: 300, delay: 2.2, keys: ['birds.' + k, 'birds.clear'],
+        pref: k === 'boss' ? ['coon', 'aunty', 'porter'] : k === 'lost' ? ['aunty', 'coon'] : ['aunty', 'porter', 'coon'], vars: { n: talkNum(d.n) } }; }
+      if (name === 'best' && d && d.game === 'birds') return { id: 'best.birds', pri: 2, ctx: 'roam', exp: 900, delay: 1.6, keys: ['best.birds', 'best'], pref: ['aunty', 'coon', 'porter'], vars: { n: talkNum(d.n), game: 'Bird Patrol' } };
+      return f0.apply(this, arguments); }; }
+  if (ok(talkLines)) { const f0 = talkLines; talkLines = function () { const L = f0.apply(this, arguments); if (L && !L['birds.first']) Object.assign(L, bpTalkLines()); return L; }; }
+  if (ok(econHost)) { const f0 = econHost; econHost = function (g) { if (g === 'birds') { const w = document.getElementById('bpWal'); return w ? [w, 'after', true] : null; } return f0.apply(this, arguments); }; }
+  if (ok(econUp)) { const f0 = econUp; econUp = function (g) { if (g === 'birds') { const S = bpS(); return S.on && S.phase === 'card'; } return f0.apply(this, arguments); }; }
+  try { const sec = ['Bird Patrol', [
+      ['birdFirst', '💦', 'Bird Patrol', 'Defend the yard in a round of Bird Patrol (grab the super-soaker from the bird bath, then tap “Bird Patrol”)'],
+      ['birdClear', '🏡', 'Yard defender', 'In Bird Patrol, hold off all six waves of birds raiding the yard'],
+      ['birdPerfect', '🛡️', 'Not a crumb taken', 'In Bird Patrol, defend the yard without a single tomato, samosa or sock stolen'],
+      ['birdBoss', '👑', 'Big Gus goes home', 'In Bird Patrol, soak Big Gus, the giant pigeon, until he flaps off in a huff'],
+      ['bird35', '🐦', 'Soaking spree', 'In Bird Patrol, soak 35 birds in one round'],
+      ['birdCombo', '🔥', 'Sploosh combo', 'In Bird Patrol, land 15 squirts in a row without a miss'],
+      ['birdGull', '🌊', 'Gull-ty as charged', 'In Bird Patrol, soak a seagull in mid-air before it lands its grab'],
+      ['birdCrow', '🐦‍⬛', 'Smarter than a crow', 'In Bird Patrol, soak 5 crows in one round (they dodge the first squirt)'],
+      ['birdRefill', '🛁', 'Pit stop', 'In Bird Patrol, cannonball into the bird bath to refill the super-soaker mid-round'],
+      ['birdScore', '🏆', 'Bird Patrol legend', 'In Bird Patrol, score 20,000 points in one round'],
+      ['birdTotal', '💯', 'Hose-down hall of fame', 'Soak 250 birds in Bird Patrol, all-time'] ]];
+    if (!ACH_BY_ID.birdFirst) { ACHIEVEMENTS.push(sec); for (const r of sec[1]) ACH_BY_ID[r[0]] = r; if (typeof updateAchCount === 'function') updateAchCount(); } } catch (e) {}
+}
+bpInstall();
+/* (end of BIRDS_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
