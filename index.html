@@ -10757,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-13 17:53';                                              // stamped when the site is published
+const BUILD = '2026-10-13 17:59';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -44154,6 +44154,390 @@ function lot2UI() {                                                      // (aft
   for (const t of ['pointerup', 'pointercancel']) u.root.addEventListener(t, up, true);
 }
 try { lot2Install(); } catch (e) { console.error(e); }
+/* COW_V1 */
+/* =====================================================================
+   COW_V1 (2026-10-13): PKR's Closet, the 🐄 Moo Crew collection (ids 'cow...'). The user asked for "a cow like sweater.
+   And a cow themed items. In the closet shop." Nine pieces, one per slot (no cape), all on today's standards:
+   - Moo Crew cow-print sweater (outfit): a soft cream knit with organic black cow spots laid out over her real body (a 3D
+     spot field, so the patches wrap her chest, sides and back as one print), a chunky udder-pink roll neck with a tiny gold
+     bell, pink ribbed hem; its sleeves carry the print and pink cuffs. Built with ck5bShell/ck5bHem like every knit top,
+     so FIT_V1 re-cuts it on the fitted shape (wraps chest and belly, roll neck at her neck, mid sleeves on her legs).
+   - Moo-moo headband (hat, tucked behind her ears by HEAD_V1's band warp), Big cowbell collar (a chunky brass bell that
+     swings), Cow-spot hoof boots (paws), Tiny cow charm (tail: a TAIL_V1 charm on its ring and chain), Milk-carton backpack
+     (pack), Cow-print sunnies (specs, HEAD_V1's curved arms), Milk-bottle earrings (ears, hung by HEAD_V1), Milk-splash
+     trail (its own 8-cell sprite sheet and material).
+   - Colourways (CK5B): every piece but the trail shares four: Original, Strawberry cow (pink spots on white), Chocolate
+     cow, Midnight cow (cream spots on black). A palette dye: each colour role (spots, cream knit, udder pink) maps to the
+     colourway's own colour, everything else (brass, horns, hooves, lenses) is kept. The trail has its own four milks.
+   - Two collections with book pages: 🐄 Moo Crew, 🥛 Dairy Day Out (with the straw sun hat). Perks: sweater 'warm',
+     cowbell 'charm'.
+   How it plugs in: ckPackH() (PACKS_V1's ckPacksRun calls it, before FIT/TAIL/HEAD/POL post-process every item), so the
+   later blocks re-cut, hang and frame these like everything else. cowHooks() (once, from there) chains ck5bDye (the
+   palette dye, only for a colourway carrying a .cow map), ck5bTrailDef / ck5bTrailMat (one-shot, only for cowTrail), and
+   adds the band and charm specs to HEAD_V1 / TAIL_V1's tables. Function declarations only: nothing here runs at load.
+   ===================================================================== */
+function ckPackH() { cowReg(); }                                         // (ckPacksRun, once)
+function cowV3(x, y, z) { return new THREE.Vector3(x, y, z); }
+function cowHash(i, s) { const h = Math.sin(i * 12.9898 + (s || 0) * 78.233) * 43758.5453; return h - Math.floor(h); }
+function cowCnt(B, k) { return B.parts[k || 's'].reduce((n, [g]) => n + g.attributes.position.count, 0); }
+function cowPal() {                                                      // the colour roles (the colourway dye finds them again): spots, cream knit, udder pink
+  return cowPal.P || (cowPal.P = { blk: 0x272322, blk2: 0x1f1c1b, crm: 0xfbf4e6, crm2: 0xf2e8d5, pnk: 0xf6a5bb, pnk2: 0xec8fa8,
+    gold: 0xe9b949, gold2: 0xb98a2c, horn: 0xeedcb5, horn2: 0xd2b07c, hoof: 0x4c3526, hoof2: 0x2e2018, leather: 0x8a5634, leather2: 0x6e4126, stitch: 0xe9c79a });
+}
+function cowVs() {                                                       // the four colourways (CK5B swatches): .cow maps each role to its new colour
+  return [
+    { n: 'Original', hex: 0xfbf4e6 },
+    { n: 'Strawberry cow', hex: 0xf58db0, cow: { blk: 0xf07fa6, crm: 0xfff5f8, pnk: 0xe8476f } },
+    { n: 'Chocolate cow', hex: 0x6e4228, cow: { blk: 0x6a3d22, crm: 0xf8ecd6, pnk: 0xf0a2b4 } },
+    { n: 'Midnight cow', hex: 0x2c2a33, cow: { blk: 0xf4ecdc, crm: 0x2c2933, pnk: 0xf6a5bb } },
+  ];
+}
+function cowDye(c, map) {                                                // (ck5bDye, for a Moo Crew colourway) a colour role turned to the colourway's colour, its shading kept
+  const t = cowDye.t || (cowDye.t = {}), u = cowDye.u || (cowDye.u = {}), o = cowDye.o || (cowDye.o = new THREE.Color());
+  const mx = Math.max(c.r, c.g, c.b), mn = Math.min(c.r, c.g, c.b), ch = mx - mn, l = (mx + mn) / 2; c.getHSL(t);
+  let role = null, ref = 1;
+  if (ch < 0.09 && l < 0.24) { role = 'blk'; ref = 0.135; }
+  else if (ch < 0.14 && l > 0.8) { role = 'crm'; ref = 0.935; }
+  else if ((t.h > 0.88 || t.h < 0.02) && t.s > 0.45 && l > 0.55 && l < 0.93) { role = 'pnk'; ref = 0.8; }
+  if (!role || map[role] == null) return;
+  o.setHex(map[role]).getHSL(u); const k = 1 + (l / ref - 1) * 0.6; c.setHSL(u.h, u.s, Math.max(0, Math.min(0.985, u.l * k)));
+}
+function cowSpotField(L, x, y, z, w) {                                   // < 1 inside a spot: the nearest spot (distance / radius), its edge wobbled
+  let d = 9; for (const s of L) { const q = Math.hypot((x - s[0]) / (s[4] || 1), y - s[1], z - s[2]) / s[3]; if (q < d) d = q; }
+  const k = w || 1;
+  return d + 0.16 * Math.sin(x * 47 * k + z * 23 * k + 0.7) * Math.cos(y * 39 * k - z * 31 * k) + 0.05 * Math.sin(x * 83 * k + y * 61 * k + z * 47 * k);
+}
+function cowMix(a, b, t) { const c = cowMix.c || (cowMix.c = new THREE.Color()), d = cowMix.d || (cowMix.d = new THREE.Color()); return c.setHex(a).lerp(d.setHex(b), Math.max(0, Math.min(1, t))).getHex(); }
+function cowSoft(d, w) { const t = Math.max(0, Math.min(1, (d - (1 - w)) / (2 * w))); return t * t * (3 - 2 * t); }   /* (0 inside a spot, 1 outside: a soft knitted edge, not a stair-step) */
+function cowBodySpots() {                                                // the sweater's spots, laid round her body (body space): [x, y, z, r]
+  if (cowBodySpots.L) return cowBodySpots.L;
+  const A = [[0.31, 0.95, 0.06], [0.23, -1.35, 0.075], [0.11, 0.25, 0.09], [0.0, -0.6, 0.08], [-0.06, 1.45, 0.085], [-0.15, -1.85, 0.065], [-0.2, 0.55, 0.075],
+    [-0.29, -0.35, 0.065], [0.17, 2.55, 0.055], [-0.08, -2.65, 0.06], [0.05, 2.15, 0.06], [-0.25, 2.0, 0.055], [0.3, -2.35, 0.05], [-0.3, -1.25, 0.06], [0.36, 0.0, 0.045], [0.26, 3.05, 0.05]];
+  return (cowBodySpots.L = A.map(([z, f, r]) => [Math.sin(f) * 0.2, 0.44 + Math.cos(f) * 0.19, z, r]));
+}
+
+/* ---------- 🧶 the sweater (garment shell, body space; f 0 her back, ±π her chest and belly) ---------- */
+function cowSweater(B) {                                                 // cream knit, organic black cow spots all round her, a chunky udder-pink roll neck with a tiny gold bell, a pink ribbed hem
+  const P = cowPal(), L = cowBodySpots();
+  const sh = ck5bShell({ m: 0.022, nd: 0.03, zb: -0.31, zbB: -0.17, cols: 88, rows: 36, bump: (u, f, k) => (k % 2 ? 0.0011 : -0.0011),
+    col: (u, f, k, j, q) => { if (j <= 3 || j >= 34) return k % 2 ? P.pnk : P.pnk2;                    /* (a pink rib up into the roll neck, and at the hem) */
+      const t = q && (q[0] || q[1] || q[2]) ? cowSoft(cowSpotField(L, q[0], q[1], q[2]), 0.07) : 1; return cowMix(k % 2 ? P.blk : P.blk2, k % 2 ? P.crm : P.crm2, t); } });
+  B.m(sh.g, sh.c);
+  B.m(ck5bHem(sh.front, true, 0.021, 0.006), (x, y, z, i) => Math.floor(i / 7) % 2 ? P.pnk : P.pnk2);      // the roll neck, ribbed
+  { const pts = []; for (let k = 0; k <= 96; k++) pts.push(sh.at(0.045, -Math.PI + k / 96 * Math.PI * 2, 0.006)); pts.pop();             // the roll's fold: a second soft roll just under it
+    B.m(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true, 'centripetal'), 192, 0.0125, 6, true), (x, y, z, i) => Math.floor(i / 7) % 2 ? P.pnk2 : P.pnk); }
+  B.m(ck5bHem(sh.back, true, 0.0105, 0.003), (x, y, z, i) => Math.floor(i / 7) % 2 ? P.pnk : P.pnk2);       // the hem
+  const p = sh.at(0.035, Math.PI, 0.02);                                 // a tiny gold bell under her chin
+  B.frame([p.x, p.y - 0.012, p.z + 0.004]);
+  B.s(CKG.tor(0.0048, 0.0016, 5, 12), P.gold, [0, 0.009, 0], [0, Math.PI / 2, 0]);
+  B.s(CKG.sph(0.0115, 14, 10), (x, y) => Math.abs(y + 0.001) < 0.0016 ? P.gold2 : P.gold, [0, -0.004, 0], null, [1, 0.95, 1]);
+  B.s(CKG.sph(0.0026, 6, 5), P.gold2, [0, -0.0125, 0.004]);
+  B.frame();
+}
+function cowSleeve(B) {                                                  // (a front leg's space) the sleeve's own design: cream knit, a spot on the front and one behind, a pink ribbed cuff (FIT_V1 reads its colours)
+  const P = cowPal(), n = 40, prof = [];
+  for (let i = 0; i <= 20; i++) { const y = -0.03 - i / 20 * 0.115; prof.push(new THREE.Vector2(0.092 - 0.02 * Math.pow(i / 20, 1.6), y)); }
+  const S = [[0, -0.065, 0.09, 0.034, 1.4], [0, -0.115, -0.09, 0.028, 1.4], [0.09, -0.12, 0.01, 0.02, 1.2], [-0.09, -0.06, -0.01, 0.022, 1.2]];
+  B.m(ckTwoSided(new THREE.LatheGeometry(prof, n)), (x, y, z, i) => cowMix(i % 2 ? P.blk : P.blk2, i % 2 ? P.crm : P.crm2, cowSoft(cowSpotField(S, x, y, z, 1.6), 0.08)), [0, 0, 0.004], null, [0.88, 1, 1.02]);
+  B.m(ckTwoSided(CKG.cyl(0.0735, 0.071, 0.02, n, true)), (x, y, z) => Math.floor((Math.atan2(x, z) + Math.PI) / (Math.PI * 2) * n * 2) % 2 ? P.pnk : P.pnk2, [0, -0.151, 0.004], null, [0.88, 1, 1.02]);
+}
+
+/* ---------- 🐮 the headband (head space: its middle is (0, 0, 0), +z out of her face; her ears poke up at x ±0.1) ---------- */
+function cowBandPts() {                                                  // (head space) the band's path: over her head just behind her ears, its ends tucked in behind them (not down her cheeks)
+  if (cowBandPts.P) return cowBandPts.P;
+  const L = [[0, 0, 0, 0.1728, 0.152, 0.1568]], C = [0, -0.005, -0.03], X = cowV3(1, 0, 0), out = [];
+  for (let i = 0; i <= 48; i++) { const th = -1.36 + 2.72 * i / 48, d = cowV3(Math.sin(th), Math.cos(th), 0).applyAxisAngle(X, -0.3), r = ckReach(C, d.toArray(), L, 0.0085, 0.4) || 0.16;
+    out.push({ th, p: cowV3(C[0] + d.x * r, C[1] + d.y * r, C[2] + d.z * r), n: d.clone() }); }
+  return (cowBandPts.P = out);
+}
+function cowEarGeo() {                                                   // a unit cow ear: a soft leaf, pinched at its base (x -1), widest past the middle, coming to a rounded point (x +1)
+  const g = new THREE.SphereGeometry(1, 20, 12), P = g.attributes.position;
+  for (let i = 0; i < P.count; i++) { const x = P.getX(i), u = (x + 1) / 2, k = 0.45 + 0.55 * Math.sin(Math.min(1, u * 1.25) * Math.PI * 0.62) - 0.35 * Math.pow(Math.max(0, u - 0.62) / 0.38, 1.6); P.setY(i, P.getY(i) * Math.max(0.12, k)); P.setZ(i, P.getZ(i) * (0.7 + 0.3 * k)); }
+  g.computeVertexNormals(); return g;
+}
+function cowHornBase(sx) {                                               // (head space) where a horn stands: on top of her head, between her ears, a little in front of the band
+  const L = [[0, 0, 0, 0.1728, 0.152, 0.1568]], C = [0, -0.005, -0.03], d = cowV3(sx * Math.sin(0.2), Math.cos(0.2), 0).applyAxisAngle(cowV3(1, 0, 0), 0.06), r = ckReach(C, d.toArray(), L, 0.004, 0.4) || 0.16;
+  return { p: cowV3(C[0] + d.x * r, C[1] + d.y * r, C[2] + d.z * r), n: d };
+}
+function cowHorns(B) {                                                   // a cow-print band over her head behind her ears, two cream horns up front, a black-and-pink cow ear sticking out each side
+  const P = cowPal(), BP = cowBandPts(), at = th => BP.reduce((a, q) => Math.abs(q.th - th) < Math.abs(a.th - th) ? q : a);
+  B.m(ckTaper(BP.map(q => q.p.toArray()), 0.0105, 0.0105, 96, 10), (x, y, z) => { const a = Math.atan2(x, y); return cowMix(P.blk, P.crm, cowSoft(1.45 - (Math.sin(a * 8 + 0.6) + 0.5 * Math.sin(a * 19 + 2)), 0.12)); });
+  for (const sx of [-1, 1]) {
+    const H = cowHornBase(sx), p = H.p, n = H.n, side = cowV3(sx, 0, 0), fw = cowV3(0, 0, 1), q = (a, b, c) => p.clone().addScaledVector(n, a).addScaledVector(side, b).addScaledVector(fw, c).toArray();
+    B.m(ckTaper([q(-0.006, 0, 0), q(0.017, 0.007, 0.002), q(0.033, 0.019, 0.008), q(0.045, 0.026, 0.019), q(0.05, 0.025, 0.029)], 0.0125, 0.0034, 26, 9),
+      (x, y, z) => cowMix(P.horn, P.horn2, (cowV3(x, y, z).sub(p).dot(n) - 0.03) / 0.02));                      // a horn: up, a little out, its tip curling forward
+    B.m(CKG.sph(0.015, 12, 9), P.blk, q(0.001, 0, 0), null, [1, 0.55, 1]);                                      // a little black cuff round its base
+    { const E2 = at(sx * 0.22); B.m(ckTaper([E2.p.toArray(), p.clone().lerp(E2.p, 0.5).addScaledVector(n, 0.004).toArray(), p.toArray()], 0.0062, 0.0062, 8, 6), P.blk); }   /* (a strap from the band to the horn) */
+    const E = at(sx * 1.17), a = cowV3(sx, -0.38, 0.42).normalize(), Zt = new THREE.Vector3().crossVectors(a, cowV3(0, 1, 0)).multiplyScalar(sx).normalize(), Y = new THREE.Vector3().crossVectors(Zt, a);
+    const M0 = B.M; B.M = new THREE.Matrix4().makeBasis(a, Y, Zt).setPosition(E.p);                            // a cow ear, out to the side, drooping a little, its pink inside turned forward
+    B.m(cowEarGeo(), P.blk, [0.04, 0, 0], null, [0.045, 0.024, 0.009]);
+    B.m(cowEarGeo(), P.pnk, [0.045, -0.001, 0.0064], null, [0.032, 0.0155, 0.0045]);
+    B.m(CKG.sph(1, 10, 8), P.blk, [0.004, 0, 0], null, [0.012, 0.013, 0.011]);
+    B.M = M0;
+  }
+}
+
+/* ---------- 🔔 collar (body space: her neck ring is ckNeck's loop; u 0.75 is her throat) ---------- */
+function cowBell(B) {                                                    // a stitched brown leather collar with a brass buckle; a big brass cowbell hanging from a D-ring at her throat (it swings)
+  const P = cowPal(), N = ckNeck(0.012, 0), n = N.n.clone().normalize();
+  B.m(ckBand(N.curve, N.n, 0.028, 0.012, 96), P.leather);
+  for (const s of [-1, 1]) { const pts = []; for (let i = 0; i < 96; i++) pts.push(ckOnCurve(N.curve, i / 96).addScaledVector(n, s * 0.0095));
+    const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true, 'centripetal'), 192, 0.0017, 4, true);   /* (the stitching: little dashes) */
+    B.m(g, (x, y, z, i) => Math.floor(i / 5 / 2) % 2 ? P.stitch : P.leather2); }
+  { const f = ckFrontOf(N, 0.47, 0), d = f.out;                         // the buckle on her left side
+    B.frame([f.p.x + d.x * 0.008, f.p.y + d.y * 0.008, f.p.z + d.z * 0.008], [0, Math.atan2(d.x, d.z), 0]);
+    B.s(ck4RBox(0.03, 0.034, 0.004, 0.0018, 3), P.gold, [0, 0, 0.001]); B.m(ck4RBox(0.02, 0.022, 0.004, 0.0012, 3), P.leather, [0, 0, 0.0025]); B.s(CKG.box(0.003, 0.026, 0.004), P.gold2, [0.002, 0, 0.004]);
+    B.frame(); }
+  const f = ckFrontOf(N, 0.75, -0.004), R = f.p.clone().addScaledVector(f.out, 0.012);
+  B.frame([R.x, R.y, R.z], [Math.atan2(-f.out.y, f.out.z), 0, 0]);
+  B.s(CKG.tor(0.0085, 0.0026, 6, 16, Math.PI), P.gold, [0, -0.002, 0], [0, 0, Math.PI]);                     // the D-ring
+  B.s(CKG.cyl(0.0026, 0.0026, 0.017, 6), P.gold, [0, -0.002, 0], [0, 0, Math.PI / 2]);
+  B.frame();
+  const a = cowCnt(B, 's');
+  const BS = 1.45; let C = cowV3(0, R.y - 0.064, 0); { const r = ckReach([0, C.y, 0.1], [0, 0, 1], CK_BODY, 0.0, 0.45) || 0.29; C.z = 0.1 + r + 0.036; }   /* (it rests on her chest: out of her, never in) */
+  const top = R.clone().add(cowV3(0, -0.012, 0.004)), up = top.clone().sub(C).normalize(), Z = cowV3(0, 0, 1).addScaledVector(up, -up.z).normalize(), X = cowV3(0, 0, 0).crossVectors(up, Z);
+  B.M = new THREE.Matrix4().makeBasis(X, up, Z).setPosition(C).multiply(new THREE.Matrix4().makeScale(BS, BS, BS));
+  const prof = [[0.0005, 0.031], [0.0135, 0.031], [0.0172, 0.027], [0.019, 0.012], [0.0222, -0.006], [0.0262, -0.022], [0.0272, -0.026]].map(([r, y]) => new THREE.Vector2(r, y));
+  B.s(new THREE.LatheGeometry(prof, 4 * 7), (x, y) => y < -0.017 ? P.gold2 : y > 0.024 ? P.gold2 : P.gold, null, null, [1.18, 1, 0.86]);   // the bell: flared, a little squared off
+  B.s(ckTwoSided(CKG.cyl(0.0252, 0.0262, 0.004, 28, true)), 0x3d2a14, [0, -0.0245, 0], null, [1.18, 1, 0.86]);                          // its dark inside at the mouth
+  B.s(CKG.tor(0.0268, 0.0028, 6, 28), P.gold, [0, -0.0262, 0], [Math.PI / 2, 0, 0], [1.18, 0.86, 1]);                                  // the rolled rim
+  for (const y of [0.016, 0.004]) B.s(CKG.tor(1, 0.0016, 4, 28), P.gold2, [0, y, 0], [Math.PI / 2, 0, 0], [(0.0182 + (0.016 - y) * 0.27) * 1.18, (0.0182 + (0.016 - y) * 0.27) * 0.86, 1]);   // two engraved bands
+  B.s(CKG.sph(0.0068, 10, 8), 0x5a4020, [0, -0.031, 0]);                                                         // the clapper
+  B.s(CKG.tor(0.008, 0.0026, 6, 14), P.gold, [0, 0.036, 0], [0, 0, 0]);                                          // its loop
+  B.s(ckFlat(ckHeartPts(0.0075), 0.002), P.pnk, [0, 0.0, 0.0232], [-0.08, 0, 0]);                               // a little pink heart on the front
+  B.frame();
+  B.fx = { sway: { k: 's', groups: [{ a, b: cowCnt(B, 's'), c: [R.x, R.y - 0.004, R.z], ph: 0.4, sx: 1 }] } };
+}
+
+/* ---------- 🥾 paws (a leg's space: the leg runs down -y; the paw's sole at y -0.42, its toe +z) ---------- */
+function cowBoots(B) {                                                   // cream boots with black cow spots, a split hoof sole, a fluffy udder-pink cuff
+  const P = cowPal(), top = -0.245, S = [[0.046, -0.29, 0.016, 0.026, 1.3], [-0.042, -0.33, -0.026, 0.024, 1.3], [0.004, -0.268, -0.05, 0.02, 1.2], [-0.026, -0.36, 0.05, 0.02, 1.2], [0.03, -0.375, -0.03, 0.017, 1.1]];
+  B.m(ck6Boot(top, { room: 0.014, foot: 1.02, seg: 32 }), (x, y, z, i) => {
+    if (y < -0.392) return Math.abs(x) < 0.0045 && z > 0.02 ? P.hoof2 : P.hoof;                               // the hoof: dark, split down the front
+    return cowSpotField(S, x, y, z, 1.4) < 1 ? (i % 2 ? P.blk : P.blk2) : P.crm; });
+  const cr = ck5bLegR(top) + 0.019;
+  B.m(ckFluff(CKG.tor(cr, 0.016, 12, 36), 0.07, 9), (x, y, z, i) => cowHash(i, 4) > 0.55 ? P.pnk : P.pnk2, [0, top - 0.002, 0], [Math.PI / 2, 0, 0]);
+}
+
+/* ---------- 🐮 tail charm (tail space: built hanging under its ring, TAIL_V1 hangs it) ---------- */
+function cowHangStart(B, n) {                                            // a silver ring round her tail, a jump ring, n beads of chain; returns where the hanging part starts
+  const sil = 0xd4d9e1;
+  B.s(CKG.tor(0.046, 0.0062, 6, 24), sil, [0, 0, -0.03]);
+  B.s(CKG.tor(0.0072, 0.0024, 6, 12), sil, [0, -0.054, -0.03], [0, Math.PI / 2, 0]);
+  const a = cowCnt(B);
+  for (let i = 0; i < n; i++) { B.s(CKG.sph(0.0042, 8, 6), sil, [0, -0.0655 - i * 0.0088, -0.03]); B.s(CKG.cyl(0.0011, 0.0011, 0.0062, 5), sil, [0, -0.061 - i * 0.0088, -0.03]); }
+  B.frame([0, -0.0655 - n * 0.0088 + 0.002, -0.03], [0, Math.PI, 0], 1.3);
+  B.s(CKG.tor(0.0034, 0.0013, 5, 10), sil, [0, 0.0015, 0], [0, Math.PI / 2, 0]);
+  return a;
+}
+function cowCharm(B) {                                                   // a tiny standing cow: spotted, a pink muzzle and udder, little horns, black ears, a tufted tail; hung by a loop on her back
+  const P = cowPal(), a = cowHangStart(B, 3), S = [[0.006, -0.016, 0.01, 0.0085, 1.2], [-0.012, -0.024, -0.008, 0.009, 1.1], [0.014, -0.03, -0.006, 0.007, 1], [-0.008, -0.03, 0.012, 0.006, 1]];
+  B.s(CKG.sph(1, 20, 14), (x, y, z) => cowSpotField(S, x * 0.021, -0.023 + y * 0.0135, z * 0.013, 2.5) < 1 ? P.blk : P.crm, [0, -0.023, 0], null, [0.021, 0.0135, 0.013]);   // body
+  B.s(CKG.sph(1, 16, 12), P.crm, [0.022, -0.016, 0.004], null, [0.0105, 0.011, 0.0105]);                  // head
+  B.s(CKG.sph(1, 12, 9), P.blk, [0.0195, -0.0115, 0.0075], null, [0.0065, 0.0055, 0.006]);                // a patch over one eye
+  B.s(CKG.sph(1, 14, 10), P.pnk, [0.025, -0.0215, 0.0115], null, [0.0085, 0.0062, 0.0062]);               // muzzle
+  for (const dx of [-0.003, 0.003]) B.s(CKG.sph(0.0013, 6, 5), P.pnk2, [0.025 + dx, -0.021, 0.0175]);
+  for (const dx of [-0.0045, 0.0045]) { B.s(CKG.sph(0.0019, 8, 6), 0xffffff, [0.022 + dx, -0.0125, 0.0128]); B.s(CKG.sph(0.0012, 6, 5), 0x161414, [0.022 + dx, -0.0125, 0.0145]); }
+  for (const sx of [-1, 1]) {
+    B.s(CKG.sph(1, 10, 8), P.blk, [0.022 + sx * 0.0125, -0.0105, 0.001], [0, 0, sx * -0.4], [0.0075, 0.0035, 0.0025]);   // ears
+    B.s(CKG.cone(0.0022, 0.0075, 8), P.horn, [0.022 + sx * 0.0055, -0.003, 0.002], [0, 0, sx * -0.35]);                // horns
+  }
+  for (const [x, z] of [[0.012, 0.006], [0.012, -0.006], [-0.012, 0.006], [-0.012, -0.006]]) {
+    B.s(CKG.cyl(0.0034, 0.0032, 0.011, 8), P.crm, [x, -0.0365, z]); B.s(CKG.cyl(0.0036, 0.0036, 0.0035, 8), P.hoof, [x, -0.0425, z]); }
+  B.s(CKG.sph(1, 10, 8), P.pnk, [-0.004, -0.0345, 0], null, [0.0062, 0.0042, 0.0052]);                   // udder
+  B.s(ckTaper([[-0.02, -0.02, 0], [-0.025, -0.026, 0.001], [-0.026, -0.034, 0.002]], 0.0015, 0.0012, 10, 5), P.crm);
+  B.s(CKG.sph(1, 8, 6), P.blk, [-0.026, -0.037, 0.002], null, [0.0032, 0.0045, 0.0032]);                 // tail tuft
+  B.s(CKG.tor(0.003, 0.0011, 5, 10), 0xd4d9e1, [0, -0.0085, 0], [0, Math.PI / 2, 0]);                     // the loop on her back
+  B.frame();
+  B.fx = { sway: { k: 's', groups: [{ c: [0, -0.054, -0.03], a, b: cowCnt(B), sx: 1, ph: 0.6, ch: 1 }] } };
+}
+
+/* ---------- 🥛 backpack (body space: the middle of her back is about (0, 0.61, -0.06)) ---------- */
+function cowCartonLetter(B, ch, x0, w, h, t, col) {                     // M or O, in little rounded bars, on the carton's top face (its own frame: +y out of the face)
+  const bar = (x1, z1, x2, z2) => B.m(ckTaper([[x1, 0, z1], [x2, 0, z2]], t, t, 4, 6), col);
+  if (ch === 'M') { bar(x0, -h / 2, x0, h / 2); bar(x0, h / 2, x0 + w / 2, 0); bar(x0 + w / 2, 0, x0 + w, h / 2); bar(x0 + w, h / 2, x0 + w, -h / 2); }
+  else B.m(CKG.tor(1, t / (w / 2), 6, 24), col, [x0 + w / 2, 0, 0], [Math.PI / 2, 0, 0], [w / 2, h / 2, w / 2]);
+}
+function cowBlobPts(r, seed) { const p = []; for (let i = 0; i < 24; i++) { const t = i / 24 * Math.PI * 2, k = 1 + 0.22 * Math.sin(t * 2 + seed * 1.7) + 0.12 * Math.sin(t * 3 + seed * 2.9) + 0.06 * Math.sin(t * 5 + seed); p.push([Math.cos(t) * r * k * 1.15, Math.sin(t) * r * k * 0.9]); } return p; }   // an organic cow spot
+function cowPack(B) {                                                    // a milk carton lying along her back, gable top toward her head: cow spots on its sides, a pink band, MOO on top, a pink cap
+  const P = cowPal(), wh = 0xfbfaf4;
+  B.frame([0, 0.651, -0.085], [0.07, 0, 0], 1.65);
+  const W = 0.096, H = 0.07, L = 0.15;
+  B.m(ck4RBox(W, H, L, 0.008, 3), wh);                                                                                           // the carton
+  B.m(ck4RBox(W + 0.003, H + 0.003, 0.03, 0.009, 3), P.pnk, [0, 0, -0.045]);                                                    // a pink band round it
+  for (const [sx, y, z, r, sd] of [[1, 0.004, 0.035, 0.021, 1], [1, -0.012, -0.012, 0.014, 2], [1, 0.012, -0.068, 0.012, 3], [-1, -0.004, 0.03, 0.017, 4], [-1, 0.01, -0.01, 0.012, 5], [-1, -0.01, -0.07, 0.015, 6]])
+    B.m(ckFlat(cowBlobPts(r, sd), 0.002), P.blk, [sx * (W / 2 + 0.0005), y, z], [0, sx * Math.PI / 2, 0]);                    // cow spots on its sides
+  B.m(ckFlat(cowBlobPts(0.018, 7), 0.002), P.blk, [0.012, -0.004, -L / 2 - 0.0005], [0, Math.PI, 0]);                           // and its end
+  { const g = new THREE.BufferGeometry(), hw = W / 2 - 0.002, hz = 0.05, z0 = L / 2 - 0.004;                                      // the gable roof: two slopes up to a ridge
+    const v = [[-hw, H / 2 - 0.002, z0], [hw, H / 2 - 0.002, z0], [hw, 0, z0 + hz], [-hw, 0, z0 + hz], [-hw, -H / 2 + 0.002, z0], [hw, -H / 2 + 0.002, z0]];
+    const pos = [], idx = []; const quad = (a, b, c, d) => { const o = pos.length / 3; for (const k of [a, b, c, d]) pos.push(...v[k]); idx.push(o, o + 1, o + 2, o, o + 2, o + 3); };
+    quad(0, 1, 2, 3); quad(5, 4, 3, 2); const tri = (a, b, c) => { const o = pos.length / 3; for (const k of [a, b, c]) pos.push(...v[k]); idx.push(o, o + 1, o + 2); };
+    tri(1, 5, 2); tri(4, 0, 3);
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); const g2 = g.toNonIndexed(); g2.computeVertexNormals(); g.dispose();
+    B.m(g2, wh); }
+  B.m(CKG.box(W - 0.004, 0.007, 0.014), wh, [0, 0, L / 2 + 0.05]);                                                               // the sealed fin along the ridge
+  B.m(CKG.cyl(0.011, 0.012, 0.009, 16), P.pnk2, [0.018, H / 4 + 0.006, L / 2 + 0.026], [-0.79, 0, 0]);                         // the pink screw cap on the upper slope
+  B.m(CKG.cyl(0.0105, 0.0105, 0.002, 16), P.pnk, [0.018, H / 4 + 0.0098, L / 2 + 0.0298], [-0.79, 0, 0]);
+  B.frame([0, 0.651, -0.085], [0.07, 0, 0], 1.65); B.M.multiply(B.mat([-0.035, H / 2 + 0.002, 0.024]));                         // MOO across the top face
+  cowCartonLetter(B, 'O', 0, 0.019, 0.026, 0.003, P.blk); cowCartonLetter(B, 'O', 0.023, 0.019, 0.026, 0.003, P.blk); cowCartonLetter(B, 'M', 0.047, 0.023, 0.026, 0.003, P.blk);   /* (+x is her left: read from behind her, M comes first) */
+  B.frame([0, 0.651, -0.085], [0.07, 0, 0], 1.65); B.M.multiply(B.mat([0.024, H / 2 + 0.001, -0.012]));                             // a daisy by the letters
+  for (let k = 0; k < 8; k++) { const t = k / 8 * Math.PI * 2; B.m(CKG.sph(1, 8, 6), 0xffffff, [Math.sin(t) * 0.0085, 0, Math.cos(t) * 0.0085], [0, t, 0], [0.0035, 0.0018, 0.006]); }
+  B.m(CKG.sph(1, 8, 6), 0xf5c93a, [0, 0.001, 0], null, [0.0042, 0.0025, 0.0042]);
+  B.frame();
+  ckStraps(B, P.pnk2);
+}
+
+/* ---------- 🕶️ glasses (head space: her eyes are about (±0.072, 0.024, 0.176)) ---------- */
+function cowSqPts(w, h, n) { const p = [], N = n || 72; for (let i = 0; i < N; i++) { const t = i / N * Math.PI * 2, c = Math.cos(t), s = Math.sin(t); p.push([w * Math.sign(c) * Math.pow(Math.abs(c), 0.55), h * Math.sign(s) * Math.pow(Math.abs(s), 0.55)]); } return p; }
+function cowSpecs(B) {                                                   // chunky rounded-square sunnies in cream-and-black cow print, rosy lenses, a tiny daisy at one corner
+  const P = cowPal(), w = 0.041, h = 0.031;
+  for (const sx of [-1, 1]) {
+    B.frame([sx * 0.073, 0.026, 0.176], [0, sx * 0.26, 0]);
+    const loop = new THREE.CatmullRomCurve3(cowSqPts(w, h, 64).map(([x, y]) => cowV3(x, y, 0)), true, 'centripetal');
+    B.m(new THREE.TubeGeometry(loop, 160, 0.0064, 8, true), (x, y) => { const a = Math.atan2(y / h, x / w) * sx; return cowMix(P.blk, P.crm, cowSoft(1.2 - (Math.sin(a * 3 + 1.1) + 0.7 * Math.sin(a * 5 + 0.3)), 0.1)); }, null, null, [1, 1, 0.85]);
+    B.l(ckFlat(cowSqPts(w - 0.002, h - 0.002), 0.003), 0xb5476e);
+    B.frame();
+  }
+  B.m(new THREE.TorusGeometry(0.03, 0.0045, 6, 16, Math.PI * 0.5), P.crm, [0, 0.012, 0.19], [0, 0, Math.PI * 0.25]);           // the bridge
+  B.frame([0.12, 0.054, 0.165], [0, 0.26, 0]);                                                                                   // a daisy on the right corner
+  for (let k = 0; k < 7; k++) { const t = k / 7 * Math.PI * 2; B.m(CKG.sph(1, 8, 6), 0xffffff, [Math.cos(t) * 0.0078, Math.sin(t) * 0.0078, 0.007], [0, 0, t], [0.0058, 0.003, 0.002]); }
+  B.m(CKG.sph(0.0037, 8, 6), 0xf5c93a, [0, 0, 0.0085]);
+  B.frame();
+  ckTemples(B, B.m, P.crm);
+}
+
+/* ---------- 🥛 earrings (on the ear: +x toward her outer edge, +y up the ear, +z out of it; HEAD_V1 hangs them) ---------- */
+function cowMilkEars(B) {                                                // a tiny cow-print milk bottle, a pink cap, swinging from a pink stud on each ear
+  const P = cowPal(), glass = 0xc4e4f2, S = [[0.004, -0.025, 0.004, 0.0036, 1], [-0.004, -0.02, 0.003, 0.003, 1], [0.0, -0.028, -0.005, 0.003, 1]];
+  const prof = [[0.0004, -0.0315], [0.0052, -0.0315], [0.0059, -0.0298], [0.006, -0.0195], [0.0054, -0.0168], [0.0037, -0.0138], [0.0034, -0.0112]].map(([r, y]) => new THREE.Vector2(r, y));
+  ears2Pair(B, { s: 0.58, t: 0.16, pv: [0, -0.004, 0.004], ph: 0.5, k: 1 }, b => ears2Stud(b, P.pnk, 0.0034), b => {
+    b.s(ckTaper([[0, -0.004, 0.004], [0, -0.0065, 0.0055], [0, -0.0088, 0.006]], 0.0011, 0.0011, 6, 4), P.gold);
+    const M0 = b.M.clone(); b.M = M0.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, 0.0062));
+    b.s(new THREE.LatheGeometry(prof, 18), (x, y, z) => y > -0.0185 ? glass : cowSpotField(S, x, y, z, 6) < 1 ? P.blk : P.crm);
+    b.s(CKG.cyl(0.0041, 0.0041, 0.0032, 14), P.pnk, [0, -0.0099, 0]);
+    b.s(CKG.tor(0.0042, 0.0007, 4, 14), P.pnk2, [0, -0.0099, 0], [Math.PI / 2, 0, 0]);
+    b.M = M0; });
+}
+
+/* ---------- ✨ the milk-splash trail: its own sprite sheet (8 cells: splash, drop, daisy, spotted heart, dot) ---------- */
+function cowTrailDefs() {
+  return cowTrailDefs.D || (cowTrailDefs.D = {
+    cowTrail: { cells: [0, 1, 1, 2, 3, 4, 1], life: 1.45, size: [0.1, 0.17], vy: 0.42, g: -0.55, spread: 0.2, sway: 0.8, spin: 0.9, rate: 22, names: ['Fresh milk', 'Strawberry milk', 'Chocolate milk', 'Banana milk'],
+      cols: [[0xffffff, 0xf6f8ff, 0xfffbf0], [0xffc6d8, 0xffdbe6, 0xffb0c8], [0xc99a72, 0xd8b090, 0xb88760], [0xfff0a0, 0xfff6c4, 0xffe680]] },
+  });
+}
+function cowSprite(c, i) {                                               // one cell, drawn round (0, 0), about 28 px out (white where the trail's colour tints it)
+  c.lineCap = c.lineJoin = 'round'; const ol = 'rgba(90,80,110,.35)';
+  if (i === 0) {                                                         // a milk splash: a crown of spikes with droplets flying off
+    c.fillStyle = '#fff'; c.strokeStyle = ol; c.lineWidth = 2; c.beginPath(); c.moveTo(-24, 14);
+    const sp = [[-20, -6], [-14, 8], [-9, -16], [-3, 6], [2, -22], [6, 6], [11, -14], [15, 8], [21, -4]];
+    for (const [x, y] of sp) c.quadraticCurveTo(x - 2, (y + 10) / 2, x, y); c.quadraticCurveTo(24, 6, 24, 14); c.bezierCurveTo(14, 22, -14, 22, -24, 14); c.closePath(); c.fill(); c.stroke();
+    for (const [x, y, r] of [[-12, -24, 3.5], [3, -28, 3], [16, -22, 3.2]]) { c.beginPath(); c.arc(x, y, r, 0, 6.3); c.fill(); c.stroke(); }
+    c.fillStyle = 'rgba(210,220,235,.7)'; c.beginPath(); c.ellipse(0, 14, 16, 4, 0, 0, 6.3); c.fill();
+  } else if (i === 1) {                                                  // a drop
+    c.fillStyle = '#fff'; c.strokeStyle = ol; c.lineWidth = 2; c.beginPath(); c.moveTo(0, -24); c.bezierCurveTo(6, -10, 16, 2, 16, 10); c.arc(0, 10, 16, 0, Math.PI); c.bezierCurveTo(-16, 2, -6, -10, 0, -24); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,1)'; c.strokeStyle = 'rgba(200,210,230,.8)'; c.beginPath(); c.ellipse(-6, 6, 4, 6, -0.4, 0, 6.3); c.stroke();
+  } else if (i === 2) {                                                  // a daisy
+    c.fillStyle = '#fff'; c.strokeStyle = ol; c.lineWidth = 1.8;
+    for (let k = 0; k < 9; k++) { c.save(); c.rotate(k / 9 * Math.PI * 2); c.beginPath(); c.ellipse(0, -14, 6, 12, 0, 0, 6.3); c.fill(); c.stroke(); c.restore(); }
+    c.fillStyle = '#ffd23a'; c.beginPath(); c.arc(0, 0, 8.5, 0, 6.3); c.fill(); c.strokeStyle = 'rgba(200,140,0,.6)'; c.stroke();
+  } else if (i === 3) {                                                  // a cow-spotted heart
+    c.fillStyle = '#fff'; c.strokeStyle = ol; c.lineWidth = 2.4; c.beginPath(); c.moveTo(0, 22); c.bezierCurveTo(-30, 2, -22, -24, 0, -10); c.bezierCurveTo(22, -24, 30, 2, 0, 22); c.fill(); c.stroke();
+    c.save(); c.clip(); c.fillStyle = '#2a2524'; c.beginPath(); c.ellipse(-12, -8, 8, 6, 0.5, 0, 6.3); c.fill(); c.beginPath(); c.ellipse(9, 6, 6, 5, -0.3, 0, 6.3); c.fill(); c.beginPath(); c.ellipse(14, -12, 4, 3, 0.2, 0, 6.3); c.fill(); c.restore();
+  } else if (i === 4) {                                                  // a round splash dot
+    c.fillStyle = '#fff'; c.strokeStyle = ol; c.lineWidth = 2; c.beginPath(); c.arc(0, 0, 13, 0, 6.3); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(210,220,235,.8)'; c.beginPath(); c.arc(4, 4, 6, 0, 6.3); c.fill();
+  }
+}
+function cowAtlas() {
+  if (cowAtlas.t) return cowAtlas.t;
+  const t = cowAtlas.t = canvasTex(512, 64, c => { for (let i = 0; i < 8; i++) { c.save(); c.translate(i * 64 + 32, 32); c.scale(0.98, 0.98); cowSprite(c, i); c.restore(); } }, 1, 1);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.repeat.set(1, 1); t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; t.anisotropy = 1; return t;
+}
+function cowTrailMat(add) {
+  const C = cowTrailMat.C || (cowTrailMat.C = {}), K = add ? 'a' : 'n'; if (C[K]) return C[K];
+  return (C[K] = new THREE.ShaderMaterial({ uniforms: { map: { value: cowAtlas() }, scale: { value: 400 } },
+    vertexShader: 'attribute vec3 tc; attribute vec4 tq; uniform float scale; varying vec3 vC; varying vec3 vQ;\nvoid main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = tq.y * scale / max(0.05, -mv.z); vC = tc; vQ = vec3(tq.x, tq.z, tq.w); }',
+    fragmentShader: 'uniform sampler2D map; varying vec3 vC; varying vec3 vQ;\nvoid main() { if (vQ.x < 0.01) discard; vec2 p = gl_PointCoord - 0.5; float c = cos(vQ.y), s = sin(vQ.y); p = vec2(c * p.x - s * p.y, s * p.x + c * p.y) * 1.08 + 0.5;\n  if (p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0) discard; vec4 t = texture2D(map, vec2((vQ.z + 0.02 + p.x * 0.96) / 8.0, 1.0 - p.y)); float a = t.a * vQ.x; if (a < 0.02) discard; gl_FragColor = vec4(t.rgb * vC, a); }',
+    transparent: true, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending }));
+}
+
+/* ---------- the catalogue ---------- */
+function cowItems() {
+  const T = (o, tags) => Object.assign(o, { tags });
+  return [
+    T({ id: 'cowHorns', slot: 'hat', name: 'Moo-moo headband', price: 150, ic: '🐮', blurb: 'A cow-print headband with two little cream horns and a soft black-and-pink cow ear flopping out each side. Instantly 40% more moo.', say: 'Moooo-ve over!', build: B => cowHorns(B), thumbDir: [0.3, 0.32, 1], thumb: [0, 0.095, -0.03, 0.215] }, ['cute', 'funny']),
+    T({ id: 'cowBell', slot: 'collar', name: 'Big cowbell collar', price: 180, ic: '🔔', perk: 'charm', blurb: 'Stitched brown leather, a brass buckle and a big brass cowbell with a pink heart that clonks when she walks. Everyone always knows exactly where she is.', say: 'More cowbell!', build: B => cowBell(B), thumbDir: [0.35, 0.3, 1], thumb: [0, 0.5, 0.39, 0.075] }, ['funny', 'cute', 'classic']),
+    T({ id: 'cowSweater', slot: 'outfit', name: 'Moo Crew cow-print sweater', price: 320, ic: '🐄', perk: 'warm', blurb: 'A soft cream knit with big black cow spots all the way round, a chunky pink roll neck with a tiny gold bell, and pink ribbed cuffs. Udderly cosy.', say: 'I’m in my cow era.', build: B => cowSweater(B), k5: 'shell', legs: B => cowSleeve(B), legsOn: [0, 1] }, ['cozy', 'cute', 'funny']),
+    T({ id: 'cowPack', slot: 'pack', name: 'Milk-carton backpack', price: 260, ic: '🥛', blurb: 'A whole carton of milk on her back: cow spots, a pink band, MOO on the top and a pink screw cap. No, she will not be sharing.', say: 'Got milk? I do.', build: B => cowPack(B), thumbDir: [0.85, 0.75, -0.6], thumb: [0, 0.665, -0.055, 0.165] }, ['funny', 'cute', 'food']),
+    T({ id: 'cowSpecs', slot: 'specs', name: 'Cow-print sunnies', price: 140, ic: '🕶️', blurb: 'Chunky rounded-square shades in cream-and-black cow print with rosy lenses and a tiny daisy on the corner. The field is her runway.', say: 'Pasture-ize this look.', build: B => cowSpecs(B), thumbDir: [0.3, 0.2, 1], thumb: [0, 0.03, 0.175, 0.098] }, ['cool', 'funny', 'cute']),
+    T({ id: 'cowMilkEars', slot: 'ears', name: 'Milk-bottle earrings', price: 120, ic: '🍼', blurb: 'A tiny cow-print milk bottle with a pink cap swinging from each ear. Calcium, but make it fashion.', say: 'Milk does a kitty good.', build: B => cowMilkEars(B) }, ['cute', 'food', 'funny']),
+    T({ id: 'cowCharm', slot: 'tail', name: 'Tiny cow charm', price: 150, ic: '🐄', seg: 2, thumbDir: [0.3, 0.3, -1], blurb: 'A little spotted cow with a pink nose, teeny horns and a tufted tail, dangling from her tail and swinging along. Her emotional support cow.', say: 'My bestie. She says moo.', build: B => cowCharm(B) }, ['cute', 'funny', 'nature']),
+    T({ id: 'cowBoots', slot: 'paws', name: 'Cow-spot hoof boots', price: 210, ic: '🐾', blurb: 'Cream boots with black cow spots, a split hoof sole that goes clip-clop, and fluffy pink cuffs. Four of them. She is a very fancy cow.', say: 'Clip-clop, moo-moo.', build: B => cowBoots(B), thumbDir: [0.85, 0.45, 1] }, ['cute', 'funny', 'cozy']),
+    { id: 'cowTrail', slot: 'trail', name: 'Milk-splash trail', price: 200, ic: '🥛', blurb: 'Little milk splashes, drops, daisies and cow-spotted hearts spill out behind her with every step. Do not cry over it.', say: 'Spilled it. On purpose.', build: () => {}, trail: 'cowTrail', tags: ['cute', 'food', 'nature'] },
+  ];
+}
+function cowSets() {                                                     // two collections (one piece per slot; none of them clash)
+  return [
+    { id: 'cowMooCrew', name: 'Moo Crew', ic: '🐄', items: ['cowHorns', 'cowBell', 'cowSweater', 'cowCharm', 'cowBoots'], tags: ['cute', 'cozy'], ck6: { a: '#fff4e6', b: '#ffe3ec', blurb: 'Horns, a cowbell, a spotty sweater and hoof boots: she has joined the herd. The herd is just her. She is the herd.' } },
+    { id: 'cowDairy', name: 'Dairy Day Out', ic: '🥛', items: ['strawHat', 'cowSpecs', 'cowMilkEars', 'cowPack', 'cowTrail'], tags: ['cute', 'funny'], ck6: { a: '#e6f4ff', b: '#fff6dc', blurb: 'A straw hat, cow-print shades and a whole carton of milk: a sunny day at the farm stand, splashing as she goes.' } },
+  ];
+}
+function cowRules() { return []; }                                       // (ck5bRules) none needed: checked against every top, cape, hat and earring
+
+/* ---------- registering ---------- */
+function cowReg() {                                                      // the things, their colourways and cards, the shop order, the collections, the hooks, the neighbours' lines
+  if (cowReg.done) return; cowReg.done = true;
+  try {
+    const I = CK_BY_ID;
+    cowHooks();
+    for (const it of cowItems()) if (!I[it.id]) { CK_ITEMS.push(it); I[it.id] = it; if (it.slot !== 'trail') it.ck5bVs = cowVs(); }
+    cowThumbs();
+    const shop = x => !ckIsEx(x) && !x.season, slot = x => CK_SLOTS.findIndex(s => s.id === x.slot);   /* (each tab cheapest first, as ck6Reg sorts them) */
+    const regs = CK_ITEMS.filter(shop).sort((a, b) => slot(a) - slot(b) || a.price - b.price), rest = CK_ITEMS.filter(x => !shop(x));
+    CK_ITEMS.length = 0; regs.concat(rest).forEach(x => CK_ITEMS.push(x));
+    const L = ckSetBase();
+    for (const s of cowSets()) if (!L.some(q => q.id === s.id) && s.items.every(id => I[id])) { s.fish = ck5Nice(s.items.reduce((a, id) => a + ((I[id] && isFinite(I[id].price) && I[id].price) || 0), 0) * 0.175); L.push(s); }
+    { const R = ck5bRules(); for (const r of cowRules()) if (!R.some(q => q.a === r.a && q.b === r.b)) R.push(r); }
+    cowRx();
+  } catch (e) { console.error(e); }
+}
+function cowHooks() {                                                    // run-time wrappers (no edits to the file outside this block), and HEAD_V1 / TAIL_V1's tables
+  if (cowHooks.done) return; cowHooks.done = true;
+  try { const d0 = ck5bDye; ck5bDye = function (c, M, T) { if (T && T.cow) return cowDye(c, T.cow); return d0.apply(this, arguments); }; } catch (e) { console.error(e); }
+  try { const D0 = ck5bTrailDef, M0 = ck5bTrailMat;
+    ck5bTrailDef = function (id) { const d = cowTrailDefs()[id] || null; cowHooks.cur = d; return d || D0.apply(this, arguments); };   /* (the card, the stage and Free roam ask for the def, then its material) */
+    ck5bTrailMat = function (add) { const d = cowHooks.cur; cowHooks.cur = null; return d ? cowTrailMat(add) : M0.apply(this, arguments); };   /* (one-shot: a stale ask never hands anyone else our material) */
+  } catch (e) { console.error(e); }
+  try { if (typeof hdEarSpecs === 'function') { const S = hdEarSpecs(); if (S && !S.cowMilkEars) S.cowMilkEars = { mode: 'hang', k: 2.4 }; } } catch (e) { console.error(e); }   /* (HEAD_V1 hangs the bottles at the base of her ears, a size up) */
+  try { if (typeof tcSpecs === 'function') { const S = tcSpecs(); if (S && !S.cowCharm) S.cowCharm = { c: 1, S: 1.8, fy: Math.PI, cord: 0.008 }; } } catch (e) { console.error(e); }   /* (TAIL_V1 hangs the cow from her ring) */
+}
+function cowThumbs() {                                                   // the cards: earrings framed on the right ear's (HEAD_V1 then turns the camera to the new hang point)
+  for (const it of CK_ITEMS) { if (!/^cow[A-Z]/.test(it.id)) continue;
+    if (it.slot === 'ears') Object.defineProperty(it, 'thumb', { get() { return ears2ThumbOf(this); }, configurable: true }); }
+}
+function cowRx() {                                                       // what the neighbours say (rxLines' item lines; the per-slot lines cover the rest)
+  try {
+    const L = rxLines(), item = (who, id, lines) => { const D = L[who]; if (D && D.item && !D.item[id]) D.item[id] = lines; };
+    item('aunty', 'cowSweater', ["Arre, a cow sweater! Very good. In my village the cows were treated like queens. Now the queen is a cow.", [['a', "So warm, so soft! Who knitted?"], ['k', "Moo."], ['a', "Hai Ram. Now she's mooing."]]]);
+    item('aunty', 'cowBell', ["A cow bell! Now I will always know when you are sneaking to my kitchen. Clonk, clonk, clonk."]);
+    item('aunty', 'cowPack', ["A whole milk carton on your back! Bring it upstairs, I'll make chai. Proper chai, with real milk."]);
+    item('aunty', 'cowHorns', ["Little horns! So sweet. Don't go butting my tomato plants, hmm?"]);
+    item('aunty', 'cowMilkEars', ["Milk bottle earrings! Calcium for the ears. Very healthy."]);
+    item('roof', 'cowBell', ["Is that a COWBELL? You can't sneak anywhere in that. ...Can I borrow it? For drumming. On the bins."]);
+    item('roof', 'cowPack', ["You're carrying a whole carton of milk and you didn't think to tell your roommate? Rude."]);
+    item('roof', 'cowSweater', ["Spotty! You look like a very small, very angry cow. In a good way."]);
+    item('roof', 'cowCharm', ["Who's the little cow on your tail? Does she want to see my bin? It's a great bin."]);
+    item('slider', 'cowHorns', ["Horns?! Okay, I'm not messing with you today. Nyah!"]);
+    item('slider', 'cowBell', ["Clonk clonk clonk. I can hear you coming from three yards away. Nyah!"]);
+    item('slider', 'cowTrail', ["You're leaving MILK everywhere? Wait... is that free milk? Nyah!"]);
+    item('porter', 'cowBell', [["🐕 Porter's ears go up at every clonk of the cowbell!", 'tilt']]);
+    item('porter', 'cowSweater', [["🐕 Porter sniffs the cow spots... and tries to herd you into the garden!", 'wag']]);
+    item('porter', 'cowPack', [["🐕 Porter licks his lips at the milk carton.", 'wag']]);
+    item('porter', 'cowCharm', [["🐕 Porter play-bows at the tiny cow on your tail!", 'bow']]);
+  } catch (e) {}
+}
+/* (end of COW_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
