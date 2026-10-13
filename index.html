@@ -10757,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-13 17:07';                                              // stamped when the site is published
+const BUILD = '2026-10-13 17:45';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -43369,6 +43369,537 @@ function polMoonBoots(B) {                                               // moon
 }
 try { polInstall(); } catch (e) { console.error(e); }   /* (POL_V1: the one call at load: wraps ckPacksRun, ck5bThumb, ckThumbPut, ck5bTrailSys) */
 /* (end of POL_V1) */
+/* TUTU_V1 */
+/* =====================================================================
+   TUTU_V1 (2026-10-13): the tutu's tulle, cleaned up. Three layers of tulle round her waist (on DRS_V1's skirt seam: the
+   FIT_V1 top's hem), each one smooth sheet with a softly scalloped edge: no random flecks (they read as holes), no
+   per-column jitter (it read as torn spikes). Each layer clears her body by a smoothed amount, its ends are rounded off
+   behind her front legs (so nothing reaches into their swing), the belly gap and the tail slit stay. Layers step down and
+   out (top one shortest), so they never cross. The tulle is its own soft translucent material (two-sided, no depth
+   write, drawn after her, so the layers never z-fight or flicker) with a light rim on each edge. It is skinned like the
+   other DRS skirts (her body, back legs and the sway spring), dyed by colourways, and drawn on the card.
+   How: tutuInstall() (the one guarded call below) chains onto ckPacksRun (after DRS_V1 registers, the tutu's build is
+   replaced by tutuBuild) and ckInstance (the tulle mesh). Needs DRS_V1. No lights.
+   ===================================================================== */
+function tutuInstall() {
+  if (tutuInstall.done) return; tutuInstall.done = true;
+  const ok = f => typeof f === 'function';
+  if (ok(ckPacksRun)) { const f0 = ckPacksRun; ckPacksRun = function () { const r = f0.apply(this, arguments); tutuReg(); return r; }; }
+  if (ok(ckInstance)) { const f0 = ckInstance; ckInstance = function (it) { const inst = f0.apply(this, arguments); try { if (it && it.id === 'tutu' && inst) tutuInst(it, inst); } catch (e) { tutuErr(e); } return inst; }; }
+  try { if (ckState.S) { tutuReg(); for (const R of [walk && walk.rig, typeof CK !== 'undefined' && CK.rig]) { if (!R || !R.ck || !R.ck.outfit || R.ck.outfit.id !== 'tutu') continue; R.ck.outfit.id = '#'; closetDress(R, R === walk.rig ? ckState().outfit : CK.prev); } } } catch (e) { tutuErr(e); }
+}
+function tutuErr(e) { if (!tutuErr.n) { tutuErr.n = 1; console.error(e); } }
+function tutuReg() {                                                     // (ckPacksRun, after DRS_V1) the tutu's new build
+  if (tutuReg.done) return; tutuReg.done = true;
+  try { const it = CK_BY_ID.tutu; if (!it || !it.build || typeof drsMerge !== 'function') return;
+    if (it.fitB0) it.fitB0 = B => tutuBuild(B); else it.build = B => tutuBuild(B);
+    delete it.geo; delete it.ck5bV; delete it.ck5bP; delete it.ck5bH; delete it.ck5bVs; if (it.fitSt !== undefined) delete it.fitSt; } catch (e) { tutuErr(e); }
+}
+function tutuBuild(B) {                                                  // a satin leotard, a sash and bow (DRS_V1's), and three clean tulle layers
+  const pink = 0xffa8cc, pink2 = 0xff8fbf;
+  const sh = ck5bShell({ m: 0.012, nd: 0.035, zb: -0.31, zbB: -0.14, cols: 48, rows: 20, col: (u, f, k, j) => j % 5 === 0 ? pink2 : pink });
+  B.s(sh.g, sh.c); B.s(ck5bHem(sh.front, true, 0.008, 0.002), pink2);
+  if (!sh.backN) return; const S = drsSet();
+  S.add('m', drsSash(sh, 0.0075, pink2), pink2, null, 0);
+  drsBow(S, 'm', sh, pink2, 0.95);
+  S.post(B);
+  const L = [];
+  [[0.085, 0xffb3d4, 9], [0.107, 0xff9cc7, 11], [0.128, 0xff86ba, 13]].forEach(([R, col, N], l) => { for (const s of [-1, 1]) L.push(tutuLayer(sh, l, R, col, N, s)); });
+  const p0 = B.post; B.post = (G, it) => { if (p0) p0(G, it); const g = drsMerge(L); if (g) G.tutuT = g; };
+}
+function tutuLayer(sh, l, R, col, N, s) {                                // one side of one layer: columns from the tail slit round to just behind her front leg, rows out to the edge
+  const SL = 0.36, FA = 2.3, NC = 40, NR = 7, P = [], C = [], T = [], I = [], c = new THREE.Color(), rim = new THREE.Color(0xffe4f0), base = new THREE.Color(col);
+  const cols = [];
+  for (let k = 0; k <= NC; k++) { const g = k / NC, f = s * (SL + (FA - SL) * g), [p0, n0] = drsHem(sh, f), h = new THREE.Vector3(n0.x, 0, n0.z); if (h.lengthSq() < 1e-6) h.set(Math.sign(p0.x) || s, 0, 0); h.normalize();
+    const o = p0.clone().addScaledVector(n0, 0.006 + 0.004 * l); o.y -= 0.013 * l;
+    let push = 0; while (push < 0.08 && fitF(o.x + h.x * push, o.y, o.z + h.z * push, 0.6) < 0.013 + 0.004 * l) push += 0.002;
+    cols.push({ g, f, o, h, push }); }
+  for (let pass = 0; pass < 2; pass++) { const q = cols.map(x => x.push); for (let k = 0; k <= NC; k++) { let m = 0; for (let d = -2; d <= 2; d++) m = Math.max(m, q[Math.max(0, Math.min(NC, k + d))]); cols[k].push = m; } }   /* (spread the clearance, then smooth it: no column juts out from its neighbours) */
+  for (let pass = 0; pass < 3; pass++) { const q = cols.map(x => x.push); for (let k = 1; k < NC; k++) cols[k].push = Math.max(q[k], (q[k - 1] + 2 * q[k] + q[k + 1]) / 4); }
+  for (const cl of cols) {
+    const e = 0.32 + 0.68 * drsSs(0, 0.16, cl.g) * drsSs(1, 0.78, cl.g), sc = 1 + 0.07 * Math.cos(cl.f * N + l * 0.9);   /* (rounded ends; a soft scallop on the edge) */
+    for (let j = 0; j <= NR; j++) { const t = j / NR, r = cl.push + R * e * t * (1 + (sc - 1) * t * t), y = cl.o.y - (0.026 + 0.012 * l) * Math.pow(t, 1.6) + 0.004 * Math.sin(cl.f * N * 2 + l) * t * t;
+      P.push(cl.o.x + cl.h.x * r, y, cl.o.z + cl.h.z * r); c.copy(base).lerp(rim, t > 0.86 ? 0.6 : 0.1 * t); C.push(c.r, c.g, c.b); T.push(0.25 + 0.75 * t); } }
+  for (let k = 0; k < NC; k++) for (let j = 0; j < NR; j++) { const a = k * (NR + 1) + j, b = a + NR + 1; if (s > 0) I.push(a, a + 1, b, a + 1, b + 1, b); else I.push(a, b, a + 1, a + 1, b, b + 1); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setIndex(I); g.computeVertexNormals();
+  return { g, col: null, M: null, t: Float32Array.from(T) };
+}
+function tutuMat() {                                                     // soft translucent tulle, both sides, skinned; no depth write (layers can't z-fight)
+  return tutuMat.M || (tutuMat.M = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide, skinning: true, emissive: 0x3c1828 }));
+}
+function tutuInst(it, inst) {                                            // (ckInstance, after) the tulle mesh, skinned and bound like DRS_V1's skirts
+  const G = ckBake(it), g = G && G.tutuT; if (!g || typeof drsCls !== 'function') return;
+  const Cl = drsCls(), m = new Cl(g, tutuMat()); m.frustumCulled = false; m.renderOrder = 3; m.userData.drsSkirt = 1;
+  const b = new THREE.Object3D(); b.position.set(0, 0.5, -0.1); b.userData.drsSway = 1; m.add(b); drsSkel(m, null); inst.obj.add(m);
+}
+try { tutuInstall(); } catch (e) { console.error(e); }   /* (TUTU_V1: the one call at load: wraps ckPacksRun and ckInstance) */
+/* (end of TUTU_V1) */
+/* RUN2_V1 */
+/* =====================================================================
+   RUN2_V1 (2026-10-13): Rooftop Runner, sharper and one delivery longer.
+   - Textures: the city's sixteen tiles repainted at 512 px a tile on strong devices (256 middling, 128 weak) with gutters round each
+     tile and mip levels taken from the unwrapped coordinates (textureGrad): no seams, no shimmer at speed. More detail in every tile
+     (window blinds and reflections, siding, shingle tabs, brick soot, plank grain, concrete tie holes and streaks, roof membrane with tar
+     seams and a drain, road cracks, steel grate, lit windows with curtains). Walls darken toward the ground (soft AO). The sky has more
+     stops, a horizon band and a ring of soft clouds; the water drifts; the red runner-vision things stay bold.
+   - CATSCO, the eighth and final delivery (after the CN Tower): a warehouse club of PKR's own (original wordmark with cat ears and
+     whiskers, a blue band, "Wholesale Whiskers"; no real brands): the parking lot and its trailers, the entrance canopy, then inside
+     along the pallet racking, giant bulk packs, a mezzanine, the tyre centre, the checkout lanes, the food court's menu, and out past the
+     receipt check with confetti. Its own atlas, music, trophy; forklifts drive the aisles; a fall lands on the warehouse floor.
+   - The autopilot learned a human thumb (tests): runApOn({ jit }) shifts every up / down / side swipe by up to ±jit seconds.
+   Chained runtime wrappers and data, installed once after RUNNER_V1 and RUNFIX_V1; everything prefixed run2.
+   ===================================================================== */
+
+/* ---------- the autopilot, now with a human thumb (tests): opts.jit shifts each up / down / side swipe by up to ±jit seconds ---------- */
+function run2ApTick() {
+  const R = RUN, A = R.ap, L = R.L, P = R.pl; if (!A || !P || R.phase !== 'run' || P.done) return;
+  const jit = A.jit || 0, vv = Math.max(4, P.v), rnd = A.rnd || (A.rnd = runRnd(A.seed || 1));
+  if (A.lastFalls !== P.falls) { if (A.lastFalls !== undefined) { A.log.push('fall@' + P.fallAt); A.i = 0; while (A.i < L.ap.length && L.ap[A.i].s < P.s) A.i++; A.pend = []; } A.lastFalls = P.falls; A.want = undefined; }
+  const pend = A.pend || (A.pend = []), fire = a => {
+    if (a.mush && !A.mush) return;
+    if (a.a === 'up') { if (a.wall && P.mode !== 'wall') return; if (!a.lanes || a.lanes.indexOf(P.li) >= 0) runInput('up'); }
+    else if (a.a === 'down') { if (!a.lanes || a.lanes.indexOf(P.li) >= 0) runInput('down'); }
+    else if (a.a === 'lane') A.want = a.v;
+    else if (a.a === 'side') runInput(a.v > 0 ? 'right' : 'left');
+    else if (a.a === 'hold') { R.hold = true; A.holdT = P.t; }
+    else if (a.a === 'avoid') {
+      const cur = A.want !== undefined ? A.want : P.li; if (a.lanes.indexOf(cur) < 0) return;
+      const blocked = l => L.O.some(o => o.k === 'block' && o.lane === l && o.s < a.s1 + 0.5 && o.s1 > a.s0 - 0.5);
+      const free = [-1, 0, 1].filter(l => !blocked(l)).sort((p, q) => Math.abs(p - cur) - Math.abs(q - cur) || Math.abs(p) - Math.abs(q));
+      if (free.length) A.want = free[0];
+    }
+  };
+  while (A.i < L.ap.length && L.ap[A.i].s - jit * vv * 1.3 <= P.s) {     /* (each cue into the queue, its moment nudged: an early or a late thumb) */
+    const a = L.ap[A.i++], k = a.a === 'up' || a.a === 'down' || a.a === 'side' || a.a === 'hold', key = a.s.toFixed(2);
+    let d = 0; if (jit && k) { A.jd = A.jd || {}; if (A.jd[key] === undefined) A.jd[key] = (rnd() * 2 - 1) * jit; d = A.jd[key]; }
+    pend.push({ a, t: d });
+  }
+  for (let i = 0; i < pend.length; i++) { const q = pend[i]; if (q.a.s + q.t * vv <= P.s) { pend.splice(i--, 1); fire(q.a); } }
+  let want = A.want;
+  if (want !== undefined) { const bl = l => L.O.some(o => o.k === 'block' && o.lane === l && o.s1 > P.s - 0.3 && o.s < P.s + 9);
+    if (bl(want)) { const fr = [-1, 0, 1].filter(l => !bl(l)).sort((p, q) => Math.abs(p - want) - Math.abs(q - want)); if (fr.length) want = fr[0]; } }
+  if (want !== undefined && want !== P.li && P.mode !== 'air') { const nx = (P.li + Math.sign(want - P.li)) * R.LANE; if ([0.2, 1.2, 2.2, 3.2].some(d => runGround(L, P.s + d, nx, P.y + 0.45) < P.y - 0.5)) want = P.li; }
+  else if (want !== undefined && want !== P.li) { const nx = (P.li + Math.sign(want - P.li)) * R.LANE, d = P.v * 0.4; if (runGround(L, P.s + d, P.x, P.y + 3) > runGround(L, P.s + d, nx, P.y + 3) + 0.5) want = P.li; }   /* (in the air over a raised line: stay on it) */
+  if (want !== undefined && want !== P.li && (P.mode === 'run' || P.mode === 'air' || P.mode === 'slide' || P.mode === 'roll') && P.t - A.lastLane > 0.1) { A.lastLane = P.t; runInput(want < P.li ? 'left' : 'right'); }
+  if (P.mode === 'run' && P.t - (A.reactT || -9) > 0.25) for (const o of runBk(L, L.bO, P.s)) if (o.s > P.s && o.s - P.s < 2.2 && P.x > o.x0 && P.x < o.x1) {
+    if (o.k === 'bar' || o.k === 'sign') { runInput('down'); A.reactT = P.t; } else if (o.k === 'vault') { runInput('up'); A.reactT = P.t; } break; }
+  if (R.hold && (P.mode === 'zip' || P.t - A.holdT > 1.4)) R.hold = false;
+  if (P.mode === 'air' && P.vy < 0 && !A.rolled) { const g = runGround(L, P.s + P.v * 0.12, P.x, P.y); if (g > -1e8 && P.peak - g > 3.2 && P.y - g < 1.9) { A.rolled = true; runInput('down'); } }
+  if (P.mode !== 'air') A.rolled = false;
+}
+
+/* ---------- the look, sharper: two atlases (the city's sixteen tiles, and Catsco's own), painted at 512 px a tile on strong devices
+   (256 middling, 128 weak) with gutters round each tile, so mipmaps never bleed a neighbour in; the tile-repeat shader picks its
+   mip level from the unwrapped coordinates (no seams, no shimmer at speed) ---------- */
+function run2T() { const t = typeof devTier === 'function' ? devTier() : 'high'; return t === 'low' ? 128 : t === 'mid' ? 256 : 512; }
+function run2Noise(c, w, h, amt, seed, cell) {                          // value-noise mottling, straight into the pixels (multiplied in)
+  const rnd = runRnd(seed || 3), cs = cell || 8, gw = Math.ceil(w / cs) + 2, gh = Math.ceil(h / cs) + 2, G = new Float32Array(gw * gh); for (let i = 0; i < G.length; i++) G[i] = rnd();
+  const img = c.getImageData(0, 0, w, h), d = img.data;
+  for (let y = 0; y < h; y++) { const fy = y / cs, iy = Math.floor(fy), vy = fy - iy, sy = vy * vy * (3 - 2 * vy);
+    for (let x = 0; x < w; x++) { const fx = x / cs, ix = Math.floor(fx), vx = fx - ix, sx = vx * vx * (3 - 2 * vx), i0 = iy * gw + ix;
+      const n = (G[i0] * (1 - sx) + G[i0 + 1] * sx) * (1 - sy) + (G[i0 + gw] * (1 - sx) + G[i0 + gw + 1] * sx) * sy, k = 1 + (n - 0.5) * amt + (rnd() - 0.5) * amt * 0.35, p = (y * w + x) * 4;
+      d[p] = Math.min(255, d[p] * k); d[p + 1] = Math.min(255, d[p + 1] * k); d[p + 2] = Math.min(255, d[p + 2] * k); } }
+  c.putImageData(img, 0, 0);
+}
+function run2Atlas(kind) {                                              // kind: 'city' | 'catsco'
+  const R = RUN, C = R.atl || (R.atl = {}); if (C[kind]) return C[kind];
+  for (const k in C) if (k !== kind && run2T() < 512) { C[k].dispose(); delete C[k]; }   /* (only a strong device keeps both atlases) */
+  const T = run2T(), g = Math.max(4, T / 16), S = T - 2 * g, cv = document.createElement('canvas'); cv.width = cv.height = T * 4; const A = cv.getContext('2d');
+  const P = kind === 'catsco' ? run2PaintCatsco() : run2PaintCity();
+  for (let i = 0; i < 16; i++) {
+    const tc = document.createElement('canvas'); tc.width = tc.height = S; const c = tc.getContext('2d'); c.save(); c.scale(S / 256, S / 256);   /* (each tile on a fresh canvas: Safari) */
+    try { (P[i] || P[0])(c, runRnd(17 + i * 31)); } catch (e) { c.fillStyle = '#fff'; c.fillRect(0, 0, 256, 256); } c.restore();
+    if (P.noise && P.noise[i]) run2Noise(c, S, S, P.noise[i][0], 50 + i, Math.max(2, P.noise[i][1] * S / 256));
+    const x0 = (i % 4) * T + g, y0 = Math.floor(i / 4) * T + g;
+    for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) { A.save(); A.beginPath(); A.rect((i % 4) * T, Math.floor(i / 4) * T, T, T); A.clip(); A.drawImage(tc, x0 + dx, y0 + dy); A.restore(); }   /* (wrapped into the gutter) */
+  }
+  const t = new THREE.CanvasTexture(cv), mx = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 4;
+  t.anisotropy = Math.min(mx, T >= 512 ? 8 : T >= 256 ? 4 : 2); t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = true; t.userData = { T, g };
+  return (C[kind] = t);
+}
+function run2Tile(i) {                                                   // the tile's content rectangle (inside its gutter)
+  const T = run2Tile.T || (run2Tile.T = []); if (T[i]) return T[i]; if (!i) return (T[0] = [0.1, 0.9, 0, 0]);
+  const g = 1 / 64, w = 0.25 - 2 * g; return (T[i] = [(i % 4) * 0.25 + g, 1 - (Math.floor(i / 4) + 1) * 0.25 + g, w, w]);
+}
+function run2TileMat(m) {
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 tile;\nvarying vec4 vTile;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvTile = tile;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec4 vTile;').replace('#include <map_fragment>',
+      '#ifdef USE_MAP\nvec2 tUv = vTile.xy + fract( vUv ) * vTile.zw;\n#if __VERSION__ >= 300\nvec4 texelColor = textureGrad( map, tUv, dFdx( vUv ) * vTile.zw, dFdy( vUv ) * vTile.zw );\n#else\nvec4 texelColor = texture2D( map, tUv );\n#endif\ntexelColor = mapTexelToLinear( texelColor );\ndiffuseColor *= texelColor;\n#endif');
+  };
+  m.customProgramCacheKey = () => 'runTile2'; return m;
+}
+function run2Mats() {                                                    // (runMats) the same set, sharper: the red things carry detail too; water moves
+  const R = RUN; if (R.M) return R.M; const A = run2Atlas('city');
+  const M = R.M = {
+    w: run2TileMat(new THREE.MeshLambertMaterial({ vertexColors: true, map: A })),
+    g: run2TileMat(new THREE.MeshBasicMaterial({ vertexColors: true, map: A })),
+    r: run2TileMat(new THREE.MeshLambertMaterial({ vertexColors: true, map: A, emissive: 0x5a0a06 })),
+    sky: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }),
+    fish: new THREE.MeshLambertMaterial({ color: 0xffc23a, emissive: 0x6a3a00 }),
+    mush: new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x6a4a00 }),
+    car: new THREE.MeshLambertMaterial({ vertexColors: true }),
+    water: new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.94, map: run2WaterTex() }),
+    line: new THREE.LineBasicMaterial({ color: 0x20242a }),
+    ghost: new THREE.MeshBasicMaterial({ color: 0x8af0ff, transparent: true, opacity: 0.46, depthWrite: false }),
+    cloud: new THREE.MeshBasicMaterial({ map: run2CloudTex(), transparent: true, depthWrite: false, fog: false, vertexColors: true }),
+  };
+  M.r.userData.pulse = true; return M;
+}
+function run2WaterTex() {                                                // ripples and glints, tiled across the water, drifting (runThings)
+  const S = RUN.low ? 128 : 256, cv = document.createElement('canvas'); cv.width = cv.height = S; const c = cv.getContext('2d'), rnd = runRnd(91);
+  c.fillStyle = '#dfe9f2'; c.fillRect(0, 0, S, S); c.scale(S / 256, S / 256);
+  for (let i = 0; i < 90; i++) { const x = rnd() * 256, y = rnd() * 256, w = 18 + rnd() * 50; c.strokeStyle = 'rgba(' + (rnd() < 0.5 ? '255,255,255,' + (0.35 + rnd() * 0.4) : '120,150,180,' + (0.25 + rnd() * 0.3)) + ')'; c.lineWidth = 1.5 + rnd() * 2.5;
+    for (const dx of [-256, 0, 256]) for (const dy of [-256, 0, 256]) { c.beginPath(); c.moveTo(x + dx - w / 2, y + dy); c.quadraticCurveTo(x + dx, y + dy - 4 - rnd() * 4, x + dx + w / 2, y + dy); c.stroke(); } }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(0.07, 0.07); t.anisotropy = 4; return t;
+}
+function run2CloudTex() {
+  const S = RUN.low ? 128 : 256, cv = document.createElement('canvas'); cv.width = S; cv.height = S / 2; const c = cv.getContext('2d'), rnd = runRnd(23); c.scale(S / 256, S / 256);
+  for (let i = 0; i < 26; i++) { const x = 30 + rnd() * 196, y = 70 + (rnd() - 0.5) * 30 - Math.sin((x - 30) / 196 * Math.PI) * 22, r = 14 + rnd() * 22, gr = c.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); }
+  const t = new THREE.CanvasTexture(cv); return t;
+}
+function run2Sky(K) {                                                    // (runSky) more stops (zenith, mid, a bright band at the horizon, haze below), the sun's halo, and soft clouds on day worlds
+  const g = new THREE.SphereGeometry(1400, 40, 24), P = g.attributes.position, C = [], c = new THREE.Color(), top = new THREE.Color(K.sky[0]), hz = new THREE.Color(K.sky[1]), lo = new THREE.Color(K.sky[2]), sun = new THREE.Color(K.sky[3] || 0xffffff), sd = new THREE.Vector3(...K.sunDir).normalize(), v = new THREE.Vector3();
+  const mid = top.clone().lerp(hz, 0.45), band = hz.clone().lerp(new THREE.Color(0xffffff), K.night ? 0.05 : 0.25);
+  for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).normalize(); const e = v.y;
+    if (e >= 0.35) c.copy(mid).lerp(top, Math.pow((e - 0.35) / 0.65, 0.8)); else if (e >= 0.04) c.copy(hz).lerp(mid, Math.pow((e - 0.04) / 0.31, 0.9)); else if (e >= 0) c.copy(band).lerp(hz, e / 0.04); else c.copy(band).lerp(lo, Math.min(1, -e * 5));
+    const k = Math.max(0, v.dot(sd)); c.lerp(sun, Math.pow(k, 6) * (K.sunGlow || 0.6) + Math.pow(k, 60) * 0.9); C.push(c.r, c.g, c.b); }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); const M = runMats(), m = new THREE.Mesh(g, M.sky); m.renderOrder = -10; m.frustumCulled = false; m.userData.name = 'Runner sky';
+  if (!K.noClouds) {                                                    // a ring of soft clouds (one draw), tinted by the sky
+    const rnd = runRnd(5), Pp = [], Cc = [], U = [], n = RUN.low ? 9 : 16, tint = K.night ? new THREE.Color(0x6a5a8a) : hz.clone().lerp(new THREE.Color(0xffffff), 0.7);
+    for (let i = 0; i < n; i++) { const a = rnd() * Math.PI * 2, el = 0.07 + rnd() * 0.22, r = 1100, w = 260 + rnd() * 320, h = w * 0.32, cx = Math.cos(a) * r * Math.cos(el), cz = Math.sin(a) * r * Math.cos(el), cy = Math.sin(el) * r, tx = -Math.sin(a), tz = Math.cos(a);
+      const q = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]; for (const [u, w2] of q) { Pp.push(cx + tx * u * w / 2, cy + w2 * h / 2, cz + tz * u * w / 2); U.push((u + 1) / 2, (w2 + 1) / 2); Cc.push(tint.r, tint.g, tint.b); } }
+    const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(Pp, 3)); cg.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); cg.setAttribute('color', new THREE.Float32BufferAttribute(Cc, 3));
+    const cm = new THREE.Mesh(cg, M.cloud); cm.renderOrder = -9; cm.frustumCulled = false; cm.userData.name = 'Runner clouds'; m.add(cm); }
+  return m;
+}
+function run2Quad4(G, mat, s, a, b2, c2, d, col, tile, uv, hint, f) {   // a quad whose corners are shaded (f: a factor per corner: ambient occlusion down a wall)
+  const bf = gbBuf(G, mat, s), n0 = gbBuf.n || (gbBuf.n = new THREE.Vector3()), base = typeof col === 'number' ? new THREE.Color(col) : col.clone();
+  const e1 = new THREE.Vector3(b2.x - a.x, b2.y - a.y, b2.z - a.z), e2 = new THREE.Vector3(c2.x - a.x, c2.y - a.y, c2.z - a.z); n0.crossVectors(e1, e2); if (n0.lengthSq() < 1e-12) return; n0.normalize();
+  const tl = runTile(tile || 0); uv = uv || [0, 0, 1, 0, 1, 1, 0, 1]; let idx = [0, 1, 2, 0, 2, 3];
+  if (hint && n0.dot(hint) < 0) { n0.negate(); idx = [0, 2, 1, 0, 3, 2]; }
+  const V = [a, b2, c2, d]; for (const j of idx) { const p = V[j], k = f[j]; bf.P.push(p.x, p.y, p.z); bf.N.push(n0.x, n0.y, n0.z); bf.C.push(base.r * k, base.g * k, base.b * k); bf.U.push(uv[j * 2], uv[j * 2 + 1]); bf.T.push(tl[0], tl[1], tl[2], tl[3]); }
+}
+function run2Slab(G, mat, s0, s1, x0, x1, yb, yt, o) {                    // (gbSlab) the same block, its walls darker toward the ground (soft AO), a light lip at the top edge
+  const L = G.L, sk = o.skip || {}, curved = (() => { for (let s = s0; s <= s1; s += 2) if (Math.abs(L.CK[Math.max(0, Math.min(L.N - 1, Math.floor(s) + RUN.OFF))]) > 1e-5) return true; return false; })();
+  const n = curved ? Math.max(1, Math.ceil((s1 - s0) / 3)) : 1, W = (s, x, y) => { const c = runC(L, s, x, y); return new THREE.Vector3(c.x, y, c.z); };
+  const top = o.top, side = o.side || top, end = o.end || side, up = new THREE.Vector3(0, 1, 0), hgt = yt - yb, ao = hgt > 1.5 && !o.flat ? Math.max(0.58, 1 - Math.min(1, hgt / 30) * 0.42) : 1, fs = [ao, ao, 1, 1];
+  for (let i = 0; i < n; i++) {
+    const a = s0 + (s1 - s0) * i / n, b = s0 + (s1 - s0) * (i + 1) / n, h = runHead(L, (a + b) / 2), Rr = new THREE.Vector3(Math.cos(h), 0, -Math.sin(h));
+    if (top && !sk.top) gbQuad(G, mat, a, W(a, x0, yt), W(a, x1, yt), W(b, x1, yt), W(b, x0, yt), top[0], top[1], [x0 / top[2], -a / top[3], x1 / top[2], -a / top[3], x1 / top[2], -b / top[3], x0 / top[2], -b / top[3]], up);
+    if (side && !sk.r) run2Quad4(G, mat, a, W(a, x1, yb), W(b, x1, yb), W(b, x1, yt), W(a, x1, yt), side[0], side[1], [a / side[2], (yb - yt) / side[3], b / side[2], (yb - yt) / side[3], b / side[2], 0, a / side[2], 0], Rr, fs);
+    if (side && !sk.l) run2Quad4(G, mat, a, W(b, x0, yb), W(a, x0, yb), W(a, x0, yt), W(b, x0, yt), side[0], side[1], [-b / side[2], (yb - yt) / side[3], -a / side[2], (yb - yt) / side[3], -a / side[2], 0, -b / side[2], 0], Rr.clone().negate(), fs);
+  }
+  const h0 = runHead(L, s0), h1 = runHead(L, s1), F0 = new THREE.Vector3(Math.sin(h0), 0, Math.cos(h0)), F1 = new THREE.Vector3(-Math.sin(h1), 0, -Math.cos(h1));
+  if (end && !sk.f) run2Quad4(G, mat, s0, W(s0, x0, yb), W(s0, x1, yb), W(s0, x1, yt), W(s0, x0, yt), end[0], end[1], [x0 / end[2], (yb - yt) / end[3], x1 / end[2], (yb - yt) / end[3], x1 / end[2], 0, x0 / end[2], 0], F0, fs);
+  if (end && !sk.b) run2Quad4(G, mat, s1, W(s1, x1, yb), W(s1, x0, yb), W(s1, x0, yt), W(s1, x1, yt), end[0], end[1], [-x1 / end[2], (yb - yt) / end[3], -x0 / end[2], (yb - yt) / end[3], -x0 / end[2], 0, -x1 / end[2], 0], F1, fs);
+}
+/* ---------- the city's sixteen tiles (same meaning as before: 1 office windows, 2 a house wall, 3 shingles, 4 brick, 5 planks, 6 concrete,
+   7 curtain wall, 8 roof membrane, 9 foliage, 10 road, 11 awning stripes, 12 mural, 13 steel grate, 14 windows at night, 15 a screen) ---------- */
+function run2PaintCity() {
+  const rect = (c, col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); }, lin = (c, x0, y0, x1, y1, st) => { const g = c.createLinearGradient(x0, y0, x1, y1); st.forEach((s, i) => g.addColorStop(s[0], s[1])); return g; };
+  const glass = (c, x, y, w, h, rnd, lit) => { c.fillStyle = lin(c, x, y, x + w * 0.6, y + h, [[0, lit ? '#f7e3b0' : '#6f97b8'], [0.45, lit ? '#e8c47a' : '#9cc2dc'], [0.5, lit ? '#f2d89a' : '#b9d6ea'], [1, lit ? '#c99a52' : '#3d6584']]); c.fillRect(x, y, w, h);
+    c.fillStyle = 'rgba(255,255,255,.22)'; c.beginPath(); c.moveTo(x + w * 0.15, y + h); c.lineTo(x + w * 0.45, y); c.lineTo(x + w * 0.62, y); c.lineTo(x + w * 0.32, y + h); c.fill(); };
+  const P = [
+    c => rect(c, '#ffffff', 0, 0, 256, 256),
+    (c, rnd) => { rect(c, '#eef1f4', 0, 0, 256, 256); rect(c, '#d9dee4', 0, 0, 256, 18); rect(c, '#d9dee4', 0, 128, 256, 18);   // office windows: spandrels, frames, blinds, the odd lit one
+      for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) { const x = i * 128 + 12, y = j * 128 + 24, lit = false; glass(c, x, y, 104, 92, rnd, lit);
+        const bl = rnd(); if (bl < 0.3) { const h = 14 + rnd() * 34; rect(c, 'rgba(214,222,230,.9)', x, y, 104, h); for (let k = 4; k < h; k += 5) rect(c, 'rgba(0,0,0,.08)', x, y + k, 104, 1); }
+        rect(c, '#f8fafb', x + 50, y, 4, 92); rect(c, '#c4ccd4', x - 2, y + 92, 108, 5); rect(c, 'rgba(0,0,0,.09)', x, y + 97, 104, 10); rect(c, 'rgba(255,255,255,.7)', x - 2, y - 2, 108, 2); } },
+    (c, rnd) => { rect(c, '#ffffff', 0, 0, 256, 256); for (let y = 0; y < 256; y += 16) { rect(c, 'rgba(0,0,0,.09)', 0, y + 13, 256, 3); rect(c, 'rgba(255,255,255,.6)', 0, y, 256, 1); }   // siding, a window, shutters, a sill
+      rect(c, '#f9f9f6', 68, 50, 120, 136); c.fillStyle = lin(c, 0, 60, 0, 176, [[0, '#5d7c98'], [0.55, '#2e465c'], [1, '#22364a']]); c.fillRect(80, 62, 96, 112);
+      c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.moveTo(90, 174); c.lineTo(122, 62); c.lineTo(138, 62); c.lineTo(106, 174); c.fill();
+      rect(c, '#f9f9f6', 125, 62, 6, 112); rect(c, '#f9f9f6', 80, 114, 96, 6); rect(c, '#55595f', 44, 50, 20, 136); rect(c, '#55595f', 192, 50, 20, 136);
+      for (let k = 56; k < 180; k += 10) { rect(c, 'rgba(0,0,0,.25)', 46, k, 16, 2); rect(c, 'rgba(0,0,0,.25)', 194, k, 16, 2); } rect(c, '#e2e0da', 60, 186, 136, 9); c.fillStyle = lin(c, 0, 195, 0, 236, [[0, 'rgba(60,50,40,.18)'], [1, 'rgba(60,50,40,0)']]); c.fillRect(70, 195, 116, 41); },
+    (c, rnd) => { rect(c, '#6e7276', 0, 0, 256, 256); for (let y = 0; y < 256; y += 21) for (let x = -(y / 21 % 2) * 16; x < 256; x += 32) { const v = 96 + rnd() * 50 | 0;   // shingles
+        rect(c, 'rgb(' + v + ',' + (v + 2) + ',' + (v + 6) + ')', x + 1, y + 1, 30, 18); rect(c, 'rgba(255,255,255,.08)', x + 1, y + 1, 30, 2); rect(c, 'rgba(0,0,0,.32)', x, y + 18, 32, 3); rect(c, 'rgba(0,0,0,.18)', x + 31, y + 1, 1, 18); } },
+    (c, rnd) => { rect(c, '#d8d0c4', 0, 0, 256, 256); for (let y = 0; y < 256; y += 16) for (let x = -(y / 16 % 2) * 16; x < 256; x += 32) { const v = rnd() * 0.22, r = 196 - v * 220, gg = 120 - v * 170, b = 96 - v * 140;   // brick
+        c.fillStyle = 'rgb(' + (r | 0) + ',' + (gg | 0) + ',' + (b | 0) + ')'; c.fillRect(x + 2, y + 2, 28, 12); rect(c, 'rgba(255,255,255,.12)', x + 2, y + 2, 28, 2); rect(c, 'rgba(0,0,0,.18)', x + 2, y + 12, 28, 2); }
+      c.fillStyle = lin(c, 0, 180, 0, 256, [[0, 'rgba(40,30,25,0)'], [1, 'rgba(40,30,25,.18)']]); c.fillRect(0, 180, 256, 76); },
+    (c, rnd) => { rect(c, '#d6bc96', 0, 0, 256, 256); for (let y = 0; y < 256; y += 32) { const t = rnd() * 0.12; rect(c, 'rgba(120,80,40,' + t + ')', 0, y, 256, 32);   // planks: grain, knots, gaps, nails
+        for (let k = 0; k < 9; k++) { c.strokeStyle = 'rgba(110,70,35,' + (0.08 + rnd() * 0.1) + ')'; c.lineWidth = 1; c.beginPath(); const yy = y + 4 + k * 3; c.moveTo(0, yy); for (let x = 0; x <= 256; x += 16) c.lineTo(x, yy + Math.sin(x * 0.05 + k + y) * 1.2); c.stroke(); }
+        if (rnd() < 0.6) { c.fillStyle = 'rgba(90,55,25,.4)'; c.beginPath(); c.ellipse(rnd() * 256, y + 16, 5, 3, 0, 0, 7); c.fill(); } rect(c, 'rgba(70,45,20,.55)', 0, y, 256, 3); const jx = (y * 7) % 256; rect(c, 'rgba(70,45,20,.5)', jx, y, 3, 32);
+        rect(c, 'rgba(50,50,55,.6)', jx + 8, y + 8, 3, 3); rect(c, 'rgba(50,50,55,.6)', jx + 8, y + 22, 3, 3); } },
+    (c, rnd) => { rect(c, '#e2e1dc', 0, 0, 256, 256); rect(c, 'rgba(0,0,0,.16)', 0, 0, 256, 3); rect(c, 'rgba(0,0,0,.16)', 0, 0, 3, 256); rect(c, 'rgba(255,255,255,.5)', 3, 3, 253, 1);   // concrete: seams, tie holes, rain streaks
+      for (const [x, y] of [[48, 48], [208, 48], [48, 208], [208, 208], [128, 128]]) { rect(c, 'rgba(0,0,0,.25)', x - 3, y - 3, 6, 6); rect(c, 'rgba(255,255,255,.4)', x - 3, y + 3, 6, 1); }
+      for (let i = 0; i < 7; i++) { const x = rnd() * 256, w = 3 + rnd() * 8; c.fillStyle = lin(c, 0, 0, 0, 256, [[0, 'rgba(70,70,60,.12)'], [1, 'rgba(70,70,60,0)']]); c.fillRect(x, 0, w, 120 + rnd() * 136); } },
+    (c, rnd) => { c.fillStyle = lin(c, 0, 0, 256, 256, [[0, '#c9e6f6'], [0.42, '#86b8da'], [0.5, '#b4d8ee'], [0.58, '#8dbedf'], [1, '#4f84ac']]); c.fillRect(0, 0, 256, 256);   // curtain wall: a cloud's reflection, mullions with a lit edge
+      c.fillStyle = 'rgba(255,255,255,.18)'; for (let i = 0; i < 6; i++) { c.beginPath(); c.ellipse(40 + rnd() * 180, 60 + rnd() * 70, 30 + rnd() * 30, 9 + rnd() * 6, 0, 0, 7); c.fill(); }
+      for (let x = 0; x < 256; x += 64) { rect(c, '#e9eef2', x, 0, 5, 256); rect(c, 'rgba(255,255,255,.8)', x, 0, 1, 256); } rect(c, '#dbe3ea', 0, 0, 256, 8); rect(c, '#9fb4c4', 0, 8, 256, 3); rect(c, 'rgba(255,255,255,.25)', 0, 120, 256, 3); },
+    (c, rnd) => { rect(c, '#cfccc5', 0, 0, 256, 256); for (let i = 0; i < 3800; i++) { const v = 140 + rnd() * 100 | 0; rect(c, 'rgb(' + v + ',' + v + ',' + (v - 8) + ')', rnd() * 256, rnd() * 256, 1.5 + rnd() * 1.5, 1.5 + rnd() * 1.5); }   // membrane: gravel, tar seams, a drain
+      for (const y of [62, 190]) { rect(c, 'rgba(30,30,32,.55)', 0, y, 256, 7); for (let k = 0; k < 9; k++) rect(c, 'rgba(30,30,32,.4)', rnd() * 256, y + 6, 2, 3 + rnd() * 6); } },
+    (c, rnd) => { rect(c, '#c8c8c8', 0, 0, 256, 256); for (let i = 0; i < 220; i++) { const v = 0.6 + rnd() * 0.4, x = rnd() * 256, y = rnd() * 256, r = 6 + rnd() * 16;   // foliage (tinted)
+        c.fillStyle = 'rgba(' + (v * 255 | 0) + ',' + (v * 255 | 0) + ',' + (v * 255 | 0) + ',1)'; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.arc(x - r * 0.3, y - r * 0.3, r * 0.4, 0, 7); c.fill(); } },
+    (c, rnd) => { rect(c, '#55585c', 0, 0, 256, 256); for (let i = 0; i < 2600; i++) rect(c, 'rgba(255,255,255,' + rnd() * 0.08 + ')', rnd() * 256, rnd() * 256, 2, 2);   // road: cracks, a tar seam, the lines
+      c.strokeStyle = 'rgba(20,20,22,.55)'; c.lineWidth = 2; for (let i = 0; i < 3; i++) { c.beginPath(); let x = rnd() * 256, y = rnd() * 256; c.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (rnd() - 0.5) * 40; y += rnd() * 20; c.lineTo(x, y); } c.stroke(); }
+      rect(c, 'rgba(25,25,27,.5)', 60, 0, 6, 256); rect(c, '#f2efe2', 124, 0, 8, 120); rect(c, '#f2efe2', 0, 0, 5, 256); rect(c, '#f2efe2', 251, 0, 5, 256); },
+    (c, rnd) => { for (let x = 0; x < 256; x += 64) { c.fillStyle = lin(c, x, 0, x + 32, 0, [[0, '#ffffff'], [0.5, '#f4f4f4'], [1, '#dcdcdc']]); c.fillRect(x, 0, 32, 256); c.fillStyle = lin(c, x + 32, 0, x + 64, 0, [[0, '#9a9a9a'], [0.5, '#8c8c8c'], [1, '#7a7a7a']]); c.fillRect(x + 32, 0, 32, 256); }   // awning stripes
+      c.fillStyle = lin(c, 0, 200, 0, 256, [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,.25)']]); c.fillRect(0, 200, 256, 56); for (let x = 0; x < 256; x += 32) { c.fillStyle = 'rgba(0,0,0,.12)'; c.beginPath(); c.arc(x + 16, 256, 16, Math.PI, 0); c.fill(); } },
+    (c, rnd) => { rect(c, '#ffe7c2', 0, 0, 256, 256); const P2 = ['#ff5a7a', '#29b6c9', '#ffc93a', '#7a5cff', '#3fbf6a', '#ff8a3a'];   // mural
+      for (let i = 0; i < 16; i++) { c.fillStyle = P2[i % 6]; c.beginPath(); c.arc(rnd() * 256, rnd() * 256, 18 + rnd() * 46, 0, 7); c.fill(); c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 3; c.stroke(); }
+      c.strokeStyle = '#2a2140'; c.lineWidth = 6; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(0, 40 + i * 60); for (let x = 0; x <= 256; x += 16) c.lineTo(x, 40 + i * 60 + Math.sin(x * 0.05 + i) * 14); c.stroke(); }
+      c.fillStyle = '#2a2140'; c.beginPath(); c.ellipse(128, 150, 26, 21, 0, 0, 7); c.fill(); for (const [x, y] of [[96, 118], [116, 104], [140, 104], [160, 118]]) { c.beginPath(); c.ellipse(x, y, 9, 11, 0, 0, 7); c.fill(); }
+      for (let i = 0; i < 40; i++) rect(c, 'rgba(255,255,255,.5)', rnd() * 256, rnd() * 256, 3, 3); },
+    (c, rnd) => { rect(c, '#7c858e', 0, 0, 256, 256); c.strokeStyle = '#dfe5ea'; c.lineWidth = 12; c.strokeRect(6, 6, 244, 244); c.lineWidth = 9; c.beginPath(); c.moveTo(0, 0); c.lineTo(256, 256); c.moveTo(256, 0); c.lineTo(0, 256); c.stroke();   // steel grate / lattice
+      c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2; c.strokeRect(1, 1, 254, 254); for (let i = 0; i < 12; i++) rect(c, 'rgba(120,70,40,.25)', rnd() * 256, rnd() * 256, 6, 12); },
+    (c, rnd) => { rect(c, '#1a1d2a', 0, 0, 256, 256); for (let j = 0; j < 4; j++) { rect(c, '#232838', 0, j * 64, 256, 8); for (let i = 0; i < 4; i++) { const on = rnd() < 0.55, w = ['#ffd98a', '#ffeccc', '#9fd4ff', '#ffc070'][(rnd() * 4) | 0], x = i * 64 + 10, y = j * 64 + 14;   // windows at night: curtains, silhouettes, a TV's blue
+        rect(c, on ? w : '#2a3044', x, y, 44, 40); if (on) { c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x, y, 44, 6); if (rnd() < 0.4) rect(c, 'rgba(120,60,40,.35)', x, y, 12 + rnd() * 10, 40); if (rnd() < 0.25) { c.fillStyle = 'rgba(40,30,30,.5)'; c.beginPath(); c.arc(x + 26, y + 26, 6, 0, 7); c.fill(); c.fillRect(x + 20, y + 30, 12, 10); } }
+        rect(c, '#3a4058', x - 1, y + 40, 46, 3); } } },
+    (c, rnd) => { c.fillStyle = lin(c, 0, 0, 256, 256, [[0, '#ff3d8b'], [0.5, '#7a3dff'], [1, '#22d3ff']]); c.fillRect(0, 0, 256, 256);   // a big screen: a cat's paw, a star, scan lines
+      c.fillStyle = 'rgba(255,255,255,.85)'; c.beginPath(); c.ellipse(128, 150, 40, 32, 0, 0, 7); c.fill(); for (const [x, y] of [[80, 100], [110, 80], [146, 80], [176, 100]]) { c.beginPath(); c.ellipse(x, y, 14, 17, 0, 0, 7); c.fill(); }
+      c.fillStyle = 'rgba(255,240,120,.9)'; c.beginPath(); for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5 - Math.PI / 2, r = k % 2 ? 9 : 22; c.lineTo(214 + Math.cos(a) * r, 46 + Math.sin(a) * r); } c.fill();
+      for (let y = 0; y < 256; y += 4) rect(c, 'rgba(0,0,0,.08)', 0, y, 256, 1); rect(c, 'rgba(255,255,255,.3)', 0, 0, 256, 14); rect(c, 'rgba(0,0,0,.3)', 0, 240, 256, 16); },
+  ];
+  P.noise = { 1: [0.06, 6], 2: [0.07, 10], 3: [0.18, 3], 4: [0.12, 3], 5: [0.1, 8], 6: [0.16, 10], 7: [0.05, 20], 8: [0.12, 4], 10: [0.2, 3], 13: [0.12, 6] };
+  return P;
+}
+
+/* ---------- Catsco's own sixteen tiles: 1 corrugated wall, 2 the brand band, 3 the CATSCO sign, 4 parking lot, 5 warehouse floor,
+   6 a stocked rack bay, 7 Soft Paws towels, 8 Fish Crunch crates, 9 cardboard, 10 shrink wrap, 11 stripes, 12 the food-court menu,
+   13 roof truss, 14 Fish Crunch crates (8: roof membrane), 15 the giant receipt. All original: a red wordmark with cat ears and whiskers, a blue band. ---------- */
+function run2Word(c, x, y, size, col, outline) {                         // the CATSCO wordmark: heavy upright letters, ears on the C, whiskers off the O
+  c.save(); c.font = '900 ' + size + 'px "Arial Black","Helvetica Neue",Arial,sans-serif'; c.textBaseline = 'alphabetic'; c.textAlign = 'center';
+  if (outline) { c.lineWidth = size * 0.12; c.strokeStyle = outline; c.lineJoin = 'round'; c.strokeText('CATSCO', x, y); }
+  c.fillStyle = col; c.fillText('CATSCO', x, y);
+  const w = c.measureText('CATSCO').width, x0 = x - w / 2, cw = w / 6.05;
+  c.beginPath(); c.moveTo(x0 + cw * 0.04, y - size * 0.62); c.lineTo(x0 + cw * 0.2, y - size * 1.12); c.lineTo(x0 + cw * 0.46, y - size * 0.72); c.closePath();   /* (two ears on the C) */
+  c.moveTo(x0 + cw * 0.52, y - size * 0.72); c.lineTo(x0 + cw * 0.8, y - size * 1.12); c.lineTo(x0 + cw * 0.96, y - size * 0.6); c.closePath(); c.fill();
+  c.strokeStyle = col; c.lineWidth = size * 0.045; c.lineCap = 'round'; const ox = x0 + w - cw * 0.05, oy = y - size * 0.36;   /* (whiskers off the O) */
+  for (const dy of [-0.1, 0.02, 0.14]) { c.beginPath(); c.moveTo(ox, oy + dy * size); c.lineTo(ox + size * 0.42, oy + dy * size * 1.9 - size * 0.04); c.stroke(); }
+  c.restore(); return w;
+}
+function run2PaintCatsco() {
+  const rect = (c, col, x, y, w, h) => { c.fillStyle = col; c.fillRect(x, y, w, h); }, lin = (c, x0, y0, x1, y1, st) => { const g = c.createLinearGradient(x0, y0, x1, y1); st.forEach(s => g.addColorStop(s[0], s[1])); return g; };
+  const txt = (c, s, x, y, size, col, al, wt) => { c.font = (wt || '900') + ' ' + size + 'px "Arial Black","Helvetica Neue",Arial,sans-serif'; c.fillStyle = col; c.textAlign = al || 'center'; c.textBaseline = 'middle'; c.fillText(s, x, y); };
+  const P = [
+    c => rect(c, '#ffffff', 0, 0, 256, 256),
+    (c, rnd) => { for (let x = 0; x < 256; x += 32) { c.fillStyle = lin(c, x, 0, x + 32, 0, [[0, '#c9ced4'], [0.25, '#eef1f4'], [0.5, '#d6dbe0'], [0.75, '#aab1b8'], [1, '#c9ced4']]); c.fillRect(x, 0, 32, 256); }   // corrugated metal
+      c.fillStyle = lin(c, 0, 190, 0, 256, [[0, 'rgba(60,60,50,0)'], [1, 'rgba(60,60,50,.2)']]); c.fillRect(0, 190, 256, 66); for (let i = 0; i < 10; i++) rect(c, 'rgba(120,90,60,.12)', rnd() * 256, rnd() * 256, 3, 10 + rnd() * 30); },
+    (c) => { rect(c, '#1f4fa8', 0, 0, 256, 256); rect(c, '#d8261c', 0, 100, 256, 56); rect(c, '#ffffff', 0, 92, 256, 8); rect(c, '#ffffff', 0, 156, 256, 8);   // the brand band
+      c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(0, 0, 256, 40); },
+    (c) => { rect(c, '#ffffff', 0, 0, 256, 256); rect(c, '#1f4fa8', 0, 176, 256, 80); rect(c, '#d8261c', 0, 170, 256, 6);   // the sign
+      run2Word(c, 120, 140, 50, '#d8261c', '#ffffff'); txt(c, 'WHOLESALE WHISKERS', 128, 216, 17, '#ffffff', 'center', '800'); },
+    (c, rnd) => { rect(c, '#4c4f53', 0, 0, 256, 256); for (let i = 0; i < 3000; i++) rect(c, 'rgba(255,255,255,' + rnd() * 0.08 + ')', rnd() * 256, rnd() * 256, 2, 2);   // parking lot: stalls
+      rect(c, '#f2efe2', 0, 0, 6, 256); rect(c, '#f2efe2', 128, 0, 6, 256); rect(c, '#f2efe2', 0, 250, 256, 6); rect(c, 'rgba(20,20,22,.5)', 30, 0, 5, 256); for (let i = 0; i < 6; i++) rect(c, 'rgba(0,0,0,.15)', rnd() * 256, rnd() * 256, 20 + rnd() * 30, 10 + rnd() * 20); },
+    (c, rnd) => { rect(c, '#b9bcbe', 0, 0, 256, 256); c.fillStyle = lin(c, 0, 0, 256, 256, [[0, 'rgba(255,255,255,.18)'], [0.5, 'rgba(255,255,255,0)'], [1, 'rgba(255,255,255,.12)']]); c.fillRect(0, 0, 256, 256);   // polished warehouse floor
+      rect(c, 'rgba(60,60,60,.35)', 0, 0, 256, 2); rect(c, 'rgba(60,60,60,.35)', 0, 0, 2, 256); for (let i = 0; i < 8; i++) rect(c, 'rgba(40,40,40,.08)', rnd() * 256, rnd() * 256, 30 + rnd() * 60, 2); rect(c, '#e8c21a', 0, 120, 256, 8); },
+    (c, rnd) => { rect(c, '#2a2e36', 0, 0, 256, 256); for (const x of [0, 248]) rect(c, '#1f5fb8', x, 0, 8, 256);   // a rack bay: blue uprights, orange beams, stock on pallets
+      for (const y of [0, 124]) { rect(c, '#ff7a1a', 0, y, 256, 10); rect(c, 'rgba(255,255,255,.3)', 0, y, 256, 2);
+        for (let x = 12; x < 244;) { const w = 34 + rnd() * 40, h = 60 + rnd() * 46, k = (rnd() * 5) | 0, col = ['#c9a06a', '#f2f2f0', '#2a6fdb', '#d8261c', '#e8e4d8'][k]; rect(c, '#9a7a4a', x, y + 114, w, 8);
+          rect(c, col, x, y + 114 - h, Math.min(w, 244 - x), h); rect(c, 'rgba(0,0,0,.15)', x, y + 114 - h, 3, h); rect(c, 'rgba(255,255,255,.25)', x, y + 114 - h, Math.min(w, 244 - x), 3);
+          if (k === 0) rect(c, 'rgba(120,80,40,.6)', x + w / 2 - 3, y + 114 - h, 6, h); x += w + 4; } } },
+    (c) => { rect(c, '#ffffff', 0, 0, 256, 256); rect(c, '#2a6fdb', 0, 0, 256, 60); txt(c, 'CATSCO SIGNATURE', 128, 22, 16, '#ffffff', 'center', '900');   // Soft Paws towels
+      txt(c, 'SOFT PAWS', 128, 44, 20, '#ffe27a', 'center', '900'); for (let j = 0; j < 2; j++) for (let i = 0; i < 3; i++) { const x = 44 + i * 84, y = 112 + j * 78; c.fillStyle = '#f4f4f0'; c.beginPath(); c.ellipse(x, y, 32, 32, 0, 0, 7); c.fill();
+        c.strokeStyle = '#d8d8d2'; c.lineWidth = 3; c.stroke(); c.fillStyle = '#c8c8c2'; c.beginPath(); c.arc(x, y, 9, 0, 7); c.fill(); } txt(c, '30 MEGA ROLLS', 128, 240, 16, '#2a6fdb', 'center', '900'); },
+    (c, rnd) => { rect(c, '#cfccc5', 0, 0, 256, 256); for (let i = 0; i < 3000; i++) { const v = 150 + rnd() * 90 | 0; rect(c, 'rgb(' + v + ',' + v + ',' + (v - 6) + ')', rnd() * 256, rnd() * 256, 2, 2); } for (const y of [62, 190]) rect(c, 'rgba(30,30,32,.5)', 0, y, 256, 6); },   // roof membrane
+    (c, rnd) => { rect(c, '#c49a62', 0, 0, 256, 256); for (let i = 0; i < 30; i++) rect(c, 'rgba(120,80,40,' + rnd() * 0.12 + ')', 0, rnd() * 256, 256, 1 + rnd() * 2);   // cardboard: tape, a label, arrows
+      rect(c, 'rgba(220,200,150,.85)', 110, 0, 36, 256); rect(c, '#f4f2ea', 30, 170, 70, 50); for (let k = 0; k < 5; k++) rect(c, '#555', 36, 178 + k * 8, 40 + rnd() * 18, 3);
+      c.strokeStyle = '#3a2a1a'; c.lineWidth = 5; for (const x of [190, 220]) { c.beginPath(); c.moveTo(x, 70); c.lineTo(x, 30); c.moveTo(x - 9, 40); c.lineTo(x, 28); c.lineTo(x + 9, 40); c.stroke(); } },
+    (c, rnd) => { rect(c, '#e8eef2', 0, 0, 256, 256); for (let i = 0; i < 40; i++) { c.strokeStyle = 'rgba(255,255,255,' + (0.3 + rnd() * 0.5) + ')'; c.lineWidth = 1 + rnd() * 3; c.beginPath(); const y = rnd() * 256; c.moveTo(0, y); c.bezierCurveTo(80, y + (rnd() - 0.5) * 30, 170, y + (rnd() - 0.5) * 30, 256, y); c.stroke(); }   // shrink wrap
+      for (let i = 0; i < 20; i++) rect(c, 'rgba(160,180,195,.18)', rnd() * 256, rnd() * 256, 40 + rnd() * 60, 2); },
+    (c) => { for (let x = 0; x < 256; x += 64) { rect(c, '#ffffff', x, 0, 32, 256); rect(c, '#9a9a9a', x + 32, 0, 32, 256); } },
+    (c) => { rect(c, '#1d2230', 0, 0, 256, 256); rect(c, '#d8261c', 0, 0, 256, 46); txt(c, 'FOOD COURT', 128, 24, 22, '#ffffff');   // the menu: original prices in fish
+      const row = (y, s1, s2, col) => { txt(c, s1, 18, y, 15, col || '#ffe27a', 'left', '900'); txt(c, s2, 238, y, 15, '#ffffff', 'right', '900'); };
+      row(76, 'HOT DOG + SODA', '🐟1.50'); row(104, 'PIZZA SLICE', '🐟2'); row(132, 'CHURRO', '🐟1'); row(160, 'TUNA MELT', '🐟3'); row(188, 'FRO-YO', '🐟2');
+      c.fillStyle = '#ff7a1a'; c.beginPath(); c.ellipse(128, 226, 58, 14, 0, 0, 7); c.fill(); rect(c, '#d8261c', 76, 222, 104, 8); txt(c, 'COMBO!', 128, 226, 14, '#ffffff'); },
+    (c, rnd) => { rect(c, '#9aa2aa', 0, 0, 256, 256); c.strokeStyle = '#e4e8ec'; c.lineWidth = 10; c.strokeRect(5, 5, 246, 246); c.lineWidth = 7; c.beginPath(); c.moveTo(0, 0); c.lineTo(128, 256); c.lineTo(256, 0); c.stroke(); c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 2; c.strokeRect(1, 1, 254, 254); },
+    (c) => { rect(c, '#ffb21a', 0, 0, 256, 256); rect(c, '#d8261c', 0, 0, 256, 70); txt(c, 'CATSCO SIGNATURE', 128, 22, 16, '#ffffff'); txt(c, 'FISH CRUNCH', 128, 50, 26, '#ffe27a');   // Fish Crunch crate
+      c.fillStyle = '#ff7a1a'; for (let i = 0; i < 4; i++) { const x = 50 + (i % 2) * 120, y = 120 + Math.floor(i / 2) * 70; c.beginPath(); c.ellipse(x, y, 34, 18, 0, 0, 7); c.fill(); c.beginPath(); c.moveTo(x + 30, y); c.lineTo(x + 52, y - 16); c.lineTo(x + 52, y + 16); c.fill();
+        c.fillStyle = '#1d2230'; c.beginPath(); c.arc(x - 18, y - 4, 3.5, 0, 7); c.fill(); c.fillStyle = '#ff7a1a'; } txt(c, 'BULK 20 KG', 128, 238, 18, '#d8261c'); },
+    (c, rnd) => { rect(c, '#fbfaf6', 0, 0, 256, 256); txt(c, 'CATSCO', 128, 26, 24, '#d8261c'); txt(c, 'THANK YOU, MEMBER!', 128, 52, 12, '#3a3a3a', 'center', '800');   // the receipt
+      for (let k = 0; k < 7; k++) { const y = 80 + k * 20; rect(c, '#9a9a96', 20, y, 90 + rnd() * 60, 5); rect(c, '#9a9a96', 206, y, 30, 5); } rect(c, '#3a3a3a', 20, 226, 216, 3); txt(c, 'PAID IN FISH 🐟', 128, 242, 12, '#3a3a3a', 'center', '800');
+      for (let x = 0; x < 256; x += 16) { c.fillStyle = '#e6e4dc'; c.beginPath(); c.moveTo(x, 256); c.lineTo(x + 8, 248); c.lineTo(x + 16, 256); c.fill(); } },
+  ];
+  P.noise = { 1: [0.08, 8], 4: [0.2, 3], 5: [0.1, 12], 8: [0.12, 4], 9: [0.12, 6] };
+  return P;
+}
+
+/* ---------- CATSCO, the eighth and final delivery: a warehouse club of PKR's very own (no real brands): the parking lot and its trailers,
+   the entrance canopy under the big red CATSCO sign, then inside: up and along the pallet racking, giant bulk packs, the mezzanine,
+   the tyre centre, the checkout lanes, the food court, and out past the receipt check (confetti!) ---------- */
+function run2CatscoWorld() {
+  return { id: 'catsco', name: 'Catsco', ic: '🛒', who: 'Aunty-ji, at the exit with the car', parcel: 'a 20 kg crate of Catsco Signature Fish Crunch', parcelIc: '🛒',
+    card: 'Last delivery of the day! Aunty-ji’s Catsco order, a 20 kg crate of Catsco Signature Fish Crunch for the whole street. Over the trailers, past the membership desk, along the racking and out through the receipt check before closing!',
+    done: 'The receipt checker draws a smiley on the giant receipt. Confetti! Aunty-ji: “Shabash! Now help me find the car.”', tod: 'day' };
+}
+function run2CatscoScript() {
+  const r = (len, f, o) => ['r', len, f || [], o || {}], gap = (len, dy) => ['gap', len, dy || 0], ledge = (len, dy) => ['ledge', len, dy], drop = (len, dy) => ['drop', len, dy],
+    pipe = (dy, lane) => ['pipe', dy, lane], wall = (len, side, dy) => ['wall', len, side, dy || 0], zip = (len, dy, lane) => ['zip', len, dy, lane], beam = (len, lane) => ['beam', len, lane], spring = (len, dy) => ['spring', len, dy || 0];
+  const v = (at, l) => ['v', at, l || 'a'], b = at => ['b', at], s = (at, l) => ['s', at, l || 'a'], k = (at, l, len) => ['k', at, l, len || 2.4], f = (at, len, l) => ['f', at, len, l === undefined ? 0 : l],
+    p = (at, len, l, dy) => ['p', at, len, l, dy || 2.6], m = (at, l, dy) => ['m', at, l, dy || 0.7];
+  return { y: 4.2, par: [0, 0], seq: [
+    r(30, [f(6, 12, 0), v(20, [-1, 0]), k(20, [1], 1.4)], { st: 'trailer', cp: 1 }), gap(3.6),
+    r(24, [b(10), f(13, 8, 1)], { st: 'trailer', turn: 8 }), spring(8, 2.8),
+    r(28, [f(3, 8, 0), s(14, 'a'), k(21, [-1], 1.4), f(18, 6, 0)], { st: 'canopy' }), gap(3, 1.0),
+    r(30, [f(3, 10, 0), v(12, [0, 1]), k(12, [-1], 2), s(24, 'a')], { st: 'rack', cp: 1 }), beam(16, 0),
+    r(20, [f(2, 8, 0), p(9, 9, 1, 2.6), m(14, 1, 3.4)], { st: 'rack' }), zip(30, -2.4, 0),
+    r(22, [f(3, 8, 0), k(10, [0, 1], 2.4), f(12, 6, -1), v(18, [-1, 0])], { st: 'bulk' }), ledge(2.6, 2.0),
+    r(22, [s(9, 'a'), f(12, 8, 0)], { st: 'rack' }), wall(12, 1, 0.4),
+    r(20, [f(2, 6, 0), b(12)], { st: 'rackhi' }), gap(3.6, -0.4),
+    r(22, [v(8, [0, 1]), k(8, [-1], 2), f(10, 8, 0)], { st: 'rack' }), pipe(4, 1),
+    r(18, [f(2, 8, 1)], { st: 'mezz' }), drop(2.6, -3.6),
+    r(26, [f(3, 8, 0), b(14), v(23, [-1, 1]), k(23, [0], 1.2)], { st: 'tyre', cp: 1 }), drop(2.4, -3.6),
+    r(16, [f(2, 8, 0)], { st: 'pallet' }), spring(8, 3.2),
+    r(22, [k(12, [0, 1], 2.4), f(4, 6, -1), s(18, 'a')], { st: 'rack' }), beam(16, -1),
+    r(18, [f(2, 8, -1), v(12)], { st: 'rack' }), zip(32, -3, 0),
+    r(24, [f(3, 8, 0), b(11), k(17, [1], 1.4), v(17, [-1, 0])], { st: 'checkout', cp: 1 }), gap(3.4, 0.6),
+    r(22, [f(3, 6, 0), s(12, 'a')], { st: 'food' }), wall(12, -1, 0),
+    r(20, [v(12), f(3, 6, 0)], { st: 'food' }), drop(2.6, -1.4),
+    r(30, [f(3, 12, 0)], { st: 'exit' }) ] };
+}
+function run2Person(G, s, x, y, vest, rot, cheer) {                     // a staffer in a red vest (cheering, maybe)
+  const M = gbAt(G, s, x, y, rot || 0); for (const sx of [-0.12, 0.12]) gbGeo(G, 'w', s, new THREE.BoxGeometry(0.16, 0.8, 0.2).translate(sx, 0.4, 0), M, 0x2a3040);
+  gbGeo(G, 'w', s, new THREE.BoxGeometry(0.5, 0.62, 0.3).translate(0, 1.11, 0), M, vest || 0xd8261c); gbGeo(G, 'w', s, new THREE.SphereGeometry(0.17, 10, 8).translate(0, 1.6, 0), M, 0xe0b08a);
+  for (const sx of [-1, 1]) gbGeo(G, 'w', s, new THREE.BoxGeometry(0.12, 0.6, 0.12).translate(0, 0.3, 0).rotateZ(cheer ? -sx * 2.6 : -sx * 0.15).translate(sx * 0.3, 1.38, 0), M, 0xf2f2ee);
+}
+function run2Car(G, s, x, y, col, rot) { const M = gbAt(G, s, x, y, rot || 0); gbGeo(G, 'w', s, new THREE.BoxGeometry(1.9, 0.8, 4.4).translate(0, 0.6, 0), M, col); gbGeo(G, 'w', s, new THREE.BoxGeometry(1.7, 0.62, 2.4).translate(0, 1.28, 0.2), M, 0xcfd8e2);
+  for (const [dx, dz] of [[-0.9, 1.4], [0.9, 1.4], [-0.9, -1.4], [0.9, -1.4]]) gbGeo(G, 'w', s, new THREE.CylinderGeometry(0.34, 0.34, 0.24, 10).rotateZ(Math.PI / 2).translate(dx, 0.34, dz), M, 0x1d1f24); }
+function run2CatscoKit() {
+  const enter = L => { const P = L.runs.find(q => q.st === 'rack'); return P ? P.s0 - 1.6 : 95; }, end = L => L.len + 8;
+  const metal = 0x8a9096, rackSide = (G, L, P, x0, x1, rnd) => { for (let s = P.s0 + 1.2; s < P.s1; s += 2.8) for (const x of [x0 + 0.06, x1 - 0.06]) gbBox(G, 'w', s, x, L.yG, 0.12, P.y - L.yG, 0.12, 0x1f5fb8); };
+  return {
+    sky: [0x4a92e0, 0xd6eaff, 0x9aa4a8, 0xfff4d8], sunDir: [0.4, 0.6, -0.5], fog: [0xe2e9f0, 90, 520], hemi: [0xffffff, 0x9098a0, 1.0], sun: [0xffffff, 0.6], atlas: 'catsco',
+    yG: L => 0, metal, blockCol: 0xffffff,
+    st: { def: { walls: [0xf2f2f0], wall: 1, roof: 0xdcdcd8, roofTile: 0, ext: 0.4 },
+      trailer: { walls: [0xf4f5f6], wall: 1, tu: 3, tv: 3, roof: 0xe2e4e6, roofTile: 0, ext: 0, base: 3.2, par: false, props: (G, L, P, x0, x1) => {
+        for (const s of [P.s0 + 2.5, P.s0 + 4, P.s1 - 3]) for (const sx of [-1.6, 1.6]) gbGeo(G, 'w', s, new THREE.CylinderGeometry(0.5, 0.5, 0.36, 12).rotateZ(Math.PI / 2).translate(sx, 0.5, 0), gbAt(G, s, 0, L.yG, 0), 0x1d1f24);
+        gbSlab(G, 'w', P.s0 + 1, P.s1 - 1, -1.3, 1.3, L.yG + 0.9, P.y - 3.2, { top: [0x30343a, 0, 1, 1], side: [0x30343a, 0, 1, 1], flat: 1 }); } },
+      canopy: { walls: [0xffffff], wall: 2, tu: 6, tv: 1.6, roof: 0xe8e8e8, roofTile: 0, ext: 3, base: 1.2, par: 0.4, trim: 0xd8261c, props: (G, L, P) => { for (let s = P.s0 + 3; s < P.s1; s += 8) for (const sx of [-5, 5]) gbBox(G, 'w', s, sx, L.yG, 0.5, P.y - 1.2 - L.yG, 0.5, 0xd8261c); } },
+      rack: { walls: [0xffffff], wall: 6, tu: 5.6, tv: 4, roof: 0xc49a62, roofTile: 9, rtu: 2.6, ext: 0.5, par: false, props: rackSide },
+      rackhi: { walls: [0xffffff], wall: 6, tu: 5.6, tv: 4, roof: 0xe8eef2, roofTile: 10, rtu: 3, ext: 0.5, par: false, props: rackSide },
+      bulk: { walls: [0xffffff], wall: 7, tu: 5.4, tv: 5.6, roof: 0xf6f6f2, roofTile: 10, rtu: 3, ext: 0.3, par: false },
+      pallet: { walls: [0xffffff], wall: 14, tu: 5.4, tv: 4.4, roof: 0xeef2f4, roofTile: 10, rtu: 3, ext: 0.3, par: false },
+      mezz: { walls: [0xe8eaec], wall: 1, tu: 3, tv: 3, roof: 0x9aa2aa, roofTile: 13, rtu: 1.4, ext: 2.4, par: 1.0, trim: 0xffc21a },
+      tyre: { walls: [0x6a7078], wall: 6, tu: 5.6, tv: 4, roof: 0x3a3e44, roofTile: 0, ext: 0.5, par: false, props: (G, L, P, x0, x1, rnd) => { rackSide(G, L, P, x0, x1, rnd);
+        for (let s = P.s0 + 2; s < P.s1 - 1; s += 3) for (const sx of [-1, 1]) { const M = gbAt(G, s, sx * 3.4, P.y, 0); for (let k = 0; k < 3; k++) gbGeo(G, 'w', s, new THREE.TorusGeometry(0.42, 0.16, 6, 14).rotateX(Math.PI / 2).translate(0, 0.16 + k * 0.32, 0), M, 0x1d1f24); } } },
+      checkout: { walls: [0xffffff], wall: 2, tu: 6, tv: 1.4, roof: 0xdedede, roofTile: 0, ext: 1.2, base: 0.8, par: 0.3, trim: 0x1f4fa8, props: (G, L, P) => { for (let s = P.s0 + 2; s < P.s1; s += 6) for (const sx of [-3, 3]) { gbBox(G, 'w', s, sx, L.yG, 0.2, P.y - 0.8 - L.yG, 0.2, 0x8a9096); }
+        for (let s = P.s0 + 3, n = 1; s < P.s1 - 1; s += 6, n++) gbBox(G, 'g', s, -3.3, P.y - 0.4, 0.5, 0.6, 0.08, [0x6ad08a, 0xff6a5a][n % 2]); } },
+      food: { walls: [0xffffff], wall: 2, tu: 6, tv: 2, roof: 0xe4e4e0, roofTile: 0, ext: 2.4, par: 0.4, trim: 0xd8261c },
+      exit: { walls: [0xffffff], wall: 5, tu: 4, tv: 4, roof: 0xb9bcbe, roofTile: 5, rtu: 4, ext: 3, base: 1.2, par: false, props: (G, L, P) => {
+        const s = L.fin + 4;
+        for (const [ds, x, c] of [[1, -3.2, 1], [2.4, -4.2, 1], [3.5, 3.0, 1], [6, -2.4, 1], [6.5, 2.2, 0]]) run2Person(G, s + ds, x, P.y, 0xd8261c, Math.PI, c);
+        gbBox(G, 'w', s + 1.6, -2.4, P.y, 1.2, 1.1, 0.7, 0x1f4fa8, { top: 0xffffff }); } } },
+    vault: (G, L, o) => { const s = (o.s + o.s1) / 2, x = (o.x0 + o.x1) / 2;   // a nest of red shopping carts
+      for (let k = 0; k < 2; k++) { const M = gbAt(G, s + k * 0.25, x, o.yb, 0); gbGeo(G, 'r', s, new THREE.BoxGeometry(1.15, 0.5, 0.95).translate(0, 0.42 + k * 0.03, 0), M, RUN_RED, 13);
+        gbGeo(G, 'w', s, new THREE.BoxGeometry(1.2, 0.06, 0.06).translate(0, 0.86, 0.5), M, 0x2a2e36); }
+      for (const [dx, dz] of [[-0.45, -0.4], [0.45, -0.4], [-0.45, 0.4], [0.45, 0.4]]) gbGeo(G, 'w', s, new THREE.CylinderGeometry(0.09, 0.09, 0.08, 8).rotateZ(Math.PI / 2).translate(dx, 0.09, dz), gbAt(G, s, x, o.yb, 0), 0x1d1f24);
+      gbBox(G, 'w', s, x, o.yb + 0.16, 1.1, 0.04, 0.85, 0x9aa0a6); },
+    block: (G, L, o, K, rnd) => { const s = (o.s + o.s1) / 2, x = (o.x0 + o.x1) / 2, d = o.s1 - o.s, k = rnd() < 0.5;   // a giant bulk pack (or a stack of tubs)
+      if (k) gbBox(G, 'w', s, x, o.yb, 1.42, 3.0, d, 0xffffff, { tile: 7, tu: 1.42, tv: 3.0, top: 0xf2f2ee, topTile: 0 });
+      else { const M = gbAt(G, s, x, o.yb, 0); for (let j = 0; j < 3; j++) gbGeo(G, 'w', s, new THREE.CylinderGeometry(0.62, 0.66, 0.96, 14).translate(0, 0.5 + j * 1.0, 0), M, [0xffffff, 0x2a6fdb, 0xffffff][j]); } },
+    spring: (G, L, sp) => { const s = (sp.s + sp.s1) / 2, x = (sp.x0 + sp.x1) / 2, w = sp.x1 - sp.x0, d = sp.s1 - sp.s;   // a stack of bulk mattresses (bouncy!)
+      gbBox(G, 'w', s, x, sp.y - 0.02, w, 0.14, d + 0.4, 0x9a7a4a); gbBox(G, 'w', s, x, sp.y + 0.1, w - 0.1, 0.1, d + 0.2, 0xffffff, { tile: 10, tu: 1, tv: 1 });
+      gbBox(G, 'r', s, x, sp.y + 0.2, w - 0.3, 0.07, d, RUN_RED, { top: 0xff4a3a }); for (let i = 0; i < 3; i++) gbBox(G, 'g', s - d / 2 + 0.2 + i * d / 3, x, sp.y + 0.28, Math.min(1.1, w * 0.5), 0.01, 0.12, 0xffffff); },
+    back: (G, L, K, rnd) => run2CatscoBack(G, L, rnd, enter(L), end(L)),
+  };
+}
+function run2CatscoBack(G, L, rnd, sE, sX) {                              // the lot, the warehouse (outside and in), its racks, its departments
+  const W = 26, H = 17, yG = 0, up = new THREE.Vector3(0, 1, 0);
+  gbSlab(G, 'w', -70, sE, -90, 90, yG - 0.4, yG, { top: [0xffffff, 4, 5.2, 5.2], skip: { l: 1, r: 1, f: 1, b: 1 }, flat: 1 });          // the parking lot
+  gbSlab(G, 'w', sE, sX + 40, -90, -W - 0.3, yG - 0.4, yG, { top: [0x8aaa6a, 0, 1, 1], skip: { l: 1, r: 1, f: 1, b: 1 }, flat: 1 }); gbSlab(G, 'w', sE, sX + 40, W + 0.3, 90, yG - 0.4, yG, { top: [0x8aaa6a, 0, 1, 1], skip: { l: 1, r: 1, f: 1, b: 1 }, flat: 1 });
+  gbSlab(G, 'w', sE, sX, -W, W, yG - 0.4, yG + 0.02, { top: [0xcfd2d4, 5, 6, 6], skip: { l: 1, r: 1, f: 1, b: 1 }, flat: 1 });           // the floor
+  /* the box: outside walls (corrugated, the blue band and red stripe), inside walls, the roof both ways */
+  const both = (s0, s1, x0, x1, y0, y1, col, tile, tu, tv) => { gbSlab(G, 'w', s0, s1, x0, x1, y0, y1, { side: [col, tile, tu, tv], end: [col, tile, tu, tv], top: [0xb8bcc0, 0, 1, 1], flat: 1 }); };
+  for (const sx of [-1, 1]) { const x = sx * W; both(sE, sX, x - 0.25, x + 0.25, yG, H - 4, 0xf2f4f6, 1, 3, 3); both(sE, sX, x - 0.26, x + 0.26, H - 4, H, 0xffffff, 2, 8, 4); }
+  both(sE - 0.3, sE + 0.3, -W, -5.6, yG, H, 0xf2f4f6, 1, 3, 3); both(sE - 0.3, sE + 0.3, 5.6, W, yG, H, 0xf2f4f6, 1, 3, 3); both(sE - 0.3, sE + 0.3, -5.6, 5.6, 12.2, H, 0xf2f4f6, 1, 3, 3);
+  both(sX - 0.3, sX + 0.3, -W, W, yG, H, 0xf2f4f6, 1, 3, 3);
+  gbSlab(G, 'w', sE - 0.32, sE - 0.31, -W, W, H - 4, H, { end: [0xffffff, 2, 8, 4], skip: { l: 1, r: 1, top: 1, b: 1 }, flat: 1 });
+  gbSlab(G, 'w', sE - 0.6, sE - 0.5, -9.3, 9.3, 12.1, H + 1.9, { end: [0xd8261c, 0, 1, 1], top: [0xd8261c, 0, 1, 1], side: [0xd8261c, 0, 1, 1], skip: { b: 1 }, flat: 1 });   /* (the sign's red back plate; the sign itself: run2CatscoSigns) */
+  gbSlab(G, 'w', sE, sX, -W, W, H, H + 0.4, { top: [0xc8ccd0, 0, 1, 1], skip: { l: 1, r: 1, f: 1, b: 1 }, flat: 1 });
+  for (let s = sE; s < sX; s += 140) { const s1 = Math.min(sX, s + 140), a = runW(L, s, -W, H - 0.01), b = runW(L, s, W, H - 0.01), c = runW(L, s1, W, H - 0.01), d = runW(L, s1, -W, H - 0.01); gbQuad(G, 'w', s, a, b, c, d, 0xd8dce0, 13, [-W / 6, -s / 6, W / 6, -s / 6, W / 6, -s1 / 6, -W / 6, -s1 / 6], new THREE.Vector3(0, -1, 0)); }
+  for (let s = sE + 6; s < sX - 2; s += 12) { gbSlab(G, 'w', s - 0.15, s + 0.15, -W, W, H - 1.6, H - 0.02, { side: [0x9aa2aa, 13, 1.6, 1.6], end: [0x9aa2aa, 13, 1.6, 1.6], skip: { top: 1 }, flat: 1 });   /* trusses, skylights, lights */
+    for (const x of [-14, 0, 14]) { const M = gbAt(G, s + 6, x, H - 0.05, 0); gbGeo(G, 'g', s, new THREE.PlaneGeometry(5, 3).rotateX(Math.PI / 2), M, 0xeef6ff, 0); }
+    for (const x of [-9, 9]) gbBox(G, 'g', s + 3, x, H - 3.2, 0.5, 0.2, 2.4, 0xfff6e0); }
+  const rack = (s, x, len, h) => { gbSlab(G, 'w', s, s + len, x - 0.6, x + 0.6, yG, h, { side: [0xffffff, 6, 5.6, 4], end: [0x1f5fb8, 0, 1, 1], top: [0xc49a62, 9, 2.6, 2.6] }); };
+  for (let s = sE + 4; s < sX - 10; s += 26) for (const sx of [-1, 1]) { rack(s, sx * 8.2, 22, 7 + rnd() * 2); rack(s, sx * 14.5, 22, 7 + rnd() * 2); rack(s, sx * 20.8, 22, 6 + rnd() * 2); }
+  /* outside: cart corrals, light poles, parked cars, a few carts */
+  const CC = [0xd8261c, 0xffffff, 0x2a6fdb, 0x30343a, 0xc8ccd0, 0x5a8a4a, 0xe8c21a];
+  for (let s = -50; s < sE - 8; s += 5.2) for (const x of [-34, -22, -12, 12, 22, 34]) if (rnd() < 0.7) run2Car(G, s, x + (rnd() - 0.5) * 0.6, yG, CC[(rnd() * CC.length) | 0], rnd() < 0.5 ? 0 : Math.PI);
+  for (let s = -40; s < sE - 6; s += 24) for (const sx of [-1, 1]) { const M = gbAt(G, s, sx * 17, yG, 0); runCyl(G, 'w', s, M, 0.16, 0.12, 11, 0x8a9096, 8); gbGeo(G, 'g', s, new THREE.BoxGeometry(1.6, 0.25, 0.6).translate(0, 11, 0), M, 0xfff6e0);
+    gbSlab(G, 'w', s - 4, s + 4, sx * 9 - 0.05, sx * 9 + 0.05, yG, yG + 1.1, { top: [0xd8261c, 0, 1, 1], side: [0xd8261c, 13, 1, 1], flat: 1 }); }
+  /* inside, along the way: sample stations, the tyre centre, checkout lanes, the food court's tables and its menu */
+  const at = st => L.runs.filter(P => P.st === st);
+  for (const P of at('rack').concat(at('bulk'))) if (rnd() < 0.5) { const s = (P.s0 + P.s1) / 2, x = (rnd() < 0.5 ? -1 : 1) * 11.3; gbBox(G, 'w', s, x, yG, 1.6, 0.9, 0.8, 0xffffff, { top: 0xd8261c }); run2Person(G, s - 0.8, x, yG, 0xd8261c, 0); }
+  for (const P of at('tyre')) for (let s = P.s0; s < P.s1; s += 2.4) for (const x of [-6.2, 6.2]) { const M = gbAt(G, s, x, yG, 0); for (let k = 0; k < 4; k++) gbGeo(G, 'w', s, new THREE.TorusGeometry(0.42, 0.16, 6, 14).rotateX(Math.PI / 2).translate(0, 0.16 + k * 0.32, 0), M, 0x1d1f24); }
+  for (const P of at('checkout')) for (let i = 0; i < 6; i++) { const x = (i % 2 ? 1 : -1) * (6 + Math.floor(i / 2) * 4.5), s = P.s0 + 4; gbBox(G, 'w', s, x, yG, 0.9, 0.9, 9, 0x2a2e36, { top: 0x40444a }); gbBox(G, 'w', s - 3.6, x, yG + 0.9, 0.5, 0.4, 0.5, 0xffffff);
+    const M = gbAt(G, s + 4, x - 0.4, yG, 0); runCyl(G, 'w', s, M, 0.06, 0.06, 2.6, 0x8a9096, 6); gbGeo(G, 'g', s, new THREE.BoxGeometry(0.5, 0.5, 0.1).translate(0, 2.8, 0), M, [0x6ad08a, 0xff6a5a][i % 2]); run2Person(G, s, x + 0.9, yG, 0xd8261c, Math.PI / 2); }
+  for (const P of at('food')) { for (let s = P.s0 + 2; s < P.s1; s += 4) for (const x of [-7, -11, 7, 11]) { gbBox(G, 'w', s, x, yG, 1.4, 0.75, 1.4, 0xd8261c, { top: 0xffffff }); const M = gbAt(G, s, x, yG, 0); runCyl(G, 'w', s, M, 0.05, 0.05, 2.2, 0x8a9096, 6); gbGeo(G, 'w', s, new THREE.ConeGeometry(1.1, 0.5, 8).translate(0, 2.3, 0), M, 0xffffff, 11); } }
+  run2CatscoSigns(G, L, sE);
+}
+function run2Confetti(dt) {                                              // (Catsco's finish) confetti over the receipt check
+  const R = RUN; if ((R.cfT = (R.cfT || 0) - dt) > 0) return; R.cfT = 0.12;
+  const P = R.pl, cols = [0xff3d6a, 0xffd23a, 0x2a6fdb, 0x6ad08a, 0xffffff, 0xd8261c];
+  for (let i = 0; i < (R.low ? 1 : 2); i++) { const c = runC(R.L, P.s + (Math.random() - 0.3) * 8, (Math.random() - 0.5) * 8, 0, R.V.c); chimFxBurst(R.fx, c.x, P.y + 5 + Math.random() * 3, c.z, R.low ? 8 : 14, cols[(Math.random() * cols.length) | 0], 3, 1, 0.16, 0.12, 2.4, 1, 1.2, 1.5); }
+}
+
+/* ---------- pictures that are one image, not a repeat (signs, decals, the menu): a quad with its own 0..1 coordinates ---------- */
+function run2DecalSide(G, mat, s0, s1, x, y0, y1, side, tile, col, u0, u1, v0, v1) {   // on a wall along the route, facing out to one side
+  const W = (s, y) => runW(G.L, s, x, y), h = runHead(G.L, (s0 + s1) / 2), n = new THREE.Vector3(Math.cos(h), 0, -Math.sin(h)).multiplyScalar(side), e = 0.002;
+  const ua = u0 === undefined ? e : u0, ub = u1 === undefined ? 1 - e : u1, va = v0 === undefined ? e : v0, vb = v1 === undefined ? 1 - e : v1;
+  if (side > 0) gbQuad(G, mat, s0, W(s0, y0), W(s1, y0), W(s1, y1), W(s0, y1), col || 0xffffff, tile, [ua, va, ub, va, ub, vb, ua, vb], n);   /* (read the right way round from the side it faces) */
+  else gbQuad(G, mat, s0, W(s1, y0), W(s0, y0), W(s0, y1), W(s1, y1), col || 0xffffff, tile, [ua, va, ub, va, ub, vb, ua, vb], n);
+}
+function run2DecalEnd(G, mat, s, x0, x1, y0, y1, tile, col) {          // across the route, facing back toward her
+  const L = G.L, a = runW(L, s, x0, y0), b = runW(L, s, x1, y0), c = runW(L, s, x1, y1), d = runW(L, s, x0, y1), h = runHead(L, s), e = 0.002;
+  gbQuad(G, mat, s, a, b, c, d, col || 0xffffff, tile, [e, e, 1 - e, e, 1 - e, 1 - e, e, 1 - e], new THREE.Vector3(Math.sin(h), 0, Math.cos(h)));
+}
+function run2Forklifts(L, sE, sX) {                                       // forklifts driving up and down the aisles beside her (instanced)
+  const parts = [], add = (geo, col, x, y, z) => { const g = geo.toNonIndexed(); g.translate(x, y, z); const c = new THREE.Color(col), C = []; for (let i = 0; i < g.attributes.position.count; i++) C.push(c.r, c.g, c.b); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); parts.push(g); };
+  add(new THREE.BoxGeometry(1.2, 0.9, 2.0), 0xffc21a, 0, 0.75, 0); add(new THREE.BoxGeometry(1.24, 0.5, 0.5), 0x30343a, 0, 0.75, 0.9); add(new THREE.BoxGeometry(1.1, 0.08, 1.4), 0x30343a, 0, 2.2, -0.1);
+  for (const sx of [-0.5, 0.5]) { add(new THREE.BoxGeometry(0.08, 1.3, 0.08), 0x30343a, sx, 1.55, -0.75); add(new THREE.BoxGeometry(0.1, 2.4, 0.12), 0x40444a, sx * 0.8, 1.2, -1.1); add(new THREE.BoxGeometry(0.12, 0.06, 1.2), 0xd8261c, sx * 0.6, 0.25, -1.8); }
+  for (const [dx, dz] of [[-0.62, 0.6], [0.62, 0.6], [-0.62, -0.6], [0.62, -0.6]]) add(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 10).rotateZ(Math.PI / 2), 0x1d1f24, dx, 0.3, dz);
+  add(new THREE.BoxGeometry(1.0, 0.7, 1.0), 0x9a7a4a, 0, 0.62, -1.9); add(new THREE.BoxGeometry(0.9, 0.62, 0.9), 0xffffff, 0, 1.28, -1.9);
+  const g = runMergeGeos(parts), n = 8, im = new THREE.InstancedMesh(g, runMats().car, n); im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3).fill(1), 3);
+  const rnd = runRnd(77), cars = []; for (let i = 0; i < n; i++) cars.push({ s: sE + 8 + rnd() * (sX - sE - 20), x: (i % 2 ? 1 : -1) * 5.3, dir: rnd() < 0.5 ? 1 : -1, v: 2.6 + rnd() * 1.6 });
+  im.userData.name = 'Runner forklifts'; im.frustumCulled = false; return { im, cars, y: 0.02, span: L.len + 120, fork: [sE + 4, sX - 6] };
+}
+/* ---------- hooked in (chained runtime wrappers and data, installed once, after RUNNER_V1 and RUNFIX_V1) ---------- */
+function run2Install() {
+  if (run2Install.done) return; run2Install.done = true;
+  const o = { tick: runApTick, kit: runKit, load: runLoad, song: runSong, fin: runFinish, upd: runUpdate, fw: runFireworks, things: runThings, step: runStep, tl: talkLines };
+  runApTick = run2ApTick;
+  runAtlas = function () { return run2Atlas('city'); }; runTile = run2Tile; runTileMat = run2TileMat; runMats = run2Mats; gbSlab = run2Slab; runSky = run2Sky;
+  { const W = runWorlds(); if (!W.some(w => w.id === 'catsco')) W.push(run2CatscoWorld()); const S = runScripts(); if (!S.catsco) S.catsco = run2CatscoScript(); }
+  runKit = function (id) { if (id === 'catsco') { const K = runKit.C || (runKit.C = run2CatscoKit()); return K; } return o.kit.apply(this, arguments); };
+  runLoad = function (wi) {                                               /* (Catsco brings its own atlas; the city's comes back after) */
+    const W = runWorlds()[wi], M = runMats(), want = W && W.id === 'catsco' ? 'catsco' : 'city', A = run2Atlas(want);
+    for (const k of ['w', 'g', 'r']) if (M[k].map !== A) { M[k].map = A; M[k].needsUpdate = false; }
+    const L = o.load.apply(this, arguments);
+    if (W && W.id === 'catsco') { try { const sE = (L.runs.find(q => q.st === 'rack') || { s0: 95 }).s0 - 1.6, D = run2Forklifts(L, sE, L.len + 8); RUN.dyn = D; RUN.world.add(D.im); RUN.world.updateMatrixWorld(true); } catch (e) { console.error(e); } }
+    return L;
+  };
+  runSong = function (id) { const w = id.split(':')[1]; if (w === '7') return { bpm: 122, key: 65, sc: 'maj', sw: 0.12, ch: '1 4 5 1 | 6 4 2 5', echo: 0.14, vol: 0.92,   /* (Catsco: a bouncy shopping-day groove, F major) */
+      dr: { k: 'x...x...x...x...', c: '....x.......x...', h: '..x...x...x...x.', w: '..x..x....x..x..' }, B: 'R.R.5.R.R.R.5.O.', A: '0.2.4.2.1.3.4.3.', C: '..x...x...x...x.',
+      M: [null, '5 - 3 - 1 - 3 5 | 6 - 4 - 6 - 1\' - | 7 - 5 - 2\' - 7 5 | 1\' - - - . . 5 6 | 1\' - 6 - 4 - 6 1\' | 2\' - 1\' - 6 - 4 - | 5 - 6 5 3 - 2 - | 1 - - - . . . .'],
+      ins: { B: 'boing', A: 'pluck', C: 'uke', M: 'bell' }, oct: { A: 1 }, v: { A: 0.6, C: 0.6, M: 1.1 } }; return o.song.apply(this, arguments); };
+  runFinish = function () { const r = o.fin.apply(this, arguments); try { const R = RUN; if (!R.sim && R.world && runWorlds()[R.world.userData.wi].id === 'catsco' && typeof unlock === 'function') unlock('runCatsco'); } catch (e) {} return r; };
+  runFireworks = function (dt) { const R = RUN; if (R.world && runWorlds()[R.world.userData.wi].id === 'catsco') return run2Confetti(dt); return o.fw.apply(this, arguments); };
+  runUpdate = function (dt) { const r = o.upd.apply(this, arguments); try { const R = RUN; if (R.phase === 'finish' && R.world && runWorlds()[R.world.userData.wi].id === 'tower') o.fw(dt); } catch (e) {} return r; };   /* (the Tower keeps its fireworks) */
+  runThings = function (dt) { const r = o.things.apply(this, arguments), R = RUN, D = R.dyn;
+    if (D && D.fork) for (const k of D.cars) { if (k.s > D.fork[1]) { k.s = D.fork[1]; k.dir = -1; } if (k.s < D.fork[0]) { k.s = D.fork[0]; k.dir = 1; } }
+    const M = R.M; if (M && M.water && M.water.map) { M.water.map.offset.x = (R.t * 0.012) % 1; M.water.map.offset.y = (R.t * 0.02) % 1; }   /* (the water drifts) */
+    return r; };
+  runStep = function (dt) { const r = o.step.apply(this, arguments), R = RUN, P = R.pl, L = R.L;   /* (Catsco has a floor: a fall lands on it, then back to the checkpoint) */
+    if (P && L && L.id === 'catsco' && P.y < 0.05 && (P.mode === 'air' || P.mode === 'fall')) { P.y = 0.05; P.vy = 0; if (P.mode === 'air') { P.mode = 'fall'; P.mt = 0; P.fallAt = Math.round(P.s * 10) / 10 + '/' + P.x.toFixed(1) + '/floor'; runSfx('fall'); runPop('Whoops!', 'bad', '+3 s'); } }
+    return r; };
+  talkLines = function () { const L = o.tl.apply(this, arguments); if (L['best.run'] && !L['best.run'].run2) { L['best.run'].run2 = 1; (L['best.run'].aunty = L['best.run'].aunty || []).push('{n} courier stars! And you went through Catsco? Next time bring the big bag of rice, beta.'); } return L; };
+  try { const sec = ACHIEVEMENTS.find(a => a[0] === 'Rooftop Runner'); if (sec && !ACH_BY_ID.runCatsco) { const row = ['runCatsco', '🛒', 'Members only', 'In Rooftop Runner, race through Catsco and out past the receipt check (the last delivery, after the CN Tower)'];
+      const i = sec[1].findIndex(r => r[0] === 'runTower'); sec[1].splice(i < 0 ? sec[1].length : i + 1, 0, row); ACH_BY_ID.runCatsco = row; if (typeof updateAchCount === 'function') updateAchCount(); } } catch (e) {}
+  try { const st = document.createElement('style'); st.id = 'run2Style'; st.textContent = '@media (max-height:520px){#rrUI .rr-w{padding:5px 8px 4px;font-size:11px;line-height:1.15}#rrUI .rr-w b{font-size:14px}#rrUI .rr-w .ic{font-size:18px}#rrUI .rr-worlds{gap:6px;margin-top:6px}}'; document.head.appendChild(st); } catch (e) {}   /* (eight worlds on a landscape phone's map) */
+  if (RUN.par) RUN.par = {};
+}
+function run2CatscoSigns(G, L, sE) {                                     // the signs and decals that are one picture each
+  run2DecalEnd(G, 'w', sE - 0.62, -9, 9, 12.4, 18.6, 3);                // the big CATSCO sign over the door
+  for (const P of L.runs.filter(q => q.st === 'trailer')) for (const sx of [-1, 1]) run2DecalSide(G, 'w', P.s0 + 2, P.s1 - 2, sx * 2.63, P.y - 2.9, P.y - 0.4, sx, 3);   /* (the trailers' sides) */
+  const wr = L.WR[L.WR.length - 1]; if (wr) run2DecalSide(G, 'g', wr.s0 + 0.5, wr.s1 - 0.5, wr.side * 3.62, wr.wy + 3.6, wr.wy + 8.6, -wr.side, 12);   /* (the food court's menu, over the last wall run) */
+  const ex = L.runs[L.runs.length - 1]; if (ex) { const s = L.fin + 4;                                            /* (the giant receipt, curling up behind the checker) */
+    for (let i = 0; i < 14; i++) { const a = i / 14, b = (i + 1) / 14, ya = ex.y + 0.6 + a * 7, yb = ex.y + 0.6 + b * 7, sa = s + 3 + Math.sin(a * 3) * 1.6, sb = s + 3 + Math.sin(b * 3) * 1.6;
+      const A = runW(L, sa, 2.4, ya), B = runW(L, sa, 4.8, ya), C = runW(L, sb, 4.8, yb), D = runW(L, sb, 2.4, yb), v0 = (i % 4) / 4, v1 = v0 + 0.25;
+      gbQuad(G, 'w', s, A, B, C, D, 0xffffff, 15, [0.002, 1 - v1, 0.998, 1 - v1, 0.998, 1 - v0, 0.002, 1 - v0], null); gbQuad(G, 'w', s, B, A, D, C, 0xf2f0e8, 0, null, null); } }
+}
+run2Install();
+/* (end of RUN2_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
