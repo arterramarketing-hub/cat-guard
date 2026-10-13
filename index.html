@@ -4718,7 +4718,7 @@ function buildYardLife(VD, DX, DW) {                                  // the bac
       const lf = grp('Limb leaves'); for (let k = 0; k < 3; k++) yBlob(lf, 0.55 + k * 0.1, [0x4f8a3a, 0x5c9a42, 0x467e34][k], e.x + 0.4 + k * 0.3, e.y + 1.1 + k * 0.25, e.z + 0.3 - k * 0.2, 0.8); bakeYard(lf); } }
   // -- a stone birdbath
   { const bx = -8.6, bz = VD + 13.5, bb = grp('Birdbath', true); bb.position.set(bx, 0, bz);
-    yCyl(bb, 0.34, 0.42, 0.14, 0xb9b3a8, 0, 0.07, 0); yCyl(bb, 0.13, 0.2, 1.05, 0xc2bcb1, 0, 0.66, 0); yCyl(bb, 0.68, 0.36, 0.2, 0xc2bcb1, 0, 1.25, 0, 18); yCyl(bb, 0.56, 0.56, 0.02, 0x8fc5e8, 0, 1.34, 0, 18);
+    yCyl(bb, 0.34, 0.42, 0.14, 0xb9b3a8, 0, 0.07, 0); yCyl(bb, 0.13, 0.2, 1.05, 0xc2bcb1, 0, 0.66, 0); yCyl(bb, 0.68, 0.36, 0.2, 0xc2bcb1, 0, 1.25, 0, 18); yCyl(bb, 0.56, 0.56, 0.02, 0x8fc5e8, 0, 1.34, 0, 18); bbWater(bb);   /* (WEAPONS_V1: a real basin, the water down inside it) */
     bakeYard(bb); shadow(bx, bz, 0.8, 0.8); block(bx - 0.8, bx + 0.8, bz - 0.8, bz + 0.8); }
   // -- a raised vegetable bed along the middle fence: lettuces and staked tomatoes
   { const vb = grp('Vegetable bed', true), VX = XR - 1.1, VZ = VD + 12; vb.position.set(VX, 0, VZ);
@@ -10641,6 +10641,14 @@ const ACHIEVEMENTS = [
     ['catscape', '🪟', 'The Great Catscape', 'In Free roam, leap out of an upstairs back window. Aunty-ji is already calling downstairs'],
     ['zombieBoss', '👹', 'Groundskeeper down', 'On zombie night, bring down the giant Groundskeeper in wave 3'],
     ['zombieNight', '🧟', 'Night of the Living Dead', 'In Free roam, survive zombie night in the backyard (it only happens when it rains at night)'],
+    ['wpnFirst', '🗡️', 'Armed and adorable', 'In Free roam, pick up a weapon (six are hidden around the house, the yard, the roof, out front and up the bank)'],
+    ['wpnAll', '🧰', 'The whole arsenal', 'In Free roam, find all six weapons'],
+    ['wkSword', '⚔️', 'The chosen one', 'On zombie night, defeat a zombie with the sword from the stone'],
+    ['wkWater', '💦', 'Soggy zombie', 'On zombie night, defeat a zombie with the water pistol'],
+    ['wkPan', '🍳', 'BONK', 'On zombie night, defeat a zombie with Aunty-ji’s frying pan'],
+    ['wkHockey', '🏒', 'Top shelf', 'On zombie night, defeat a zombie with the hockey stick (a slapshot counts)'],
+    ['wkGlow', '✨', 'Glow up', 'On zombie night, defeat a zombie with the raccoon’s glow-stick sword'],
+    ['wkRake', '🍂', 'Raked', 'On zombie night, defeat a zombie with the garden rake'],
     ['hopTen', '🌳', 'Treetop hopper', 'In Treetop Hop, reach 10 trees in one run (stand on a tree top in Free roam and tap the 🌳 button)'],
     ['hopCombo', '🎯', 'Dead centre', 'In Treetop Hop, land 5 Perfects in a row'],
     ['hopNight', '🌙', 'Moonlit canopy', 'In Treetop Hop, keep hopping until night falls'],
@@ -10749,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-12 20:43';                                              // stamped when the site is published
+const BUILD = '2026-10-13 00:03';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -37095,6 +37103,507 @@ function talkInstall() {
 }
 try { talkInstall(); } catch (e) { console.error(e); }
 /* (end of TALK_V1) */
+/* WEAPONS_V1 */
+/* =====================================================================
+   WEAPONS_V1 (2026-10-12): weapons lying about the world for zombie night, and the bird bath (no more flicker; a splash).
+   Six pickups, one in each corner of PKR's world: 🗡️ the sword in the stone (middle of the back lawn), 💦 a water pistol
+   (by the bird bath), 🍳 Aunty-ji's frying pan (her kitchen floor), 🏒 a hockey stick (our driveway), ✨ the raccoon's
+   glow-stick sword (on the roof, by his camp) and 🍂 a garden rake (up the bank behind the back fence). Each glints.
+   Walk over one (or tap it when she's close) and she carries it in her mouth; the 🐾 button / E swings it (G or the chip
+   drops it). Picking up another drops the one she has where she stands.
+   Each has its own feel (reach, arc, speed, damage, knock-back, hit-stop) and trick: the sword cleaves three, the pan
+   BONKs (the Groundskeeper reels), the hockey stick slapshots a puck when nothing's in reach, the water pistol has range
+   but tickles (24 squirts: hop in the bird bath, or stand in the rain, to refill), the glow sword spins every 4th swing,
+   the rake sweeps wide and trips them. Off zombie night they're harmless: weeds, bushes, the rubber ducks; Porter, the
+   raccoon and Aunty-ji only get a funny line. Hits go through zWound / zKill (so the HUD, kills, sounds and anything
+   that wraps zKill still see them). Achievements: wpnFirst, wpnAll and one zombie kill with each (wk*), after the zombie rows.
+   Bird bath: its stone bowl was a solid drum whose flat top sat exactly level with the water disc (z-fighting stripes from
+   any distance). Now (bbWater, called from the yard builder) the bowl is a real basin (a lathe) with a rim, and the water
+   is its own disc sitting inside it, clear of every stone face, with a polygon offset. Jump in: a splash of drops (the
+   pooled particles), rings on the water, the tub's splash sound; she can stand in it (water over her paws), and shakes
+   herself off when she hops out. Two sparrows drink there by day and fly off when she comes near.
+   Hooks: walkSwipe, walkTap and updateZombies are wrapped at load (chained: each wrapper calls the previous function);
+   wpnTick / bbTick run from the updateZombies wrapper. Everything else is hoisted function declarations (no TDZ).
+   No lights anywhere; one merged mesh per weapon (the glow sword's blade is two more), sprites for the glints.
+   ===================================================================== */
+function wpnDefs() {                                                     // reach / arc (half-angle) in metres / radians; cd = seconds between swings; T = the swing itself
+  return [
+    { id: 'sword', ic: '🗡️', name: 'Sword', full: 'the sword in the stone', verb: 'Swing', style: 'slash', reach: 1.8, arc: 1.3, cd: 0.42, T: 0.3, dmg: 2, boss: 2, inv: 0.65, kb: 3, cleave: 3, stop: 0.07, trail: 0xd8ecff, ach: 'wkSword',
+      find: '✨ A sword, stuck in a stone in the middle of the lawn! Walk into it to pull it out', got: '🗡️ PKR pulls the sword from the stone! (🐾 or E to swing)', kill: '⚔️ Sliced! The sword’s first zombie' },
+    { id: 'water', ic: '💦', name: 'Water pistol', full: 'a water pistol', verb: 'Squirt', style: 'shoot', range: 10, lane: 1.25, cd: 0.2, T: 0.16, dmg: 1, boss: 1, kb: 2.4, stop: 0, tank: 24, ach: 'wkWater', lieRoll: true,
+      find: '✨ A water pistol by the bird bath! Walk over it to pick it up', got: '💦 A water pistol! Long range, tiny damage. (🐾 or E to squirt)', kill: '💦 Soaked! That zombie’s had enough' },
+    { id: 'pan', ic: '🍳', name: 'Frying pan', full: 'Aunty-ji’s frying pan', verb: 'Bonk', style: 'chop', reach: 1.5, arc: 0.95, cd: 0.55, T: 0.34, dmg: 2, boss: 2, inv: 0.9, kb: 2, cleave: 1, stun: true, stop: 0.12, trail: 0, ach: 'wkPan',
+      find: '✨ Aunty-ji’s frying pan, on her kitchen floor! Walk over it to pick it up', got: '🍳 Aunty-ji’s frying pan! BONK! (🐾 or E to swing)', kill: '🍳 BONK! Right on the noggin' },
+    { id: 'hockey', ic: '🏒', name: 'Hockey stick', full: 'a hockey stick', verb: 'Shoot', style: 'slap', reach: 1.7, arc: 1.1, cd: 0.5, T: 0.32, dmg: 1, boss: 1, inv: 0.4, kb: 7.5, cleave: 2, puck: true, stop: 0.06, trail: 0xffffff, ach: 'wkHockey',
+      find: '✨ A hockey stick on the driveway! Walk over it to pick it up', got: '🏒 A hockey stick! Nothing in reach? She slapshots a puck. (🐾 or E)', kill: '🏒 Top shelf! He shoots, he scores' },
+    { id: 'glow', ic: '✨', name: 'Glow-stick sword', full: 'the raccoon’s glow-stick sword', verb: 'Swing', style: 'slash', reach: 1.95, arc: 1.5, cd: 0.36, T: 0.26, dmg: 2, boss: 2, inv: 0.6, kb: 3.5, cleave: 9, spin: 4, stop: 0.05, trail: 0x6ff4ff, glow: true, ach: 'wkGlow',
+      find: '✨ The raccoon’s glow-stick sword, up by his camp! Walk over it to pick it up', got: '✨ A cardboard tube full of glow sticks! Every 4th swing is a spin. (🐾 or E)', kill: '✨ Vwoom! Glowing victory' },
+    { id: 'rake', ic: '🍂', name: 'Garden rake', full: 'a garden rake', verb: 'Sweep', style: 'sweep', reach: 2.25, arc: 1.75, cd: 0.62, T: 0.42, dmg: 1, boss: 1, inv: 0.5, kb: 4.5, cleave: 9, trip: true, stop: 0.08, trail: 0xe2f2b0, ach: 'wkRake',
+      find: '✨ A garden rake up on the bank! Walk over it to pick it up', got: '🍂 A garden rake! Longest reach, sweeps wide, trips them up. (🐾 or E)', kill: '🍂 Raked! Into the compost with you' },
+  ];
+}
+function wpnState() { return wpnState.s || (wpnState.s = { built: false, list: [], held: null, ready: 0, sw: null, stopT: 0, wasOn: false, said: {}, hintN: 0, pucks: [], tmp: {}, err: 0 }); }
+function wpnV(x, y, z) { return new THREE.Vector3(x || 0, y || 0, z || 0); }
+function wpnSave() { const W = wpnState(); try { localStorage.setItem('catguard.weapons', JSON.stringify({ f: [...W.found], k: W.kills })); } catch (e) {} }
+function wpnLoad() { const W = wpnState(); W.found = new Set(); W.kills = {}; try { const o = JSON.parse(localStorage.getItem('catguard.weapons') || '{}'); (o.f || []).forEach(id => W.found.add(id)); W.kills = o.k || {}; } catch (e) {} }
+function wpnTalk(kind, w) { try { if (typeof talkEvent === 'function') talkEvent('weapon', { id: w.D.id, name: w.D.name, kind }); } catch (e) {} }
+function wpnMerge(parts) {                                               // [geometry, colour, x, y, z, rx, ry, rz, sx, sy, sz, unlit]: one vertex-coloured geometry, lit once (like the yard's bake)
+  const pos = [], col = [], m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(), v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3(), c = new THREE.Color(), L = new THREE.Vector3(0.45, 0.8, 0.4).normalize();
+  for (const pt of parts) {
+    const src = pt[0], g = src.index ? src.toNonIndexed() : src; if (!g.attributes.normal) g.computeVertexNormals();
+    m4.compose(p.set(pt[2] || 0, pt[3] || 0, pt[4] || 0), q.setFromEuler(e.set(pt[5] || 0, pt[6] || 0, pt[7] || 0)), s.set(pt[8] || 1, pt[9] || 1, pt[10] || 1)); nm.getNormalMatrix(m4); c.set(pt[1]);
+    const P = g.attributes.position, N = g.attributes.normal;
+    for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(m4); n.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); pos.push(v.x, v.y, v.z);
+      const k = pt[11] ? 1 : 0.58 + 0.5 * Math.max(0, n.dot(L)) + 0.08 * n.y; col.push(Math.min(1, c.r * k), Math.min(1, c.g * k), Math.min(1, c.b * k)); }
+    if (g !== src) g.dispose(); src.dispose();
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.computeVertexNormals(); geo.computeBoundingSphere(); return geo;
+}
+function wpnParts(id) {                                                  // each weapon in its own frame: the grip (where her teeth go) at the origin, the business end up +Y, its width along X, its face along Z
+  const B = (w, h, d) => new THREE.BoxGeometry(w, h, d), C = (rt, rb, h, s) => new THREE.CylinderGeometry(rt, rb, h, s || 10), S = (r, a, b) => new THREE.SphereGeometry(r, a || 10, b || 8), H = Math.PI / 2;
+  if (id === 'sword') return { len: 0.95, parts: [
+    [C(0.026, 0.028, 0.2, 8), 0x5a2416, 0, 0, 0], [C(0.03, 0.03, 0.025, 8), 0xd9a632, 0, 0.06, 0], [C(0.03, 0.03, 0.025, 8), 0xd9a632, 0, -0.06, 0],   // a leather grip, gold bands
+    [S(0.042, 10, 8), 0xe8b830, 0, -0.13, 0], [B(0.28, 0.04, 0.05), 0xe0ae2e, 0, 0.12, 0], [S(0.03, 8, 6), 0xe8b830, -0.15, 0.12, 0], [S(0.03, 8, 6), 0xe8b830, 0.15, 0.12, 0], [S(0.022, 8, 6), 0xd8323a, 0, 0.12, 0.024],   // pommel, crossguard, a ruby
+    [B(0.09, 0.68, 0.016), 0xdfe5ee, 0, 0.48, 0], [B(0.02, 0.6, 0.019), 0x9eaab8, 0, 0.45, 0],                                                         // the blade and its fuller
+    [C(0, 0.045, 0.14, 4), 0xdfe5ee, 0, 0.89, 0, 0, 0, 0, 1, 1, 0.18]] };                                                                     // the point
+  if (id === 'water') return { len: 0.42, parts: [
+    [B(0.07, 0.26, 0.075), 0xff8a2a, 0, 0.05, 0], [C(0.05, 0.05, 0.15, 12), 0x3fc8ff, 0, 0.08, 0.075, 0, 0, 0], [S(0.05, 10, 6), 0x7fdcff, 0, 0.155, 0.075],   // the body, a see-through-blue tank on top
+    [C(0.022, 0.026, 0.12, 8), 0x5adc5a, 0, 0.24, 0], [C(0.03, 0.03, 0.03, 8), 0xffd23a, 0, 0.3, 0],                                                          // the barrel, a yellow nozzle
+    [B(0.06, 0.07, 0.15), 0xff6f9a, 0, -0.06, -0.08, 0.35, 0, 0], [B(0.018, 0.05, 0.05), 0x2a2a2e, 0, 0.0, -0.06]] };                                         // the grip, the trigger
+  if (id === 'pan') return { len: 0.58, parts: [
+    [C(0.17, 0.15, 0.045, 22), 0x45454e, 0, 0.36, 0, H, 0, 0], [C(0.148, 0.148, 0.004, 22), 0x6a6a76, 0, 0.36, 0.024, H, 0, 0],                          // the pan (its face along Z), the cooking surface
+    [new THREE.TorusGeometry(0.168, 0.012, 6, 24), 0x8a8a96, 0, 0.36, 0.02],                                                                               // the rim
+    [B(0.04, 0.2, 0.022), 0x232327, 0, 0.12, 0], [B(0.046, 0.2, 0.03), 0x8a5530, 0, -0.06, 0], [C(0.018, 0.018, 0.032, 8), 0xc9c9cf, 0, -0.14, 0, H, 0, 0]] };   // the handle: iron, then a wooden grip with a hanging hole
+  if (id === 'hockey') {
+    const p = [[B(0.04, 1.22, 0.028), 0xd9c08a, 0, 0.36, 0], [B(0.044, 0.16, 0.032), 0x1f1f22, 0, -0.18, 0], [B(0.046, 0.05, 0.034), 0x1f1f22, 0, -0.25, 0]];   // the shaft, black tape at the butt
+    for (let k = 0; k < 4; k++) p.push([B(0.043, 0.012, 0.031), 0xffffff, 0, 0.12 + k * 0.025, 0]);                                                        // (a few rings of white tape)
+    p.push([B(0.3, 0.075, 0.022), 0xf2f2f2, 0.13, 0.98, 0, 0, 0, -0.18], [B(0.31, 0.03, 0.024), 0x1f1f22, 0.13, 0.965, 0, 0, 0, -0.18]);                     // the blade, white tape on its heel
+    return { len: 1.0, parts: p }; }
+  if (id === 'glow') {
+    const p = [[C(0.034, 0.034, 0.24, 10), 0xb08a5a, 0, 0, 0], [C(0.036, 0.036, 0.03, 10), 0xc9ccd2, 0, 0.09, 0], [C(0.036, 0.036, 0.03, 10), 0xc9ccd2, 0, -0.09, 0], [C(0.036, 0.036, 0.02, 10), 0xe23a3a, 0, 0.0, 0],   // a cardboard tube, silver duct tape, a red stripe
+      [B(0.03, 0.05, 0.016), 0x2a2a2e, 0, 0.03, 0.033], [C(0.042, 0.03, 0.03, 10), 0x8a6a42, 0, 0.13, 0]];                                                   // a 'button' drawn on, the tube's end
+    return { len: 0.95, parts: p, blade: true }; }
+  if (id === 'rake') {
+    const p = [[C(0.022, 0.022, 1.42, 8), 0xb88a52, 0, 0.45, 0], [C(0.026, 0.026, 0.06, 8), 0x3a8a4a, 0, -0.25, 0], [B(0.46, 0.04, 0.045), 0x3a8a4a, 0, 1.17, 0], [C(0.018, 0.03, 0.12, 6), 0x3a8a4a, 0, 1.12, 0]];   // the handle, a green steel head
+    for (let k = 0; k < 9; k++) p.push([B(0.014, 0.014, 0.13), 0x9aa2a8, -0.2 + k * 0.05, 1.17, 0.07]);                                                    // nine tines (along +Z)
+    return { len: 1.2, parts: p }; }
+}
+function wpnMats() {                                                     // outdoors (tinted with the time of day, like the zombies) and indoors (as built)
+  const W = wpnState(); if (W.matOut) return W;
+  W.matOut = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }); W.matOut.userData.noTod = true;
+  W.matIn = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }); W.matIn.userData.noTod = true;
+  W.matDS = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }); W.matDS.userData.noTod = true;
+  W.coreMat = new THREE.MeshBasicMaterial({ color: 0xc8fdff, fog: false }); W.coreMat.userData.noTod = true;
+  W.haloMat = new THREE.MeshBasicMaterial({ color: 0x2fd0ff, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }); W.haloMat.userData.noTod = true;
+  W.starTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#000'; c.fillRect(0, 0, w, h); const g = c.createRadialGradient(32, 32, 0, 32, 32, 30); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.18, 'rgba(255,246,200,.75)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g; c.beginPath(); c.moveTo(32, 0); c.quadraticCurveTo(35, 29, 64, 32); c.quadraticCurveTo(35, 35, 32, 64); c.quadraticCurveTo(29, 35, 0, 32); c.quadraticCurveTo(29, 29, 32, 0); c.fill(); }, 1, 1);   /* (black, not see-through: additive, so black adds nothing) */
+  W.starTex.wrapS = W.starTex.wrapT = THREE.ClampToEdgeWrapping;
+  W.glintMat = new THREE.SpriteMaterial({ map: W.starTex, color: 0xfff8e0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false });
+  W.flashMat = new THREE.SpriteMaterial({ map: W.starTex, color: 0xffffff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false, opacity: 0 });
+  return W;
+}
+function wpnBasis(q, Y, R) {                                             // a rotation that puts the weapon's length along Y, its face toward R (as near as it can)
+  const T = wpnState().tmp, Z = T.z || (T.z = new THREE.Vector3()), X = T.x || (T.x = new THREE.Vector3()), M = T.m || (T.m = new THREE.Matrix4());
+  Z.copy(R).addScaledVector(Y, -R.dot(Y)); if (Z.lengthSq() < 1e-6) Z.set(Y.y, Y.z, Y.x); Z.normalize(); X.crossVectors(Y, Z).normalize();
+  M.makeBasis(X, Y, Z); return q.setFromRotationMatrix(M);
+}
+function wpnGround(x, z, fromY) { const h = walk.hitObj, y = surfaceTop(x, z, fromY); walk.hitObj = h; return y; }   /* (surfaceTop, without disturbing what she's standing on) */
+function wpnInside(p) { const U = UPPER; return p.x > YARD.HL - 0.3 && p.x < YARD.HR + 0.3 && p.z > U.zF - 0.3 && p.z < U.zB + 0.3 && !(p.y > U.CH + 0.25); }
+function wpnInit() {                                                     // built the first time Free roam starts (never at load)
+  const W = wpnMats(); if (W.built) return W; W.built = true; wpnLoad();
+  const root = W.root = new THREE.Group(); root.userData.noWalk = true; root.userData.name = 'Weapons'; scene.add(root);
+  const up = wpnV(0, 1, 0), UF = UPPER.UF;
+  const lay = (x, y, z, yaw, n, roll) => { const Y = wpnV(Math.cos(yaw), 0, Math.sin(yaw)), N = (n || up).clone().normalize(); Y.addScaledVector(N, -Y.dot(N)).normalize();
+    const q = wpnBasis(new THREE.Quaternion(), Y, N); if (roll) q.multiply(new THREE.Quaternion().setFromAxisAngle(up, Math.PI / 2)); return { p: wpnV(x, y, z), q }; };
+  const roofN = (x, z) => { const R = RF || roofGeo(), d = [x - R.x0, R.x1 - x, z - R.z0, R.z1 - z], i = d.indexOf(Math.min(...d)); return [wpnV(-R.k, 1, 0), wpnV(R.k, 1, 0), wpnV(0, 1, -R.k), wpnV(0, 1, R.k)][i]; };
+  const hillN = z => wpnV(0, 1, -(hillY(z + 0.1) - hillY(z - 0.1)) / 0.2);
+  const SX = 3.6, SZ = 39.5;                                             // the sword's stone, out in the open in the middle of the lawn
+  { const rock = new THREE.Mesh(wpnMerge([[new THREE.DodecahedronGeometry(0.42, 0), 0x8d8a84, 0, 0.17, 0, 0.3, 0.5, 0.1, 1.15, 0.62, 1], [new THREE.DodecahedronGeometry(0.2, 0), 0x7e7b75, 0.36, 0.08, 0.12, 0.6, 0.2, 0, 1, 0.7, 1],
+      [new THREE.SphereGeometry(0.16, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2), 0x5f8a3e, -0.18, 0.3, 0.12, 0, 0, 0.25, 1.3, 0.35, 1]]), W.matOut);   // (a mossy patch)
+    rock.position.set(SX, 0, SZ); rock.userData.name = 'Sword stone'; root.add(rock); W.rock = rock; }
+  const homes = {
+    sword: { p: wpnV(SX + 0.02, 1.13, SZ), q: new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, 0.5, 0.1)) },                                // point down in the stone
+    water: lay(-7.3, 0.05, 35.35, 0.9, null, true),
+    pan: lay(6.5, UF + 0.032, -12.3, 2.6),
+    hockey: lay(13.1, 0.028, -34.2, 2.3),
+    glow: (() => { const x = -1.3, z = 13.0, R = RF || roofGeo(), y = roofH(x, z); return lay(x, y + 0.05, z, Math.PI / 2, roofN(x, z)); })(),
+    rake: (() => { const x = -9.1, z = 63.2; return lay(x, hillY(z) + 0.05, z, 0.25, hillN(z)); })(),   /* (across the path from the hole in the fence up to the sled) */
+  };
+  for (const D of wpnDefs()) {
+    const P = wpnParts(D.id), g = new THREE.Group(); g.userData.name = D.name; root.add(g);
+    const mesh = new THREE.Mesh(wpnMerge(P.parts), W.matOut); mesh.userData.name = D.name; g.add(mesh);
+    if (P.blade) { const core = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.8, 10), W.coreMat), halo = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.058, 0.86, 10, 1, true), W.haloMat);
+      core.position.y = halo.position.y = 0.54; core.userData.name = halo.userData.name = D.name; g.add(core, halo); }
+    const glint = new THREE.Sprite(W.glintMat); glint.scale.setScalar(0.5); root.add(glint);
+    const h = homes[D.id], w = { D, g, mesh, len: P.len, home: h, st: 'home', p: h.p.clone(), q: h.q.clone(), glint, noPick: false, tank: D.tank || 0, swings: 0, ph: Math.random() * 6 };
+    g.position.copy(w.p); g.quaternion.copy(w.q); W.list.push(w);
+  }
+  W.byId = {}; W.list.forEach(w => { W.byId[w.D.id] = w; });
+  { const n = 14, geo = new THREE.BufferGeometry(), idx = [];                                       // the swing's trail: a ribbon from the last few frames' blade positions
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 6), 3)); geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 6), 3));
+    for (let i = 0; i < n - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } geo.setIndex(idx);
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    m.material.userData.noTod = true; m.frustumCulled = false; m.visible = false; m.renderOrder = 6; root.add(m); W.trail = { m, n, pts: [], col: new THREE.Color() }; }
+  { const f = new THREE.Sprite(W.flashMat); f.visible = false; f.renderOrder = 7; root.add(f); W.flash = { s: f, t: 1 }; }
+  { const jet = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, 1, 8, 1, true).translate(0, 0.5, 0), new THREE.MeshBasicMaterial({ color: 0xcdeeff, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+    jet.material.userData.noTod = true; jet.visible = false; jet.renderOrder = 5; root.add(jet); W.jet = { m: jet, t: 1 }; }
+  return W;
+}
+function wpnReset() {                                                    // a fresh Free roam: every weapon back where it lives
+  const W = wpnState(); if (!W.built) return;
+  for (const w of W.list) { w.st = 'home'; w.p.copy(w.home.p); w.q.copy(w.home.q); w.g.position.copy(w.p); w.g.quaternion.copy(w.q); w.g.scale.setScalar(1); w.noPick = false; w.tank = w.D.tank || 0; w.swings = 0; }
+  W.held = null; W.sw = null; W.stopT = 0; W.said = {}; W.hintN = 0; W.trail.m.visible = false; W.trail.pts.length = 0; W.pucks.forEach(k => { k.on = false; k.m.visible = false; }); wpnChip();
+}
+function wpnMouthBusy() {                                                // her mouth's already full: the pistol (with rounds in it), the laser, the sardine tin, Aunty-ji's lost thing
+  try {
+    if (gunRig.state === 'cat' && (gunRig.ammo > 0 || !(ZN && ZN.on))) return '🔫 Her mouth’s full of pistol';
+    if (laser.state === 'cat') return '🔴 Her mouth’s full of laser pointer';
+    const h = walk.rig && walk.rig.head; if (h && RF && RF.tinM && RF.tinM.visible && RF.tinM.parent === h) return '🐟 Her mouth’s full of sardine tin';
+    if (AQ && AQ.item && AQ.item.carried) return '🧶 She’s carrying Aunty-ji’s lost thing';
+  } catch (e) {}
+  return '';
+}
+function wpnPickup(w) {
+  const W = wpnState(), old = W.held;
+  if (gunRig.state === 'cat' && gunRig.ammo <= 0) tossGun();            // (an empty pistol on zombie night: she spits it out for this)
+  if (old) wpnDrop(old, true);
+  W.held = w; w.st = 'grab'; w.grabT = 0; w.from = { p: w.g.position.clone(), q: w.g.quaternion.clone() }; w.noPick = false; W.sw = null; W.ready = clock + 0.25;
+  const fresh = !W.found.has(w.D.id); W.found.add(w.D.id); wpnSave();
+  showWalkName(fresh ? w.D.got : `${w.D.ic} ${w.D.name}${w.D.tank ? ` (💧${w.tank})` : ''}`); wpnSfx('pick', w);
+  unlock('wpnFirst'); if (W.found.size >= W.list.length) unlock('wpnAll');
+  if (fresh) wpnTalk('pickup', w);
+  if (w.D.id === 'sword' && w.p.distanceTo(w.home.p) < 0.1) burst(wpnV(w.home.p.x, 0.45, w.home.p.z), 0xb9b3a8, 8, 1.6, 2, 0.32);   // (a puff of stone dust as it comes out)
+  wpnChip();
+}
+function wpnDrop(w, swap) {                                               // put down where she stands (to her side), lying flat
+  const W = wpnState(), p = walk.pos; if (W.held === w) W.held = null; W.sw = null;
+  const side = swap ? 0.55 : 0.4, fx = Math.sin(walk.face), fz = Math.cos(walk.face), x = p.x + fz * side, z = p.z - fx * side, gy = wpnGround(x, z, p.y + 0.4);
+  const Y = wpnV(Math.cos(walk.face + 0.8), 0, Math.sin(walk.face + 0.8)), q = wpnBasis(new THREE.Quaternion(), Y, wpnV(0, 1, 0)); if (w.D.lieRoll) q.multiply(new THREE.Quaternion().setFromAxisAngle(wpnV(0, 1, 0), Math.PI / 2));
+  for (const o of W.list) if (o !== w && (o.st === 'home' || o.st === 'ground') && o.g.position.distanceTo(p) < 1.3) o.noPick = true;   /* (put down on top of another: don't grab that one instead) */
+  w.st = 'ground'; w.p.set(x, gy + 0.035, z); w.q.copy(q); w.g.position.copy(w.p); w.g.quaternion.copy(w.q); w.g.scale.setScalar(1); w.noPick = true;
+  W.trail.m.visible = false; W.trail.pts.length = 0; wpnSfx('drop', w); wpnChip();
+}
+function wpnSfx(kind, w) {                                               // through the game's own tone() / noise() (and so the effects switch)
+  try { const id = w && w.D.id;
+    if (kind === 'pick') { tone(660, 990, 0.08, 'triangle', 0.035); tone(990, 1320, 0.1, 'triangle', 0.03, 0.07); if (id === 'sword' || id === 'glow') tone(2400, 1800, 0.25, 'sine', 0.018, 0.05); }
+    else if (kind === 'drop') { tone(300, 180, 0.08, 'triangle', 0.03); noise(0.06, 0.04, 900); }
+    else if (kind === 'swing') {
+      if (id === 'glow') { tone(95, 150, 0.32, 'sawtooth', 0.028); tone(190, 290, 0.3, 'sine', 0.02); }
+      else if (id === 'water') { noise(0.1, 0.035, 4200); tone(900, 600, 0.06, 'sine', 0.012); }
+      else noise(id === 'rake' ? 0.22 : 0.13, id === 'pan' ? 0.06 : 0.05, id === 'rake' ? 650 : id === 'pan' ? 900 : 1500); }
+    else if (kind === 'hit') {
+      if (id === 'pan') { tone(430, 170, 0.24, 'square', 0.045); tone(860, 640, 0.32, 'sine', 0.03); tone(1290, 1100, 0.2, 'sine', 0.012); }
+      else if (id === 'sword') { tone(1900, 1350, 0.14, 'triangle', 0.03); tone(2700, 2300, 0.2, 'sine', 0.014); }
+      else if (id === 'glow') { tone(880, 260, 0.16, 'sawtooth', 0.026); noise(0.08, 0.04, 2600); }
+      else if (id === 'hockey') { tone(240, 120, 0.08, 'square', 0.035); noise(0.05, 0.06, 2400); }
+      else if (id === 'rake') { tone(320, 640, 0.09, 'triangle', 0.028); noise(0.12, 0.05, 1100); }
+      else if (id === 'water') { noise(0.12, 0.04, 2400); } }
+    else if (kind === 'slap') { noise(0.05, 0.1, 3200); tone(200, 110, 0.07, 'square', 0.04); }
+    else if (kind === 'clack') { tone(700, 520, 0.05, 'square', 0.025); }
+    else if (kind === 'clang') { tone(1500, 1450, 0.25, 'triangle', 0.022); tone(2210, 2180, 0.3, 'sine', 0.012); }
+    else if (kind === 'empty') { tone(500, 380, 0.06, 'square', 0.02); }
+    else if (kind === 'swish') { noise(0.25, 0.05, 1300); }
+  } catch (e) {}
+}
+function wpnPose(style, k, spin) {                                       // [yaw from her nose (+ = to her side), pitch] of the weapon at swing progress k (0 = carried)
+  const E = x => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3), S = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); }, L = (a, b, x) => a + (b - a) * x;
+  if (style === 'slash') { if (k < 0.22) { const a = S(k / 0.22); return [L(1.25, 1.95, a), L(0.3, 0.45, a)]; } const b = E((k - 0.22) / 0.78); return spin ? [L(1.95, 1.95 - Math.PI * 2 - 0.5, b), L(0.45, 0.05, b)] : [L(1.95, -1.35, b), L(0.45, -0.1, b)]; }
+  if (style === 'chop') { if (k < 0.3) { const a = S(k / 0.3); return [L(1.3, 0.15, a), L(0.15, 1.45, a)]; } const b = E((k - 0.3) / 0.7); return [0.15 * (1 - b), L(1.45, -0.5, b)]; }
+  if (style === 'slap') { if (k < 0.3) { const a = S(k / 0.3); return [L(1.35, 2.0, a), L(-0.12, 0.55, a)]; } const b = E((k - 0.3) / 0.7); return [L(2.0, -0.7, b), L(0.55, -0.8, b)]; }
+  if (style === 'sweep') { if (k < 0.25) { const a = S(k / 0.25); return [L(1.4, 2.15, a), L(-0.12, 0.1, a)]; } const b = E((k - 0.25) / 0.75); return [L(2.15, -2.0, b), L(0.1, -0.4, b)]; }
+  return [0, 0.06 + (k > 0 && k < 1 ? 0.35 * Math.sin(k * Math.PI) * (1 - k) : 0)];
+}
+function wpnKC(style) { return { slash: 0.38, chop: 0.5, slap: 0.5, sweep: 0.37, shoot: 0 }[style] || 0; }   /* (where in the swing it lands) */
+function wpnMouth(out) { const h = walk.rig.head; return h.localToWorld(out.set(0, -0.12, 0.15)); }
+function wpnAim(w, th, ph, out, q) {                                     // the world direction for (yaw, pitch) off her nose; q = the weapon's rotation
+  const f = walk.face, fx = Math.sin(f), fz = Math.cos(f), sx = fz, sz = -fx, c = Math.cos(ph);
+  out.set((fx * Math.cos(th) + sx * Math.sin(th)) * c, Math.sin(ph), (fz * Math.cos(th) + sz * Math.sin(th)) * c).normalize();
+  if (q) { const T = wpnState().tmp, R = T.r || (T.r = new THREE.Vector3()), st = w.D.style;
+    if (st === 'chop') R.set(sx, 0, sz).cross(out); else if (st === 'sweep') R.set(0, -1, 0); else if (st === 'slap') R.set(-fx, -0.4, -fz); else R.set(0, 1, 0);   /* (the pan's face leads its chop; the rake's tines point down) */
+    wpnBasis(q, out, R); }
+  return out;
+}
+function wpnSwipe() {                                                    // (the walkSwipe wrapper) true = the weapon took the swipe
+  const W = wpnState(), w = W.held; if (!w || !walk.on || state !== 'playing' || gameMode !== 'walk') return false;
+  if (mirrorWorld || blanketRigs.some(r => r.state === 'cat')) return false;
+  if (w.st !== 'held') return true;
+  if (clock < W.ready) return true;
+  const D = w.D, zon = !!(ZN && ZN.on);
+  if (D.tank !== undefined && D.tank && w.tank <= 0) { W.ready = clock + 0.3; wpnSfx('empty', w); if (clock > (W.emptySaid || 0)) { W.emptySaid = clock + 3; showWalkName('💦 Empty! Hop in the bird bath (or stand in the rain) to refill'); } return true; }
+  w.swings++; const spin = !!(D.spin && w.swings % D.spin === 0);
+  W.ready = clock + D.cd + (spin ? 0.15 : 0); W.sw = { w, t: 0, T: D.T + (spin ? 0.16 : 0), spin, hit: false, kc: wpnKC(D.style), zon };
+  walk.batT = 0.35; wpnSfx('swing', w);
+  if (!zon && D.style !== 'shoot' && !D.puck) { if (!wpnFun(w)) return 'paw'; }   /* (nothing funny to do: the paw's own swipe still knocks on doors, opens the garage...) */
+  return true;
+}
+function wpnFun(w) {                                                     // off zombie night: whatever's at the end of it (no one friendly gets hurt)
+  const p = walk.pos, f = walk.face, r = Math.min(1.4, (w.D.reach || 1.4) * 0.75), tip = wpnV(p.x + Math.sin(f) * r, p.y + 0.35, p.z + Math.cos(f) * r);
+  try {
+    if (weedSwipe(tip)) return true;
+    if (duckSwipe(tip)) return true;
+    const R = dog.rig; if (R && R.g.visible && Math.hypot(R.g.position.x - tip.x, R.g.position.z - tip.z) < 1.6) { showWalkName(['🐕 Porter play-bows: he thinks it’s a game!', '🐕 Porter tries to grab it in his mouth. Not a stick, Porter!', '🐕 Porter wags so hard his whole back end wiggles'][(Math.random() * 3) | 0]); tone(520, 700, 0.1, 'triangle', 0.025); return true; }
+    if (typeof coonActive === 'function' && coonActive()) { const h = coonHome(); if (Math.hypot(h.x - tip.x, h.z - 0.45 - tip.z) < 1.4) { showWalkName('🦝 "Whoa whoa whoa! Not the face! I bruise like a peach!"'); return true; } }
+    const S0 = wpnState(); if (S0.aunty === undefined) { let o = null; scene.traverse(q => { if (!o && q.userData && q.userData.name === 'Aunty-ji') o = q; }); S0.aunty = o; } const A = S0.aunty;
+    if (A && A.visible) { const v = A.getWorldPosition(wpnV()); if (Math.hypot(v.x - tip.x, v.z - tip.z) < 1.8 && Math.abs(v.y - p.y) < 2) { showWalkName(w.D.id === 'pan' ? '👵 "My pan! Beta, that is for parathas, not for fighting!"' : '👵 "Arre! Not inside the house, beta!"'); return true; } }
+    for (const b of YARD_BUSHES) if (Math.hypot(b[0] - tip.x, b[1] - tip.z) < b[2] + 0.35 && tip.y < (b[3] || 2) + 0.3) {
+      burst(wpnV(tip.x, tip.y + 0.3, tip.z), 0x4f8a3a, 9, 1.8, 2.2, 0.38); burst(wpnV(tip.x, tip.y + 0.2, tip.z), 0x7cc152, 5, 1.2, 1.8, 0.3); wpnSfx('swish', w);
+      const W = wpnState(); if (!W.said.bush) { W.said.bush = 1; showWalkName('🌿 Swish! Leaves everywhere'); } return true; }
+  } catch (e) {}
+  return false;
+}
+function wpnHitZ(q, w, how, dmg) {                                       // one zombie hit: through zWound (knock-back, the flash, the pips) or zKill (the kill, the HUD, its sounds)
+  const D = w.D, W = wpnState(), p = walk.pos, dd = Math.hypot(p.x - q.x, p.z - q.z);
+  if (!zAlive(q)) return false;
+  if (q.boss && how !== 'ranged' && clock < (q.inv || 0)) { wpnSfx('clang', w); burst(wpnV(q.x, 1.4 * q.sc, q.z), 0xfff3b0, 4, 2, 1.5, 0.25); return false; }   /* (still reeling: a clang off his chest) */
+  dmg = dmg || (q.boss ? D.boss : D.dmg);
+  const ux = dd ? (q.x - p.x) / dd : 0, uz = dd ? (q.z - p.z) / dd : 0, ty = how === 'melee' ? Math.max(0.45, Math.min(1.6, wpnMouth(wpnV()).y + 0.1)) : how === 'ranged' && D.puck ? 0.3 : 1.2 * q.sc;
+  const at = wpnV(q.x - ux * (q.boss ? 0.55 : 0.3), ty, q.z - uz * (q.boss ? 0.55 : 0.3));                     /* (where it connects: the near side of it, at the weapon's height) */
+  wpnSfx('hit', w); wpnFlash(at, D.glow ? 0x8ffcff : D.id === 'water' ? 0xa8e4ff : 0xfff2b0);
+  burst(at, D.glow ? 0x9ffcff : D.id === 'water' ? 0xa8e0ff : 0xfff1b0, 10, 4.2, 3, D.id === 'water' ? 0.4 : 0.3); burst(at, 0x8fcf4a, 4, 2.4, 2, 0.32);
+  if (D.id === 'pan') floatText(wpnV(q.x, 2.2 * q.sc, q.z), 'BONK!', 'warn');
+  if ((q.hp || 1) > dmg) {
+    q.hp -= dmg;
+    if (D.stun && q.boss) zWound(q, 'swipe', dd);                       // (the pan: he reels, and can't ground-pound while he does)
+    else { zWound(q, 'shot', dd); const k = (q.boss ? 0.5 : 1) * D.kb / 5; q.kbx *= k; q.kbz *= k;
+      if (q.boss) q.inv = clock + (D.inv || 0);
+      else if ((D.trip || D.stun) && q.st === 'walk') { q.st = 'stagger'; q.t = 0; } }
+    if (D.id === 'rake' && !q.boss && !W.said.trip) { W.said.trip = 1; showWalkName('🍂 Tripped it up!'); }
+    return 'wound';
+  }
+  q.hp = 1; q.inv = 0; zKill(q, how === 'ranged' ? 'shot' : 'swipe');
+  if (q.st !== 'die') return false;
+  W.kills[D.id] = (W.kills[D.id] || 0) + 1; wpnSave();
+  if (!achDone[D.ach]) { unlock(D.ach); showWalkName(D.kill); wpnTalk('kill', w); }
+  return 'kill';
+}
+function wpnFlash(at, col) { const W = wpnState(), F = W.flash; if (!F) return; F.s.position.copy(at); F.s.material.color.setHex(col); F.t = 0; F.s.visible = true; }
+function wpnContact(sw) {                                                // the swing lands: who's in reach and in the arc
+  const W = wpnState(), w = sw.w, D = w.D, p = walk.pos, f = walk.face, fx = Math.sin(f), fz = Math.cos(f), g = walk.gScale || 1;
+  if (D.style === 'shoot') return wpnSquirt(w);
+  let hits = 0;
+  if (ZN && ZN.on && ZN.z) {
+    const reach = D.reach * g, arc = sw.spin ? Math.PI : D.arc, list = [];
+    for (const q of ZN.z) { if (!zAlive(q) || (q.st === 'rise' && q.t <= 1.4) || p.y > 2.2 * q.sc) continue;
+      const dx = q.x - p.x, dz = q.z - p.z, d0 = Math.hypot(dx, dz), d = d0 - (q.boss ? 0.6 : 0.25); if (d > reach) continue;
+      const ang = Math.acos(Math.max(-1, Math.min(1, (dx * fx + dz * fz) / (d0 || 1)))); if (ang > arc && d0 > 0.6) continue;
+      list.push([d, q]); }
+    list.sort((a, b) => a[0] - b[0]);
+    for (const [, q] of list.slice(0, D.cleave || 1)) if (wpnHitZ(q, w, 'melee')) hits++;
+  }
+  if (hits) { W.stopT = D.stop || 0; shake = Math.max(shake, reduceMotion ? 0.03 : D.id === 'pan' ? 0.22 : 0.12); sw.hit = true; }
+  else if (D.puck) wpnSlap(w);
+  else if (ZN && ZN.on) wpnFun(w);
+}
+function wpnSlap(w) {                                                     // the hockey stick, nothing in reach: a slapshot
+  const W = wpnState(), p = walk.pos, f = walk.face, fx = Math.sin(f), fz = Math.cos(f);
+  let k = W.pucks.find(k => !k.on);
+  if (!k) { if (W.pucks.length >= 3) k = W.pucks.reduce((a, b) => (a.t > b.t ? a : b));
+    else { const m = new THREE.Mesh(wpnMerge([[new THREE.CylinderGeometry(0.075, 0.075, 0.04, 16), 0x16161a, 0, 0, 0], [new THREE.CylinderGeometry(0.04, 0.04, 0.042, 12), 0x3a3a42, 0, 0, 0]]), W.matOut);
+      m.userData.name = 'Puck'; W.root.add(m); k = { m, v: wpnV(), t: 0, on: false }; W.pucks.push(k); } }
+  const x = p.x + fx * 0.75, z = p.z + fz * 0.75;
+  k.on = true; k.t = 0; k.hit = false; k.m.visible = true; k.m.scale.setScalar(1); k.m.position.set(x, wpnGround(x, z, p.y + 0.4) + 0.025, z); k.v.set(fx * 17, 0, fz * 17); k.vy = 0;
+  wpnSfx('slap', w); burst(k.m.position.clone(), 0xe8f0ff, 5, 1.6, 1.2, 0.25);
+}
+function wpnPucks(dt) {
+  const W = wpnState(); if (!W.pucks.length) return; const rc = W.rc || (W.rc = new THREE.Raycaster()), d = wpnV();
+  for (const k of W.pucks) { if (!k.on) continue; k.t += dt; const m = k.m, P = m.position, sp = Math.hypot(k.v.x, k.v.z);
+    if (sp > 0.2) { d.set(k.v.x / sp, 0, k.v.z / sp); rc.set(wpnV(P.x, P.y + 0.06, P.z), d); rc.far = sp * dt + 0.1;
+      const hs = rc.intersectObjects(walkMeshesAt(P.x, P.y, P.z), false); if (hs.length && hs[0].face) { const n = hs[0].face.normal.clone().transformDirection(hs[0].object.matrixWorld); n.y = 0; if (n.lengthSq() > 0.01) { n.normalize(); k.v.addScaledVector(n, -2 * k.v.dot(n)).multiplyScalar(0.55); wpnSfx('clack'); } } }
+    P.x += k.v.x * dt; P.z += k.v.z * dt; const gy = wpnGround(P.x, P.z, P.y + 0.3) + 0.022;
+    if (P.y > gy + 0.01) { k.vy -= 9.8 * dt; P.y += k.vy * dt; if (P.y < gy) { P.y = gy; k.vy = 0; } } else { P.y = gy; k.vy = 0; }
+    m.rotation.y += sp * dt * 2; const fr = k.t > 1.0 ? 2.2 : 0.35; k.v.multiplyScalar(Math.exp(-dt * fr));
+    if (!k.hit && ZN && ZN.on && ZN.z) for (const q of ZN.z) { if (!zAlive(q) || (q.st === 'rise' && q.t <= 1.4)) continue;
+      if (Math.hypot(q.x - P.x, q.z - P.z) < (q.boss ? 0.8 : 0.48) * q.sc) { k.hit = true; const w = W.byId.hockey; if (w) wpnHitZ(q, w, 'ranged', 1); k.v.multiplyScalar(-0.25); W.stopT = 0.04; break; } }
+    if (k.t > 3.5 || (sp < 0.15 && k.t > 0.8)) { const s = Math.max(0, m.scale.x - dt * 3); m.scale.setScalar(s); if (s <= 0) { k.on = false; m.visible = false; } } }
+}
+function wpnSquirt(w) {                                                  // the water pistol: a jet down a lane in front of her
+  const W = wpnState(), D = w.D, f = walk.face, fx = Math.sin(f), fz = Math.cos(f), m = wpnMouth(wpnV()), J = W.jet;
+  w.tank = Math.max(0, w.tank - 1); wpnChip();
+  let best = null, bd = D.range * (walk.gScale || 1);
+  if (ZN && ZN.on && ZN.z) for (const q of ZN.z) { if (!zAlive(q) || (q.st === 'rise' && q.t <= 1.4)) continue; const dx = q.x - m.x, dz = q.z - m.z, al = dx * fx + dz * fz;
+    if (al > 0 && al < bd && Math.abs(dx * fz - dz * fx) < D.lane + (q.boss ? 0.4 : 0)) { bd = al; best = q; } }
+  const nz = m.clone().add(wpnV(fx * 0.3, 0.02, fz * 0.3)); let end;
+  if (best) end = wpnV(best.x, 1.2 * best.sc, best.z);
+  else { end = wpnV(m.x + fx * 7, 0, m.z + fz * 7); end.y = Math.max(wpnGround(end.x, end.z, m.y + 0.5) + 0.05, m.y - 0.7); }
+  const dir = end.clone().sub(nz), L = dir.length(); dir.normalize();
+  J.m.position.copy(nz); J.m.quaternion.setFromUnitVectors(wpnV(0, 1, 0), dir); J.m.scale.set(1, L, 1); J.m.visible = true; J.t = 0;
+  burst(end, 0xa8e0ff, best ? 6 : 8, 1.8, 1.6, 0.32);
+  if (best) { if (wpnHitZ(best, w, 'ranged')) { W.stopT = 0.02; } }
+  else if (!(ZN && ZN.on)) { const R = dog.rig; if (R && R.g.visible && Math.hypot(R.g.position.x - end.x, R.g.position.z - end.z) < 2.5) { if (!W.said.dogWet) { W.said.dogWet = 1; showWalkName('🐕 Porter snaps at the water, delighted. Best. Game. Ever.'); } } }
+  if (w.tank === 0) showWalkName('💦 Out of water! Hop in the bird bath to refill');
+}
+function wpnTrail(dt) {                                                  // the ribbon behind the blade
+  const W = wpnState(), T = W.trail, sw = W.sw, live = sw && sw.w.D.trail && sw.t < sw.T * 1.02 && sw.w.st === 'held';
+  if (live) { const w = sw.w, a = wpnV(), b = wpnV(), m = wpnMouth(wpnV()), dir = wpnV(0, 1, 0).applyQuaternion(w.g.quaternion), s = w.g.scale.x;
+    a.copy(m).addScaledVector(dir, w.len * 0.35 * s); b.copy(m).addScaledVector(dir, w.len * 1.02 * s); if (w.D.id === 'hockey') b.addScaledVector(wpnV(1, 0, 0).applyQuaternion(w.g.quaternion), 0.25 * s);
+    T.pts.push([a, b]); if (T.pts.length > T.n) T.pts.shift(); T.col.setHex(w.D.trail); T.k = sw.spin ? 1.25 : 1; }
+  else if (T.pts.length) T.pts.splice(0, Math.max(1, Math.round(dt * 90)));
+  const n = T.pts.length; T.m.visible = n >= 2; if (n < 2) return;
+  const P = T.m.geometry.attributes.position, C = T.m.geometry.attributes.color;
+  for (let i = 0; i < n; i++) { const [a, b] = T.pts[i], k = Math.pow(i / (n - 1), 1.6) * 0.85 * (T.k || 1); P.setXYZ(i * 2, a.x, a.y, a.z); P.setXYZ(i * 2 + 1, b.x, b.y, b.z);
+    C.setXYZ(i * 2, T.col.r * k * 0.25, T.col.g * k * 0.25, T.col.b * k * 0.25); C.setXYZ(i * 2 + 1, T.col.r * k, T.col.g * k, T.col.b * k); }
+  P.needsUpdate = C.needsUpdate = true; T.m.geometry.setDrawRange(0, (n - 1) * 6); T.m.geometry.computeBoundingSphere();
+}
+function wpnHeldPose(w, dt) {                                            // in her mouth: carried to one side, or mid-swing
+  const W = wpnState(), sw = W.sw && W.sw.w === w ? W.sw : null, D = w.D, m = wpnMouth(wpnV()), dir = wpnV(), q = new THREE.Quaternion();
+  let th, ph;
+  if (sw) { const k = sw.t / sw.T; if (k <= 1) [th, ph] = wpnPose(D.style, k, sw.spin); else { const e = wpnPose(D.style, 1, sw.spin), i = wpnPose(D.style, 0), r = Math.min(1, (sw.t - sw.T) / 0.16), s = r * r * (3 - 2 * r); let a0 = e[0]; if (sw.spin) a0 += Math.PI * 2; th = a0 + (i[0] - a0) * s; ph = e[1] + (i[1] - e[1]) * s; } }
+  else { [th, ph] = wpnPose(D.style, 0); th += Math.sin(clock * 5.2 + w.ph) * 0.04 * Math.min(1, Math.hypot(walk.vel.x, walk.vel.z)); ph += Math.sin(walk.phase || 0) * 0.03; }
+  wpnAim(w, th, ph, dir, q); const s = walk.gScale || 1;
+  if (w.st === 'grab') { w.grabT += dt; const k = Math.min(1, w.grabT / 0.22), e = k * k * (3 - 2 * k); w.g.position.lerpVectors(w.from.p, m, e); w.g.quaternion.copy(w.from.q).slerp(q, e); w.g.scale.setScalar(1 + (s - 1) * e); if (k >= 1) w.st = 'held'; }
+  else { w.g.position.copy(m); w.g.quaternion.copy(q); w.g.scale.setScalar(s); }
+  if (D.style === 'shoot') w.g.position.addScaledVector(dir, -0.04 * (sw && sw.t < sw.T ? Math.sin(sw.t / sw.T * Math.PI) : 0));
+  w.g.visible = !walk.fp && walk.rig.g.visible;
+}
+function wpnChip() {                                                     // the strip by the buttons: what she's holding (tap it to put it down); the swipe button says what it does
+  const W = wpnState(), w = W.held, on = !!w && walk.on && state === 'playing' && gameMode === 'walk';
+  let el = W.chip; if (!el) { if (!on) return;
+    const st = document.createElement('style'); st.textContent = '#wpnChip{position:fixed;right:calc(128px + env(safe-area-inset-right,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px));z-index:7;background:rgba(31,23,18,.74);color:#ffe9b0;font:800 13px system-ui,sans-serif;padding:5px 11px;border-radius:12px;white-space:nowrap;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}#wpnChip i{font-style:normal;opacity:.7;font-weight:700;margin-left:6px}#wpnChip.low{color:#ff8a6a}@media (max-width:360px){#wpnChip{bottom:calc(196px + env(safe-area-inset-bottom,0px))}}';
+    document.head.appendChild(st); el = W.chip = document.createElement('button'); el.id = 'wpnChip'; el.type = 'button'; document.body.appendChild(el); el.addEventListener('pointerup', e => e.stopPropagation());
+    el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); const h = wpnState().held; if (h && h.st === 'held') { wpnDrop(h); showWalkName(`${h.D.ic} PKR puts the ${h.D.name.toLowerCase()} down`); } }); }
+  const txt = on ? `${w.D.ic} ${w.D.name}${w.D.tank ? ` 💧${w.tank}` : ''}` : '';
+  if (txt !== W.chipT) { W.chipT = txt; el.innerHTML = on ? `${txt}<i>✕</i>` : ''; el.hidden = !on; el.classList.toggle('low', !!(on && w.D.tank && w.tank <= 4)); }
+  const b = document.getElementById('walkSwipe'); if (b) { if (W.btn0 === undefined) W.btn0 = b.innerHTML;
+    const want = on ? `<span><b>${w.D.ic}</b>${w.D.verb}</span>` : W.btn0; if (b.innerHTML !== want && (on || W.btnSet)) { b.innerHTML = want; W.btnSet = on; } }
+}
+function wpnTint() {                                                     // the outdoor material follows the time of day (as todActors does the zombies)
+  const W = wpnState(), T = TOD; if (!T || !T.tint) return; const tn = T.tint, k = 0.85;
+  W.matOut.color.setRGB(1 + (Math.min(1.25, tn.r) - 1) * k, 1 + (Math.min(1.25, tn.g) - 1) * k, 1 + (Math.min(1.25, tn.b) - 1) * k); W.matDS.color.copy(W.matOut.color);
+}
+function wpnTick(dt) {
+  const W = wpnState(), on = walk.on && gameMode === 'walk';
+  if (!on) { if (W.wasOn) { W.wasOn = false; wpnReset(); } if (W.chip) wpnChip(); return; }
+  if (!W.wasOn) { W.wasOn = true; wpnInit(); wpnReset(); }
+  if (state !== 'playing') { wpnChip(); return; }
+  wpnTint();
+  const p = walk.pos, cam = camera.position;
+  if (W.held && W.held.st === 'held') { const why = (gunRig.state === 'cat' && gunRig.ammo > 0) || laser.state === 'cat'; if (why) { const h = W.held; wpnDrop(h); showWalkName(`${h.D.ic} PKR drops the ${h.D.name.toLowerCase()} for the ${laser.state === 'cat' ? 'laser' : 'pistol'}`); } }
+  for (const w of W.list) {
+    if (w.st === 'home' || w.st === 'ground') {
+      const dx = w.g.position.x - p.x, dz = w.g.position.z - p.z, d = Math.hypot(dx, dz), dy = w.g.position.y - p.y - (w.st === 'home' && w.D.id === 'sword' ? 0.8 : 0);   /* (the sword: its stone's at her height, its hilt isn't) */
+      if (w.noPick && d > 1.3) w.noPick = false;
+      if (!w.noPick && d < 0.8 && dy > -0.9 && dy < 0.9 && !(walk.napT > 0)) { const why = wpnMouthBusy(); if (why) { if (clock > (W.busyT || 0)) { W.busyT = clock + 4; showWalkName(`${why}: put that down first`); } } else wpnPickup(w); }
+      else if (d < 4.5 && Math.abs(dy) < 3 && !W.found.has(w.D.id) && !W.said['f' + w.D.id]) { W.said['f' + w.D.id] = 1; showWalkName(w.D.find); }
+      const gd = Math.hypot(w.g.position.x - cam.x, w.g.position.y - cam.y, w.g.position.z - cam.z), vis = gd < 70 && (wpnInside(w.g.position) || povEndWall.visible || cam.y > UPPER.CH);
+      w.g.visible = vis; const gl = w.glint; gl.visible = vis && gd < 55 && w.st === 'home';
+      if (gl.visible) { const tw = (Math.sin(clock * 2.3 + w.ph) * 0.5 + 0.5), k = Math.pow(tw, 3); gl.position.copy(w.g.position).y += w.D.id === 'sword' ? -0.05 : 0.18; gl.scale.setScalar((0.18 + 0.42 * k) * (1 + gd * 0.015)); gl.material.rotation = clock * 0.4; }
+      w.g.children.forEach(o => { if (o.material === W.matOut || o.material === W.matIn) o.material = wpnInside(w.g.position) ? W.matIn : W.matOut; });
+    } else { w.glint.visible = false; }
+  }
+  if (W.rock) W.rock.visible = Math.hypot(W.rock.position.x - cam.x, W.rock.position.z - cam.z) < 70 && povEndWall.visible;
+  const w = W.held;
+  if (w) {
+    const sw = W.sw;
+    if (sw && sw.w === w && w.st === 'held') {
+      if (!W.frozen) {
+        const k0 = sw.t / sw.T; sw.t += dt; const k1 = sw.t / sw.T;
+        if (!sw.done && k0 <= sw.kc && k1 >= sw.kc) { sw.done = true; if (sw.zon || w.D.style === 'shoot' || w.D.puck) wpnContact(sw); }
+        if (sw.t > sw.T + 0.16) W.sw = null; } }
+    wpnHeldPose(w, dt);
+    w.mesh.material = wpnInside(p) ? W.matIn : W.matOut; w.glint.visible = false;
+    if (w.D.tank && w.tank < w.D.tank && TOD && TOD.wx === 'rain' && TOD.W > 0.4 && !wpnInside(p) && (W.rainT = (W.rainT || 0) + dt) > 1.5) { W.rainT = 0; w.tank++; wpnChip(); }
+  }
+  wpnTrail(dt); wpnPucks(dt);
+  { const F = W.flash; if (F && F.s.visible) { F.t += dt; const k = F.t / 0.16; F.s.scale.setScalar(0.7 + k * 1.6); F.s.material.opacity = Math.max(0, 1 - k); F.s.material.rotation = k * 0.8; if (k >= 1) F.s.visible = false; } }
+  { const J = W.jet; if (J && J.m.visible) { J.t += dt; J.m.material.opacity = Math.max(0, 0.8 - J.t * 7); if (J.t > 0.12) J.m.visible = false; } }
+  if (ZN && ZN.on && !W.held && inOurYard(p.x, p.z)) {                  // zombie night, empty-pawed: a nudge toward the nearest weapon in the yard
+    if (!W.zHint) W.zHint = clock + 7; else if (clock > W.zHint && W.hintN < 2) { W.zHint = clock + 40; W.hintN++;
+      const near = W.list.filter(o => o.st !== 'held' && o.st !== 'grab' && inOurYard(o.g.position.x, o.g.position.z)).sort((a, b) => a.g.position.distanceTo(p) - b.g.position.distanceTo(p))[0];
+      if (near) showWalkName(near.D.id === 'sword' ? '✨ Psst... the sword in the stone, out in the middle of the lawn!' : `✨ Psst... ${near.D.full} is lying in the yard!`); } }
+  else if (!(ZN && ZN.on)) W.zHint = 0;
+  wpnChip();
+}
+function wpnTap(x, y) {                                                  // (the walkTap wrapper) a tap on a weapon lying about: pick it up if she's close, else say what it is
+  const W = wpnState(); if (!W.built || !walk.on || state !== 'playing') return false;
+  if (mirrorWorld) x = window.innerWidth - x;
+  const v = wpnV(); let best = null, bd = 46;
+  for (const w of W.list) { if ((w.st !== 'home' && w.st !== 'ground') || !w.g.visible) continue; v.copy(w.g.position); if (w.D.id === 'sword') v.y -= 0.3;
+    v.project(camera); if (v.z > 1) continue; const sx = (v.x * 0.5 + 0.5) * window.innerWidth, sy = (-v.y * 0.5 + 0.5) * window.innerHeight, d = Math.hypot(sx - x, sy - y); if (d < bd) { bd = d; best = w; } }
+  if (!best) return false;
+  const d = Math.hypot(best.g.position.x - walk.pos.x, best.g.position.z - walk.pos.z);
+  if (d < 2.6 && Math.abs(best.g.position.y - walk.pos.y) < 1.5) { const why = wpnMouthBusy(); if (why) showWalkName(`${why}: put that down first`); else wpnPickup(best); }
+  else showWalkName(`${best.D.ic} ${best.D.full[0].toUpperCase() + best.D.full.slice(1)}: walk over to it to pick it up`);
+  return true;
+}
+/* ---------- the bird bath ---------- */
+function bbWater(bb) {                                                   // (from the yard builder, before its bake) the bowl as a real basin with a rim, and the water sitting down inside it
+  try {
+    const kids = bb.children.slice(), bowl = kids.find(o => o.geometry && o.geometry.parameters && o.geometry.parameters.radiusTop === 0.68), old = kids.find(o => o.geometry && o.geometry.parameters && o.geometry.parameters.radiusTop === 0.56);
+    if (!bowl || !old) return;
+    const prof = [[0.001, -0.1], [0.36, -0.1], [0.5, -0.04], [0.64, 0.06], [0.69, 0.11], [0.69, 0.13], [0.66, 0.145], [0.62, 0.135], [0.57, 0.1], [0.45, 0.065], [0.001, 0.055]].map(([r, y]) => new THREE.Vector2(r, y));
+    bowl.geometry.dispose(); bowl.geometry = new THREE.LatheGeometry(prof, 24);               // (was a solid drum: its flat top lay exactly level with the water disc)
+    bb.remove(old); old.geometry.dispose();
+    const tex = canvasTex(64, 64, (c, w, h) => { const g = c.createRadialGradient(26, 24, 2, 32, 32, 34); g.addColorStop(0, '#d8f0ff'); g.addColorStop(0.35, '#a8d4f0'); g.addColorStop(1, '#6fa6cc'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2; c.beginPath(); c.arc(32, 34, 14, 3.6, 4.6); c.stroke(); c.beginPath(); c.arc(32, 34, 22, 3.9, 4.3); c.stroke(); }, 1, 1);
+    const wm = new THREE.MeshBasicMaterial({ color: 0xffffff, map: tex, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.615, 28), wm); water.rotation.x = -Math.PI / 2; water.position.y = 1.37;   /* 2 cm under the rim, 7 cm over the basin's floor */
+    water.userData.keep = true; water.userData.noWalk = true; water.userData.name = 'Bird bath water'; bb.add(water);
+    bbWater.st = { bb, water, y: 1.37, x: bb.position.x, z: bb.position.z, rings: [], wasIn: false, wet: false, t: 0, vy: 0, birds: null };
+  } catch (e) {}
+}
+function bbRipple(x, z, size, delay) {
+  const B = bbWater.st; if (!B) return; let r = B.rings.find(q => q.t >= q.life);
+  if (!r) { if (B.rings.length >= 4) return; const m = new THREE.Mesh(new THREE.RingGeometry(0.74, 1, 28), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }));
+    m.material.userData.noTod = true; m.rotation.x = -Math.PI / 2; m.renderOrder = 3; m.userData.noWalk = true; m.visible = false; scene.add(m); r = { m, t: 1, life: 0.9, size: 1 }; B.rings.push(r); }
+  const dx = x - B.x, dz = z - B.z, d = Math.hypot(dx, dz), k = d > 0.42 ? 0.42 / d : 1;          // (kept inside the bowl)
+  r.t = -(delay || 0); r.size = Math.min(size, 0.6); r.m.position.set(B.x + dx * k, B.y + 0.004, B.z + dz * k); r.m.visible = false;
+}
+function bbSplash(s) {                                                   // SPLOOSH: water flung up out of the bowl, rings, the splash sound, the birds off
+  const B = bbWater.st, p = walk.pos; if (!B) return;
+  const n = devTier() === 'low' ? 10 : 18;
+  burst(wpnV(p.x, B.y + 0.1, p.z), 0xbfe2ff, Math.round(n * s), 2.2 * s + 0.8, 3.6 * Math.sqrt(s), 0.5); burst(wpnV(p.x, B.y + 0.06, p.z), 0xffffff, Math.round(n * 0.5 * s), 1.5, 2.8, 0.36);
+  for (let k = 0; k < 3; k++) bbRipple(p.x, p.z, 0.3 + k * 0.15 + s * 0.15, k * 0.12);
+  try { splashSound(Math.min(1, 0.35 + s * 0.45)); } catch (e) {}
+  bbBirdsOff(); B.wet = true;
+  if (!B.said) { B.said = 1; showWalkName('💦 SPLOOSH! PKR is in the bird bath'); }
+  const W = wpnState(), w = W.held; if (w && w.D.tank && w.tank < w.D.tank) { w.tank = w.D.tank; wpnChip(); showWalkName('💦 Water pistol refilled!'); }
+}
+function bbBirdMesh() {                                                  // a little sparrow: one body mesh, one pair of wings (a shallow V that flaps by flipping)
+  const W = wpnMats(), body = new THREE.Mesh(wpnMerge([[new THREE.SphereGeometry(0.075, 10, 8), 0x8a6a4a, 0, 0, 0, 0, 0, 0, 0.85, 0.8, 1.25], [new THREE.SphereGeometry(0.06, 8, 6), 0xe8dcc4, 0, -0.025, 0.02, 0, 0, 0, 0.8, 0.7, 1],
+    [new THREE.SphereGeometry(0.05, 8, 6), 0x7a5a3c, 0, 0.06, 0.08], [new THREE.ConeGeometry(0.016, 0.04, 6), 0xe8b030, 0, 0.055, 0.135, Math.PI / 2, 0, 0], [new THREE.SphereGeometry(0.011, 6, 4), 0x111111, 0.034, 0.07, 0.1], [new THREE.SphereGeometry(0.011, 6, 4), 0x111111, -0.034, 0.07, 0.1],
+    [new THREE.BoxGeometry(0.05, 0.012, 0.09), 0x5a4230, 0, 0.01, -0.12, 0.3, 0, 0]]), W.matOut);
+  const wg = new THREE.BufferGeometry(), V = [0, 0, 0.04, 0.16, 0.035, 0.0, 0, 0, -0.05,   0, 0, 0.04, 0, 0, -0.05, -0.16, 0.035, 0.0], C = []; for (let i = 0; i < 6; i++) C.push(0.42, 0.32, 0.22);
+  wg.setAttribute('position', new THREE.Float32BufferAttribute(V, 3)); wg.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); wg.computeVertexNormals();
+  const wings = new THREE.Mesh(wg, W.matDS); wings.position.set(0, 0.03, 0); body.add(wings);
+  body.rotation.order = 'YXZ'; body.userData.noWalk = true; body.userData.name = 'Sparrow'; return { g: body, wings };
+}
+function bbBirdsOff() { const B = bbWater.st; if (!B || !B.birds) return; for (const b of B.birds) if (b.st === 'perch') { b.st = 'fly'; b.t = 0; b.dir = Math.random() * Math.PI * 2; tone(3200 + Math.random() * 800, 4200, 0.06, 'sine', 0.012); } B.away = clock + 25 + Math.random() * 20; }
+function bbTick(dt) {
+  const B = bbWater.st; if (!B || !walk.on || gameMode !== 'walk' || state !== 'playing') return;
+  const p = walk.pos, d = Math.hypot(p.x - B.x, p.z - B.z), inB = d < 0.6 && p.y > B.y - 0.15 && p.y < B.y + 0.12;
+  if (!walk.grounded) B.vy = walk.vy;
+  else if (!inB) B.vy *= Math.exp(-dt * 6);
+  if (inB && walk.grounded && !B.wasIn && clock > (B.splT || 0)) { B.splT = clock + 0.8; bbSplash(Math.min(1.2, Math.max(0.35, Math.abs(B.vy || 0) / 6))); B.vy = 0; }
+  if (inB && walk.grounded) { B.t += dt; const sp = Math.hypot(walk.vel.x, walk.vel.z); if (B.t > (sp > 0.3 ? 0.35 : 1.4)) { B.t = 0; bbRipple(p.x, p.z, sp > 0.3 ? 0.45 : 0.25); if (sp > 0.3 && Math.random() < 0.5) burst(wpnV(p.x, B.y + 0.04, p.z), 0xcfe8ff, 3, 1, 1.4, 0.26); } }
+  if (B.wasIn !== (inB && walk.grounded)) B.wasIn = inB && walk.grounded;
+  if (B.wet && !inB && walk.grounded && d > 0.75 && p.y < B.y - 0.2 && !((walk.shakeT || 0) > 0)) { B.wet = false; walk.shakeT = 0.9; walk.wet = 0; noise(0.6, 0.05, 2600); showWalkName('💦 Brrr! PKR shakes off the bird bath'); }
+  if (TOD && TOD.wx === 'rain' && TOD.W > 0.4 && d < 30 && Math.random() < dt * 3) bbRipple(B.x + (Math.random() - 0.5) * 0.8, B.z + (Math.random() - 0.5) * 0.8, 0.12 + Math.random() * 0.1);   /* (rain on the water) */
+  for (const r of B.rings) { if (r.t >= r.life) { r.m.visible = false; continue; } r.t += dt; const k = r.t / r.life; r.m.visible = k > 0 && k < 1; if (k > 0) { r.m.scale.setScalar(0.04 + k * r.size); r.m.material.opacity = (1 - k) * 0.9; } }
+  const day = TOD && TOD.nightF < 0.4 && !(TOD.wx === 'rain' && TOD.W > 0.2) && !(ZN && ZN.on), near = Math.hypot(p.x - B.x, p.z - B.z) < 3.4 && Math.abs(p.y - 1) < 3;
+  if (!B.birds) { if (!day) return; const W = wpnMats(); B.birds = [0, 1].map(i => { const o = bbBirdMesh(); W.root ? W.root.add(o.g) : scene.add(o.g); return { g: o.g, wings: o.wings, i, st: 'gone', t: 0, ph: i * 2.1, a: i ? 2.4 : -0.6 }; }); B.away = 0; }
+  const camD = Math.hypot(camera.position.x - B.x, camera.position.z - B.z);
+  for (const b of B.birds) { const g = b.g;
+    if (b.st === 'gone') { g.visible = false; if (day && clock > (B.away || 0) && !near && Math.hypot(p.x - B.x, p.z - B.z) > 6) { b.st = 'land'; b.t = 0; b.dir = b.a + Math.PI; } continue; }
+    const rx = B.x + Math.sin(b.a) * 0.64, rz = B.z + Math.cos(b.a) * 0.64, ry = B.y + 0.09;   /* (on the rim, facing in) */
+    if (b.st === 'land') { b.t += dt; const k = Math.min(1, b.t / 1.6), e = 1 - Math.pow(1 - k, 2), far = (1 - e) * 9; g.position.set(rx + Math.sin(b.dir) * far, ry + (1 - e) * 4, rz + Math.cos(b.dir) * far); g.rotation.y = b.dir + Math.PI; b.wings.scale.set(1, Math.sin(clock * 40 + b.ph) * 1.6, 1); if (k >= 1) { b.st = 'perch'; b.t = 0; }
+      if (!day || near) { b.st = 'fly'; b.t = 0; b.dir = Math.random() * 6.28; } }
+    else if (b.st === 'perch') { b.t += dt; g.position.set(rx, ry, rz); const dip = Math.max(0, Math.sin(b.t * 1.3 + b.ph)) > 0.92 ? 0.6 : 0; g.rotation.set(dip, b.a + Math.PI + Math.sin(b.t * 0.7 + b.ph) * 0.5, 0); b.wings.scale.set(0.3, 1, 1);   /* (wings folded) */
+      if (Math.random() < dt * 0.3) g.position.y += 0.03;
+      if (near || !day) bbBirdsOff(); }
+    else if (b.st === 'fly') { b.t += dt; const k = b.t; g.position.set(rx + Math.sin(b.dir) * k * k * 3.5, ry + k * 2.6 + k * k, rz + Math.cos(b.dir) * k * k * 3.5); g.rotation.set(-0.3, b.dir, 0); b.wings.scale.set(1, Math.sin(clock * 45 + b.ph) * 1.7, 1); if (b.t > 3) { b.st = 'gone'; } }
+    g.visible = b.st !== 'gone' && camD < 60 && povEndWall.visible; }
+}
+/* the hooks: chained wrappers (each calls the one before; other blocks can wrap these too) */
+walkSwipe = (function (prev) { return function () { let r = false; try { r = wpnSwipe(); } catch (e) { r = false; } if (r === true) return; return prev.apply(this, arguments); }; })(walkSwipe);
+walkTap = (function (prev) { return function (x, y) { try { if (wpnTap(x, y)) return; } catch (e) {} return prev.apply(this, arguments); }; })(walkTap);
+updateZombies = (function (prev) { return function (dt) { const W = wpnState(), slow = W.stopT > 0; W.frozen = slow; if (slow) W.stopT = Math.min(0.2, W.stopT) - dt;   /* (a hit's hit-stop: the zombies (and her swing) all but freeze for a few frames) */
+  const r = prev.call(this, slow ? dt * 0.05 : dt);
+  try { wpnTick(dt); bbTick(dt); } catch (e) { if (W.err++ < 3) console.warn('WEAPONS_V1', e); }
+  return r; }; })(updateZombies);
+try { parts.forEach(q => { q.m.userData.noWalk = true; }); } catch (e) {}   /* (the pooled particles were never meant to be stood on: a big splash drop counted as a ledge for a frame) */
+window.addEventListener('keydown', e => { if (e.repeat || (e.key || '').toLowerCase() !== 'g') return; try { const W = wpnState(), h = W.held; if (h && h.st === 'held' && walk.on && state === 'playing' && gameMode === 'walk') { wpnDrop(h); showWalkName(`${h.D.ic} PKR puts the ${h.D.name.toLowerCase()} down`); } } catch (err) {} });
+/* (end of WEAPONS_V1) */
+
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
