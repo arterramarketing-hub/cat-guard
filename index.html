@@ -10757,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-13 17:45';                                              // stamped when the site is published
+const BUILD = '2026-10-13 17:53';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -43900,6 +43900,260 @@ function run2CatscoSigns(G, L, sE) {                                     // the 
 }
 run2Install();
 /* (end of RUN2_V1) */
+/* LOT2_V1 */
+/* =====================================================================
+   LOT2_V1 (2026-10-13): Meow Lot's barrier gates, made a ticket barrier. Before, every gate flipped up/down with EVERY move
+   anywhere (parity), so players had to count moves and waste one to wait. Now each gate starts DOWN and never moves by
+   itself: tap its ticket booth (the yellow pillar with the red button and the lamp, the ticket badge over it, or its arm) to lift
+   it. That's a move (stars count it; the grumpy neighbour steps as for any move). A lifted barrier stays up till ONE car
+   drives out through it, then drops behind that car (one ticket per car). Swiping a car into a barrier that's down rolls it
+   to the stop line (a move only if it moved) and says where to tap, the booth's badge pulsing. Undo/restart/snap restore
+   the gates (they're in the state: S.S.gu, a bit per gate, in lotKey too).
+   The solver (lotSolveRun / lotSolveAny) also tries "lift gate g" (move [cars + g, 0]); every gated lot's fewest moves and
+   best line were re-found with it offline (lot2Data); a lot with no gates plays exactly as before (same keys, same order).
+   Saved progress: stars and the fish paid for them are kept; the gated lots' best-moves (counted under the old rules) are
+   cleared once (flag tips.gate2m). The first-time tip is new ('gate2'), so returning players see it once.
+   How: lot2Install() (the one guarded call below) swaps the rule functions and chains onto lotLevels, lotProg,
+   lotDecorGeo, lotLoad, lotTry, lotContact, lotSnap, lotHintStep, lotTips, lotSfx and lotBuildUI; lotWorldStep is
+   replaced (gates + the neighbour). No lights; one merged mesh for the machines, a small lamp each (two shared materials).
+   ===================================================================== */
+/* ---------- the rules, with ticket barriers (the solver uses these too) ---------- */
+function lot2Prep(L) {                                                   // the lot's gates, in order (top, right, bottom, left; along each): L.gt [{s, i}], L.gi[s * 16 + i] -> its index
+  if (L.gt) return L; L.gt = []; L.gi = {};
+  for (let s = 0; s < 4; s++) for (let i = 0; i < L.e[s].length; i++) { const c = L.e[s][i]; if (c === 'g' || c === 'G') { L.gi[s * 16 + i] = L.gt.length; L.gt.push({ s, i }); } }
+  return L;
+}
+function lot2Rules() {                                                   // (once, below) every gate starts down and stays down till its booth is tapped (a move); up, it lets ONE car out, then drops behind it
+  lotState = function (L) { const n = L.v.length, pos = new Int8Array(n); L.v.forEach((v, i) => { pos[i] = v.hz ? v.x : v.y; }); return { pos, gu: 0, pi: 0, pd: 1 }; };
+  lotCopy = function (S) { return { pos: Int8Array.from(S.pos), gu: S.gu | 0, pi: S.pi, pd: S.pd }; };
+  lotKey = function (S) { let s = ''; for (let i = 0; i < S.pos.length; i++) s += String.fromCharCode(S.pos[i] + 66); return s + (S.gu | 0) + S.pi + (S.pd > 0 ? '+' : '-'); };   /* (a lot with no gates: the very same keys as before) */
+  lotGateOpen = function (c, up) { return c === '1' || ((c === 'g' || c === 'G') && !!up); };
+  lotSlide = function (L, S, i, d, occ, R) {                             // how far car i slides that way, and what stops it (as before; R.gate: the gate it went out through, or stopped at, else -1)
+    const v = L.v[i], p = S.pos[i], lim = v.hz ? L.w : L.h, w = L.w, ped = L.hasPed ? L.n[S.pi] : null; let k = 0;
+    R.j = -1; R.hiss = false; R.gate = -1;
+    for (;;) {
+      const a = d > 0 ? p + v.l + k : p - 1 - k;
+      if (a < 0 || a >= lim) {
+        const side = v.hz ? (d > 0 ? 1 : 3) : (d > 0 ? 2 : 0), ln = v.hz ? v.y : v.x, c = L.e[side][ln];
+        R.side = side; R.k = k; R.np = p + d * k;
+        if (c === '0') { R.c = 'wall'; return R; }
+        if (c !== '1') { const gi = (L.gt ? L : lot2Prep(L)).gi[side * 16 + ln]; R.gate = gi === undefined ? -1 : gi; if (!(gi !== undefined && (S.gu >> gi) & 1)) { R.c = 'gate'; return R; } }
+        if (v.k === 'i') { let o = 0; for (let j = 0; j < S.pos.length; j++) if (j !== i && S.pos[j] >= 0) o++; if (o) { R.c = 'wait'; return R; } }
+        R.c = 'out'; R.np = -1; return R;
+      }
+      const cx = v.hz ? a : v.x, cy = v.hz ? v.y : a, o = occ[cy * w + cx];
+      if (o === -2) { R.c = 'block'; break; }
+      if (o >= 0 && o !== i) { R.c = 'car'; R.j = o; R.hiss = v.cat || L.v[o].cat; break; }
+      if (ped && ped[0] === cx && ped[1] === cy) { R.c = 'ped'; break; }
+      k++;
+    }
+    R.k = k; R.np = p + d * k; return R;
+  };
+  lotStep = function (L, S, i, d, occ, R) {                              // one move, into S: a car swiped (i < cars), or gate i - cars lifted (true: it was a move)
+    const nC = L.v.length; if (!L.gt) lot2Prep(L);
+    if (i >= nC) { const g = i - nC; R.c = 'lift'; R.g = g; R.gate = g; R.j = -1; R.hiss = false; R.k = 0; R.np = 0;
+      if (g >= L.gt.length || (S.gu >> g) & 1) return false; S.gu |= 1 << g; }
+    else { lotOcc(L, S.pos, occ); lotSlide(L, S, i, d, occ, R);
+      if (R.np !== -1 && R.k === 0) return false;
+      S.pos[i] = R.np; if (R.np === -1 && R.gate >= 0) S.gu &= ~(1 << R.gate); }      /* (out through a gate: it drops behind her) */
+    if (L.hasPed) { lotOcc(L, S.pos, occ); const P = L.n; let pd = S.pd, ni = S.pi + pd; if (ni < 0 || ni >= P.length) { pd = -pd; ni = S.pi + pd; }
+      R.pedMoved = occ[P[ni][1] * L.w + P[ni][0]] < 0; if (R.pedMoved) S.pi = ni; S.pd = pd; }
+    return true;
+  };
+  lotSolveRun = function (J, ms) {                                       // (as before, and each gate that's down can be lifted: one more kind of move)
+    if (J.done) return true; const L = J.L, occ = J.occ, R = J.R, seen = J.seen, q = J.q, t0 = performance.now(), nC = L.v.length, nG = lot2Prep(L).gt.length; let n = 0;
+    while (J.h < q.length) {
+      const S = q[J.h++], ks = lotKey(S);
+      for (let i = 0; i < S.pos.length && !J.goal; i++) { if (S.pos[i] < 0) continue;
+        for (let d = 1; d >= -1; d -= 2) { const T = lotCopy(S); if (!lotStep(L, T, i, d, occ, R) || R.hiss) continue; const kt = lotKey(T); if (seen.has(kt)) continue;
+          seen.set(kt, [ks, i, d]); if (lotDone(T)) { J.goal = kt; break; } q.push(T); } }
+      if (J.goal) break;
+      for (let g = 0; g < nG; g++) { if ((S.gu >> g) & 1) continue; const T = lotCopy(S); if (!lotStep(L, T, nC + g, 0, occ, R)) continue; const kt = lotKey(T); if (seen.has(kt)) continue; seen.set(kt, [ks, nC + g, 0]); q.push(T); }
+      if (seen.size > J.cap) { J.over = true; break; }
+      if ((++n & 63) === 0 && performance.now() - t0 > ms) return false;
+    }
+    J.done = true; J.q = null;
+    if (J.goal) { const out = []; for (let k = J.goal; seen.get(k); k = seen.get(k)[0]) { const e = seen.get(k); out.push([e[1], e[2]]); } J.res = out.reverse(); }
+    return true;
+  };
+  lotSolveAny = function (L, S0, cap) {                                  // (as before, with the lifts)
+    const occ = new Int16Array(L.w * L.h), R = {}, heap = [], seen = new Map(), nC = L.v.length, nG = lot2Prep(L).gt.length, cnt = S => { let n = 0; for (let i = 0; i < S.pos.length; i++) if (S.pos[i] >= 0) n++; return n; };
+    const push = (S, g, key) => { const f = cnt(S) * 3 + g; heap.push([f, S, g, key]); let c = heap.length - 1; while (c > 0) { const p = (c - 1) >> 1; if (heap[p][0] <= heap[c][0]) break; [heap[p], heap[c]] = [heap[c], heap[p]]; c = p; } };
+    const pop = () => { const top = heap[0], e = heap.pop(); if (heap.length) { heap[0] = e; let c = 0; for (;;) { const l = c * 2 + 1, r = l + 1; let m = c; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === c) break; [heap[m], heap[c]] = [heap[c], heap[m]]; c = m; } } return top; };
+    const k0 = lotKey(S0); seen.set(k0, null); push(S0, 0, k0);
+    while (heap.length && seen.size < (cap || 200000)) {
+      const [, S, g, ks] = pop(); if (lotDone(S)) { const out = []; for (let k = ks; seen.get(k); k = seen.get(k)[0]) { const e = seen.get(k); out.push([e[1], e[2]]); } return out.reverse(); }
+      for (let i = 0; i < S.pos.length; i++) { if (S.pos[i] < 0) continue; for (let d = 1; d >= -1; d -= 2) { const T = lotCopy(S); if (!lotStep(L, T, i, d, occ, R) || R.hiss) continue; const kt = lotKey(T); if (seen.has(kt)) continue; seen.set(kt, [ks, i, d]); push(T, g + 1, kt); } }
+      for (let e = 0; e < nG; e++) { if ((S.gu >> e) & 1) continue; const T = lotCopy(S); if (!lotStep(L, T, nC + e, 0, occ, R)) continue; const kt = lotKey(T); if (seen.has(kt)) continue; seen.set(kt, [ks, nC + e, 0]); push(T, g + 1, kt); }
+    }
+    return null;
+  };
+}
+function lot2Data() {                                                    // gated lots under the new rules: index -> [seed, fewest moves, a best line] (BFS, offline; '0^' = lift gate 0)
+  return { 23: [1851, 17, "h-f+k-c+m-l-0^b-c-d-a+f+c-g+i-e+j+"], 24: [1888, 18, "i+a-1^k+1^d+c-b-a+e+c-h-b-f-g-l-j-a+"], 27: [1999, 20, "g+i+j+d+e+f-b+a+c-f-e-d-j-e+0^b+h-g+a+e-"], 28: [2036, 22, "e+i+j+d-b+f-k+c-g+b+0^l-0^a-0^h-c-1^i-f+d+g+"], 29: [2073, 20, "f+g+e-h+l+m+j+b-c-1^a-0^i+k+e+d+b-c-0^f+"], 32: [2184, 21, "c+k+j+i+g+n-f-e-0^d-a-l-b-c+k+i+m+e+h-l-b-"], 33: [2221, 16, "d+e+a-c-f-i+j-0^h+g-k-b+d+e+f-g-"], 34: [2258, 22, "d+k-b+i+e+g-l+o+f+h+o-a+m+c+b-0^j-0^n-l+o+a+"], 35: [2295, 11, "d+b+a-c-f-g+d+e+h+i+b+"], 36: [2332, 27, "b+k+l+m+e+h+n+o+0^c-h-k-m-b-d-l+a+j+g+f-h-i-k-m+1^d-b-"], 37: [2369, 20, "c+f-e-k+j+0^d-a-m-b-c+k+i+g+l+a-m-e+h-b-"], 38: [2406, 28, "c-e-i+b-j+f-l-m-n-k+a+f+i+l+n+b+g+o+c+b-d-h-l-m-n-0^f-b-"], 39: [2443, 31, "d-e-i-g-f-h-e+d+m-l+j+m+k+a-j-m-b+a+c+i-g-f-n+0^d-0^e-j-1^m-a+"] };
+}
+function lot2Install() {
+  if (lot2Install.done) return; lot2Install.done = true;
+  const ok = f => typeof f === 'function';
+  if (!ok(lotLevels) || !ok(lotStep) || !ok(lotLoad) || !ok(lotTry)) return;
+  lot2Rules();
+  { const f0 = lotLevels; lotLevels = function () { const out = f0.apply(this, arguments); if (out && !out.lot2) { out.lot2 = true; try { lot2Levels(out); } catch (e) { lot2Err(e); } } return out; }; }
+  { const f0 = lotProg; lotProg = function () { const p = f0.apply(this, arguments); try { lot2Migrate(p); } catch (e) { lot2Err(e); } return p; }; }
+  { const f0 = lotDecorGeo; lotDecorGeo = function (L) { if (!L || !L.hasGate) return f0.apply(this, arguments); return f0.call(this, Object.assign({}, L, { e: L.e.map(s => s.replace(/[gG]/g, '1')) })); }; }   /* (the gates' posts: ticket machines now, drawn below) */
+  { const f0 = lotLoad; lotLoad = function () { const r = f0.apply(this, arguments); try { lot2Gates(); } catch (e) { lot2Err(e); } return r; }; }
+  { const f0 = lotTry; lotTry = function (i, d) { const S = LOT, r = f0.apply(this, arguments);
+      try { const R = S.R; if (r && R && R.np === -1 && R.gate >= 0 && S.gates[R.gate]) { const G = S.gates[R.gate]; G.hold = S.cars[i]; G.holdT = 0; G.pulse = 0; } } catch (e) { lot2Err(e); } return r; }; }
+  { const f0 = lotContact; lotContact = function (V, R, ax, now) { if (!R || R.c !== 'gate') return f0.apply(this, arguments); try { lot2Blocked(V, R, now); } catch (e) { lot2Err(e); } }; }
+  { const f0 = lotSnap; lotSnap = function () { const r = f0.apply(this, arguments); try { lot2GatesSnap(); } catch (e) { lot2Err(e); } return r; }; }
+  { const f0 = lotHintStep; lotHintStep = function () { const S = LOT, H = S.hint; if (H && S.L && H.i >= S.L.v.length) { try { lot2HintGate(H.i - S.L.v.length); } catch (e) { lot2Err(e); } return; } return f0.apply(this, arguments); }; }
+  { const f0 = lotTips; lotTips = function () { const T = f0.apply(this, arguments); if (T && !T.lot2) { T.lot2 = true; const k = T.findIndex(t => t[0] === 'gate'); const tip = ['gate2', L => L.hasGate, '🎟️', 'Ticket barriers', 'The yellow-and-black gaps have a barrier and a ticket booth. Tap the booth to lift the barrier (that counts as a move). It stays up till ONE car drives out, then drops behind it: one ticket per car!']; if (k >= 0) T[k] = tip; else T.push(tip); } return T; }; }
+  { const f0 = lotSfx; lotSfx = function (n, k) { if (n === 'gate') return;   /* (the old tick on every move: the gates don't flip by themselves any more) */
+      if (n === 'ticket' || n === 'gatedown') { lot2Sfx(n, k); return; } return f0.apply(this, arguments); }; }
+  { const f0 = lotBuildUI; lotBuildUI = function () { const r = f0.apply(this, arguments); try { lot2UI(); } catch (e) { lot2Err(e); } return r; }; }
+  lotWorldStep = lot2WorldStep;
+  if (lotLevels.L && !lotLevels.L.lot2) { lotLevels.L.lot2 = true; try { lot2Levels(lotLevels.L); } catch (e) { lot2Err(e); } }
+}
+function lot2Err(e) { if (!lot2Err.n) { lot2Err.n = 1; console.error(e); } }
+function lot2Levels(Ls) {                                                // every lot: its gates listed; the gated ones: the fewest moves and a best line under the new rules
+  const D = lot2Data();
+  Ls.forEach((L, li) => { lot2Prep(L); if (!L.hasGate) return; const d = D[li];
+    if (!d || d[0] !== L.seed) { L.lot2Need = true; return; }                  /* (a lot that's changed since: solved when it's set out) */
+    lot2SetSol(L, d[1], d[2]); });
+}
+function lot2SetSol(L, min, s) { L.min = min; L.sol = []; for (let i = 0; i + 1 < s.length; i += 2) { const a = s[i], b = s[i + 1]; L.sol.push(b === '^' ? [L.v.length + (+a), 0] : [a.charCodeAt(0) - 97, b === '+' ? 1 : -1]); } }
+function lot2Migrate(p) {                                                // (once) the gated lots' best moves were counted under the old rules: cleared; stars and fish already earned are kept
+  if (!p || !p.tips || p.tips.gate2m) return; p.tips.gate2m = 1;
+  const Ls = lotLevels(); let ch = false; Ls.forEach((L, i) => { if (L.hasGate && p.bm[i]) { p.bm[i] = 0; ch = true; } });
+  if (ch) lotSave();
+}
+function lot2Side(L, s, i) {                                             // which side of the lane the machine stands: by a wall or the corner if it can (-1: before it, +1: after it)
+  const E = L.e[s], good = j => j < 0 || j >= E.length || E[j] === '0';
+  return good(i - 1) ? -1 : good(i + 1) ? 1 : -1;
+}
+function lot2BoothGeo(L) {                                               // the ticket machines (one geometry for them all): a yellow pillar, a dark panel with a ticket slot and a big red button facing the lot, a little roof
+  const parts = [], B = lotRBox, hw = L.w / 2, hh = L.h / 2;
+  for (const g of L.gt) { const s = g.s, hz = s === 1 || s === 3, o = lot2Side(L, s, g.i), x = hz ? (s === 1 ? hw + 0.08 : -hw - 0.08) : g.i - hw + 0.5, z = hz ? g.i - hh + 0.5 : (s === 2 ? hh + 0.08 : -hh - 0.08);
+    const px = x + (hz ? 0 : o * 0.55), pz = z + (hz ? o * 0.55 : 0), inX = s === 1 ? -1 : s === 3 ? 1 : 0, inZ = s === 2 ? -1 : s === 0 ? 1 : 0, ry = Math.atan2(inX, inZ);
+    parts.push([B(0.24, 0.62, 0.24, 0.05), 0xffd23a, px, 0.31, pz, 1, 1, 1, 0, 0, 0]);
+    parts.push([B(0.28, 0.06, 0.28, 0.03), 0xe0303a, px, 0.64, pz, 1, 1, 1, 0, 0, 0]);
+    parts.push([B(0.18, 0.26, 0.04, 0.015), 0x2a2a2e, px + inX * 0.115, 0.42, pz + inZ * 0.115, 1, 1, 1, 0, ry, 0]);
+    parts.push([new THREE.CylinderGeometry(0.045, 0.045, 0.04, 12), 0xff3a3a, px + inX * 0.14, 0.47, pz + inZ * 0.14, 1, 1, 1, inZ ? Math.PI / 2 : 0, 0, inX ? Math.PI / 2 : 0]);
+    parts.push([B(0.11, 0.025, 0.03, 0.01), 0xf4f2ea, px + inX * 0.14, 0.36, pz + inZ * 0.14, 1, 1, 1, 0, ry, 0]);
+    parts.push([B(0.3, 0.05, 0.3, 0.02), 0x2a2a2e, px, 0.025, pz, 1, 1, 1, 0, 0, 0]);
+    g.px = px; g.pz = pz; g.o = o; g.cx = x; g.cz = z; g.bx = px - inX * 0.62; g.by = hz ? 0.62 : 0.98; g.bz = pz; }   /* (its 🎫: above it, or out to the side on a side edge, clear of the arm) */
+  return parts.length ? lotMerge(parts) : new THREE.BufferGeometry();
+}
+function lot2Gates() {                                                   // (after lotLoad) the machines, their lamps, the arms on the right side of the lane, all down
+  const S = LOT, L = S.L, sc = S.scene; if (!L || !sc) return; lot2Prep(L);
+  if (L.lot2Need) { L.lot2Need = false; const r = lotSolve(L, lotState(L), 400000); if (r) { L.min = r.length; L.sol = r; } }
+  if (!S.l2) { S.l2 = { booth: new THREE.Mesh(new THREE.BufferGeometry(), S.M.veh), lamps: [], red: new THREE.MeshBasicMaterial({ color: 0xff2a2a }), green: new THREE.MeshBasicMaterial({ color: 0x2ee86a }), lampGeo: new THREE.SphereGeometry(0.075, 12, 8) }; sc.add(S.l2.booth); }
+  const Z = S.l2; Z.booth.geometry.dispose(); Z.booth.geometry = L.hasGate ? lot2BoothGeo(L) : new THREE.BufferGeometry(); Z.booth.visible = !!L.hasGate;
+  while (Z.lamps.length < L.gt.length) { const m = new THREE.Mesh(Z.lampGeo, Z.red); sc.add(m); Z.lamps.push(m); }
+  Z.lamps.forEach((m, k) => { m.visible = k < L.gt.length; m.material = Z.red; });
+  S.gates.forEach((G, k) => { const g = L.gt[k]; if (!g) return; const hz = g.s === 1 || g.s === 3;
+    G.k = k; G.px = g.px; G.pz = g.pz; G.bx = g.bx; G.by = g.by; G.bz = g.bz; G.cx = g.cx; G.cz = g.cz; G.o = g.o; G.hold = null; G.holdT = 0; G.pulse = 0; G.up = 0; G.lampOn = false;
+    G.m.position.set(g.px, 0.42, g.pz); G.m.rotation.y = (hz ? -Math.PI / 2 : 0) + (g.o > 0 ? Math.PI : 0); G.m.rotation.z = 0;
+    G.lamp = Z.lamps[k]; G.lamp.position.set(g.px, 0.74, g.pz); G.lamp.scale.setScalar(1); });
+  lot2Badges(0, true);
+}
+function lot2GatesSnap() { const S = LOT; for (const G of S.gates) { G.hold = null; G.pulse = 0; G.up = (S.S.gu >> G.k) & 1; G.m.rotation.z = G.up * 1.35; } }
+function lot2WorldStep(dt) {                                              // the gates: up while their ticket's live (and till the car that used it is through), the lamps; the neighbour stomping along his beat
+  const S = LOT, L = S.L, Z = S.l2;
+  for (const G of S.gates) {
+    const bit = G.k !== undefined ? (S.S.gu >> G.k) & 1 : 0;
+    if (G.hold) { const V = G.hold; G.holdT += dt; if (V.mode === 'gone' || G.holdT > 2.2 || Math.hypot(V.x - G.cx, V.z - G.cz) > L.v[V.i].l / 2 + 0.75) { G.hold = null; if (!bit) lotSfx('gatedown'); } }
+    const want = bit || G.hold ? 1 : 0; G.up += (want - G.up) * Math.min(1, dt * (want ? 9 : 7)); G.m.rotation.z = G.up * 1.35;
+    if (G.lamp && Z) { const on = !!want; if (on !== G.lampOn) { G.lampOn = on; G.lamp.material = on ? Z.green : Z.red; }
+      G.pulse = Math.max(0, (G.pulse || 0) - dt); const hinted = S.hint && S.hint.i === L.v.length + G.k, pz = G.pulse > 0 || hinted ? 1 + 0.45 * Math.abs(Math.sin(S.t * 9)) : 1; G.lamp.scale.setScalar(pz); } }
+  if (S.ped && S.pedM.visible) { const P = S.ped, dx = P.tx - P.x, dz = P.tz - P.z, d = Math.hypot(dx, dz);
+    if (d > 0.01) { const st = Math.min(d, dt * 2.2); P.x += dx / d * st; P.z += dz / d * st; P.walk += dt * 10; } else P.walk *= 0.9;
+    S.pedM.position.set(P.x, Math.abs(Math.sin(P.walk)) * 0.05, P.z); S.pedM.rotation.set(0, P.yaw + Math.sin(S.t * 1.3) * 0.1, Math.sin(P.walk) * 0.06); }
+  lot2Badges(dt);
+}
+function lot2Badges(dt, reset) {                                         // a ticket badge over each machine whose barrier's down (it pulses when she's swiped into one, or the hint points there)
+  const S = LOT, u = S.ui, L = S.L; if (!u || !u.l2) return; const B = u.l2.badges, n = L && L.hasGate ? L.gt.length : 0;
+  while (B.length < n) { const d = document.createElement('div'); d.className = 'ml-tk'; d.innerHTML = '<i>P</i><span>TAP</span>'; u.root.appendChild(d); B.push({ d, shown: false, cls: '' }); }
+  B.forEach((b, k) => { const G = S.gates[k], show = k < n && !!G && !reset && !((S.S.gu >> k) & 1) && !G.hold && S.phase === 'play' && !S.won;
+    if (show !== b.shown) { b.shown = show; b.d.style.display = show ? 'flex' : 'none'; } if (!show) return;
+    const hinted = S.hint && S.hint.i === L.v.length + k, cls = G.pulse > 0 || hinted ? 'pulse' : ''; if (cls !== b.cls) { b.cls = cls; b.d.className = 'ml-tk' + (cls ? ' ' + cls : ''); }
+    const [x, y] = lot2BadgeXY(G); b.d.style.transform = `translate(${Math.round(x - 17)}px,${Math.round(y - 18)}px)`; });
+}
+function lot2BadgeXY(G) {                                                // the badge's centre on screen (kept clear of the top bar: beside the booth then)
+  const S = LOT, u = S.ui, key = innerWidth + 'x' + innerHeight; let [x, y] = lotProject(G.bx, G.by, G.bz); y -= 22; G.bClamp = false;
+  if (u && u.l2 && u.l2.barKey !== key && S.phase === 'play') { const t = u.root.querySelector('.ml-top'), r = t && t.getBoundingClientRect(); if (r && r.bottom > 0) { u.l2.barKey = key; u.l2.barB = r.bottom; } }
+  const bb = u && u.l2 && u.l2.barB || 0; if (y - 18 < bb + 4) { y = bb + 24; G.bClamp = true; if (G.k !== undefined && LOT.L && LOT.L.gt[G.k]) { const s = LOT.L.gt[G.k].s; if (s === 0 || s === 2) x += (G.o > 0 ? 1 : -1) * 30; } }
+  return [x, y];
+}
+function lot2HintGate(g) {                                               // the hint arrow over a machine, pointing down at it
+  const S = LOT, u = S.ui, G = S.gates[g]; if (!u || !G || ((S.S.gu >> g) & 1)) { lotHintHide(); return; }
+  const [x, y] = lot2BadgeXY(G), o = 46 + Math.abs(Math.sin(S.t * 5)) * 12, up = G.bClamp;   /* (down onto the badge; up at it from below when it's tucked under the top bar) */
+  u.Arrow.style.transform = `translate(${x - 28}px,${y - 28 + (up ? o : -o)}px) rotate(${(up ? -1 : 1) * Math.PI / 2}rad)`; u.Arrow.classList.add('on');
+}
+function lot2Blocked(V, R, now) {                                         // she swiped a car into a barrier that's down: a thud at the stop line, and where the ticket machine is
+  const S = LOT, L = S.L, v = L.v[V.i], side = R.side, g = side >= 0 ? L.gi[side * 16 + (v.hz ? v.y : v.x)] : undefined;
+  lotSfx('thud'); vibrate(15); lotEmo(V.x, 1.0, V.z, '🚧');
+  if (g !== undefined && S.gates[g]) S.gates[g].pulse = 2.4;
+  lotMsg('🎟️ Tap the booth!', 'It lifts the barrier: one car per ticket');
+}
+function lot2Lift(g) {                                                   // a tap on a ticket machine: the barrier goes up (a move); it stays up for one car
+  const S = LOT, L = S.L; if (!L || !L.gt || S.phase !== 'play' || S.tipOn || S.won) return false;
+  const G = S.gates[g]; if (!G || g >= L.gt.length) return false;
+  if (typeof initAudio === 'function') initAudio(); S.idle = 0;
+  if ((S.S.gu >> g) & 1) { lotSfx('tap'); lotEmo(G.px, 1.1, G.pz, '👍'); return false; }   /* (already up: it's waiting for a car) */
+  if (S.occ.length < L.w * L.h) S.occ = new Int16Array(L.w * L.h);
+  const T = lotCopy(S.S), R = S.R, m = L.v.length + g; if (!lotStep(L, T, m, 0, S.occ, R)) return false;
+  S.hist.push({ S: S.S, moves: S.moves, onPath: S.onPath });
+  if (S.onPath >= 0 && L.sol[S.onPath] && L.sol[S.onPath][0] === m) S.onPath++; else S.onPath = -1;
+  S.S = T; S.moves++; lotHintHide(); G.pulse = 0;
+  lotSfx('ticket'); vibrate(12); lotEmo(G.px, 1.05, G.pz, '🎟️');
+  if (L.hasPed && S.ped) { const [x, z] = lotCell(L, L.n[S.S.pi][0], L.n[S.S.pi][1]); if (x !== S.ped.tx || z !== S.ped.tz) { S.ped.yaw = Math.atan2(x - S.ped.tx, z - S.ped.tz); S.ped.tx = x; S.ped.tz = z; } else if (R.pedMoved === false) lotEmo(S.ped.x, 1.25, S.ped.z, '😤'); }
+  lotHud(); return true;
+}
+function lot2Sfx(n) {                                                    // the machine: a beep-beep, the ticket zipping out, the arm's motor; the arm clacking down
+  if (typeof sndFx === 'function' && sndFx('lot', n)) return;
+  if (!actx || actx.state !== 'running') return;
+  try {
+    if (n === 'ticket') { tone(1568, 1568, 0.06, 'square', 0.012); tone(2093, 2093, 0.08, 'square', 0.012, 0.08); tone(2600, 1400, 0.09, 'triangle', 0.01, 0.17); tone(180, 320, 0.3, 'sawtooth', 0.006, 0.2); }
+    else { tone(320, 200, 0.12, 'triangle', 0.028); tone(150, 90, 0.08, 'square', 0.01, 0.1); }
+  } catch (e) {}
+}
+function lot2GateAt(cx, cy) {                                            // the ticket machine under (or near) her finger: its pillar, the 🎫 over it, its arm (generous: phones)
+  const S = LOT, L = S.L; if (!L || !L.hasGate) return -1; let best = -1, bd = 1e9;
+  const seg = (ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((cx - ax) * dx + (cy - ay) * dy) / l2)); return Math.hypot(cx - ax - dx * t, cy - ay - dy * t); };
+  S.gates.forEach((G, k) => { if (k >= L.gt.length) return;
+    const [bx, by] = lotProject(G.px, 0, G.pz), [tx, ty] = lot2BadgeXY(G), [ux, uy] = lotProject(G.px + 1, 0, G.pz), unit = Math.hypot(ux - bx, uy - by);
+    const g = L.gt[k], hz = g.s === 1 || g.s === 3, ex = G.px + (hz ? 0 : -G.o * 1.05), ez = G.pz + (hz ? -G.o * 1.05 : 0), [ax, ay] = lotProject(G.px, 0.42, G.pz), [qx, qy] = lotProject(ex, 0.42, ez);
+    const r = Math.max(30, unit * 0.5), d = Math.min(seg(bx, by, tx, ty), seg(ax, ay, qx, qy) + 6);
+    if (d < r && d < bd) { bd = d; best = k; } });
+  return best;
+}
+function lot2CarDirect(cx, cy) {                                         // a car right under her finger (its box), as lotPickCar sees it
+  const S = LOT, L = S.L, r = S.vv.r, B = new THREE.Box3(), hit = new THREE.Vector3(); if (!L) return false;
+  r.setFromCamera({ x: cx / window.innerWidth * 2 - 1, y: -(cy / window.innerHeight) * 2 + 1 }, S.cam);
+  for (const V of S.cars) { if (S.S.pos[V.i] < 0 || V.mode === 'exit' || V.mode === 'gone') continue; const v = L.v[V.i], hx = v.hz ? v.l / 2 - 0.04 : 0.42, hz = v.hz ? 0.42 : v.l / 2 - 0.04, top = lotRoofY(v.k) + (v.cat ? 0.25 : 0);
+    B.min.set(V.tx - hx, 0, V.tz - hz); B.max.set(V.tx + hx, top, V.tz + hz); if (r.ray.intersectBox(B, hit)) return true; }
+  return false;
+}
+function lot2UI() {                                                      // (after lotBuildUI) the 🎫 badges' look; taps on the machines (ahead of the car swipes)
+  const S = LOT, u = S.ui; if (!u || u.l2) return; u.l2 = { badges: [] };
+  const st = document.createElement('style'); st.id = 'lot2Style';
+  st.textContent = `#lotUI .ml-tk{position:absolute;left:0;top:0;display:none;flex-direction:column;align-items:center;justify-content:center;width:34px;height:36px;border-radius:11px;background:#fff8ee;border:2px solid #e0303a;box-shadow:0 3px 0 #8a1020,0 4px 10px rgba(0,0,0,.3);pointer-events:none;line-height:1;will-change:transform}
+#lotUI .ml-tk i{display:block;width:21px;height:14px;border-radius:3px;background:#ffd23a;box-shadow:inset 5px 0 0 #e0303a,0 1px 0 #b8801a;font:900 10px/14px var(--body);font-style:normal;color:#3a1f2b;text-align:center;padding-left:4px;box-sizing:border-box;transform:rotate(-8deg)}
+#lotUI .ml-tk span{font:900 8px var(--body);color:#c8303a;letter-spacing:.5px;margin-top:1px}
+#lotUI .ml-tk.pulse{animation:ml2Pulse .55s ease-in-out infinite alternate;background:#ffe27a}
+@keyframes ml2Pulse{from{box-shadow:0 3px 0 #8a1020,0 0 0 0 rgba(255,210,58,.9)}to{box-shadow:0 3px 0 #8a1020,0 0 0 10px rgba(255,210,58,0)}}
+#lotUI.mapping .ml-tk,#lotUI.won .ml-tk,#lotUI.ghost .ml-tk{visibility:hidden}`;
+  document.head.appendChild(st);
+  const area = u.Area, ok = e => S.active && S.phase === 'play' && !S.tipOn && !S.won && S.L && S.L.hasGate && e.target === area;
+  u.root.addEventListener('pointerdown', e => { S.l2p = null; if (!ok(e)) return; const g = lot2GateAt(e.clientX, e.clientY); if (g < 0) return;
+    const direct = lot2CarDirect(e.clientX, e.clientY); S.l2p = { id: e.pointerId, x: e.clientX, y: e.clientY, g, own: !direct };
+    if (!direct) { e.preventDefault(); e.stopPropagation(); if (typeof initAudio === 'function') initAudio(); } }, true);   /* (on the machine: hers; a car right there too: the car's if she swipes, the machine's if she taps) */
+  const up = e => { const P = S.l2p; if (!P || P.id !== e.pointerId) return; S.l2p = null; if (e.type !== 'pointerup') return; const far = Math.hypot(e.clientX - P.x, e.clientY - P.y);
+    if (P.own) { if (far < 44) lot2Lift(P.g); e.stopPropagation(); return; }
+    const G = S.ptr; if (G && G.id === e.pointerId && !G.used && far < 14) { S.ptr = null; lot2Lift(P.g); } };
+  for (const t of ['pointerup', 'pointercancel']) u.root.addEventListener(t, up, true);
+}
+try { lot2Install(); } catch (e) { console.error(e); }
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
