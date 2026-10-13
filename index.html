@@ -10757,7 +10757,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-10-13 00:08';                                              // stamped when the site is published
+const BUILD = '2026-10-13 00:33';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -38192,6 +38192,369 @@ function carHeroTick(dt) {                                               // (eve
   warmJobs = function () { const J = o.warm.apply(this, arguments); try { const R = J.find(j => j.id === 'roam'); if (R && R.steps) R.steps.splice(1, 0, () => { carHeroPrep(); }); } catch (e) {} return J; };
 })();
 /* (end of CAR_V1) */
+/* CXT_V1 */
+/* =====================================================================
+   CROSSY KITTY TEXTURES (2026-10-13): a crisper, toy-like Crossy Kitty. Everything here is prefixed cxt/CXT and only reaches Crossy
+   Kitty through wrappers installed once at load (cxtInstall: crossyGroundTex, crossyGroundSlot, crossyGroundFlow, crossyMod,
+   crossyBuild, crossyLook, crossyLogGeo, crossyPadGeo and the tree / bush / rock / reed / pumpkin builders); no draw calls are added.
+   - The ground: a new atlas, 32 strips of one row each, 8 cells wide and wrapping (1024 x 2048, 128 px a cell; 'low' 512 x 1024).
+     Cells line up with texels (no shimmer on dashes, ties or joints) and every row gets its own whole-cell offset (no repeats you
+     can spot). Strips: grass light/dark in two variants (a faint checker, tufts, the season's flowers or leaves or snow), riverbanks
+     (mud, pebbles; ice in winter) on whichever side the water is, the 401 lanes (asphalt grain, wheel-worn bands, crack sealer,
+     manholes and tar patches, crisp dashes, edge lines and gutters; snowbanks and salt in winter), the off-ramp (arrows), the
+     divider (concrete slabs, joints, yellow lines, road studs), GO tracks (ballast stones, wooden ties with grain, tie plates,
+     steel rails with a shine), the Lower Don Trail (crushed gravel, ruts, grassy edges, puddles; footprints and tyre lines in
+     snow), the shoulder (gravel, weeds) and the river (ripples, foam where it meets a bank; ice shelves in winter). The fronts of
+     the rows (the bit you see above a lower row) have their own strips: earth under a grass lip, a concrete curb, gravel.
+   - The ground's shader (onBeforeCompile): the river shimmers and sparkles (moonlight glints at night), road paint and studs catch
+     the light after dark, and on summer nights fireflies blink over the grass ('low': shimmer only).
+   - Cars, vans, trucks, buses, trains: glass with a sky reflection (bus and GO train windows lit at night), head and tail lights
+     that glow after dark (emissive), body panels with a crease and a shine; barrels' reflective bands and the lamps' lenses glow.
+     It's Crossy's own vehicle material (S.M.veh) with a new atlas: Meow Lot's (the plates) on top, Crossy's pieces below.
+   - Logs with bark and ringed ends, lily pads with veins, ice floes with cracks; trees, bushes, rocks and reeds shaded (darker
+     low down, a little colour per facet).
+   ===================================================================== */
+function cxtRng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function cxtHash(r) { return Math.imul((r | 0) + 1013, 0x9E3779B1) >>> 0; }
+function cxtAniso(low) { let m = 4; try { m = renderer.capabilities.getMaxAnisotropy(); } catch (e) {} return Math.max(1, Math.min(low ? 2 : 8, m)); }
+
+/* ---------- the ground atlas ---------- */
+function cxtGroundTex(sea) {
+  const S = CROSSY, low = !!S.low, W = low ? 512 : 1024, H = W * 2, C = W / 8, R = H / 32, win = sea === 'winter';
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+  const G = { summer: { a: '#86cb52', b: '#7bbf4a', d: '#67a93c', l: '#a2db69', fl: ['#ffe14a', '#ffffff', '#ffe14a', '#fff6a8'], nf: 7 },
+    spring: { a: '#8ed55c', b: '#83c954', d: '#6db548', l: '#aee474', fl: ['#ffd23a', '#ff9cc8', '#ffffff', '#c8a0ff', '#ffb3d9'], nf: 22 },
+    autumn: { a: '#9fbd54', b: '#93b24c', d: '#7d9a3e', l: '#b7cc66', fl: [], nf: 0, lv: ['#e0782c', '#d8452a', '#e8b13a', '#b8541e', '#f0c040'] },
+    winter: { a: '#eef3f8', b: '#e3eaf3', d: '#9aa88c', l: '#ffffff', fl: [], nf: 0 } }[sea] || null;
+  const g = G || { a: '#86cb52', b: '#7bbf4a', d: '#67a93c', l: '#a2db69', fl: ['#ffe14a', '#ffffff'], nf: 7 };
+  let rnd = cxtRng(7);
+  const X = u => u * C, Y = v => v * R;
+  const at = (x, w, f) => { f(x); if (x + w > 8) f(x - 8); if (x - w < 0) f(x + 8); };   // (each strip wraps left to right)
+  const rect = (x, y, w, h, col) => { c.fillStyle = col; const a = Math.round(X(x)), b = Math.round(Y(y)), ww = Math.max(1, Math.round(X(x + w)) - a), hh = Math.max(1, Math.round(Y(y + h)) - b); c.fillRect(a, b, ww, hh); if (a + ww > W) c.fillRect(a - W, b, ww, hh); if (a < 0) c.fillRect(a + W, b, ww, hh); };
+  const band = (y, h, col) => rect(0, y, 8, h, col);
+  const ell = (x, y, rx, ry, col, rot) => { c.fillStyle = col; at(x, rx, xx => { c.beginPath(); c.ellipse(X(xx), Y(y), Math.max(0.7, X(rx)), Math.max(0.7, Y(ry)), rot || 0, 0, 6.2832); c.fill(); }); };
+  const dot = (x, y, s, col) => { c.fillStyle = col; const a = Math.round(X(x)), b = Math.round(Y(y)); c.fillRect(a, b, s, s); if (a + s > W) c.fillRect(a - W, b, s, s); };
+  const poly = (x, y, pts, col) => { c.fillStyle = col; at(x, 0.4, xx => { c.beginPath(); pts.forEach((p, k) => (k ? c.lineTo : c.moveTo).call(c, X(xx + p[0]), Y(y + p[1]))); c.closePath(); c.fill(); }); };
+  const line = (pts, col, w) => { c.strokeStyle = col; c.lineWidth = w; c.lineJoin = c.lineCap = 'round'; for (const o of [0, -8, 8]) { c.beginPath(); pts.forEach((p, k) => (k ? c.lineTo : c.moveTo).call(c, X(p[0] + o), Y(p[1]))); c.stroke(); } };
+  const strip = (i, f) => { c.save(); c.translate(0, i * R); c.beginPath(); c.rect(0, 0, W, R); c.clip(); rnd = cxtRng(i * 7919 + (sea || 's').length * 131 + 17); f(); c.restore(); };
+  const n = k => Math.max(1, Math.round(k * (low ? 0.6 : 1)));
+  const tuft = (x, y, col, s) => { for (const b of [-1, 0, 1]) poly(x, y, [[b * 0.022 - 0.011, 0], [b * 0.022 + 0.011, 0], [b * 0.05 * s, -0.085 * s - (b ? 0 : 0.02)]], col); };
+  const flower = (x, y, col) => { for (let k = 0; k < 5; k++) { const a = k / 5 * 6.2832; ell(x + Math.cos(a) * 0.022, y + Math.sin(a) * 0.022, 0.017, 0.017, col); } ell(x, y, 0.012, 0.012, col === '#ffe14a' ? '#f29a1a' : '#ffd23a'); };
+  const leaf = (x, y, col) => { const a = rnd() * 3.14; ell(x, y, 0.045, 0.036, col, a); ell(x, y, 0.03, 0.007, 'rgba(90,40,10,.3)', a); };
+  const stones = (cnt, y0, y1, cols, r0, r1) => { for (let k = 0; k < cnt; k++) { const x = rnd() * 8, y = y0 + rnd() * (y1 - y0), r = r0 + rnd() * (r1 - r0); ell(x, y + r * 0.35, r * 1.05, r * 0.9, 'rgba(0,0,0,.18)'); ell(x, y, r, r * (0.7 + rnd() * 0.3), cols[(rnd() * cols.length) | 0], rnd() * 3); if (rnd() < 0.5) ell(x - r * 0.25, y - r * 0.3, r * 0.4, r * 0.25, 'rgba(255,255,255,.28)'); } };
+  const grain = (cnt, y0, y1, cols, s) => { for (let k = 0; k < cnt; k++) dot(rnd() * 8, y0 + rnd() * (y1 - y0), s || 2, cols[(rnd() * cols.length) | 0]); };
+  /* grass: 0-3 (light / dark, two layouts), riverbanks 4-7 (water near: 4, 5; water far: 6, 7) */
+  const grass = (i, p, bank) => strip(i, () => {
+    band(0, 1, p ? g.b : g.a);
+    for (let u = 0; u < 8; u++) if ((u + p) & 1) rect(u, 0, 1, 1, win ? 'rgba(110,140,180,.04)' : 'rgba(30,80,10,.04)');   // (a faint checker: the cells read)
+    for (let k = 0; k < n(12); k++) ell(rnd() * 8, 0.18 + rnd() * 0.64, 0.25 + rnd() * 0.45, 0.1 + rnd() * 0.12, win ? 'rgba(255,255,255,.55)' : 'rgba(190,240,120,.16)');
+    for (let k = 0; k < n(10); k++) ell(rnd() * 8, 0.18 + rnd() * 0.64, 0.2 + rnd() * 0.35, 0.08 + rnd() * 0.1, win ? 'rgba(120,150,195,.13)' : 'rgba(40,100,20,.075)');
+    for (let k = 0; k < n(win ? 12 : 44); k++) tuft(rnd() * 8, 0.16 + rnd() * 0.74, win ? g.d : rnd() < 0.62 ? g.d : g.l, 0.7 + rnd() * 0.6);
+    for (let k = 0; k < n(g.nf * (i & 2 ? 1.5 : 0.8)); k++) { const x = rnd() * 8, y = 0.15 + rnd() * 0.7, col = g.fl[(rnd() * g.fl.length) | 0]; flower(x, y, col); if (rnd() < 0.5) flower(x + 0.07, y + 0.05, col); }
+    if (sea === 'autumn') for (let k = 0; k < n(i & 2 ? 24 : 15); k++) leaf(rnd() * 8, 0.1 + rnd() * 0.8, g.lv[(rnd() * g.lv.length) | 0]);
+    if (win) { for (let k = 0; k < n(30); k++) ell(rnd() * 8, 0.12 + rnd() * 0.76, 0.06 + rnd() * 0.1, 0.03 + rnd() * 0.03, 'rgba(160,185,215,.22)'); grain(n(160), 0.05, 0.95, ['rgba(255,255,255,.9)', 'rgba(200,220,245,.8)'], 2); }
+    if (bank) { const top = bank === 'T', y0 = top ? 0 : 0.84, mud = win ? '#dbe6ef' : '#b9a06e', wet = win ? '#b4cadb' : '#86704a';
+      band(y0, 0.16, mud); for (let x = 0; x < 8; x += 0.11) ell(x + rnd() * 0.04, top ? 0.16 : 0.84, 0.075, 0.035 + rnd() * 0.03, mud);
+      stones(n(46), y0 + 0.02, y0 + 0.13, win ? ['#c8d3dc', '#e8eef3'] : ['#9a958a', '#c2bba8', '#7f7a70', '#d8cfb8'], 0.018, 0.04);
+      band(top ? 0 : 0.97, 0.03, wet);
+      if (!win) for (let k = 0; k < n(16); k++) tuft(rnd() * 8, top ? 0.2 + rnd() * 0.05 : 0.83 - rnd() * 0.04, '#4f8a34', 1.2); }
+  });
+  for (let k = 0; k < 4; k++) grass(k, k & 1, null);
+  grass(4, 0, 'B'); grass(5, 1, 'B'); grass(6, 0, 'T'); grass(7, 1, 'T');
+  /* the 401 (8-11, 22) and the off-ramp (12, 13) */
+  const road = (i, o) => strip(i, () => {
+    band(0, 1, o.ramp ? (win ? '#64676e' : '#5a5d64') : (win ? '#575a61' : '#4b4e55'));
+    for (let k = 0; k < n(26); k++) ell(rnd() * 8, rnd(), 0.3 + rnd() * 0.7, 0.1 + rnd() * 0.25, 'rgba(255,255,255,.03)');
+    for (let k = 0; k < n(26); k++) ell(rnd() * 8, rnd(), 0.3 + rnd() * 0.7, 0.1 + rnd() * 0.25, 'rgba(0,0,0,.045)');
+    band(0.24, 0.13, 'rgba(0,0,0,.06)'); band(0.63, 0.13, 'rgba(0,0,0,.06)');                                   // (where the wheels go)
+    grain(n(1500), 0, 1, ['rgba(255,255,255,.07)', 'rgba(0,0,0,.09)', 'rgba(255,255,255,.05)'], low ? 1 : 2);
+    for (let k = 0; k < 3; k++) { let x = rnd() * 8, y = 0.2 + rnd() * 0.6; const pts = [[x, y]]; for (let j = 0; j < 7; j++) { x += 0.12 + rnd() * 0.2; y = Math.max(0.12, Math.min(0.88, y + (rnd() - 0.5) * 0.14)); pts.push([x, y]); } line(pts, 'rgba(24,25,28,.5)', Math.max(1.5, C * 0.016)); }
+    if (o.alt) { const x = 0.6 + rnd() * 2.6; ell(x, 0.5, 0.22, 0.22, '#2f3136'); ell(x, 0.5, 0.19, 0.19, '#46484e');
+      for (let k = -2; k <= 2; k++) { rect(x - 0.15, 0.5 + k * 0.06 - 0.008, 0.3, 0.016, 'rgba(25,26,30,.6)'); } ell(x - 0.05, 0.45, 0.08, 0.04, 'rgba(255,255,255,.07)');
+      const px0 = 4.2 + rnd() * 2; rect(px0, 0.18, 1.3, 0.42, 'rgba(30,31,34,.45)'); rect(px0, 0.18, 1.3, 0.015, 'rgba(255,255,255,.06)'); }
+    if (win) { band(0, 1, 'rgba(235,240,246,.06)'); for (let k = 0; k < n(30); k++) ell(rnd() * 8, rnd() < 0.5 ? 0.08 + rnd() * 0.1 : 0.82 + rnd() * 0.1, 0.2 + rnd() * 0.4, 0.04, 'rgba(240,244,250,.22)'); }
+    const paint = '#f4f3ea';
+    if (o.top === 'dash') for (let x = 0; x < 8; x += 2) rect(x + 0.1, 0.012, 0.8, 0.07, paint);
+    if (o.top === 'solid') { rect(0, 0.035, 8, 0.065, paint); band(0, 0.02, 'rgba(0,0,0,.4)'); }
+    if (o.bot) { rect(0, 0.9, 8, 0.065, paint); band(0.978, 0.022, 'rgba(0,0,0,.4)'); }
+    grain(n(80), 0, 0.1, ['rgba(60,60,64,.25)'], 2); grain(n(80), 0.89, 0.97, ['rgba(60,60,64,.25)'], 2);   // (worn paint)
+    if (o.arrows) for (const x of [2.5, 6.5]) { rect(x - 0.42, 0.465, 0.5, 0.07, 'rgba(244,243,234,.85)'); poly(x, 0.5, [[0.06, -0.15], [0.42, 0], [0.06, 0.15]], 'rgba(244,243,234,.85)'); }
+    if (win) for (const [on, y] of [[o.top === 'solid', 0.02], [o.bot, 0.98]]) if (on) for (let x = 0; x < 8; x += 0.16) { ell(x + rnd() * 0.06, y, 0.13, 0.05 + rnd() * 0.03, 'rgba(120,135,160,.35)'); ell(x + rnd() * 0.06, y + (y < 0.5 ? -0.01 : 0.01), 0.12, 0.045 + rnd() * 0.025, '#eef3f8'); }
+  });
+  road(8, { top: 'dash' }); road(9, { top: 'dash', bot: true }); road(10, { top: 'solid' }); road(11, { top: 'solid', bot: true });
+  road(12, { top: 'dash', bot: true, ramp: true, arrows: true }); road(13, { top: 'solid', ramp: true }); road(22, { top: 'dash', alt: true });
+  /* GO tracks (14) */
+  strip(14, () => {
+    band(0, 1, win ? '#c9cdd2' : '#8b8477');
+    stones(n(win ? 500 : 1300), 0, 1, win ? ['#b4bac2', '#d9dde2', '#9ea5ae'] : ['#9c9488', '#7b746a', '#a9a296', '#6d675e', '#b5aea2', '#8a8378'], 0.016, 0.034);
+    if (win) for (let k = 0; k < n(40); k++) ell(rnd() * 8, rnd(), 0.2 + rnd() * 0.3, 0.06 + rnd() * 0.1, 'rgba(244,247,250,.7)');
+    for (let k = 0; k < 16; k++) { const x = k * 0.5 + 0.25, w = 0.17, col = ['#6e5139', '#664a33', '#73563d', '#5f4530'][(rnd() * 4) | 0];
+      rect(x - w / 2 + 0.015, 0.12, w, 0.8, 'rgba(0,0,0,.25)'); rect(x - w / 2, 0.1, w, 0.8, col);
+      for (let j = 1; j < 4; j++) rect(x - w / 2 + j * w / 4 + (rnd() - 0.5) * 0.02, 0.12, 0.011, 0.76, 'rgba(36,22,12,.35)');
+      rect(x - w / 2, 0.1, w, 0.025, 'rgba(255,255,255,.12)');
+      if (win) rect(x - w / 2, 0.1 + rnd() * 0.3, w, 0.2 + rnd() * 0.3, 'rgba(242,246,250,.75)');
+      for (const rv of [0.3, 0.7]) rect(x - 0.1, rv - 0.05, 0.2, 0.1, '#45464a'); }
+    for (const rv of [0.3, 0.7]) { band(rv + 0.035, 0.03, 'rgba(0,0,0,.35)'); band(rv - 0.032, 0.066, '#5a5d63'); band(rv - 0.032, 0.024, '#d6dae0'); band(rv + 0.02, 0.014, '#3e4045'); }
+  });
+  /* the Lower Don Trail (15, 23) */
+  const trail = (i, alt, eT, eB) => strip(i, () => {
+    band(0, 1, win ? '#e3e8ee' : '#cdb284');
+    for (let k = 0; k < n(20); k++) ell(rnd() * 8, 0.15 + rnd() * 0.7, 0.3 + rnd() * 0.5, 0.06 + rnd() * 0.1, win ? 'rgba(255,255,255,.4)' : 'rgba(255,240,210,.18)');
+    band(0.3, 0.12, win ? 'rgba(150,165,185,.2)' : 'rgba(120,90,50,.1)'); band(0.58, 0.12, win ? 'rgba(150,165,185,.2)' : 'rgba(120,90,50,.1)');
+    grain(n(900), 0.08, 0.92, win ? ['rgba(255,255,255,.8)', 'rgba(170,185,205,.5)'] : ['rgba(255,255,255,.18)', 'rgba(90,68,40,.16)', 'rgba(150,120,80,.25)'], low ? 1 : 2);
+    stones(n(win ? 20 : 110), 0.12, 0.88, ['#b8ab92', '#e4d8bf', '#9c8f78', '#d2c4a6'], 0.012, 0.026);
+    if (alt && !win) { const x = 1 + rnd() * 5; ell(x, 0.52, 0.5, 0.17, 'rgba(96,120,128,.55)'); ell(x, 0.52, 0.44, 0.13, 'rgba(120,170,200,.55)'); ell(x - 0.15, 0.48, 0.18, 0.03, 'rgba(255,255,255,.35)'); }
+    if (win) { for (const y0 of [0.36, 0.64]) { const pts = []; for (let x = -0.2; x <= 8.2; x += 0.4) pts.push([x, y0 + Math.sin(x * 1.3 + y0 * 9) * 0.03]); line(pts, 'rgba(140,155,178,.55)', Math.max(1.5, C * 0.014)); }
+      for (let x = 0.3; x < 8; x += 0.32) { const y = 0.47 + ((x * 3.1) % 1) * 0.05; ell(x, y, 0.035, 0.05, 'rgba(150,165,190,.45)'); ell(x + 0.16, y + 0.06, 0.035, 0.05, 'rgba(150,165,190,.45)'); } }
+    if (sea === 'autumn') for (let k = 0; k < n(18); k++) leaf(rnd() * 8, 0.12 + rnd() * 0.76, g.lv[(rnd() * g.lv.length) | 0]);
+    const edge = win ? '#e9eff5' : g.b;
+    if (eT) { band(0, 0.08, edge); for (let x = 0; x < 8; x += 0.1) ell(x + rnd() * 0.05, 0.08, 0.06, 0.02 + rnd() * 0.025, edge); }
+    if (eB) { band(0.92, 0.08, edge); for (let x = 0; x < 8; x += 0.1) ell(x + rnd() * 0.05, 0.92, 0.06, 0.02 + rnd() * 0.025, edge); }
+    if (!win) for (let k = 0; k < n(30); k++) { const top = rnd() < 0.5; if (top ? eT : eB) tuft(rnd() * 8, top ? 0.1 + rnd() * 0.02 : 0.98 - rnd() * 0.03, g.d, 0.9); }
+  });
+  trail(15, false, true, true); trail(23, true, true, true); trail(30, false, true, false); trail(31, false, false, true);   /* (a two-lane trail: grass only on its outer edges) */
+  /* the 401 divider (16): concrete slabs, joints, yellow lines, road studs */
+  strip(16, () => {
+    band(0, 1, win ? '#b2b5b8' : '#b0ada5');
+    for (let k = 0; k < n(24); k++) ell(rnd() * 8, rnd(), 0.2 + rnd() * 0.5, 0.08 + rnd() * 0.2, rnd() < 0.5 ? 'rgba(0,0,0,.05)' : 'rgba(255,255,255,.05)');
+    grain(n(900), 0, 1, ['rgba(255,255,255,.08)', 'rgba(0,0,0,.08)'], low ? 1 : 2);
+    for (let u = 0; u < 8; u++) { rect(u - 0.008, 0.13, 0.016, 0.74, 'rgba(70,68,64,.55)'); rect(u + 0.008, 0.13, 0.008, 0.74, 'rgba(255,255,255,.12)'); }
+    band(0.495, 0.012, 'rgba(70,68,64,.35)');
+    if (win) for (let x = 0; x < 8; x += 0.14) ell(x + rnd() * 0.05, 0.5, 0.12, 0.12 + rnd() * 0.08, 'rgba(242,246,250,.92)');
+    band(0.045, 0.06, '#f2c230'); band(0.895, 0.06, '#f2c230');
+    for (let x = 0.5; x < 8; x += 2) for (const y of [0.075, 0.925]) { rect(x - 0.06, y - 0.025, 0.12, 0.05, '#3c3a36'); rect(x - 0.045, y - 0.016, 0.09, 0.032, '#fff4d0'); }
+  });
+  /* the shoulder (17): gravel and weeds (and the wall's row) */
+  strip(17, () => {
+    band(0, 1, win ? '#d9dce0' : '#a59d8e');
+    stones(n(win ? 300 : 900), 0, 1, win ? ['#c3c8ce', '#e9ecef', '#aab1b9'] : ['#b5ad9e', '#8f887a', '#c9c1b0', '#7c766a'], 0.012, 0.028);
+    if (win) for (let k = 0; k < n(30); k++) ell(rnd() * 8, rnd(), 0.2 + rnd() * 0.3, 0.06 + rnd() * 0.1, 'rgba(246,248,251,.75)');
+    else for (let k = 0; k < n(26); k++) tuft(rnd() * 8, rnd() < 0.5 ? 0.12 + rnd() * 0.1 : 0.85 + rnd() * 0.1, rnd() < 0.5 ? '#6c9a3c' : '#86ad48', 1);
+  });
+  /* the Don River (18 plain, 19 bank beyond, 20 bank in front, 21 both) */
+  const water = (i, top, bot) => strip(i, () => {
+    band(0, 1, win ? '#4f93bb' : '#45a0e2');
+    for (let k = 0; k < n(16); k++) ell(rnd() * 8, 0.2 + rnd() * 0.6, 0.6 + rnd() * 0.8, 0.08 + rnd() * 0.08, 'rgba(255,255,255,.07)');
+    for (let k = 0; k < n(12); k++) ell(rnd() * 8, 0.2 + rnd() * 0.6, 0.5 + rnd() * 0.8, 0.07 + rnd() * 0.08, 'rgba(0,40,110,.08)');
+    const lw = Math.max(1.6, C * 0.02), rip = win ? 'rgba(205,232,246,.55)' : 'rgba(228,246,255,.8)';
+    for (let gy = 0; gy < 4; gy++) for (let gx = 0; gx < 14; gx++) { if (rnd() < 0.2) continue; const x = gx * 8 / 14 + (gy & 1) * 0.28 + (rnd() - 0.5) * 0.18, y = 0.17 + gy * 0.22 + (rnd() - 0.5) * 0.06, w = 0.1 + rnd() * 0.12;
+      c.strokeStyle = rip; c.lineWidth = lw; c.lineCap = 'round'; at(x, w + 0.05, xx => { c.beginPath(); c.moveTo(X(xx - w), Y(y)); c.quadraticCurveTo(X(xx), Y(y - 0.07), X(xx + w), Y(y)); c.stroke(); }); }
+    for (const [on, y0, s] of [[top, 0, 1], [bot, 1, -1]]) { if (!on) continue;
+      if (win) { band(s > 0 ? 0 : 0.9, 0.1, '#e6f1f8'); for (let x = 0; x < 8; x += 0.12) ell(x + rnd() * 0.05, y0 + s * 0.1, 0.07 + rnd() * 0.04, 0.02 + rnd() * 0.035, '#e6f1f8');
+        for (let k = 0; k < n(8); k++) { const x = rnd() * 8; line([[x, y0 + s * 0.01], [x + 0.08, y0 + s * 0.05], [x + 0.05, y0 + s * 0.09]], 'rgba(150,180,205,.8)', 1.5); }
+        for (let k = 0; k < n(14); k++) ell(rnd() * 8, y0 + s * (0.16 + rnd() * 0.1), 0.04 + rnd() * 0.05, 0.02 + rnd() * 0.02, 'rgba(232,242,250,.85)', rnd() * 3); }
+      else { band(s > 0 ? 0 : 0.94, 0.06, 'rgba(255,255,255,.92)'); for (let x = 0; x < 8; x += 0.09) ell(x + rnd() * 0.04, y0 + s * 0.06, 0.05 + rnd() * 0.03, 0.025 + rnd() * 0.025, 'rgba(255,255,255,.88)');
+        for (let k = 0; k < n(60); k++) { const r = 0.008 + rnd() * 0.016; ell(rnd() * 8, y0 + s * (0.1 + rnd() * 0.12), r, r, 'rgba(255,255,255,.75)'); } } }
+  });
+  water(18, false, false); water(19, true, false); water(20, false, true); water(21, true, true);
+  /* the fronts of the rows (24 earth under grass, 25 concrete curb, 26 gravel, 28 asphalt, 29 water): the top of each is at the row's surface */
+  strip(24, () => { const gr = c.createLinearGradient(0, 0, 0, R); gr.addColorStop(0, win ? '#8d7a66' : '#8f6b45'); gr.addColorStop(1, win ? '#4c3f33' : '#4a3422'); c.fillStyle = gr; c.fillRect(0, 0, W, R);
+    for (let k = 0; k < 4; k++) band(0.12 + k * 0.2 + rnd() * 0.04, 0.012, 'rgba(0,0,0,.12)'); stones(n(90), 0.06, 0.95, ['#a08a6e', '#6e5a44', '#b8a488'], 0.012, 0.022);
+    band(0, win ? 0.045 : 0.03, win ? '#f4f8fc' : '#6fb446'); for (let x = 0; x < 8; x += 0.07) rect(x, win ? 0.04 : 0.028, 0.035, (win ? 0.008 : 0.006) + rnd() * 0.02, win ? '#f4f8fc' : '#5fa03c'); });
+  strip(25, () => { const gr = c.createLinearGradient(0, 0, 0, R); gr.addColorStop(0, '#aaa69e'); gr.addColorStop(1, '#6f6b65'); c.fillStyle = gr; c.fillRect(0, 0, W, R);
+    grain(n(500), 0, 1, ['rgba(255,255,255,.08)', 'rgba(0,0,0,.1)'], 2); for (let u = 0; u < 8; u++) rect(u - 0.01, 0, 0.02, 1, 'rgba(60,58,54,.6)'); band(0, 0.014, '#dedad2'); });
+  strip(26, () => { const gr = c.createLinearGradient(0, 0, 0, R); gr.addColorStop(0, win ? '#c4c8cd' : '#8c8578'); gr.addColorStop(1, win ? '#7c8188' : '#4f4a42'); c.fillStyle = gr; c.fillRect(0, 0, W, R);
+    stones(n(220), 0.02, 0.98, win ? ['#d3d7dc', '#a3a9b1'] : ['#a19a8c', '#6e685e', '#8a8376'], 0.012, 0.026); band(0, 0.012, win ? '#eef2f6' : '#b1aa9c'); });
+  strip(27, () => band(0, 1, '#6b5a44'));
+  strip(28, () => { band(0, 1, '#404247'); band(0, 0.012, '#5c5f66'); grain(n(300), 0, 1, ['rgba(255,255,255,.05)'], 2); });
+  strip(29, () => { const gr = c.createLinearGradient(0, 0, 0, R); gr.addColorStop(0, '#2f74ad'); gr.addColorStop(1, '#173e60'); c.fillStyle = gr; c.fillRect(0, 0, W, R); });
+  const t = new THREE.CanvasTexture(cv); t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; t.anisotropy = cxtAniso(low); t.userData = { cxt: 1 }; return t;
+}
+/* which strip a row wears, and which its front */
+function cxtWat(r) { const o = crossyRowGet(r); return o ? (o.t === 'water' ? 1 : 0) : -1; }
+function cxtStrip(row) {
+  const t = row.t, h = cxtHash(row.r) >>> 16, p = row.r & 1;
+  if (t === 'water') return 18 + (cxtWat(row.r + 1) === 0 ? 1 : 0) + (cxtWat(row.r - 1) === 0 ? 2 : 0);
+  if (t === 'grass') { if (cxtWat(row.r - 1) === 1) return 4 + p; if (cxtWat(row.r + 1) === 1) return 6 + p; return (h & 1 ? 2 : 0) + p; }
+  if (t === 'road') { if (row.ramp) return row.strip === 12 ? 12 : 13; return row.strip === 3 ? 9 : row.strip === 4 ? 10 : row.strip === 5 ? 11 : (h & 3) === 0 ? 22 : 8; }
+  if (t === 'rail') return 14; if (t === 'trail') { const fT = crossyRowGet(row.r + 1), fN = crossyRowGet(row.r - 1), tT = !!fT && fT.t === 'trail', tN = !!fN && fN.t === 'trail'; return tT ? 31 : tN ? 30 : (h & 3) === 1 ? 23 : 15; } if (t === 'median') return 16; return 17;
+}
+function cxtSide(row) { const t = row.t; return t === 'grass' || t === 'trail' ? 24 : t === 'median' ? 25 : t === 'road' ? 28 : t === 'water' ? 29 : 26; }
+function cxtSlot(row) {                                                  // (crossyGroundSlot) its three top quads and three fronts: cells on whole texels, the row's own offset
+  const S = CROSSY, g = S.ground.geometry, P = g.attributes.position.array, U = g.attributes.uv.array, C = g.attributes.color.array, s = row.slot;
+  const zF = -row.r - 0.5, zN = -row.r + 0.5, y = row.y, GW = S.GW, X = [-GW, -S.HALF - 0.5, S.HALF + 0.5, GW], st = cxtStrip(row), sd = cxtSide(row), e = 1 / 2048;
+  const vT = 1 - st / 32 - e, vB = 1 - (st + 1) / 32 + e, sT = 1 - sd / 32 - e, sB = 1 - (sd + 1) / 32 + e;
+  if (row.cxo === undefined) row.cxo = (cxtHash(row.r) >>> 20) & 7;
+  const o = row.cxo + 0.5 - (row.cxs || 0), fr = crossyRowGet(row.r - 1), yb = fr && fr !== row && fr.y >= y - 0.001 ? y : -1.6;   /* (a front hidden behind a row as high: folded flat, no hairline where they meet) */
+  for (let k = 0; k < 3; k++) {
+    const xa = X[k], xb = X[k + 1], ua = (xa + o) / 8, ub = (xb + o) / 8, c = k === 1 ? 1 : 0.76, q = s * 6 + k, f = s * 6 + 3 + k;
+    P.set([xa, y, zF, xb, y, zF, xa, y, zN, xb, y, zN], q * 12); U.set([ua, vT, ub, vT, ua, vB, ub, vB], q * 8); C.set([c, c, c, c, c, c, c, c, c, c, c, c], q * 12);
+    const c1 = c * 0.66, c2 = c * 0.42; P.set([xa, y, zN, xb, y, zN, xa, yb, zN, xb, yb, zN], f * 12); U.set([ua, sT, ub, sT, ua, sB, ub, sB], f * 8); C.set([c1, c1, c1, c1, c1, c1, c2, c2, c2, c2, c2, c2], f * 12);
+  }
+  g.attributes.position.needsUpdate = g.attributes.uv.needsUpdate = g.attributes.color.needsUpdate = true;
+}
+function cxtFlow(dt) {                                                   // (crossyGroundFlow) the river's texture drifts the way its row flows; the shader's clock
+  const S = CROSSY, U = cxtUni(); U.uCxtT.value = (U.uCxtT.value + dt) % (Math.PI * 20);   /* (every wave in the shader repeats in 20 pi seconds: no jump when it wraps) */
+  if (!S.ground) return; const g = S.ground.geometry, UV = g.attributes.uv.array, GW = S.GW, X = [-GW, -S.HALF - 0.5, S.HALF + 0.5, GW]; let any = false;
+  for (const row of S.rows) { if (!row || row.t !== 'water' || !row.v) continue; row.cxs = ((row.cxs || 0) + row.v * dt) % 8; any = true; const o = (row.cxo || 0) + 0.5 - row.cxs;
+    for (let k = 0; k < 6; k++) { const kk = k % 3, ua = (X[kk] + o) / 8, ub = (X[kk + 1] + o) / 8, q = (row.slot * 6 + k) * 8; UV[q] = UV[q + 4] = ua; UV[q + 2] = UV[q + 6] = ub; } }
+  if (any) g.attributes.uv.needsUpdate = true;
+}
+function cxtUni() { const S = CROSSY; return S.cxtU || (S.cxtU = { uCxtT: { value: 0 }, uCxtN: { value: 0 }, uCxtF: { value: 0 } }); }
+function cxtGroundShader(m) {                                            // the river's shimmer and sparkle, road paint at night, summer-night fireflies
+  const S = CROSSY, U = cxtUni(), low = !!S.low;
+  const FRAG = `
+vec3 cxtAdd = vec3(0.0);
+#ifdef USE_MAP
+{ float cxtS = floor((1.0 - vUv.y) * 32.0);
+  if (cxtS > 17.5 && cxtS < 21.5) {
+    vec2 w = vCxtW.xz;
+    float sh = sin(w.x * 1.7 + w.y * 2.3 + uCxtT * 1.6) * sin(w.x * 0.9 - w.y * 1.3 - uCxtT * 1.1);
+    diffuseColor.rgb *= 1.0 + 0.08 * sh;
+#ifndef CXT_LOW
+    vec2 gq = w * vec2(2.3, 2.9); vec2 id = floor(gq); vec2 fq = fract(gq) - 0.5; float h = cxtH(id);
+    vec2 o = vec2(cxtH(id + 3.1), cxtH(id + 7.7)) - 0.5;
+    float tw = pow(max(0.0, sin(uCxtT * 2.4 + h * 40.0)), 14.0);
+    float d = length((fq - o * 0.5) * vec2(1.0, 1.7));
+    cxtAdd += tw * smoothstep(0.1, 0.0, d) * step(0.45, h) * mix(vec3(1.0, 0.98, 0.9), vec3(0.62, 0.74, 1.0), uCxtN);
+#endif
+  } else if ((cxtS > 7.5 && cxtS < 13.5) || (cxtS > 15.5 && cxtS < 16.5) || (cxtS > 21.5 && cxtS < 22.5)) {
+    cxtAdd += diffuseColor.rgb * smoothstep(0.8, 0.9, max(texelColor.r, texelColor.g)) * step(texelColor.b, 0.95) * uCxtN * 0.6;   /* (paint and studs, not snow) */
+  }
+#ifndef CXT_LOW
+  else if (cxtS < 7.5 && uCxtF > 0.0) {
+    vec2 gq = vCxtW.xz * 1.1; vec2 id = floor(gq); vec2 fq = fract(gq) - 0.5; float h = cxtH(id + 11.0);
+    vec2 o = vec2(cxtH(id + 5.3), cxtH(id + 9.1)) - 0.5;
+    float pulse = pow(max(0.0, sin(uCxtT * 1.3 + h * 30.0)), 6.0);
+    cxtAdd += vec3(0.75, 1.0, 0.35) * smoothstep(0.05, 0.0, length(fq - o * 0.7)) * pulse * step(0.6, h) * uCxtF;
+  }
+#endif
+}
+#endif
+`;
+  m.onBeforeCompile = sh => { Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'varying vec3 vCxtW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vCxtW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = (low ? '#define CXT_LOW\n' : '') + 'uniform float uCxtT, uCxtN, uCxtF;\nvarying vec3 vCxtW;\nfloat cxtH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\n' +
+      sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + FRAG).replace('#include <envmap_fragment>', '#include <envmap_fragment>\n  outgoingLight += cxtAdd;'); };
+  m.customProgramCacheKey = () => 'cxtGround' + (low ? 'L' : 'H'); m.needsUpdate = true;
+}
+
+/* ---------- the pieces' atlas: Meow Lot's on top (the plates), Crossy's below; and what glows at night ---------- */
+function cxtRects() {
+  if (cxtRects.R) return cxtRects.R;
+  const r = (x, y, w, h, i) => ({ u0: (x + i) / 512, u1: (x + w - i) / 512, v0: 1 - (y + h - i) / 1024, v1: 1 - (y + i) / 1024, uc: (x + w / 2) / 512, vc: 1 - (y + h / 2) / 1024, x, y, w, h });
+  return (cxtRects.R = { glass: r(0, 520, 64, 64, 4), glassLit: r(64, 520, 64, 64, 4), body: r(128, 520, 32, 128, 3), head: r(160, 520, 16, 16, 4), tail: r(176, 520, 16, 16, 4), refl: r(192, 520, 16, 16, 4),
+    bark: r(0, 600, 128, 256, 3), rings: r(160, 600, 128, 128, 2), pad: r(288, 600, 128, 128, 2), ice: r(288, 740, 128, 128, 2) });
+}
+function cxtUV(R) { return [R.u0, R.v0, R.u1, R.v1]; }
+function cxtProps() {
+  const S = CROSSY; if (S.cxtP) return S.cxtP;
+  const A = cxtRects(), cv = document.createElement('canvas'); cv.width = 512; cv.height = 1024; const c = cv.getContext('2d'), rnd = cxtRng(99);
+  c.fillStyle = '#ffffff'; c.fillRect(0, 0, 512, 1024);
+  try { const la = lotAtlas().image; if (la && la.getContext) c.putImageData(la.getContext('2d').getImageData(0, 0, 512, 512), 0, 0); } catch (e) {}
+  const grad = (R, stops) => { const g = c.createLinearGradient(0, R.y, 0, R.y + R.h); stops.forEach(([o, col]) => g.addColorStop(o, col)); c.fillStyle = g; c.fillRect(R.x, R.y, R.w, R.h); };
+  for (const [R, top, bot] of [[A.glass, '#7598c8', '#1c2a46'], [A.glassLit, '#8fa6c6', '#2f3d58']]) { grad(R, [[0, top], [0.55, '#34507e'], [1, bot]]);
+    c.save(); c.beginPath(); c.rect(R.x, R.y, R.w, R.h); c.clip(); c.fillStyle = 'rgba(255,255,255,.3)';
+    for (const [a, w] of [[10, 12], [34, 5], [48, 9]]) { c.beginPath(); c.moveTo(R.x + a, R.y + R.h); c.lineTo(R.x + a + w, R.y + R.h); c.lineTo(R.x + a + w + 26, R.y); c.lineTo(R.x + a + 26, R.y); c.closePath(); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(R.x, R.y, R.w, 3); c.restore(); }
+  { const R = A.body; for (let y = 0; y < R.h; y++) { const t = 1 - (y + 0.5) / R.h; let f = t < 0.1 ? 0.72 + t * 1.2 : t < 0.47 ? 0.86 + (t - 0.1) * 0.24 : t < 0.5 ? 0.78 : t < 0.53 ? 1.0 : 0.93 + (t - 0.53) * 0.15;
+      const v = Math.round(Math.min(1, f) * 255); c.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')'; c.fillRect(R.x, R.y + y, R.w, 1); } }
+  for (const k of ['head', 'tail', 'refl']) { const R = A[k]; c.fillStyle = '#ffffff'; c.fillRect(R.x, R.y, R.w, R.h); }
+  { const R = A.bark; c.fillStyle = '#dcdcdc'; c.fillRect(R.x, R.y, R.w, R.h);   /* (bark: a grey the log's brown is multiplied by: furrows along it, ridges between) */
+    for (let x = 0; x < R.w; x += 2) { const v = 205 + ((rnd() * 40) | 0); c.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')'; c.fillRect(R.x + x, R.y, 2, R.h); }
+    for (let k = 0; k < 11; k++) { const x0 = R.x + 4 + k * 11.5 + rnd() * 4, w = 2.5 + rnd() * 2.5; c.fillStyle = 'rgba(70,70,70,.75)'; for (let y = 0; y < R.h; y += 4) c.fillRect(x0 + Math.sin(y * 0.05 + k) * 2.5, R.y + y, w, 4.5);
+      c.fillStyle = 'rgba(255,255,255,.55)'; for (let y = 0; y < R.h; y += 4) c.fillRect(x0 + w + 1.5 + Math.sin(y * 0.05 + k) * 2.5, R.y + y, 1.5, 4.5); }
+    for (let k = 0; k < 7; k++) { c.fillStyle = 'rgba(60,60,60,.6)'; const x = R.x + 6 + rnd() * (R.w - 12), y = R.y + 10 + rnd() * (R.h - 20); c.fillRect(x, y, 10 + rnd() * 8, 2); } }
+  { const R = A.rings, cx = R.x + R.w / 2, cy = R.y + R.h / 2, rr = R.w / 2;   /* (a cut end: rings, the pith, the bark round the edge) */
+    c.fillStyle = '#ffffff'; c.fillRect(R.x, R.y, R.w, R.h); c.lineWidth = 1.6; c.strokeStyle = 'rgba(150,110,70,.55)';
+    for (let k = 1; k < 9; k++) { c.beginPath(); for (let a = 0; a <= 6.3; a += 0.2) { const r = rr * (k / 10) * (1 + Math.sin(a * 3 + k) * 0.03); c.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } c.stroke(); }
+    c.fillStyle = 'rgba(120,80,40,.75)'; c.beginPath(); c.arc(cx, cy, 3.5, 0, 6.3); c.fill(); c.lineWidth = rr * 0.13; c.strokeStyle = '#6d5238'; c.beginPath(); c.arc(cx, cy, rr * 0.93, 0, 6.3); c.stroke();
+    c.lineWidth = 1.2; c.strokeStyle = 'rgba(120,80,40,.5)'; for (const a of [0.7, 2.6, 4.4]) { c.beginPath(); c.moveTo(cx + Math.cos(a) * rr * 0.15, cy + Math.sin(a) * rr * 0.15); c.lineTo(cx + Math.cos(a + 0.08) * rr * 0.62, cy + Math.sin(a + 0.08) * rr * 0.62); c.stroke(); } }
+  { const R = A.pad, cx = R.x + R.w / 2, cy = R.y + R.h / 2, rr = R.w / 2;   /* (a lily pad: lighter at the heart, veins out to a darker rim) */
+    const g = c.createRadialGradient(cx, cy, 2, cx, cy, rr); g.addColorStop(0, '#f6f6f6'); g.addColorStop(0.7, '#d8d8d8'); g.addColorStop(1, '#bcbcbc'); c.fillStyle = g; c.fillRect(R.x, R.y, R.w, R.h);
+    c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 1.7; for (let k = 0; k < 15; k++) { const a = k / 15 * 6.283; c.beginPath(); c.moveTo(cx, cy); c.quadraticCurveTo(cx + Math.cos(a + 0.15) * rr * 0.5, cy + Math.sin(a + 0.15) * rr * 0.5, cx + Math.cos(a) * rr * 0.92, cy + Math.sin(a) * rr * 0.92); c.stroke(); }
+    c.strokeStyle = 'rgba(40,70,20,.35)'; c.lineWidth = 3; c.beginPath(); c.arc(cx, cy, rr * 0.95, 0, 6.3); c.stroke(); for (let k = 0; k < 8; k++) { c.fillStyle = 'rgba(120,80,30,.18)'; c.beginPath(); c.arc(cx + (rnd() - 0.5) * rr, cy + (rnd() - 0.5) * rr, 2 + rnd() * 3, 0, 6.3); c.fill(); } }
+  { const R = A.ice; c.fillStyle = '#eef6fc'; c.fillRect(R.x, R.y, R.w, R.h);   /* (an ice floe: frost, cracks) */
+    for (let k = 0; k < 40; k++) { c.fillStyle = rnd() < 0.5 ? 'rgba(255,255,255,.9)' : 'rgba(200,222,240,.6)'; c.beginPath(); c.arc(R.x + rnd() * R.w, R.y + rnd() * R.h, 2 + rnd() * 7, 0, 6.3); c.fill(); }
+    c.strokeStyle = 'rgba(140,175,205,.8)'; c.lineWidth = 1.4; for (let k = 0; k < 6; k++) { let x = R.x + 20 + rnd() * 88, y = R.y + 20 + rnd() * 88; c.beginPath(); c.moveTo(x, y); for (let j = 0; j < 4; j++) { x += (rnd() - 0.5) * 34; y += (rnd() - 0.5) * 34; c.lineTo(x, y); } c.stroke(); } }
+  const map = new THREE.CanvasTexture(cv); map.anisotropy = cxtAniso(S.low);
+  const ce = document.createElement('canvas'); ce.width = 128; ce.height = 256; const e = ce.getContext('2d'); e.fillStyle = '#000000'; e.fillRect(0, 0, 128, 256);   /* (what glows after dark: a quarter-size copy of the layout) */
+  for (const [k, col] of [['head', '#fff0c8'], ['tail', '#ff3428'], ['refl', '#9a9a9a'], ['glassLit', '#b88c4c']]) { const R = A[k]; e.fillStyle = col; e.fillRect(R.x / 4, R.y / 4, R.w / 4, R.h / 4); }
+  { const R = A.glassLit, x0 = R.x / 4, y0 = R.y / 4; e.fillStyle = '#000000'; for (let x = 0; x < 16; x += 5) e.fillRect(x0 + x, y0, 1, 16); e.fillRect(x0, y0, 16, 2); e.fillRect(x0, y0 + 14, 16, 2); e.fillStyle = '#e0b46a'; e.fillRect(x0 + 1, y0 + 2, 16, 3); }   /* (lit windows: frames between them, brighter near the top) */
+  const emi = new THREE.CanvasTexture(ce); emi.generateMipmaps = false; emi.minFilter = emi.magFilter = THREE.NearestFilter;   /* (crisp window frames; the lights sample their regions' centres) */
+  return (S.cxtP = { map, emi });
+}
+function cxtVehMat() {                                                   // Crossy's vehicle material (S.M.veh, its own: Meow Lot keeps lotAtlas) takes the new atlas and a glow map
+  const S = CROSSY, M = S.M && S.M.veh; if (!M || M.userData.cxt) return M; const A = cxtProps();
+  M.map = A.map; M.emissiveMap = A.emi; M.emissive.setRGB(0, 0, 0); M.userData.cxt = 1; M.needsUpdate = true; return M;
+}
+function cxtHex(r, g, b) { return (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255); }
+function cxtRemap(name, g) {                                             // a piece's uvs into the new atlas (Meow Lot's half moves to the top); on vehicles, glass, lights and body panels get their own
+  if (!g || !g.attributes || !g.attributes.uv || !g.userData || g.userData.cxtUV) return g; g.userData.cxtUV = 1;
+  const U = g.attributes.uv, Cc = g.attributes.color, Pp = g.attributes.position, Nn = g.attributes.normal, n = U.count, wu = lotWhiteUV(), A = cxtRects();
+  const veh = /^(c\d|v\d|p\d|bus|t\d|moto\d|eng|coach)$/.test(name), lit = name === 'bus' || name === 'coach', barrel = name === 'barrel', lamp = name === 'lamp';
+  let y0 = 1e9, y1 = -1e9, gy0 = 1e9, gy1 = -1e9;
+  if (Cc && veh) for (let i = 0; i < n; i++) { const y = Pp.getY(i); y0 = Math.min(y0, y); y1 = Math.max(y1, y); const h = cxtHex(Cc.getX(i), Cc.getY(i), Cc.getZ(i)); if (h === 0x2b3d5e || h === 0x24324a) { gy0 = Math.min(gy0, y); gy1 = Math.max(gy1, y); } }
+  const pt = (i, R) => U.setXY(i, R.uc, R.vc);
+  for (let i = 0; i < n; i++) {
+    const u = U.getX(i), v = U.getY(i);
+    if (!Cc || Math.abs(u - wu[0]) > 1e-4 || Math.abs(v - wu[1]) > 1e-4) { U.setY(i, 0.5 + 0.5 * v); continue; }   /* (the plates, and anything else of Meow Lot's) */
+    const r = Cc.getX(i), gg = Cc.getY(i), b = Cc.getZ(i), hx = cxtHex(r, gg, b);
+    if (veh && (hx === 0x2b3d5e || hx === 0x24324a)) { const R = lit ? A.glassLit : A.glass, t = Math.max(0, Math.min(1, (Pp.getY(i) - gy0) / (gy1 - gy0 || 1))), s = Pp.getZ(i) * 0.9 + Pp.getX(i) * 0.4, f = s - Math.floor(s);
+      Cc.setXYZ(i, 1, 1, 1); U.setXY(i, R.u0 + (R.u1 - R.u0) * f, R.v0 + (R.v1 - R.v0) * t); continue; }
+    if ((veh || lamp) && (hx === 0xfff3c0 || hx === 0xfff2c4 || (veh && hx === 0xffd23a))) { pt(i, A.head); continue; }
+    if (veh && hx === 0xe0303a) { pt(i, A.tail); continue; }
+    if (barrel && hx === 0xffffff) { pt(i, A.refl); continue; }
+    if (veh && 0.3 * r + 0.59 * gg + 0.11 * b > 0.2) { const h = (Pp.getY(i) - y0) / (y1 - y0 || 1), ny = Nn ? Nn.getY(i) : 0, t = Math.min(1, h + Math.max(0, ny - 0.5) * 2 * (1 - h)), R = A.body;
+      U.setXY(i, R.uc, R.v0 + (R.v1 - R.v0) * t); Cc.setXYZ(i, r * 1.06, gg * 1.06, b * 1.06); continue; }
+    U.setY(i, 0.5 + 0.5 * v);
+  }
+  U.needsUpdate = true; if (Cc) Cc.needsUpdate = true; return g;
+}
+function cxtShade(g) {                                                   // trees, bushes, rocks, reeds: darker low down and underneath, cooler in the shade, a touch of colour per facet
+  if (!g || !g.attributes || !g.userData || g.userData.cxtSh) return g; g.userData.cxtSh = 1;
+  const P = g.attributes.position, Cc = g.attributes.color, N = g.attributes.normal; if (!Cc || !P) return g;
+  let y0 = 1e9, y1 = -1e9; for (let i = 0; i < P.count; i++) { const y = P.getY(i); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  for (let t = 0; t < P.count; t += 3) { const j = 1 + ((Math.imul(t + 7, 0x9E3779B1) >>> 0) / 4294967296 - 0.5) * 0.1;
+    for (let k = t; k < t + 3 && k < P.count; k++) { const h = (P.getY(k) - y0) / (y1 - y0 || 1), ny = N ? N.getY(k) : 0, f = (0.8 + 0.27 * h) * j * (1 + 0.08 * ny);
+      Cc.setXYZ(k, Cc.getX(k) * f, Cc.getY(k) * f, Cc.getZ(k) * f * (1 + 0.06 * (1 - h))); } }
+  Cc.needsUpdate = true; return g;
+}
+function cxtLogGeo(len) {                                                // a floating log: bark all round, ringed ends, knots
+  const P = crossyParts(), l = len - 0.12, A = cxtRects(), B = A.bark, f = Math.min(1, len / 4);
+  P.add(crossyFlat(new THREE.CylinderGeometry(0.34, 0.34, l, 9, 1, true)), 0x9c6b42, 0, 0, 0, 1, 1, 1, Math.PI / 2, 0, 0, [B.u0, B.v1 - (B.v1 - B.v0) * f, B.u1, B.v1]);
+  for (const s of [-1, 1]) P.add(crossyFlat(new THREE.CylinderGeometry(0.335, 0.335, 0.03, 9)), 0xe6c28c, 0, 0, s * l / 2, 1, 1, 1, Math.PI / 2, 0, 0, cxtUV(A.rings));
+  for (let i = 0; i < len; i++) P.add(crossyFlat(new THREE.BoxGeometry(0.09, 0.12, 0.16)), 0x5e3e24, (i % 2 ? 0.2 : -0.18), 0.27, -l / 2 + 0.6 + i * 0.95, 1, 1, 1, 0, 0.3, i % 2 ? -0.5 : 0.5);
+  const g = lotMerge(P); g.userData.cxtUV = 1; return g;
+}
+function cxtPadGeo(fl, sea) {                                            // a lily pad with veins (a pink flower on some); in winter, a cracked floe of ice
+  const P = crossyParts(), A = cxtRects();
+  if (sea === 'winter') { P.add(crossyFlat(new THREE.CylinderGeometry(0.44, 0.47, 0.09, 7)), 0xe2eef7, 0, 0, 0, 1, 1, 1, 0, 0, 0, cxtUV(A.ice)); P.add(crossyFlat(new THREE.CylinderGeometry(0.34, 0.4, 0.1, 7)), 0xffffff, 0.02, 0.01, -0.02, 1, 1, 1, 0, 0.4, 0, cxtUV(A.ice));
+    if (fl) P.add(crossyLump(5.5, 0.2), 0xffffff, -0.1, 0.08, 0.08, 0.16, 0.08, 0.14); }
+  else { P.add(crossyFlat(new THREE.CylinderGeometry(0.44, 0.44, 0.05, 16, 1, false, 0.35, Math.PI * 2 - 0.7)), 0x64b648, 0, 0, 0, 1, 1, 1, 0, 0, 0, cxtUV(A.pad));
+    if (fl) { for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; P.add(crossyFlat(new THREE.ConeGeometry(0.06, 0.16, 4)), 0xff8ac0, Math.cos(a) * 0.07 - 0.12, 0.1, Math.sin(a) * 0.07 + 0.1, 1, 1, 1, Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6); } P.add(new THREE.SphereGeometry(0.05, 8, 6), 0xffd23a, -0.12, 0.12, 0.1); } }
+  const g = lotMerge(P); g.userData.cxtUV = 1; return g;
+}
+function cxtLookSync() {                                                 // (crossyLook) the night in the shader and the lights; any piece swapped for the season into the new atlas
+  const S = CROSSY; if (!S.M || S.cxtOff) return; const n = Math.max(0, Math.min(1, S.night || 0)), U = cxtUni();
+  U.uCxtN.value = n; U.uCxtF.value = S.sea === 'summer' && n > 0.5 ? n : 0;
+  if (S.M.veh && S.M.veh.userData.cxt) S.M.veh.emissive.setScalar(n > 0.12 ? Math.min(1, 0.25 + n * 0.85) : 0);
+  if (S.mods) for (const k in S.mods) { const D = S.mods[k]; if (D.m.material === S.M.veh && D.m.geometry && !D.m.geometry.userData.cxtUV) D.m.geometry = cxtRemap(k, D.m.geometry); }
+}
+function cxtInstall() {                                                  // (once, at load) the wrappers
+  if (cxtInstall.done) return; cxtInstall.done = true;
+  const ok = f => typeof f === 'function';
+  if (ok(crossyGroundTex)) { const f0 = crossyGroundTex; crossyGroundTex = function (sea) { const S = CROSSY; if (!S.cxtOff) { try { return cxtGroundTex(sea); } catch (e) { console.error(e); S.cxtOff = true; } } return f0.apply(this, arguments); }; }
+  if (ok(crossyGroundSlot)) { const f0 = crossyGroundSlot; crossyGroundSlot = function (row) { const S = CROSSY; if (S.cxtOff) return f0.apply(this, arguments);
+    cxtSlot(row); const pr = crossyRowGet(row.r - 1); if (pr && pr !== row && ((pr.t === 'water') !== (row.t === 'water') || (pr.t === 'trail' && row.t === 'trail'))) cxtSlot(pr); }; }   /* (a river's last row learns there's a bank beyond it, a bank that the river starts, a trail that it has a second lane) */
+  if (ok(crossyGroundFlow)) { const f0 = crossyGroundFlow; crossyGroundFlow = function (dt) { if (CROSSY.cxtOff) return f0.apply(this, arguments); cxtFlow(dt); }; }
+  if (ok(crossyMod)) { const f0 = crossyMod; crossyMod = function (name, geo, cap, mat, dyn) { const S = CROSSY;
+    if (!S.cxtOff && S.M && (!mat || mat === S.M.veh)) { try { cxtVehMat(); geo = cxtRemap(name, geo); } catch (e) { console.error(e); } }
+    return f0.call(this, name, geo, cap, mat, dyn); }; }
+  if (ok(crossyBuild)) { const f0 = crossyBuild; crossyBuild = function () { const S = CROSSY, was = S.built, r = f0.apply(this, arguments);
+    if (!was && S.built && !S.cxtOff) { try { if (S.wall && S.wall.material === S.M.veh) S.wall.geometry = cxtRemap('wall', S.wall.geometry); cxtGroundShader(S.M.ground); cxtLookSync(); } catch (e) { console.error(e); } }
+    return r; }; }
+  if (ok(crossyLook)) { const f0 = crossyLook; crossyLook = function () { const r = f0.apply(this, arguments); try { cxtLookSync(); } catch (e) { console.error(e); } return r; }; }
+  if (ok(crossyLogGeo)) { const f0 = crossyLogGeo; crossyLogGeo = function (len) { if (!CROSSY.cxtOff) try { return cxtLogGeo(len); } catch (e) { console.error(e); } return f0.apply(this, arguments); }; }
+  if (ok(crossyPadGeo)) { const f0 = crossyPadGeo; crossyPadGeo = function (fl, sea) { if (!CROSSY.cxtOff) try { return cxtPadGeo(fl, sea); } catch (e) { console.error(e); } return f0.apply(this, arguments); }; }
+  for (const nm of ['crossyTreeGeo', 'crossyBushGeo', 'crossyRockGeo', 'crossyReedGeo', 'crossyPumpkinGeo']) {
+    const wrap = f0 => function () { const g = f0.apply(this, arguments); try { return CROSSY.cxtOff ? g : cxtShade(g); } catch (e) { return g; } };
+    if (nm === 'crossyTreeGeo' && ok(crossyTreeGeo)) crossyTreeGeo = wrap(crossyTreeGeo); else if (nm === 'crossyBushGeo' && ok(crossyBushGeo)) crossyBushGeo = wrap(crossyBushGeo);
+    else if (nm === 'crossyRockGeo' && ok(crossyRockGeo)) crossyRockGeo = wrap(crossyRockGeo); else if (nm === 'crossyReedGeo' && ok(crossyReedGeo)) crossyReedGeo = wrap(crossyReedGeo);
+    else if (nm === 'crossyPumpkinGeo' && ok(crossyPumpkinGeo)) crossyPumpkinGeo = wrap(crossyPumpkinGeo); }
+}
+cxtInstall();
+/* (end of CROSSY KITTY TEXTURES) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
