@@ -4233,7 +4233,7 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
       const skyTex = canvasTex(W, H, (g) => {
         const gr = g.createLinearGradient(0, 0, 0, HZ); gr.addColorStop(0, '#3f86d8'); gr.addColorStop(0.55, '#7db6ea'); gr.addColorStop(0.9, '#cfe6f7'); gr.addColorStop(1, '#e8f3fb');
         g.fillStyle = gr; g.fillRect(0, 0, W, HZ); g.fillStyle = '#7aa36f'; g.fillRect(0, HZ, W, H - HZ);
-        for (const x of wrap(W * 0.18)) { const sg = g.createRadialGradient(x, 150, 4, x, 150, 150); sg.addColorStop(0, 'rgba(255,253,235,1)'); sg.addColorStop(0.08, 'rgba(255,248,215,.95)'); sg.addColorStop(0.3, 'rgba(255,240,200,.35)'); sg.addColorStop(1, 'rgba(255,240,200,0)'); g.fillStyle = sg; g.fillRect(x - 160, 0, 320, HZ); }   // the sun
+        for (const x of wrap(W * 0.879)) { const sg = g.createRadialGradient(x, 112, 4, x, 112, 150); sg.addColorStop(0, 'rgba(255,253,235,1)'); sg.addColorStop(0.08, 'rgba(255,248,215,.95)'); sg.addColorStop(0.3, 'rgba(255,240,200,.35)'); sg.addColorStop(1, 'rgba(255,240,200,0)'); g.fillStyle = sg; g.fillRect(x - 160, 0, 320, HZ); }   // the sun
         const ridge = (base, amp, col, seed) => {                                                          // a seamless range of hills
           g.fillStyle = col; g.beginPath(); g.moveTo(0, HZ + 6);
           for (let x = 0; x <= W; x += 4) { const a = x / W * Math.PI * 2; g.lineTo(x, base - amp * (0.55 + 0.25 * Math.sin(a * 3 + seed) + 0.15 * Math.sin(a * 7 + seed * 2) + 0.05 * Math.sin(a * 17 + seed * 3))); }
@@ -8770,9 +8770,9 @@ function todSkyTex(key) {                                              // a pain
   const T = TOD; if (T.skies[key]) return T.skies[key];
   const W = 1024, H = 512, HZ = H / 2, wrap = x => [x - W, x, x + W];
   const P = {
-    morning: { g: [[0, '#5d8fd4'], [0.55, '#a3c3e6'], [0.86, '#f2d8c6'], [1, '#ffe7c9']], sun: [0.75, HZ - 46, 120, 'rgba(255,244,214,'], hills: ['#b7c2cc', '#a0b3aa'], trees: '#6f8e62' },
-    golden: { g: [[0, '#2e4a88'], [0.45, '#8579ad'], [0.76, '#f09b6c'], [1, '#ffcf78']], sun: [0.25, HZ - 26, 190, 'rgba(255,214,130,'], hills: ['#b08a92', '#8d7678'], trees: '#4d5642' },
-    dusk: { g: [[0, '#111a3c'], [0.5, '#39386c'], [0.85, '#ad6488'], [1, '#e6977a']], sun: [0.25, HZ + 10, 170, 'rgba(255,150,120,'], stars: 60, hills: ['#4b4464', '#3b3750'], trees: '#252a2a' },
+    morning: { g: [[0, '#5d8fd4'], [0.55, '#a3c3e6'], [0.86, '#f2d8c6'], [1, '#ffe7c9']], sun: [0.82, HZ - 46, 120, 'rgba(255,244,214,'], hills: ['#b7c2cc', '#a0b3aa'], trees: '#6f8e62' },
+    golden: { g: [[0, '#2e4a88'], [0.45, '#8579ad'], [0.76, '#f09b6c'], [1, '#ffcf78']], sun: [0.35, HZ - 26, 190, 'rgba(255,214,130,'], hills: ['#b08a92', '#8d7678'], trees: '#4d5642' },
+    dusk: { g: [[0, '#111a3c'], [0.5, '#39386c'], [0.85, '#ad6488'], [1, '#e6977a']], sun: [0.35, HZ + 10, 170, 'rgba(255,150,120,'], stars: 60, hills: ['#4b4464', '#3b3750'], trees: '#252a2a' },
     night: { g: [[0, '#040814'], [0.6, '#0e1936'], [1, '#243058']], stars: 420, moon: [0.62, 104], hills: ['#1c2236', '#161b29'], trees: '#0e1310' },
     overcast: { g: [[0, '#6f777f'], [0.6, '#959ca3'], [1, '#b6bbbf']], murk: true, hills: ['#8a979a', '#7c8c87'], trees: '#586a54' },
   }[key];
@@ -9435,7 +9435,7 @@ function rigMerge(root, protect) {                                    // one mes
       const mesh = new THREE.Mesh(mg, m); mesh.renderOrder = list[0].renderOrder; for (const o of list) par.remove(o); par.add(mesh); } }
 }
 function zHud() {                                                      // the strip up top: wave, how many bopped, hearts; and while the Groundskeeper is up, his health bar under it
-  if (!ZN.hud) { const d = ZN.hud = document.createElement('div'); d.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(18,26,14,.78);color:#d8ff9a;font:700 15px system-ui,sans-serif;padding:7px 16px;border-radius:18px;border:2px solid #7fbf3a;text-shadow:0 1px 2px #000;white-space:nowrap;text-align:center';
+  if (!ZN.hud) { const d = ZN.hud = document.createElement('div'); d.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;transform:translateX(-50%);z-index:60;max-width:calc(100vw - 150px);pointer-events:none;background:rgba(18,26,14,.78);color:#d8ff9a;font:700 15px system-ui,sans-serif;padding:7px 16px;border-radius:18px;border:2px solid #7fbf3a;text-shadow:0 1px 2px #000;white-space:nowrap;text-align:center';
     ZN.hudS = d.appendChild(document.createElement('div')); const b = ZN.hudB = d.appendChild(document.createElement('div')); b.style.cssText = 'display:none;align-items:center;justify-content:center;gap:6px;margin-top:5px';
     b.innerHTML = '<span style="font-size:16px;line-height:1">👹</span><span style="position:relative;width:150px;height:12px;border-radius:7px;background:#2a0d0a;border:2px solid #120604;overflow:hidden;box-shadow:0 0 8px rgba(255,70,40,.45)"><i style="position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(#ff8a5a,#d0261c);transition:width .3s ease-out"></i><i style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(20% - 2px),#120604 calc(20% - 2px) 20%)"></i></span>';
     ZN.hudF = b.querySelector('i'); document.body.appendChild(d); }
@@ -10749,7 +10749,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-13 11:41';                                              // stamped when the site is published
+const BUILD = '2026-11-13 12:05';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -43550,6 +43550,7 @@ function perfAdapt(now) {                                               // slow 
   const P = perfAdapt, S = pf1S(); S.f++;
   if (S.fps) pf1Fps(now);
   try { pm1Tick(now); } catch (e) {}                                     /* (MERGE1_V1) */
+  try { lp1Tick(now); } catch (e) { if (!lp1Tick.err) { lp1Tick.err = 1; console.error(e); } }   /* (LIT1_V1) */
   if (pf1On() && now > S.scanT) { S.scanT = now + 3000; try { pf1Mirrors(); } catch (e) {} }
   if (!P.last) { P.last = now; P.ema = 16; P.cap = Math.min(window.devicePixelRatio || 1, 1.75); P.r = renderer.getPixelRatio(); P.hold = now + 4000; P.bad = 0; P.badT = 0; P.badN = 0; return; }
   if (SET.gfx !== 'auto') { const want = SET.gfx === 'low' ? 0.75 : P.cap; if (P.r !== want) { P.r = want; renderer.setPixelRatio(want); } P.slow = SET.gfx === 'low'; P.last = now; return; }   /* (Settings: always sharp, or always the battery saver) */
@@ -44101,19 +44102,18 @@ function pf2Ok() { return actx && soundOn && actx.__snd && (actx.state === 'runn
 function pf2Land(k) {                                                    // PKR lands (Free roam). SOUND3 (2026-11-13): ONE soft "pomf", all of it low-passed, with slow attacks (6-15 ms) so nothing clicks:
   k = Math.max(0, Math.min(1, k || 0.3));                                // a cushion of low noise, a little body under it; grass adds a quiet rustle, hard ground a dull knock. (The first try, two bright pats, was jarring and sharp.)
   try { if (pf2Ok()) { const t = actx.currentTime + 0.003, o = sndKitBus('land'), r = sndR(0.05), kind = pf2Surf(), v = 0.5 + 0.6 * k;
-    sN(t, 0.1 + 0.03 * k, 0.24 * v, o, 'lowpass', kind === 2 ? 1150 : 950, 360, 0.5, 0.008);   /* (the weight sits around 400-1200 Hz: a phone's speaker plays almost nothing under 250 Hz, which is why the old low thump sounded flat) */
-    sO(t, 'sine', 230 * r, 120, 0.1, 0.05 * v, o, 0.006);
-    if (kind === 1) sN(t + 0.012, 0.13, 0.05 * v, o, 'bandpass', 1500, 900, 0.6, 0.015);
-    if (kind === 2) sO(t, 'triangle', 210 * r, 120, 0.05, 0.03 * v, o, 0.004);
+    sN(t, 0.11 + 0.03 * k, 0.13 * v, o, 'lowpass', kind === 2 ? 850 : 700, 320, 0.5, 0.014);   /* (the weight sits around 400-1200 Hz: a phone's speaker plays almost nothing under 250 Hz, which is why the old low thump sounded flat) */
+    sO(t, 'sine', 210 * r, 120, 0.1, 0.026 * v, o, 0.012);
+    if (kind === 1) sN(t + 0.012, 0.13, 0.022 * v, o, 'bandpass', 1200, 800, 0.6, 0.02);
+    if (kind === 2) sO(t, 'sine', 260 * r, 150, 0.05, 0.012 * v, o, 0.008);
     return; } } catch (e) {}
   try { sfx.padThud(0.2 + 0.3 * k); } catch (e) {}
 }
 function pf2Paw(k) {                                                     // one paw step: a very quiet, dull pat (paws are pads: almost no high end). Never the same twice: pitch and level wander, and alternate steps sit a little lower
   try { if (!pf2Ok()) return; const S = pf2Paw.S || (pf2Paw.S = { n: 0 }), t = actx.currentTime + 0.002, o = sndKitBus('land'), kind = pf2Surf(), alt = (S.n++ & 1) ? 0.9 : 1, r = sndR(0.07) * alt, v = (0.45 + 0.55 * k) * (0.85 + Math.random() * 0.3);
-    sN(t, 0.05, 0.085 * v, o, 'lowpass', (kind === 0 ? 800 : kind === 1 ? 950 : 1150) * r, 400, 0.5, 0.006);
-    sO(t, 'sine', 260 * r, 170, 0.04, 0.018 * v, o, 0.005);
-    if (kind === 1) sN(t + 0.006, 0.07, 0.014 * v, o, 'bandpass', 1400 * r, 900, 0.6, 0.012);
-    if (kind === 2) sN(t, 0.012, 0.006 * v, o, 'bandpass', 2200 * r, 1800, 1.5, 0.003);   /* (the faintest claw tick, hard ground only) */
+    sN(t, 0.055, 0.042 * v, o, 'lowpass', (kind === 0 ? 600 : kind === 1 ? 700 : 800) * r, 330, 0.5, 0.012);
+    sO(t, 'sine', 240 * r, 170, 0.04, 0.008 * v, o, 0.01);
+    if (kind === 1) sN(t + 0.006, 0.07, 0.006 * v, o, 'bandpass', 1100 * r, 800, 0.6, 0.016);
   } catch (e) {}
 }
 function pf2Steps(spd) {                                                 // (updateWalk, after walk.phase moves on) a diagonal pair of paws comes down every half turn of her walk cycle
@@ -44340,6 +44340,127 @@ html #startScreen.hm1 .card>*{margin:0}
   }
   try { hmInstall(); } catch (e) { console.error(e); }
 
+/* PLAY3_V1 */
+/* =====================================================================
+   PLAY3_V1 (2026-11-13): (a) PKR's phone. The neighbours' speech cards (TALK_V1) no longer pop up over the game: each
+   becomes a message on her phone, a 📱 button beside the camera and pause buttons with a count of unread ones; tapping it
+   opens the list (newest first, the last 40 kept in catguard.phone). Speech from somebody standing right next to her
+   (Aunty-ji's subtitles, the raccoon on the roof, Porter's bark) is still said out loud where it happens. ?phone=0 puts
+   the cards back. (b) Wall jumps: in the air against a wall she slides down it slowly, and Jump kicks her off it, up and
+   away (three in a row at most before she must touch down). (c) the zombie-night strip sits below the notch, level with
+   the camera and pause buttons; the painted suns sit where the baked light comes from; softer landing and paw steps
+   (all edited in place).
+   ===================================================================== */
+function ph3On() { return ph3On.v !== undefined ? ph3On.v : (ph3On.v = !/[?&]phone=0\b/.test(location.search)); }
+function ph3S() { if (ph3S.S) return ph3S.S; const S = ph3S.S = { msgs: [], unread: 0, btn: null, panel: null, open: false };
+  try { const o = JSON.parse(localStorage.getItem('catguard.phone') || '{}'); if (Array.isArray(o.m)) S.msgs = o.m.slice(-40); S.unread = Math.max(0, Math.min(S.msgs.length, o.u | 0)); } catch (e) {} return S; }
+function ph3Save() { const S = ph3S(); try { localStorage.setItem('catguard.phone', JSON.stringify({ m: S.msgs.slice(-40), u: S.unread })); } catch (e) {} }
+function ph3Css() {
+  if (document.getElementById('ph3Css')) return; const st = document.createElement('style'); st.id = 'ph3Css';
+  st.textContent = '#ph3Btn{position:relative;display:none;font-size:15px;line-height:1}body.walking #ph3Btn{display:grid;place-items:center}'
+    + '#ph3Btn b{position:absolute;right:-5px;top:-5px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#ff3d6e;color:#fff;font:800 10px/16px var(--body);text-align:center;box-shadow:0 0 0 2px rgba(255,255,255,.9)}#ph3Btn b[hidden]{display:none}'
+    + '#ph3Btn.ping{animation:ph3Ping .9s ease-out}@keyframes ph3Ping{0%{transform:scale(1)}25%{transform:scale(1.28) rotate(-8deg)}50%{transform:scale(1.1) rotate(6deg)}100%{transform:scale(1)}}'
+    + '#ph3Panel{position:fixed;z-index:70;right:max(10px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 56px);width:min(340px,calc(100vw - 20px));max-height:min(70vh,560px);display:flex;flex-direction:column;box-sizing:border-box;border-radius:26px;border:3px solid var(--ink,#2a1630);background:#fff6fb;color:var(--ink,#2a1630);box-shadow:0 10px 28px rgba(0,0,0,.35);overflow:hidden;font:600 14px/1.35 var(--body)}#ph3Panel[hidden]{display:none}'
+    + '#ph3Panel header{display:flex;align-items:center;gap:8px;padding:10px 12px 9px 16px;background:#ffd9ea;border-bottom:2px solid var(--ink,#2a1630);font-weight:800;font-size:15px}#ph3Panel header span{flex:1}'
+    + '#ph3Panel header button{width:34px;height:34px;border-radius:50%;border:2.5px solid var(--ink,#2a1630);background:#fff;font:800 15px/1 var(--body);color:inherit;cursor:pointer}'
+    + '#ph3List{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 10px 12px;display:flex;flex-direction:column;gap:8px;touch-action:pan-y}'
+    + '.ph3-m{display:flex;gap:8px;align-items:flex-end}.ph3-m i{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:17px;background:var(--tk,#ffb86b)}'
+    + '.ph3-m div{max-width:calc(100% - 46px);padding:7px 11px 8px;border-radius:16px 16px 16px 5px;background:#fff;border:2px solid #e7cfdc}.ph3-m b{display:block;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#a0627e}.ph3-m small{display:block;margin-top:2px;font-size:10.5px;font-weight:600;color:#a895a0}'
+    + '.ph3-m.me{flex-direction:row-reverse}.ph3-m.me div{border-radius:16px 16px 5px 16px;background:#ff8fbd;border-color:#e26a9d;color:#3a0f24}.ph3-m.me b{color:#7a2349}.ph3-m.new div{border-color:#ff6aa6}'
+    + '.ph3-none{padding:22px 8px;text-align:center;color:#9a8792}'
+    + '@media (max-height:520px){#ph3Panel{top:calc(env(safe-area-inset-top,0px) + 48px);max-height:calc(100vh - 60px)}}';
+  document.head.appendChild(st);
+}
+function ph3Ui() {
+  const S = ph3S(); if (S.btn) return S; const cam = document.getElementById('camBtn'); if (!cam || !cam.parentNode) return S; ph3Css();
+  const b = S.btn = document.createElement('button'); b.className = 'icon-btn'; b.id = 'ph3Btn'; b.type = 'button'; b.setAttribute('aria-label', 'PKR’s phone: messages'); b.innerHTML = '<span aria-hidden="true">📱</span><b hidden></b>';
+  cam.parentNode.insertBefore(b, cam); b.addEventListener('pointerdown', e => e.stopPropagation()); b.addEventListener('click', e => { e.stopPropagation(); ph3Open(!S.open); });
+  const p = S.panel = document.createElement('section'); p.id = 'ph3Panel'; p.hidden = true; p.setAttribute('aria-label', 'PKR’s phone');
+  p.innerHTML = '<header><span>📱 PKR’s phone</span><button type="button" aria-label="Close">✕</button></header><div id="ph3List"></div>'; document.body.appendChild(p);
+  for (const ev of ['pointerdown', 'pointermove', 'touchstart', 'touchmove', 'wheel']) p.addEventListener(ev, e => e.stopPropagation());
+  p.querySelector('button').addEventListener('click', () => ph3Open(false)); ph3Badge(); return S;
+}
+function ph3Badge() { const S = ph3S(), b = S.btn && S.btn.querySelector('b'); if (!b) return; b.hidden = !S.unread; b.textContent = S.unread > 9 ? '9+' : String(S.unread); }
+function ph3Ago(t) { const s = Math.max(0, (Date.now() - t) / 1000); return s < 90 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' d ago'; }
+function ph3Open(on) {
+  const S = ph3Ui(); if (!S.panel) return; S.open = !!on; S.panel.hidden = !on; if (!on) return;
+  const L = S.panel.querySelector('#ph3List'), W = talkWho(); L.textContent = '';
+  if (!S.msgs.length) { const d = document.createElement('div'); d.className = 'ph3-none'; d.textContent = 'No messages yet. The neighbours will text when something happens.'; L.appendChild(d); }
+  const n = S.msgs.length;
+  for (let i = n - 1; i >= 0; i--) { const m = S.msgs[i], w = W[m.w] || W.aunty, me = m.w === 'k', el = document.createElement('div'); el.className = 'ph3-m' + (me ? ' me' : '') + (i >= n - S.unread ? ' new' : ''); el.style.setProperty('--tk', w.c);
+    const av = document.createElement('i'); av.textContent = me ? '🐱' : w.ic; const bub = document.createElement('div'), nm = document.createElement('b'), tx = document.createElement('span'), tm = document.createElement('small');
+    nm.textContent = me ? 'PKR' : w.name; tx.textContent = m.x; tm.textContent = ph3Ago(m.t); bub.append(nm, tx, tm); el.append(av, bub); L.appendChild(el); }
+  L.scrollTop = 0; S.unread = 0; ph3Badge(); ph3Save();
+}
+function ph3Push(frames) {                                               // a speech card's lines, as messages
+  const S = ph3Ui(), now = Date.now(); let k = 0; for (const [w, t] of frames) { S.msgs.push({ w, x: String(t), t: now + k++ }); S.unread++; }
+  if (S.msgs.length > 40) S.msgs.splice(0, S.msgs.length - 40); S.unread = Math.min(S.unread, S.msgs.length); ph3Badge(); ph3Save();
+  if (S.open) ph3Open(true);
+  if (S.btn) { S.btn.classList.remove('ping'); void S.btn.offsetWidth; S.btn.classList.add('ping'); }
+  try { if (pf2Ok()) { const t = actx.currentTime + 0.01, o = sndKitBus('tap'); sO(t, 'sine', 880, 880, 0.09, 0.012, o, 0.01); sO(t + 0.09, 'sine', 1175, 1175, 0.14, 0.012, o, 0.01); } } catch (e) {}   /* (a soft two-note ping) */
+}
+function ph3Install() {
+  if (ph3Install.done || !ph3On()) return; ph3Install.done = true;
+  if (typeof talkFrame === 'function') { const f0 = talkFrame; talkFrame = function () { const S = talkS(), C = S.cur;
+      if (C && C.card && C.frames && C.ctx !== 'closet' && document.getElementById('camBtn')) { try { ph3Push(C.frames.slice(C.i)); C.i = C.frames.length - 1; C.until = S.t + 0.05; if (talkCard.el) talkCard.el.classList.remove('on'); return; } catch (e) { console.error(e); } }
+      return f0.apply(this, arguments); }; }
+  setTimeout(() => { try { ph3Ui(); } catch (e) {} }, 0);
+}
+/* ---------- wall jumps ---------- */
+function pf3Wall(ox, oz, dx, dz, dt) {                                   // (updateWalk, straight after she tries to move) ox, oz: where she was; dx, dz: how far she meant to go
+  const S = pf3Wall.S || (pf3Wall.S = { t: -9, nx: 0, nz: 0, n: 0, said: 0 }), p = walk.pos;
+  if (walk.grounded || walk.climb || walk.frozen) { S.n = 0; S.t = -9; return; }
+  { const bx = Math.abs(dx) > 1e-4 && Math.abs(p.x - ox) < 0.3 * Math.abs(dx), bz = Math.abs(dz) > 1e-4 && Math.abs(p.z - oz) < 0.3 * Math.abs(dz);   /* (stopped along x, along z, or both: house walls, fences, furniture, the room's own walls) */
+    if (bx || bz) { const nx = bx ? -Math.sign(dx) : 0, nz = bz ? -Math.sign(dz) : 0, l = Math.hypot(nx, nz); S.t = clock; S.nx = nx / l; S.nz = nz / l; if (walk.vy < -2.6) walk.vy += (-2.6 - walk.vy) * Math.min(1, dt * 14); } }   /* (paws on the wall: she slides down it slowly) */
+  if (walk.jumpQ > 0 && clock - walk.jumpQ < 0.2 && clock - S.t < 0.17 && S.n < 3 && !(typeof flyFlying === 'function' && flyFlying())) {
+    walk.jumpQ = -1; S.n++; S.t = -9; const k = typeof nipK === 'function' ? nipK().jump : 1;
+    walk.vel.set(S.nx * 4.8, 0, S.nz * 4.8); walk.vy = WALK.jumpV * 0.88 * k; walk.flingT = clock + 0.22; walk.face = Math.atan2(S.nx, S.nz); walk.squash = 0.8;
+    try { burst(new THREE.Vector3(p.x - S.nx * 0.3, p.y + 0.35, p.z - S.nz * 0.3), 0xffffff, 7, 1.6, 1.2, 0.3); } catch (e) {}
+    try { pf2Paw(1); tone(600 + S.n * 90, 1080 + S.n * 120, 0.1, 'triangle', 0.028); } catch (e) {}
+    if (!S.said) { S.said = 1; try { showWalkName('🐾 Wall jump! Jump again off the next wall'); } catch (e) {} }
+  }
+}
+try { ph3Install(); } catch (e) { console.error(e); }
+/* (end of PLAY3_V1) */
+/* LIT1_V1 */
+/* =====================================================================
+   LIT1_V1 (2026-11-13): fewer live lights indoors (the audit's Phase 3, second half). The house has 17 point lights
+   (candles, sconce, TV, fire, the star projector, the dome lights up and downstairs...). three.js makes every lit
+   pixel add up ALL of them, shining or not, and at most six to eight ever shine at once. Now those lights are kept as
+   "sources" only (hidden from the renderer, still moved, flickered and switched by the game exactly as before), and a
+   pool of 8 real point lights (6 on weak phones) copies, every frame, whichever sources light the scene most where the
+   camera and PKR are. The count never changes, so nothing recompiles. With 8 or fewer shining the picture is the same;
+   with more, the faintest far ones are left out. Runs from perfAdapt. ?fast=0 or ?lights=0 switches it off.
+   ===================================================================== */
+function lp1S() { return lp1S.S || (lp1S.S = { on: null, pool: [], src: [], pick: [], scanT: 0, v: null, r: null, sc: [] }); }
+function lp1On() { const S = lp1S(); if (S.on === null) S.on = pf1On() && !/[?&]lights=0\b/.test(location.search); return S.on; }
+function lp1Scan() {                                                     // every point light under the scene becomes a source (a lamp built later is caught here too)
+  const S = lp1S(); S.src.length = 0;
+  scene.traverse(o => { if (!o.isPointLight || o.userData.lp1Pool) return; if (!o.userData.lp1) { o.userData.lp1 = 1; } if (o.visible) o.visible = false; S.src.push(o); });
+}
+function lp1Tick(now) {
+  if (!lp1On() || typeof scene === 'undefined' || !scene) return; const S = lp1S();
+  if (!S.pool.length) { const K = typeof devTier === 'function' && devTier() === 'low' ? 6 : 8; S.v = new THREE.Vector3(); S.r = new THREE.Vector3();
+    for (let i = 0; i < K; i++) { const L = new THREE.PointLight(0xffffff, 0, 1, 2); L.userData.lp1Pool = 1; L.userData.name = 'Pooled light'; scene.add(L); S.pool.push(L); S.pick.push(null); } S.scanT = 0; }
+  if (now > S.scanT) { S.scanT = now + 1500; lp1Scan(); }
+  const src = S.src, n = src.length, sc = S.sc, v = S.v, cam = camera.position; sc.length = n;
+  let rx = cam.x, ry = cam.y, rz = cam.z, two = false; if (walk.on && walk.rig) { S.r.copy(walk.pos); S.r.y += 0.5; two = true; } else if (typeof ROOM !== 'undefined') { S.r.set(0, 1, ROOM.visDepth / 2); two = true; }
+  for (let i = 0; i < n; i++) { const o = src[i]; let s = 0;
+    if (o.visible) o.visible = false;                                    /* (should the game ever show one: it stays a source) */
+    if (o.intensity > 0.001) { let shown = true; for (let q = o.parent; q; q = q.parent) if (!q.visible) { shown = false; break; }
+      if (shown) { v.setFromMatrixPosition(o.matrixWorld); const D = o.distance || 30, f = d => { const k = Math.max(0, 1 - d / D); return k * k; };
+        s = o.intensity * Math.max(f(Math.hypot(v.x - rx, v.y - ry, v.z - rz)), two ? f(v.distanceTo(S.r)) : 0) + o.intensity * 1e-4; } }
+    sc[i] = s; }
+  const P = S.pool, pick = S.pick, K = P.length;
+  for (let k = 0; k < K; k++) { const o = pick[k]; if (o && (src.indexOf(o) < 0 || sc[src.indexOf(o)] <= 0)) pick[k] = null; }   /* (gone dark, hidden or removed: its slot is free) */
+  for (let pass = 0; pass < K; pass++) {                                 // the brightest source not yet in the pool takes a free slot, or the dimmest slot if it beats it clearly
+    let bi = -1, bs = 0; for (let i = 0; i < n; i++) if (sc[i] > bs && pick.indexOf(src[i]) < 0) { bs = sc[i]; bi = i; } if (bi < 0) break;
+    let slot = pick.indexOf(null); if (slot < 0) { let ws = Infinity; for (let k = 0; k < K; k++) { const s = sc[src.indexOf(pick[k])]; if (s < ws) { ws = s; slot = k; } } if (bs < ws * 1.25) break; }
+    pick[slot] = src[bi]; }
+  for (let k = 0; k < K; k++) { const L = P[k], o = pick[k]; if (!o) { if (L.intensity) L.intensity = 0; continue; }
+    L.position.setFromMatrixPosition(o.matrixWorld); L.color.copy(o.color); L.intensity = o.intensity; L.distance = o.distance; L.decay = o.decay; }
+}
+/* (end of LIT1_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
@@ -44500,7 +44621,7 @@ function updateWalk(dt) {
       }
       p.x = nx; p.z = nz; return true;
     };
-    tryMove(p.x + dx, p.z + dz) || tryMove(p.x + dx, p.z) || tryMove(p.x, p.z + dz);
+    const moved3 = tryMove(p.x + dx, p.z + dz) || tryMove(p.x + dx, p.z) || tryMove(p.x, p.z + dz); pf3Wall(ox0, oz0, dx, dz, dt);   /* (PLAY3_V1: wall slides and wall jumps) */
     fenceCrossed(ox0, oz0);
   }
   // up and down: stand on whatever is under her; step up small ledges, fall off big ones
