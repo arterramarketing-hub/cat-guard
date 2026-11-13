@@ -10749,7 +10749,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-13 09:40';                                              // stamped when the site is published
+const BUILD = '2026-11-13 09:57';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -44088,23 +44088,52 @@ try { pkrInstall(); } catch (e) { console.error(e); }   /* (PKR_V1: the one call
    of one small step every third of a second, and starts a third of a second after load instead of 2.5 to 4 seconds;
    the furniture merge (MERGE1_V1) starts on the title screen too. A small "Getting the house ready" line under the
    buttons shows until that is done: starting before it finishes still works, it is only smoother after.
-   (c) pf2Land: her landing sound in Free roam (the four padThud calls in the walk code, edited in place).
+   (c) pf2Land: her landing sound in Free roam (the four padThud calls in the walk code, edited in place);
+   pf2Steps / pf2Paw: quiet paw steps as she walks and runs (one call added in updateWalk).
    ===================================================================== */
 function pf2RoamReady() { const W = warmSt(); if (W.done) return true; if (!W.q) return false; const J = W.q[0]; return !J || J.id !== 'roam' || (J.s !== undefined && J.s >= J.steps.length); }
-function pf2Land(k) {                                                    // PKR lands (Free roam): two soft paw pats a moment apart (front paws, back paws), not one flat thud
-  k = Math.max(0, Math.min(1, k || 0.3));                                // carpet: hushed; grass: a little rustle; anything hard (roof, concrete, a car): a clearer tap; a long drop adds a soft whump underneath
-  try { if (actx && soundOn && actx.__snd && (actx.state === 'running' || actx.__test)) {
-    const A = actx, t = A.currentTime + 0.003, o = sndKitBus('land'), r = sndR(0.06), p = walk.pos, hn = (walk.hitObj && walk.hitObj.userData && walk.hitObj.userData.name) || '';
-    const indoors = p.x > YARD.HL && p.x < YARD.HR && p.z > UPPER.zF && p.z < UPPER.zB && p.y < UPPER.CH + 0.25;
-    const kind = indoors ? 0 : (/lawn|bank|grass/i.test(hn) || (!hn && p.y < 0.15)) ? 1 : 2, v = 0.55 + 0.6 * k, gap = 0.042 + 0.022 * Math.random();
-    for (let i = 0; i < 2; i++) { const tt = t + i * gap, vv = v * (i ? 0.72 : 1), f = (kind === 2 ? 1900 : kind === 1 ? 1100 : 800) * sndR(0.12);
-      sN(tt, 0.045, 0.27 * vv, o, 'bandpass', f, f * 0.6, 1.1, 0.002);
-      sO(tt, 'triangle', (kind === 2 ? 300 : 230) * r * (i ? 0.9 : 1), 120, 0.055, 0.11 * vv, o, 0.002); }
-    if (kind === 1) sN(t + 0.01, 0.11, 0.085 * v, o, 'bandpass', 3200, 2200, 0.8, 0.01);
-    if (kind === 0) sN(t, 0.07, 0.1 * v, o, 'lowpass', 500, 250);
-    if (k > 0.85) sO(t, 'sine', 120 * r, 60, 0.11, 0.06 * k, o, 0.002);
+function pf2Surf() {                                                     // what is under her paws: 0 carpet and floors indoors, 1 grass, 2 anything hard outdoors (driveway, roof, a car)
+  const p = walk.pos, hn = (walk.hitObj && walk.hitObj.userData && walk.hitObj.userData.name) || '';
+  if (p.x > YARD.HL && p.x < YARD.HR && p.z > UPPER.zF && p.z < UPPER.zB && p.y < UPPER.CH + 0.25) return 0;
+  return (/lawn|bank|grass/i.test(hn) || (!hn && p.y < 0.15)) ? 1 : 2;
+}
+function pf2Ok() { return actx && soundOn && actx.__snd && (actx.state === 'running' || actx.__test); }
+function pf2Land(k) {                                                    // PKR lands (Free roam). SOUND3 (2026-11-13): ONE soft "pomf", all of it low-passed, with slow attacks (6-15 ms) so nothing clicks:
+  k = Math.max(0, Math.min(1, k || 0.3));                                // a cushion of low noise, a little body under it; grass adds a quiet rustle, hard ground a dull knock. (The first try, two bright pats, was jarring and sharp.)
+  try { if (pf2Ok()) { const t = actx.currentTime + 0.003, o = sndKitBus('land'), r = sndR(0.05), kind = pf2Surf(), v = 0.5 + 0.6 * k;
+    sN(t, 0.1 + 0.03 * k, 0.24 * v, o, 'lowpass', kind === 2 ? 1150 : 950, 360, 0.5, 0.008);   /* (the weight sits around 400-1200 Hz: a phone's speaker plays almost nothing under 250 Hz, which is why the old low thump sounded flat) */
+    sO(t, 'sine', 230 * r, 120, 0.1, 0.05 * v, o, 0.006);
+    if (kind === 1) sN(t + 0.012, 0.13, 0.05 * v, o, 'bandpass', 1500, 900, 0.6, 0.015);
+    if (kind === 2) sO(t, 'triangle', 210 * r, 120, 0.05, 0.03 * v, o, 0.004);
     return; } } catch (e) {}
   try { sfx.padThud(0.2 + 0.3 * k); } catch (e) {}
+}
+function pf2Paw(k) {                                                     // one paw step: a very quiet, dull pat (paws are pads: almost no high end). Never the same twice: pitch and level wander, and alternate steps sit a little lower
+  try { if (!pf2Ok()) return; const S = pf2Paw.S || (pf2Paw.S = { n: 0 }), t = actx.currentTime + 0.002, o = sndKitBus('land'), kind = pf2Surf(), alt = (S.n++ & 1) ? 0.9 : 1, r = sndR(0.07) * alt, v = (0.45 + 0.55 * k) * (0.85 + Math.random() * 0.3);
+    sN(t, 0.05, 0.085 * v, o, 'lowpass', (kind === 0 ? 800 : kind === 1 ? 950 : 1150) * r, 400, 0.5, 0.006);
+    sO(t, 'sine', 260 * r, 170, 0.04, 0.018 * v, o, 0.005);
+    if (kind === 1) sN(t + 0.006, 0.07, 0.014 * v, o, 'bandpass', 1400 * r, 900, 0.6, 0.012);
+    if (kind === 2) sN(t, 0.012, 0.006 * v, o, 'bandpass', 2200 * r, 1800, 1.5, 0.003);   /* (the faintest claw tick, hard ground only) */
+  } catch (e) {}
+}
+function pf2Steps(spd) {                                                 // (updateWalk, after walk.phase moves on) a diagonal pair of paws comes down every half turn of her walk cycle
+  const S = pf2Steps.S || (pf2Steps.S = { h: 0, t: 0 }), h = Math.floor(walk.phase / Math.PI); if (h === S.h) return; S.h = h;
+  if (!walk.on || !walk.grounded || walk.climb || spd < 0.4 || state !== 'playing' || gameMode !== 'walk' || clock - S.t < 0.11 || (walk.squash || 0) > 0.5) return;
+  S.t = clock; pf2Paw(Math.min(1, spd / 5));
+}
+function pf2Fill() {                                                     // (d) the game added to an iPhone's Home Screen: iOS lays the page out a status bar short, leaving a dark band along the bottom.
+  if (pf2Fill.done || /[?&]fill=0\b/.test(location.search)) return; pf2Fill.done = true;   // There the stage (the 3D picture) is made the full height of the screen, and window.innerHeight says so too, so everything that
+  let alone = false; try { alone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches; } catch (e) {}   // sizes itself by it (the camera, taps, the HUD maths) agrees. Menus and buttons stay where they were. ?fill=0 switches it off.
+  if (!alone) return;
+  const D = Object.getOwnPropertyDescriptor(window, 'innerHeight') || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), 'innerHeight'); if (!D || !D.get) return;
+  const real = () => D.get.call(window), probe = document.createElement('div'); probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:100vh;height:100lvh;visibility:hidden;pointer-events:none'; document.body.appendChild(probe);
+  let full = 0;
+  const calc = () => { const h = real(), port = window.innerWidth < h, scr = port ? Math.max(screen.height, screen.width) : Math.min(screen.height, screen.width), want = Math.min(probe.offsetHeight || h, scr || h), st = document.getElementById('stage');
+    full = want - h >= 12 && want - h <= 140 ? want : 0;                 /* (only the band this is about: never a keyboard, a split view or a desktop window) */
+    if (st) { st.style.bottom = full ? 'auto' : ''; st.style.height = full ? full + 'px' : ''; } };
+  try { Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => full || real() }); } catch (e) { return; }
+  calc(); addEventListener('resize', calc, true); addEventListener('orientationchange', () => setTimeout(() => { calc(); dispatchEvent(new Event('resize')); }, 350));
+  setTimeout(() => { calc(); dispatchEvent(new Event('resize')); }, 60); setTimeout(() => { calc(); dispatchEvent(new Event('resize')); }, 900);
 }
 function pf2Install() {
   if (pf2Install.done || !pf1On()) return; pf2Install.done = true;
@@ -44117,6 +44146,7 @@ function pf2Install() {
   setTimeout(tick, 400);
 }
 try { pf2Install(); } catch (e) { console.error(e); }
+try { pf2Fill(); } catch (e) { console.error(e); }
 /* (end of PERF2_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
@@ -44358,7 +44388,7 @@ function updateWalk(dt) {
     if (dr && dr.state === 'rest' && Math.abs(dr.center.y - p.y) < 0.9 && Math.hypot(dr.center.x - bx, dr.center.z - bz) < 0.4) interact(dr.vase.children[0], dr.center);
   }
   // animate: trot, tuck in the air, bat with a front paw, tail sways
-  walk.phase += dt * (5 + spd * 3.4); walk.batT = Math.max(0, walk.batT - dt); walk.squash = Math.max(0, walk.squash - dt * 5);
+  walk.phase += dt * (5 + spd * 3.4); pf2Steps(spd); walk.batT = Math.max(0, walk.batT - dt); walk.squash = Math.max(0, walk.squash - dt * 5);
   const a = Math.min(1, spd / 2), sw = Math.sin(walk.phase);
   W.g.position.copy(p); W.g.rotation.y = walk.face; W.g.visible = !walk.fp && !blanketRigs.some(r => r.state === 'cat');   // (under a blanket: she's the lump)
   const nk = catnip.active ? catnip.kind : '';
