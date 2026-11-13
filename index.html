@@ -10749,7 +10749,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-13 14:46';                                              // stamped when the site is published
+const BUILD = '2026-11-13 15:26';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45552,7 +45552,7 @@ function makeDog() {
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), softShadowMat(0.42)); shadow.rotation.x = -Math.PI / 2; shadow.renderOrder = 1; shadow.userData.noWalk = true; shadow.visible = false; povEndWall.add(shadow);   // his shadow on the grass
   return { g, body, head, neck, legs, tail, tongue, shadow };
 }
-function bark(n) { for (let i = 0; i < (n || 1); i++) setTimeout(() => { noise(0.09, 0.16, 650); tone(420, 190, 0.12, 'sawtooth', 0.05); tone(240, 140, 0.14, 'square', 0.03); }, i * 230); }
+function bark(n) { /* PORTER1_V1: a soft woof, quieter far away; and only while he plays with her, or when she is close (within 9 m) */ let k = 0.6, d = 0; try { d = dog.rig.g.position.distanceTo(walk.pos); k = Math.max(0.3, Math.min(1, 1.2 - d / 25)); } catch (e) {} if (!/^(play|run|hop|caught|leap)$/.test((typeof dog !== 'undefined' && dog.state) || '') && d > 9) return; for (let i = 0; i < (n || 1); i++) setTimeout(() => { const p = 0.93 + Math.random() * 0.14; noise(0.06, 0.035 * k, 380 * p); tone(330 * p, 175 * p, 0.13, 'triangle', 0.055 * k); tone(170 * p, 115 * p, 0.16, 'sine', 0.05 * k); }, i * 260); }
 function dogSet(st) { dog.state = st; dog.t = 0; }
 function dogTouch() {                                                 // she runs into Porter: that starts the chase, or (mid-chase) tags him
   const R = dog.rig; if (!R || !R.g.visible || (dog.state !== 'play' && dog.state !== 'run')) return;
@@ -45622,7 +45622,7 @@ function updateDog(dt) {
     if (dd > 0.4) moveTo(tx, tz, Math.min(6, dd * 2 + 2));
     else { face(walk.pos.x, walk.pos.z); if (near) bow(0.35 + 0.35 * Math.sin(clock * 3)); else R.head.rotation.z = Math.sin(clock * 2.3) * 0.18; }   // (at the fence: play bows)
     pos.y = 0;
-    if (clock > dog.barkAt) { dog.barkAt = clock + (near ? 0.8 + Math.random() * 0.6 : 2.4 + Math.random() * 3); bark(near ? 2 : 1); R.head.rotation.x = -0.3; }
+    if (clock > dog.barkAt) { dog.barkAt = clock + (near ? 1.6 + Math.random() * 1.2 : 8 + Math.random() * 6); bark(near ? 2 : 1); R.head.rotation.x = -0.3; }
     if (dog.meowAt && clock > dog.meowAt + 0.55) {                    // she meowed at him (a beat to hear it): up and over
       dog.meowAt = 0;
       if (out) { dog.from.copy(pos); dog.to.set(Y.XR - 2.8, 0, pos.z); g.rotation.y = -Math.PI / 2; dogSet('leap'); dog.match = false; bark(3); showWalkName('🐕 WOOF! Porter the Doberman just jumped the fence!'); unlock('dogMeet'); }
