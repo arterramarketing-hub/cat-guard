@@ -10749,7 +10749,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-13 09:57';                                              // stamped when the site is published
+const BUILD = '2026-11-13 11:22';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -44148,6 +44148,189 @@ function pf2Install() {
 try { pf2Install(); } catch (e) { console.error(e); }
 try { pf2Fill(); } catch (e) { console.error(e); }
 /* (end of PERF2_V1) */
+
+  // ===================================================================== HOME1_V1 (2026-11-13): the title screen, simpler.
+  // Defend and Explore side by side, 🎮 More games (Chaos, Mouse, and the secret games she's found), Closet / Awards / Settings.
+  // Every game opens its rules card first (icon, name, three picture rules, ▶ Play). Settings gets 📖 How to play and an Updates
+  // section (🔄 Check, What's new); the What's new card pops up once after an update. Free roam is called Explore on the menu.
+  // The old buttons stay in the page, hidden: every new button just clicks the old one, so the games start exactly as before.
+  // Off switch: ?hm=0. To announce a release, add an entry at the top of HM_NEWS (n = update number, d = date, l = 2 or 3 lines).
+  const HM_NEWS = [
+    { n: 205, d: '13 Nov', l: [['🏠', '<b>A new title screen.</b> Defend and Explore, side by side.'], ['📖', '<b>Every game has a how-to-play card</b> before you start.'], ['👗', '<b>A brand-new Closet.</b> Pick a category, tap to wear.']] },
+  ];
+  const HM_SECRETS = ['ride', 'hop', 'jet', 'sled', 'lot', 'crossy', 'run'];
+  const HM_GAMES = {
+    defend: { i: '🍄', n: 'Defend', b: 'startBtn', s: 'Protect the mushrooms', r: [['🐭', '<b>Tap the mice</b> before they steal your mushrooms.'], ['💣', '<b>Don’t tap bomb mice.</b> It costs a life.'], ['🍄', 'Lose all <b>3 mushrooms</b> or <b>9 lives</b> and it’s over.']] },
+    explore: { i: '🏡', n: 'Explore', b: 'walkBtn', s: 'The whole house is yours', ex: 1, r: [['🕹️', '<b>Steer PKR</b> with the stick. <b>Jump</b> onto anything.'], ['👆', '<b>Tap things</b> to see what they are. Swipe and meow too.'], ['✨', '<b>Find secret games</b> hidden around the house and yard.']] },
+    chaos: { i: '🪩', n: 'Chaos mode', b: 'chaosBtn', s: 'No thieves, just a party', r: [['🐭', '<b>No thieves tonight:</b> the mice only come out to party.'], ['👆', '<b>Tap anything</b> and see what happens.'], ['💥', '<b>Nothing to lose,</b> so make a mess!']] },
+    mouse: { i: '🐭', n: 'Mouse mode', b: 'mouseBtn', s: 'Be the mouse', r: [['👆', '<b>Hold</b> to run toward your finger.'], ['🍄', '<b>Grab a mushroom</b> and carry it to any mouse hole.'], ['🐾', '<b>A red ring</b> shows where her paw lands. Steal all 3 to win!']] },
+    ride: { i: '🏍️', n: 'Ride', b: 'rideBtn', s: 'Hop on the motorcycle', r: [['↔️', '<b>Swipe sideways</b> to change lanes.'], ['↕️', '<b>Swipe up</b> to jump, <b>down</b> to duck.'], ['🦢', '<b>Dodge</b> the bins, geese and raccoons. Flip off the ramps!']] },
+    hop: { i: '🌳', n: 'Treetop Hop', b: 'hopBtn', s: 'Leap from tree to tree', r: [['👆', '<b>Hold</b> to crouch and charge.'], ['🌳', '<b>Let go</b> to leap to the next treetop.'], ['🎯', '<b>Land dead centre</b> for a perfect. Miss and it’s a fall!']] },
+    jet: { i: '✈️', n: 'Sky Paws', b: 'jetBtn', s: 'The raccoon’s junk jet', r: [['👆', '<b>Drag anywhere</b> to fly.'], ['🐀', '<b>Blast</b> the Rat King’s air force.'], ['⚠️', '<b>Look out</b> for planes from behind!']] },
+    sled: { i: '❄️', n: 'Sled Rush', b: 'sledBtn', s: 'Down the icy slope', r: [['👆', '<b>Hold and slide</b> left or right to steer.'], ['🧊', '<b>Stay on the ice:</b> don’t fall off the edge!'], ['↕️', '<b>Swipe up</b> (or tap) to jump, <b>down</b> to tuck.']] },
+    lot: { i: '🅿️', n: 'Meow Lot', b: 'lotBtn', s: 'Valet parking puzzles', r: [['🚗', '<b>Swipe a car</b> along its length to drive it.'], ['🚧', 'It drives <b>until something stops it.</b>'], ['⭐', '<b>Clear the lot.</b> Fewer moves, more stars.']] },
+    crossy: { i: '🐾', n: 'Crossy Kitty', b: 'crossyBtn', s: 'Hop across the traffic', r: [['👆', '<b>Tap</b> to hop forward.'], ['↔️', '<b>Swipe</b> to hop sideways or back.'], ['🚗', '<b>Don’t get splatted!</b> How many rows can you cross?']] },
+    run: { i: '🏃', n: 'Rooftop Runner', b: 'runBtn', s: 'Rooftop deliveries', r: [['⬆️', '<b>Swipe up</b> to jump and vault, <b>down</b> to slide.'], ['↔️', '<b>Swipe sideways</b> to change line or run along a wall.'], ['🟥', '<b>Red means use it:</b> boxes, bars, pipes and ziplines.']] },
+  };
+  function hmOn() { try { return new URLSearchParams(location.search).get('hm') !== '0'; } catch (e) { return true; } }
+  function hmEl(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+  function hmOpen(id) { const b = document.getElementById(id); if (!b) return false; if (b.hidden) return false; const w = b.closest('.ml-pair'); return !(w && w.style.display === 'none'); }
+  function hmFound() { return HM_SECRETS.filter(k => hmOpen(HM_GAMES[k].b)); }
+  function hmBest() { const e = document.getElementById('bestStart'), t = e ? e.textContent.trim() : ''; return t && t !== '—' && t !== '0' ? t : ''; }
+  function hmClose() { document.querySelectorAll('.hm-scrim,.hm-sheet,.hm-card').forEach(e => e.remove()); }
+  function hmCard(key, mode) {          // a game's rules card; mode 'learn' (from Settings): Got it! instead of Play
+    hmClose(); const G = HM_GAMES[key]; if (!G) return; const best = key === 'defend' ? hmBest() : '';
+    const scrim = hmEl('div', 'hm-scrim'), c = hmEl('section', 'hm-card' + (G.ex ? ' ex' : ''));
+    c.setAttribute('role', 'dialog'); c.setAttribute('aria-label', G.n);
+    c.innerHTML = '<div class="hm-top"><i aria-hidden="true">' + G.i + '</i><div><h2>' + G.n + '</h2><div class="hm-sub">' + (best ? 'Best ' + best : G.s) + '</div></div><button class="hm-x" aria-label="Close">✕</button></div><ul>' +
+      G.r.map(r => '<li><i aria-hidden="true">' + r[0] + '</i><span>' + r[1] + '</span></li>').join('') + '</ul><button class="hm-go">' + (mode === 'learn' ? 'Got it!' : '▶ Play') + '</button>';
+    scrim.addEventListener('click', hmClose); c.querySelector('.hm-x').addEventListener('click', hmClose);
+    c.querySelector('.hm-go').addEventListener('click', () => { hmClose(); if (mode === 'learn') return; const b = document.getElementById(G.b); if (b) b.click(); });
+    document.body.append(scrim, c); try { c.querySelector('.hm-go').focus({ preventScroll: true }); } catch (e) {}
+  }
+  function hmSheet(mode) {              // 🎮 More games; mode 'learn' (Settings → How to play) lists every game she can play
+    hmClose(); const learn = mode === 'learn', found = hmFound();
+    const scrim = hmEl('div', 'hm-scrim'), s = hmEl('section', 'hm-sheet'); s.setAttribute('role', 'dialog');
+    const g = (k, sub) => { const G = HM_GAMES[k]; return '<button class="hm-g" data-k="' + k + '"><i aria-hidden="true">' + G.i + '</i><span><b>' + G.n + '</b><small>' + (sub || G.s) + '</small></span></button>'; };
+    let h = '<div class="hm-hd"><h2>' + (learn ? 'How to play' : 'Pick a game') + '</h2><button class="hm-x" aria-label="Close">✕</button></div><div class="hm-sec">In the house</div><div class="hm-gg">' +
+      (learn ? g('defend') + g('explore') : '') + g('chaos') + g('mouse') + '</div>';
+    if (found.length || !learn) {
+      h += '<div class="hm-sec">✨ Secrets you’ve found · ' + found.length + ' of ' + HM_SECRETS.length + '</div><div class="hm-gg">' + found.map(k => g(k)).join('');
+      if (!learn) for (let i = found.length; i < HM_SECRETS.length; i++) h += '<div class="hm-g lock" aria-label="A secret game, not found yet"><i aria-hidden="true">🔒</i><span><b>???</b><small>Keep exploring</small></span></div>';
+      h += '</div>';
+    }
+    s.innerHTML = h;
+    scrim.addEventListener('click', hmClose); s.querySelector('.hm-x').addEventListener('click', hmClose);
+    s.querySelectorAll('.hm-g[data-k]').forEach(b => b.addEventListener('click', () => hmCard(b.dataset.k, mode)));
+    document.body.append(scrim, s);
+  }
+  function hmNewsHtml(N) { return '<div class="hm-wn"><h4>What’s new <small>Update ' + N.n + ' · ' + N.d + '</small></h4><ul>' + N.l.map(r => '<li><i aria-hidden="true">' + r[0] + '</i><span>' + r[1] + '</span></li>').join('') + '</ul></div>'; }
+  function hmNewsCard() {               // once per update, on the title screen
+    hmClose(); const N = HM_NEWS[0], scrim = hmEl('div', 'hm-scrim'), c = hmEl('section', 'hm-card');
+    c.setAttribute('role', 'dialog'); c.setAttribute('aria-label', 'What’s new');
+    c.innerHTML = '<div class="hm-top"><i aria-hidden="true">✨</i><div><h2>What’s new</h2><div class="hm-sub">Update ' + N.n + ' · ' + N.d + '</div></div><button class="hm-x" aria-label="Close">✕</button></div><ul>' +
+      N.l.map(r => '<li><i aria-hidden="true">' + r[0] + '</i><span>' + r[1] + '</span></li>').join('') + '</ul><button class="hm-go">OK!</button>';
+    scrim.addEventListener('click', hmClose); c.querySelector('.hm-x').addEventListener('click', hmClose); c.querySelector('.hm-go').addEventListener('click', hmClose);
+    document.body.append(scrim, c);
+  }
+  function hmNewsMaybe() {
+    const N = HM_NEWS[0], scr = document.getElementById('startScreen'); if (!N || !scr || scr.hidden || typeof state === 'undefined' || state !== 'menu') return;
+    let seen = null; try { seen = localStorage.getItem('catguard.hmNews'); } catch (e) {}
+    try { localStorage.setItem('catguard.hmNews', String(N.n)); } catch (e) {}
+    if (seen === null ? !hmBest() : +seen >= N.n) return;   // (a brand-new player doesn't need the news)
+    if (!document.querySelector('.hm-card,.hm-sheet')) hmNewsCard();
+  }
+  function hmSync() {                   // (every half second while the title shows) counts, best score, the Closet's dot
+    const U = hmSync.u; if (!U) return; const scr = document.getElementById('startScreen'); if (!scr || scr.hidden) return;
+    const best = hmBest(), n = 2 + hmFound().length, t1 = best ? 'Best ' + best : 'Protect the mushrooms';
+    if (U.dS.textContent !== t1) U.dS.textContent = t1;
+    if (U.cnt.textContent !== String(n)) U.cnt.textContent = n;
+    const cd = document.querySelector('#closetBtn .ck-dot'), on = !!(cd && !cd.hidden);
+    if (U.dot.hidden === on) U.dot.hidden = !on;
+    if (!document.getElementById('closetBtn')) U.ck.hidden = true; else if (U.ck.hidden) U.ck.hidden = false;
+  }
+  function hmSettings() {               // 📖 How to play, and Updates (🔄 Check, What's new, earlier updates)
+    const card = document.querySelector('#setScreen .card'), close = document.getElementById('setClose'); if (!card || !close || card.querySelector('.hm-upd')) return;
+    const fix = document.getElementById('roamFix'), row = fix && fix.closest('.set-row');
+    if (row) { const sp = row.querySelector('span'); if (sp) sp.textContent = '🔧 Explore house'; const note = row.nextElementSibling; if (note && note.classList.contains('set-note')) note.textContent = 'Explore remembers the time, the weather and anything she’s broken open. This puts it all back.'; }
+    const how = hmEl('button', 'hm-setrow', '<span>📖 How to play</span>'); how.addEventListener('click', () => hmSheet('learn'));
+    const N = HM_NEWS[0], u = hmEl('div', 'hm-upd');
+    u.innerHTML = '<div class="hm-now"><div><b>Updates</b><small>Update ' + N.n + ' · ' + N.d + '</small></div><button class="hm-chk">🔄 Check</button></div>' + hmNewsHtml(N) +
+      (HM_NEWS.length > 1 ? '<button class="hm-old">📜 Earlier updates</button><div class="hm-olds" hidden>' + HM_NEWS.slice(1).map(hmNewsHtml).join('') + '</div>' : '');
+    u.querySelector('.hm-chk').addEventListener('click', () => { const b = document.getElementById('updBtn'); if (b) b.click(); });
+    const old = u.querySelector('.hm-old'); if (old) old.addEventListener('click', () => { const o = u.querySelector('.hm-olds'); o.hidden = !o.hidden; old.textContent = o.hidden ? '📜 Earlier updates' : '📜 Hide earlier updates'; });
+    card.insertBefore(how, close); card.insertBefore(u, close);
+  }
+  function hmInstall() {
+    if (!hmOn()) return; const scr = document.getElementById('startScreen'), card = scr && scr.querySelector('.card'), title = card && card.querySelector('.title');
+    if (!card || !title || scr.classList.contains('hm1')) return;
+    const st = document.createElement('style'); st.id = 'hm1Css'; st.textContent = `
+/* HOME1_V1: the title screen, simpler. Defend and Explore side by side, More games, Closet / Awards / Settings; every game opens its rules card first. */
+html #startScreen.hm1:not([hidden]){display:block;padding:0}
+html #startScreen.hm1 .card>.rules,html #startScreen.hm1 #startBtn,html #startScreen.hm1 .card>.foot,html #startScreen.hm1 .card>.icon-bar{display:none!important}
+html #startScreen.hm1>.title{position:absolute;z-index:2;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 14px);margin:0;pointer-events:none}
+html body:has(#newVerPill:not([hidden])) #startScreen.hm1>.title{top:calc(env(safe-area-inset-top,0px) + 58px)}
+html #startScreen.hm1 .card{position:absolute;left:max(14px,env(safe-area-inset-left,0px));right:max(14px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);top:auto;margin:0;width:auto;max-width:520px;margin-inline:auto;max-height:none;display:flex;flex-direction:column;gap:11px;padding:14px;column-count:auto;transform:none}
+html #startScreen.hm1 .card>*{margin:0}
+#startScreen .hm-duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#startScreen .hm-big{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:112px;padding:8px 6px;border:3px solid var(--ink);border-radius:20px;background:#ff6fae;color:var(--ink);box-shadow:0 5px 0 var(--ink);cursor:pointer;font:inherit}
+#startScreen .hm-big.ex{background:#7fe0b5}
+#startScreen .hm-big:active,#startScreen .hm-more:active,#startScreen .hm-ib:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+#startScreen .hm-big i{font-style:normal;font-size:34px;line-height:1}
+#startScreen .hm-big b{font:400 26px/1 var(--display);letter-spacing:.3px}
+#startScreen .hm-big span{font:800 12.5px/1.2 var(--body);color:#3a1830}
+#startScreen .hm-more{display:flex;align-items:center;gap:12px;min-height:54px;padding:0 16px;border:3px solid var(--ink);border-radius:18px;background:#fff;color:var(--ink);box-shadow:0 4px 0 var(--ink);font:800 17px/1 var(--body);cursor:pointer}
+#startScreen .hm-more i{font-style:normal;font-size:24px}#startScreen .hm-more span{flex:1;text-align:left}
+#startScreen .hm-more em{flex:none;width:auto;text-align:center;font-style:normal;min-width:30px;padding:4px 9px;border:2px solid var(--ink);border-radius:999px;background:#ffd23a;font:800 13px/1 var(--body)}
+#startScreen .hm-icons{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+#startScreen .hm-ib{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:62px;border:2.5px solid var(--ink);border-radius:16px;background:#fff;color:var(--ink);box-shadow:0 3px 0 var(--ink);font:800 13px/1.1 var(--body);cursor:pointer}
+#startScreen .hm-ib i{font-style:normal;font-size:24px;line-height:1}
+#startScreen .hm-ib .hm-dot{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#ff3b5c;border:2.5px solid var(--ink)}
+#newVerPill{background:#ffd23a!important;color:var(--ink)!important;border:3px solid var(--ink)!important;box-shadow:0 3px 0 var(--ink)!important;min-height:44px;z-index:30!important}
+/* overlays: the games list and the rules cards (outside the title card, so they work from Settings too) */
+.hm-scrim{position:fixed;z-index:200;inset:0;background:rgba(20,10,18,.5)}
+.hm-sheet{position:fixed;z-index:201;left:0;right:0;bottom:0;max-height:88%;display:flex;flex-direction:column;gap:10px;padding:14px max(14px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 14px) max(14px,env(safe-area-inset-left,0px));border:3px solid var(--ink);border-bottom:0;border-radius:26px 26px 0 0;background:var(--paper);color:var(--ink);overflow-y:auto;-webkit-overflow-scrolling:touch;font-family:var(--body)}
+.hm-sheet>*{flex:none}
+.hm-sheet h2,.hm-card h2{margin:0;font:400 24px/1 var(--display);color:var(--cheese-deep)}
+.hm-sheet .hm-hd{display:flex;align-items:center}.hm-sheet .hm-hd h2{flex:1}
+.hm-x{flex:none;width:44px;height:44px;border-radius:50%;border:2.5px solid var(--ink);background:#fff;color:var(--ink);font:800 17px/1 var(--body);cursor:pointer;padding:0}
+.hm-sec{font:800 13px/1 var(--body);color:#7a5a6a;margin-top:4px;text-transform:uppercase;letter-spacing:.06em}
+.hm-gg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.hm-g{display:flex;align-items:center;gap:10px;min-height:64px;padding:8px 10px;border:2.5px solid var(--ink);border-radius:16px;background:#fff;color:var(--ink);box-shadow:0 3px 0 var(--ink);text-align:left;font:inherit;cursor:pointer}
+.hm-g i{font-style:normal;font-size:28px;line-height:1;flex:none}
+.hm-g b{display:block;font:800 15px/1.1 var(--body)}
+.hm-g small{display:block;font:600 12px/1.2 var(--body);color:#7a5a6a;margin-top:2px}
+.hm-g.lock{border-style:dashed;border-color:#b995a8;box-shadow:none;background:transparent;color:#9b8791;cursor:default}
+.hm-card{position:fixed;z-index:202;left:max(14px,env(safe-area-inset-left,0px));right:max(14px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);max-width:520px;margin-inline:auto;max-height:calc(100% - 20px);overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:16px 18px 18px;border:3px solid var(--ink);border-radius:26px;background:var(--paper);color:var(--ink);box-shadow:0 6px 0 var(--ink);font-family:var(--body)}
+.hm-card .hm-top{display:flex;align-items:center;gap:12px}
+.hm-card .hm-top>i{font-style:normal;font-size:40px;line-height:1}
+.hm-card .hm-top>div{flex:1;min-width:0}
+.hm-card .hm-sub{font:800 13px/1.2 var(--body);color:#7a5a6a;margin-top:3px}
+.hm-card ul{list-style:none;margin:0;padding:12px 0 0;display:flex;flex-direction:column;gap:11px;border-top:2px dashed #e2c7d4}
+.hm-card li{display:flex;gap:12px;align-items:center;font:500 15.5px/1.3 var(--body)}
+.hm-card li b{font-weight:800}
+.hm-card li>i{flex:none;font-style:normal;font-size:30px;width:38px;text-align:center}
+.hm-go{min-height:58px;border:3px solid var(--ink);border-radius:18px;background:#ff6fae;color:var(--ink);box-shadow:0 5px 0 var(--ink);font:400 24px/1 var(--display);cursor:pointer}
+.hm-go:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+.hm-card.ex .hm-go{background:#7fe0b5}
+/* Settings: Updates and What's new */
+.hm-upd{display:flex;flex-direction:column;gap:9px;padding:12px;border:2.5px solid var(--ink);border-radius:16px;background:#fff;margin:6px 0 4px;text-align:left}
+.hm-upd .hm-now{display:flex;align-items:center;gap:10px}.hm-upd .hm-now div{flex:1}
+.hm-upd .hm-now b{display:block;font:800 16px/1.2 var(--body)}.hm-upd .hm-now small{display:block;font:600 12.5px/1.2 var(--body);color:#7a5a6a}
+.hm-chk{min-height:44px;padding:0 14px;border:2.5px solid var(--ink);border-radius:999px;background:#fff;color:var(--ink);box-shadow:0 3px 0 var(--ink);font:800 13.5px/1 var(--body);cursor:pointer}
+.hm-wn{border-top:2px dashed #e2c7d4;padding-top:9px;display:flex;flex-direction:column;gap:7px}
+.hm-wn h4{margin:0;display:flex;align-items:baseline;gap:8px;font:400 17px/1 var(--display);color:var(--cheese-deep)}.hm-wn h4 small{font:700 12px var(--body);color:#7a5a6a}
+.hm-wn ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.hm-wn li{display:flex;gap:10px;align-items:center;font:500 14.5px/1.3 var(--body)}.hm-wn li b{font-weight:800}.hm-wn li i{font-style:normal;font-size:22px;width:28px;text-align:center;flex:none}
+.hm-old{min-height:44px;border:2px solid #e2c7d4;border-radius:12px;background:transparent;color:#7a5a6a;font:800 14px/1 var(--body);cursor:pointer}
+.hm-setrow{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:48px;margin:4px 0;padding:0 14px;border:2.5px solid var(--ink);border-radius:14px;background:#fff;color:var(--ink);font:800 15px/1 var(--body);cursor:pointer}
+.hm-setrow::after{content:'›';font:800 20px/1 var(--body);color:#a08a96}
+@media (orientation:landscape) and (min-width:560px){
+  html #startScreen.hm1>.title{left:max(14px,env(safe-area-inset-left,0px));right:auto;width:44%;top:calc(env(safe-area-inset-top,0px) + 18px)}
+  html #startScreen.hm1 .card{left:auto;right:max(14px,env(safe-area-inset-right,0px));width:min(390px,50%);top:0;bottom:0;margin-block:auto;height:-webkit-fit-content;height:fit-content;max-height:calc(100% - 16px);overflow-y:auto;gap:9px;padding:13px}
+  #startScreen .hm-big{min-height:92px}#startScreen .hm-big i{font-size:28px}#startScreen .hm-big b{font-size:23px}
+  #startScreen .hm-more{min-height:48px}#startScreen .hm-ib{min-height:54px}
+  .hm-sheet{left:auto;top:10px;right:10px;bottom:10px;width:min(560px,70%);max-height:none;border:3px solid var(--ink);border-radius:22px}
+  .hm-gg{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hm-card{left:50%;right:auto;width:min(480px,92%);transform:translate(-50%,-50%);gap:9px;padding:12px 16px 14px}
+  .hm-card ul{gap:7px;padding-top:9px}.hm-card li>i{font-size:24px}.hm-card .hm-top>i{font-size:32px}.hm-go{min-height:50px}
+}
+`; document.head.appendChild(st);
+    scr.classList.add('hm1'); scr.insertBefore(title, card);
+    const duo = hmEl('div', 'hm-duo'), d = hmEl('button', 'hm-big', '<i aria-hidden="true">🍄</i><b>Defend</b><span></span>'), x = hmEl('button', 'hm-big ex', '<i aria-hidden="true">🏡</i><b>Explore</b><span>Go anywhere</span>');
+    d.addEventListener('click', () => hmCard('defend')); x.addEventListener('click', () => hmCard('explore')); duo.append(d, x);
+    const more = hmEl('button', 'hm-more', '<i aria-hidden="true">🎮</i><span>More games</span><em></em>'); more.addEventListener('click', () => hmSheet());
+    const icons = hmEl('div', 'hm-icons'), ib = (ic, lab, id) => { const b = hmEl('button', 'hm-ib', '<i aria-hidden="true">' + ic + '</i>' + lab); b.addEventListener('click', () => { const o = document.getElementById(id); if (o) o.click(); }); return b; };
+    const ck = ib('👗', 'Closet', 'closetBtn'), dot = hmEl('span', 'hm-dot'); dot.hidden = true; ck.appendChild(dot);
+    icons.append(ck, ib('🏆', 'Awards', 'achBtn'), ib('⚙️', 'Settings', 'setBtn'));
+    const first = card.querySelector('.rules'); card.insertBefore(duo, first); card.insertBefore(more, first); card.insertBefore(icons, first);
+    const wb = document.getElementById('walkBtn'); if (wb) wb.textContent = 'Explore';
+    hmSync.u = { dS: d.querySelector('span'), cnt: more.querySelector('em'), dot, ck }; hmSync(); setInterval(hmSync, 500);
+    try { hmSettings(); } catch (e) { console.error(e); }
+    setTimeout(() => { try { hmNewsMaybe(); } catch (e) {} }, 3000);
+  }
+  try { hmInstall(); } catch (e) { console.error(e); }
+
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
