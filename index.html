@@ -10749,7 +10749,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-12 15:55';                                              // stamped when the site is published
+const BUILD = '2026-11-12 23:24';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -43783,13 +43783,14 @@ html #closet.ckd .ck-panel{gap:8px}
 html #closet.ckd .ck-grid{padding-top:10px}
 html #closet.ckd.ckd-bar .ck-grid{padding-bottom:84px}
 html #closet.ckd .ck-tag.own{display:none}
-html #closet.ckd .ck-card.ckd-shop{background:#faf5f7;border-color:#cbb8c2;box-shadow:3px 3px 0 #cbb8c2}
-html #closet.ckd .ck-card.ckd-shop .ck-th{filter:grayscale(1);opacity:.5}
-html #closet.ckd .ck-card.ckd-shop .ck-nm{color:#9b8791}
-html #closet.ckd .ck-card.ckd-shop .ck-tag{background:#fff;color:#6f6068;border-color:#b9a6b0}
-html #closet.ckd .ck-card.ckd-shop.sel{background:#fff0f7;border-color:var(--ink);box-shadow:3px 3px 0 var(--ink)}
-html #closet.ckd .ck-card.ckd-shop.sel .ck-th{filter:none;opacity:1}
-html #closet.ckd .ck-card.ckd-shop.sel .ck-nm{color:var(--ink)}
+/* CLOSETD_V2: not hers yet: full colour, a softer card and its fish price; the price goes grey only when she can't afford it */
+html #closet.ckd .ck-card.ckd-mine{order:-2}
+html #closet.ckd .ckd-div{order:-1;grid-column:1/-1;display:flex;align-items:center;gap:8px;margin:4px 2px 0;font:800 12.5px/1 var(--body);color:#8a6f7d}
+html #closet.ckd .ckd-div::before,html #closet.ckd .ckd-div::after{content:'';flex:1;border-top:2px dashed #d9bccb}
+html #closet.ckd .ck-card.ckd-shop{background:#fff8fb}
+html #closet.ckd .ck-card.ckd-shop .ck-tag{background:#ffd23a;color:var(--ink);border-color:var(--ink)}
+html #closet.ckd .ck-card.ckd-shop .ck-tag.poor{background:#eee3e9;color:#8a7f86;border-color:#a898a1}
+html #closet.ckd .ck-card.ckd-shop.sel{background:#fff0f7;outline:3px dashed var(--cheese);outline-offset:1px}
 html #closet.ckd .ck-card:not(.ckd-shop).sel{outline:none;background:#fff}
 html #closet.ckd .ck-card.ckd-worn{background:#e9fbe4;outline:none}
 #closet .ckd-none{border-style:dashed!important;box-shadow:none!important;background:transparent!important;order:-3}
@@ -43868,6 +43869,7 @@ function ckdUI() {                                                      // (ckBu
   u.Tabs.before(home, back);
   const none = D.none = document.createElement('button'); none.className = 'ck-card ckd-none'; none.innerHTML = '<span class="ck-th">∅</span><span class="ck-nm">None</span>'; none.setAttribute('aria-label', 'None');
   none.addEventListener('click', () => { if (CK_SLOTS.some(s => s.id === CK.tab)) ckdOff(CK.tab, true); }); u.Grid.prepend(none);
+  const dv = D.div = document.createElement('div'); dv.className = 'ckd-div'; dv.innerHTML = '<span>🛍️ Shop</span>'; dv.hidden = true; u.Grid.append(dv);   // (between her things and the shop's)
   const buy = D.buy = ckdEl('div', 'ckd-buy', '<b></b><button class="btn ck-main"></button>'); buy.hidden = true; D.buyName = buy.querySelector('b'); D.buyBtn = buy.querySelector('button');
   D.buyBtn.addEventListener('click', () => { ckMain(); }); panel.appendChild(buy);
   const scrim = D.scrim = ckdEl('div', 'ckd-scrim'); scrim.hidden = true; scrim.addEventListener('click', ckdPopClose);
@@ -43889,8 +43891,10 @@ function ckdSync() {                                                    // (ckRe
   const slot = CK_SLOTS.find(s => s.id === CK.tab), sel = CK.sel && CK_BY_ID[CK.sel], a = CK.act;
   root.classList.toggle('ckd-athome', D.home);
   D.title.textContent = slot ? slot.name : CK.tab === 'sn' ? 'Limited' : CK.tab === 'secrets' ? 'Secrets' : '';
-  for (const it of CK_ITEMS) { const c = CK.cards[it.id]; if (!c || c.el.hidden) continue; const own = S.owned.has(it.id);
-    c.el.classList.toggle('ckd-shop', !own); c.el.classList.toggle('ckd-worn', own && ckWornId(S.outfit, it.slot) === it.id); }
+  let nMine = 0, nShop = 0;
+  for (const it of CK_ITEMS) { const c = CK.cards[it.id]; if (!c || c.el.hidden) continue; const own = S.owned.has(it.id); if (own) nMine++; else nShop++;
+    c.el.classList.toggle('ckd-shop', !own); c.el.classList.toggle('ckd-mine', own); c.el.classList.toggle('ckd-worn', own && ckWornId(S.outfit, it.slot) === it.id); }
+  D.div.hidden = !(nMine && nShop && slot);
   D.none.hidden = !slot; if (slot) D.none.classList.toggle('ckd-on', slot.id === 'hat' ? S.outfit.hat === 'none' : !S.outfit[slot.id]);
   let any = false;
   for (const s of CK_SLOTS) { const c = D.cats[s.id], id = ckdWornIn(s.id); if (id) any = true; c.el.classList.toggle('worn', !!id);
