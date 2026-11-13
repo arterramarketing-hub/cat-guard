@@ -10749,7 +10749,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-13 11:22';                                              // stamped when the site is published
+const BUILD = '2026-11-13 11:41';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -44222,9 +44222,9 @@ try { pf2Fill(); } catch (e) { console.error(e); }
   }
   function hmSync() {                   // (every half second while the title shows) counts, best score, the Closet's dot
     const U = hmSync.u; if (!U) return; const scr = document.getElementById('startScreen'); if (!scr || scr.hidden) return;
-    const best = hmBest(), n = 2 + hmFound().length, t1 = best ? 'Best ' + best : 'Protect the mushrooms';
+    const best = hmBest(), n = 2 + hmFound().length, t1 = best ? 'Best ' + best : 'Stop the mice';
     if (U.dS.textContent !== t1) U.dS.textContent = t1;
-    if (U.cnt.textContent !== String(n)) U.cnt.textContent = n;
+    if (U.cnt && U.cnt.textContent !== String(n)) U.cnt.textContent = n;
     const cd = document.querySelector('#closetBtn .ck-dot'), on = !!(cd && !cd.hidden);
     if (U.dot.hidden === on) U.dot.hidden = !on;
     if (!document.getElementById('closetBtn')) U.ck.hidden = true; else if (U.ck.hidden) U.ck.hidden = false;
@@ -44247,6 +44247,14 @@ try { pf2Fill(); } catch (e) { console.error(e); }
     const st = document.createElement('style'); st.id = 'hm1Css'; st.textContent = `
 /* HOME1_V1: the title screen, simpler. Defend and Explore side by side, More games, Closet / Awards / Settings; every game opens its rules card first. */
 html #startScreen.hm1:not([hidden]){display:block;padding:0}
+/* HOME1C_V1: a soft white glow behind the title (top-down upright, left-to-right sideways); the sideways title sits a touch above centre */
+html #startScreen.hm1::before{content:'';position:absolute;z-index:1;pointer-events:none;left:50%;top:calc(env(safe-area-inset-top,0px) - 4px);width:min(430px,115%);height:200px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(255,244,250,.9),rgba(255,236,246,.55) 55%,rgba(255,236,246,0))} /* HOME1D_V1: a small halo just behind the title */
+#startScreen .hm-more::after{content:'›';flex:none;font:800 26px/1 var(--body);color:#a08a96;margin-top:-3px}
+#startScreen .hm-big span{white-space:nowrap}
+@media (orientation:landscape) and (min-width:560px){
+  html #startScreen.hm1::before{left:calc(25% + 7px);top:calc(50% - 20px);width:min(400px,48%);height:210px;transform:translate(-50%,-50%);opacity:.85}
+  html #startScreen.hm1>.title{padding-bottom:40px}
+}
 html #startScreen.hm1 .card>.rules,html #startScreen.hm1 #startBtn,html #startScreen.hm1 .card>.foot,html #startScreen.hm1 .card>.icon-bar{display:none!important}
 html #startScreen.hm1>.title{position:absolute;z-index:2;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 14px);margin:0;pointer-events:none}
 html body:has(#newVerPill:not([hidden])) #startScreen.hm1>.title{top:calc(env(safe-area-inset-top,0px) + 58px)}
@@ -44306,8 +44314,9 @@ html #startScreen.hm1 .card>*{margin:0}
 .hm-setrow{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:48px;margin:4px 0;padding:0 14px;border:2.5px solid var(--ink);border-radius:14px;background:#fff;color:var(--ink);font:800 15px/1 var(--body);cursor:pointer}
 .hm-setrow::after{content:'›';font:800 20px/1 var(--body);color:#a08a96}
 @media (orientation:landscape) and (min-width:560px){
-  html #startScreen.hm1>.title{left:max(14px,env(safe-area-inset-left,0px));right:auto;width:44%;top:calc(env(safe-area-inset-top,0px) + 18px)}
-  html #startScreen.hm1 .card{left:auto;right:max(14px,env(safe-area-inset-right,0px));width:min(390px,50%);top:0;bottom:0;margin-block:auto;height:-webkit-fit-content;height:fit-content;max-height:calc(100% - 16px);overflow-y:auto;gap:9px;padding:13px}
+  html #startScreen.hm1>.title{left:max(14px,env(safe-area-inset-left,0px));right:auto;width:calc(50% - max(14px,env(safe-area-inset-left,0px)));top:0;bottom:0;align-content:center} /* HOME1B_V1: centred in the left half */
+  html #startScreen.hm1>.title .crown{width:54px;height:30px}html #startScreen.hm1>.title .pk{font-size:42px}html #startScreen.hm1>.title .g{font-size:46px}
+  html #startScreen.hm1 .card{left:calc(50% + 7px);right:max(14px,env(safe-area-inset-right,0px));width:auto;max-width:none;top:0;bottom:0;margin-block:auto;height:-webkit-fit-content;height:fit-content;max-height:calc(100% - 16px);overflow-y:auto;gap:9px;padding:13px}
   #startScreen .hm-big{min-height:92px}#startScreen .hm-big i{font-size:28px}#startScreen .hm-big b{font-size:23px}
   #startScreen .hm-more{min-height:48px}#startScreen .hm-ib{min-height:54px}
   .hm-sheet{left:auto;top:10px;right:10px;bottom:10px;width:min(560px,70%);max-height:none;border:3px solid var(--ink);border-radius:22px}
@@ -44319,7 +44328,7 @@ html #startScreen.hm1 .card>*{margin:0}
     scr.classList.add('hm1'); scr.insertBefore(title, card);
     const duo = hmEl('div', 'hm-duo'), d = hmEl('button', 'hm-big', '<i aria-hidden="true">🍄</i><b>Defend</b><span></span>'), x = hmEl('button', 'hm-big ex', '<i aria-hidden="true">🏡</i><b>Explore</b><span>Go anywhere</span>');
     d.addEventListener('click', () => hmCard('defend')); x.addEventListener('click', () => hmCard('explore')); duo.append(d, x);
-    const more = hmEl('button', 'hm-more', '<i aria-hidden="true">🎮</i><span>More games</span><em></em>'); more.addEventListener('click', () => hmSheet());
+    const more = hmEl('button', 'hm-more', '<i aria-hidden="true">🎮</i><span>Mini games</span>'); more.addEventListener('click', () => hmSheet());
     const icons = hmEl('div', 'hm-icons'), ib = (ic, lab, id) => { const b = hmEl('button', 'hm-ib', '<i aria-hidden="true">' + ic + '</i>' + lab); b.addEventListener('click', () => { const o = document.getElementById(id); if (o) o.click(); }); return b; };
     const ck = ib('👗', 'Closet', 'closetBtn'), dot = hmEl('span', 'hm-dot'); dot.hidden = true; ck.appendChild(dot);
     icons.append(ck, ib('🏆', 'Awards', 'achBtn'), ib('⚙️', 'Settings', 'setBtn'));
