@@ -8764,7 +8764,7 @@ const TOD_P = [
   { n: 'day', d: 150, sky: 'day', tint: [1, 1, 1], cloud: [1, 1, 1], night: 0 },
   { n: 'golden', d: 80, sky: 'golden', tint: [1.03, 0.83, 0.64], cloud: [1.0, 0.76, 0.6], night: 0, say: '🌅 Golden hour...' },
   { n: 'dusk', d: 60, sky: 'dusk', tint: [0.6, 0.52, 0.68], cloud: [0.6, 0.48, 0.62], night: 0.65 },
-  { n: 'night', d: 120, sky: 'night', tint: [0.3, 0.34, 0.54], cloud: [0.2, 0.22, 0.32], night: 1, say: '🌙 Night falls. The street lamps flicker on.' },
+  { n: 'night', d: 120, sky: 'night', tint: [0.44, 0.48, 0.66], cloud: [0.26, 0.28, 0.4], night: 1, /* MOON1_V1: moonlit, not just dark */ say: '🌙 Night falls. The street lamps flicker on.' },
 ];
 function todSkyTex(key) {                                              // a painted sky for each time of day (the midday one is the original)
   const T = TOD; if (T.skies[key]) return T.skies[key];
@@ -8781,8 +8781,8 @@ function todSkyTex(key) {                                              // a pain
     const gr = g.createLinearGradient(0, 0, 0, HZ); for (const [f, c] of P.g) gr.addColorStop(f, c); g.fillStyle = gr; g.fillRect(0, 0, W, HZ);
     if (P.stars) for (let i = 0; i < P.stars; i++) { const y = rn() * HZ * 0.8, a = (0.35 + rn() * 0.65) * (1 - y / HZ); g.fillStyle = `rgba(255,255,${230 + rn() * 25 | 0},${a})`; const s = rn() < 0.08 ? 2.2 : 1.2; g.fillRect(rn() * W, y, s, s); }
     if (P.sun) { const [fx, y, r, c] = P.sun; for (const x of wrap(W * fx)) { const sg = g.createRadialGradient(x, y, 3, x, y, r); sg.addColorStop(0, c + '1)'); sg.addColorStop(0.07, c + '.95)'); sg.addColorStop(0.3, c + '.35)'); sg.addColorStop(1, c + '0)'); g.fillStyle = sg; g.fillRect(x - r, y - r, 2 * r, 2 * r); } }
-    if (P.moon) { const [fx, y] = P.moon, x = W * fx, mg = g.createRadialGradient(x, y, 8, x, y, 70); mg.addColorStop(0, 'rgba(220,230,255,.35)'); mg.addColorStop(1, 'rgba(220,230,255,0)'); g.fillStyle = mg; g.fillRect(x - 70, y - 70, 140, 140);
-      g.fillStyle = '#f4f1e2'; g.beginPath(); g.arc(x, y, 11, 0, 7); g.fill(); g.fillStyle = 'rgba(180,176,160,.5)'; for (const [dx, dy, r] of [[-3, -2, 3], [4, 3, 2.2], [1, 5, 1.6]]) { g.beginPath(); g.arc(x + dx, y + dy, r, 0, 7); g.fill(); } }
+    if (P.moon) { const [fx, y] = P.moon, x = W * fx, mg = g.createRadialGradient(x, y, 10, x, y, 130); mg.addColorStop(0, 'rgba(225,234,255,.6)'); mg.addColorStop(0.35, 'rgba(210,222,255,.22)'); mg.addColorStop(1, 'rgba(210,222,255,0)'); g.fillStyle = mg; g.fillRect(x - 130, y - 130, 260, 260);
+      g.fillStyle = '#fbf8ea'; g.beginPath(); g.arc(x, y, 16, 0, 7); g.fill(); g.fillStyle = 'rgba(180,176,160,.45)'; for (const [dx, dy, r] of [[-4, -3, 4.2], [6, 4, 3.1], [1, 7, 2.2]]) { g.beginPath(); g.arc(x + dx, y + dy, r, 0, 7); g.fill(); } }
     if (P.murk) for (let i = 0; i < 70; i++) { const x = rn() * W, y = rn() * HZ * 0.9, r = 40 + rn() * 90; for (const px of wrap(x)) { const cg = g.createRadialGradient(px, y, 5, px, y, r); cg.addColorStop(0, `rgba(${rn() < 0.5 ? '70,76,84' : '200,204,208'},.3)`); cg.addColorStop(1, 'rgba(120,126,132,0)'); g.fillStyle = cg; g.fillRect(px - r, y - r, 2 * r, 2 * r); } }
     const ridge = (amp, col, seed) => { g.fillStyle = col; g.beginPath(); g.moveTo(0, HZ + 6);
       for (let x = 0; x <= W; x += 4) { const a = x / W * Math.PI * 2; g.lineTo(x, HZ - amp * (0.55 + 0.25 * Math.sin(a * 3 + seed) + 0.15 * Math.sin(a * 7 + seed * 2) + 0.05 * Math.sin(a * 17 + seed * 3))); }
@@ -10749,7 +10749,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-13 14:38';                                              // stamped when the site is published
+const BUILD = '2026-11-13 14:46';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -44449,7 +44449,7 @@ function pf3Wall(ox, oz, dx, dz, dt) {                                   // (upd
   const S = pf3Wall.S || (pf3Wall.S = { t: -9, nx: 0, nz: 0, n: 0, said: 0 }), p = walk.pos;
   if (walk.grounded || walk.climb || walk.frozen) { S.n = 0; S.t = -9; return; }
   { const bx = Math.abs(dx) > 1e-4 && Math.abs(p.x - ox) < 0.3 * Math.abs(dx), bz = Math.abs(dz) > 1e-4 && Math.abs(p.z - oz) < 0.3 * Math.abs(dz);   /* (stopped along x, along z, or both: house walls, fences, furniture, the room's own walls) */
-    if (bx || bz) { const nx = bx ? -Math.sign(dx) : 0, nz = bz ? -Math.sign(dz) : 0, l = Math.hypot(nx, nz); S.t = clock; S.nx = nx / l; S.nz = nz / l; if (walk.vy < -2.6) walk.vy += (-2.6 - walk.vy) * Math.min(1, dt * 14); } }   /* (paws on the wall: she slides down it slowly) */
+    if (bx || bz) { const nx = bx ? -Math.sign(dx) : 0, nz = bz ? -Math.sign(dz) : 0, l = Math.hypot(nx, nz); if (typeof flyIndoor === 'function' && flyIndoor({ x: p.x + nx / l * 0.45, y: p.y, z: p.z + nz / l * 0.45 })) { S.n = 0; S.t = -9; } /* MOON1_V1: indoors (judged a step back from the wall, so the house's outside walls still count as outdoors): no wall slide, no wall jump */ else { S.t = clock; S.nx = nx / l; S.nz = nz / l; if (walk.vy < -2.6) walk.vy += (-2.6 - walk.vy) * Math.min(1, dt * 14); } } }   /* (paws on the wall: she slides down it slowly) */
   if (S.camT > clock) { let d = S.camY - fc.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); fc.yaw += d * Math.min(1, dt * 5); }   /* (after a kick the camera eases side-on to the wall) */
   if (walk.jumpQ > 0 && (clock - walk.jumpQ < 0.32 || clock < (S.holdT || 0)) && clock - S.t < 0.3 && S.n < 3 && !(typeof flyFlying === 'function' && flyFlying())) {
     walk.jumpQ = -1; S.n++; S.t = -9; S.holdT = 0; const k = typeof nipK === 'function' ? nipK().jump : 1;
