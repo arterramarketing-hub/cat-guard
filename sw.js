@@ -2,11 +2,12 @@
    Everything is kept on the device. The game page opens straight from the saved copy (no waiting on the
    network); a fresh copy is fetched in the background, and if it's a newer version the game is told so it
    can offer "new version ready". Three.js, fonts and icons come straight from the cache. */
-const CACHE = 'pkd-v4';
+const CACHE = 'pkd-v5';
 const CORE = [
   './', './index.html', './apple-touch-icon.png', './icon-512.png', './manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
-  'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js',
+  'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js',
+  'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.core.js',
+  'https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/objects/Reflector.js',
 ];
 const buildOf = txt => { const m = txt.match(/const BUILD = '([^']+)'/); return m ? m[1] : ''; };
 self.addEventListener('install', e => {

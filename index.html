@@ -516,9 +516,31 @@
   </div>
 </section>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
-<script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/" } }</script>
+<script type="module">
+/* (THREE1_V1) Three.js r187 as ES modules. THREE is a plain copy of the module so the game can keep saying THREE.Reflector. */
+import * as THREE_NS from 'three';
+import { Reflector } from 'three/addons/objects/Reflector.js';
+const THREE = Object.assign({}, THREE_NS, { Reflector });
+/* (THREE1_V1) keep the r128 look: every hex colour, canvas texture and light strength in this file was tuned by eye without colour
+   management, so it stays off; the old (non-physical) light maths is put back in the shader chunks. ?look=raw switches all of this off. */
+const THREE1_RAW = /[?&]look=raw\b/.test(location.search);
+(function three1Look() { if (THREE1_RAW) return;
+  THREE.ColorManagement.enabled = false;
+  const LAMP = +((/[?&]lamp=([0-9.]+)/.exec(location.search) || [])[1] || 0.75);   /* lamp strength on matt (Lambert) surfaces: r187 lights them per pixel, r128 did it per corner and missed the bright middle of each lamp's pool, so the same lamp reads stronger now (?lamp=1 to compare) */
+  const C = THREE.ShaderChunk, sub = (k, a, b) => { if (C[k].indexOf(a) < 0) { console.warn('THREE1: chunk ' + k + ' changed, look patch skipped: ' + a.slice(0, 40)); return; } C[k] = C[k].split(a).join(b); };
+  /* r128 multiplied every light by PI (and its Lambert term divides by PI): put that back, in one place per kind of light */
+  sub('lights_pars_begin', 'vec3 irradiance = ambientLightColor;', 'vec3 irradiance = ambientLightColor * PI;');
+  sub('lights_pars_begin', 'vec3 irradiance = mix( hemiLight.groundColor, hemiLight.skyColor, hemiDiffuseWeight );', 'vec3 irradiance = mix( hemiLight.groundColor, hemiLight.skyColor, hemiDiffuseWeight ) * PI;');
+  sub('lights_pars_begin', 'light.color = directionalLight.color;', 'light.color = directionalLight.color * PI;');
+  sub('lights_pars_begin', 'light.color = pointLight.color;', '#ifdef LAMBERT\n\t\tlight.color = pointLight.color * ' + (Math.PI * LAMP).toFixed(4) + ';\n#else\n\t\tlight.color = pointLight.color * PI;\n#endif');
+  sub('lights_pars_begin', 'light.color = spotLight.color * spotAttenuation;', 'light.color = spotLight.color * spotAttenuation * PI;');
+  sub('lights_fragment_maps', 'vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;', 'vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity * PI;');
+  { const L = THREE.ShaderLib.basic, a = 'lightMapTexel.rgb * lightMapIntensity * RECIPROCAL_PI;';   /* unlit (Basic) materials used the lightMap as it is: the baked yard ground */
+    if (L.fragmentShader.indexOf(a) < 0) console.warn('THREE1: basic lightMap line changed, look patch skipped'); else L.fragmentShader = L.fragmentShader.split(a).join('lightMapTexel.rgb * lightMapIntensity;'); }
+  /* r128's lamp falloff: (1 - d / reach) ^ decay, not the physical 1 / d^2 */
+  sub('lights_pars_begin', 'float distanceFalloff = 1.0 / max( pow( lightDistance, decayExponent ), 0.01 );', 'if ( cutoffDistance > 0.0 && decayExponent > 0.0 ) return pow( saturate( - lightDistance / cutoffDistance + 1.0 ), decayExponent ); return 1.0;\n\tfloat distanceFalloff = 1.0;');
+})();
 window.__pkBoot = () => {   /* (the whole game; started a frame after the loading screen has painted) */
 'use strict';
 
@@ -662,6 +684,7 @@ const stage = document.getElementById('stage');
     p.texSubImage2D = function (...a) { if (a.length === 7) a[6] = clean(a[6]); else if (a.length === 9) a[8] = clean(a[8]); return ts.apply(this, a); }; }
 })();
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+if (!THREE1_RAW) renderer.outputColorSpace = THREE.LinearSRGBColorSpace;   /* (THREE1_V1) r128 wrote its colours straight to the screen */
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, devTier() === 'low' ? 0.75 : devTier() === 'mid' ? 1.5 : 1.75));   /* (older phones start soft: no stutter while Auto finds its feet) */
 renderer.setClearColor(0x2b2520);
 stage.appendChild(renderer.domElement);
@@ -10750,7 +10773,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-14 12:00';                                              // stamped when the site is published
+const BUILD = '2026-11-14 13:39';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -18969,7 +18992,7 @@ function jetQ(Q, x, y, z, sx, sy, ang, shape, r, g, b, a) {           // one spr
 }
 function jetQEnd(Q) {                                                  // upload just what's used
   const k = Q.k; Q.g.instanceCount = k; Q.mesh.visible = k > 0; if (!k) return;
-  Q.off.updateRange.count = k * 3; Q.col.updateRange.count = k * 4; Q.sca.updateRange.count = k * 4; Q.off.needsUpdate = Q.col.needsUpdate = Q.sca.needsUpdate = true;
+  three1Range(Q.off, k * 3); three1Range(Q.col, k * 4); three1Range(Q.sca, k * 4); Q.off.needsUpdate = Q.col.needsUpdate = Q.sca.needsUpdate = true;
 }
 
 /* ---------- particles: fire, sparks, smoke, feathers (two pools: glowing, and plain) ---------- */
@@ -20121,7 +20144,7 @@ function jetPutC(n, x, y, z, ry, rx, rz, s, r, g, b) { const V = JET.V[n]; if (V
 function jetDrawBegin() { const J = JET; for (const V of J.VL) V.k = 0; for (const Q of J.QL) Q.k = 0; }
 function jetDrawEnd() {
   const J = JET;
-  for (const V of J.VL) { const m = V.m, k = V.k; m.count = k; m.visible = k > 0; if (k) { m.instanceMatrix.updateRange.count = k * 16; m.instanceMatrix.needsUpdate = true; m.instanceColor.updateRange.count = k * 3; m.instanceColor.needsUpdate = true; } }
+  for (const V of J.VL) { const m = V.m, k = V.k; m.count = k; m.visible = k > 0; if (k) { three1Range(m.instanceMatrix, k * 16); m.instanceMatrix.needsUpdate = true; three1Range(m.instanceColor, k * 3); m.instanceColor.needsUpdate = true; } }
   for (const Q of J.QL) jetQEnd(Q);
 }
 function jetEnemiesDraw() {                                            // every enemy: its model(s), its shadow
@@ -26060,7 +26083,7 @@ function crossyBuild() {
   { const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); S.pkSh = new THREE.Mesh(g, softShadowMat(0.32)); S.pkSh.renderOrder = 1; sc.add(S.pkSh); }
   S.bub = new THREE.Mesh(new THREE.SphereGeometry(0.5, 18, 12), new THREE.MeshBasicMaterial({ color: 0x8fdcff, transparent: true, opacity: 0.26, depthWrite: false })); S.bub.position.y = 0.3; S.bub.visible = false; S.pk.add(S.bub);
   { const hk = S.hk = { g: new THREE.Group(), on: false, ph: 'off', t: 0, a: 0, p: new THREE.Vector3(), p0: new THREE.Vector3(), cry: 0 };
-    S.M.hawk = new THREE.MeshLambertMaterial({ vertexColors: true, morphTargets: true, morphNormals: true });   /* (CROSSY2_V1: one smooth mesh; its wingbeats, stoop and grab are morph targets) */
+    S.M.hawk = new THREE.MeshLambertMaterial({ vertexColors: true });   /* (CROSSY2_V1: one smooth mesh; its wingbeats, stoop and grab are morph targets) */
     hk.body = new THREE.Mesh(crossyHawkGeo(), S.M.hawk); hk.body.frustumCulled = false; hk.body.userData.name = 'Crossy hawk'; hk.g.rotation.order = 'YXZ'; hk.v = new THREE.Vector3(); hk.yaw = 0; hk.yr = 0; hk.hold = new THREE.Vector3();
     hk.g.add(hk.body); hk.g.scale.setScalar(1.3); hk.g.visible = false; sc.add(hk.g);
     const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2); hk.sh = new THREE.Mesh(g, softShadowMat(0.3)); hk.sh.renderOrder = 1; hk.sh.visible = false; sc.add(hk.sh); }
@@ -37997,7 +38020,7 @@ function cxtGroundShader(m) {                                            // the 
   const FRAG = `
 vec3 cxtAdd = vec3(0.0);
 #ifdef USE_MAP
-{ float cxtS = floor((1.0 - vUv.y) * 32.0);
+{ float cxtS = floor((1.0 - vMapUv.y) * 32.0);
   if (cxtS > 17.5 && cxtS < 21.5) {
     vec2 w = vCxtW.xz;
     float sh = sin(w.x * 1.7 + w.y * 2.3 + uCxtT * 1.6) * sin(w.x * 0.9 - w.y * 1.3 - uCxtT * 1.1);
@@ -38010,7 +38033,7 @@ vec3 cxtAdd = vec3(0.0);
     cxtAdd += tw * smoothstep(0.1, 0.0, d) * step(0.45, h) * mix(vec3(1.0, 0.98, 0.9), vec3(0.62, 0.74, 1.0), uCxtN);
 #endif
   } else if ((cxtS > 7.5 && cxtS < 13.5) || (cxtS > 15.5 && cxtS < 16.5) || (cxtS > 21.5 && cxtS < 22.5)) {
-    cxtAdd += diffuseColor.rgb * smoothstep(0.8, 0.9, max(texelColor.r, texelColor.g)) * step(texelColor.b, 0.95) * uCxtN * 0.6;   /* (paint and studs, not snow) */
+    cxtAdd += diffuseColor.rgb * smoothstep(0.8, 0.9, max(sampledDiffuseColor.r, sampledDiffuseColor.g)) * step(sampledDiffuseColor.b, 0.95) * uCxtN * 0.6;   /* (paint and studs, not snow) */
   }
 #ifndef CXT_LOW
   else if (cxtS < 7.5 && uCxtF > 0.0) {
@@ -38830,7 +38853,7 @@ function runTileMat(m) {                                                 // a ma
   m.onBeforeCompile = sh => {
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 tile;\nvarying vec4 vTile;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvTile = tile;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec4 vTile;').replace('#include <map_fragment>',
-      '#ifdef USE_MAP\nvec4 texelColor = texture2D( map, vTile.xy + fract( vUv ) * vTile.zw );\ntexelColor = mapTexelToLinear( texelColor );\ndiffuseColor *= texelColor;\n#endif');
+      '#ifdef USE_MAP\nvec4 texelColor = texture2D( map, vTile.xy + fract( vMapUv ) * vTile.zw );\ndiffuseColor *= texelColor;\n#endif');
   };
   m.customProgramCacheKey = () => 'runTile'; return m;
 }
@@ -40831,7 +40854,7 @@ function tcCls() {
 }
 function tcSkinMat(k) {                                                  // her Closet materials, skinned
   const C = tcSkinMat.C || (tcSkinMat.C = {}); if (C[k]) return C[k];
-  const m = ckMat()[k].clone(); m.skinning = true; return (C[k] = m);
+  const m = ckMat()[k].clone(); return (C[k] = m);
 }
 function tcTag(R) { if (R && R.tail) R.tail.forEach((s, i) => { if (s && s.userData) s.userData.tcSeg = i; }); }
 function tcSegOf(o) { for (let i = 0; o && i < 6; i++, o = o.parent) if (o.userData && o.userData.tcSeg != null) return o; return null; }
@@ -41366,7 +41389,7 @@ function drsCls() {
   }
   return (drsCls.C = DrsSkin);
 }
-function drsSkinMat(k) { const C = drsSkinMat.C || (drsSkinMat.C = {}); if (C[k]) return C[k]; const m = ckMat()[k].clone(); m.skinning = true; return (C[k] = m); }
+function drsSkinMat(k) { const C = drsSkinMat.C || (drsSkinMat.C = {}); if (C[k]) return C[k]; const m = ckMat()[k].clone(); return (C[k] = m); }
 function drsSkirtInst(it, inst) {                                        // (ckInstance, after) an outfit's skirt meshes
   const G = ckBake(it); if (!G) return;
   for (const k of ['m', 's', 'l']) { const g = G['drs' + k.toUpperCase()]; if (!g) continue; const Cl = drsCls(), m = new Cl(g, drsSkinMat(k)); m.frustumCulled = false; m.userData.drsSkirt = 1; if (k === 'l') m.renderOrder = 2;
@@ -42198,7 +42221,7 @@ function tutuLayer(sh, l, R, col, N, s) {                                // one 
   return { g, col: null, M: null, t: Float32Array.from(T) };
 }
 function tutuMat() {                                                     // soft translucent tulle, both sides, skinned; no depth write (layers can't z-fight)
-  return tutuMat.M || (tutuMat.M = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide, skinning: true, emissive: 0x3c1828 }));
+  return tutuMat.M || (tutuMat.M = new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide, emissive: 0x3c1828 }));
 }
 function tutuInst(it, inst) {                                            // (ckInstance, after) the tulle mesh, skinned and bound like DRS_V1's skirts
   const G = ckBake(it), g = G && G.tutuT; if (!g || typeof drsCls !== 'function') return;
@@ -42298,7 +42321,7 @@ function run2TileMat(m) {
   m.onBeforeCompile = sh => {
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 tile;\nvarying vec4 vTile;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvTile = tile;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec4 vTile;').replace('#include <map_fragment>',
-      '#ifdef USE_MAP\nvec2 tUv = vTile.xy + fract( vUv ) * vTile.zw;\n#if __VERSION__ >= 300\nvec4 texelColor = textureGrad( map, tUv, dFdx( vUv ) * vTile.zw, dFdy( vUv ) * vTile.zw );\n#else\nvec4 texelColor = texture2D( map, tUv );\n#endif\ntexelColor = mapTexelToLinear( texelColor );\ndiffuseColor *= texelColor;\n#endif');
+      '#ifdef USE_MAP\nvec2 tUv = vTile.xy + fract( vMapUv ) * vTile.zw;\n#if __VERSION__ >= 300\nvec4 texelColor = textureGrad( map, tUv, dFdx( vMapUv ) * vTile.zw, dFdy( vMapUv ) * vTile.zw );\n#else\nvec4 texelColor = texture2D( map, tUv );\n#endif\ndiffuseColor *= texelColor;\n#endif');
   };
   m.customProgramCacheKey = () => 'runTile2'; return m;
 }
@@ -43448,20 +43471,20 @@ function ph2Ready() {
   for (const o of povEndWall.children) { if (!NAMES[o.userData.name]) continue; o.traverse(q => { const m = q.material; if (!q.isMesh || !m || Array.isArray(m) || !m.isMeshBasicMaterial || m.transparent || m.visible === false || q.isInstancedMesh || !q.geometry.attributes.position) return;
       if (!q.geometry.boundingBox) q.geometry.computeBoundingBox(); bb.copy(q.geometry.boundingBox).applyMatrix4(q.matrixWorld); if (bb.max.y - bb.min.y > 0.25 || bb.max.y > 0.2) return;   /* (the flat ground, and the low slabs and stones lying on it) */
       const p = q.geometry.attributes.position, a = new Float32Array(p.count * 2); for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(q.matrixWorld); a[i * 2] = (v.x - D.X0) / (D.X1 - D.X0); a[i * 2 + 1] = (v.z - D.Z0) / (D.Z1 - D.Z0); }
-      q.geometry.setAttribute('uv2', new THREE.BufferAttribute(a, 2)); S.recv.push(q); }); }
+      q.geometry.setAttribute('uv1', new THREE.BufferAttribute(a, 2)); S.recv.push(q); }); }
   if (!S.recv.length) return;
   const FE = 10; S.fx = new Float32Array(N); S.fz = new Float32Array(N);   /* the map's effect fades out over its last 10 units, so a shadow never ends on a ruled line */
   for (let i = 0; i < N; i++) { const x = (i + 0.5) / N * (D.X1 - D.X0), z = (i + 0.5) / N * (D.Z1 - D.Z0); S.fx[i] = Math.max(0, Math.min(1, Math.min(x, D.X1 - D.X0 - x) / FE)); S.fz[i] = Math.max(0, Math.min(1, Math.min(z, D.Z1 - D.Z0 - z) / FE)); }
   S.fx[0] = S.fx[N - 1] = S.fz[0] = S.fz[N - 1] = 0;
-  S.out = new Uint8Array(N * N * 3).fill(255);
-  const t = S.tex = new THREE.DataTexture(S.out, N, N, THREE.RGBFormat); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true;
+  S.out = new Uint8Array(N * N * 4).fill(255);
+  const t = S.tex = new THREE.DataTexture(S.out, N, N, THREE.RGBAFormat); t.channel = 1;   /* (THREE1_V1) RGBA, read with the second UV set */ t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true;
   try { t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); } catch (e) {}
-  { const n = N >> 1, out = new Uint8Array(n * n * 3).fill(255), tl = new THREE.DataTexture(out, n, n, THREE.RGBFormat);   /* (PERF1_V1) a half-size copy for while the light is changing: a quarter of the sums, a small upload, no mip-maps to rebuild */
+  { const n = N >> 1, out = new Uint8Array(n * n * 4).fill(255), tl = new THREE.DataTexture(out, n, n, THREE.RGBAFormat); tl.channel = 1;   /* (PERF1_V1) a half-size copy for while the light is changing: a quarter of the sums, a small upload, no mip-maps to rebuild */
     tl.wrapS = tl.wrapT = THREE.ClampToEdgeWrapping; tl.magFilter = tl.minFilter = THREE.LinearFilter; tl.generateMipmaps = false; S.lo = { n, out, tex: tl }; }
   const P = ph2Params(); ph2Rows(P, 0, N, false); S.key = S.keyHi = P.key; t.needsUpdate = true;
   const mats = new Set(); for (const q of S.recv) { const m = q.material; if (!mats.has(m)) { mats.add(m); m.lightMap = t; m.lightMapIntensity = 1; m.needsUpdate = true; } }
   S.mats = [...mats]; S.cur = t;
-  povEndWall.traverse(q => { if (q.isMesh && !Array.isArray(q.material) && mats.has(q.material) && q.geometry.attributes.position && !q.geometry.attributes.uv2) q.geometry.setAttribute('uv2', new THREE.BufferAttribute(new Float32Array(q.geometry.attributes.position.count * 2), 2)); });   /* (anything else on one of those materials reads the map's corner, which is always white) */
+  povEndWall.traverse(q => { if (q.isMesh && !Array.isArray(q.material) && mats.has(q.material) && q.geometry.attributes.position && !q.geometry.attributes.uv1) q.geometry.setAttribute('uv1', new THREE.BufferAttribute(new Float32Array(q.geometry.attributes.position.count * 2), 2)); });   /* (anything else on one of those materials reads the map's corner, which is always white) */
   S.ready = true;
 }
 function ph2Params() {                                                  // what the light is doing now: which two sun maps and how far between them, how strong the sun is, the shade's colour
@@ -43473,8 +43496,8 @@ function ph2Params() {                                                  // what 
 }
 function ph2Rows(P, r0, r1, lo) {                                        // rows r0..r1 of the lightMap (lo: of its half-size copy, every other texel), from the four maps
   const S = ph2S(), N = S.N, st = lo ? 2 : 1, n = lo ? S.lo.n : N, A = S.src[P.a], B = S.src[P.b], K = S.src.sky, O = lo ? S.lo.out : S.out, s = P.s, str = P.str / 255, amb = P.amb, tr = P.tint[0], tg = P.tint[1], tb = P.tint[2], fx = S.fx, fz = S.fz, AO = 0.55 / 255;
-  for (let j = r0; j < r1; j++) { const fj = j === n - 1 ? 0 : fz[j * st]; let i = j * st * N, o = j * n * 3;
-    for (let x = 0; x < n; x++, i += st, o += 3) { const fe = x === n - 1 ? 0 : fj * fx[x * st]; if (fe <= 0) { O[o] = O[o + 1] = O[o + 2] = 255; continue; }
+  for (let j = r0; j < r1; j++) { const fj = j === n - 1 ? 0 : fz[j * st]; let i = j * st * N, o = j * n * 4;
+    for (let x = 0; x < n; x++, i += st, o += 4) { const fe = x === n - 1 ? 0 : fj * fx[x * st]; if (fe <= 0) { O[o] = O[o + 1] = O[o + 2] = 255; continue; }
       const sv = A[i] + (B[i] - A[i]) * s, lit = 1 - str * (255 - sv), a = 1 - AO * (255 - K[i]), k = (0.88 + 0.12 * a) * 255, sh = amb * a, q = 255 * (1 - fe);
       let h = sh * tr; O[o] = q + fe * (h + (1 - h) * lit) * k; h = sh * tg; O[o + 1] = q + fe * (h + (1 - h) * lit) * k; h = sh * tb; O[o + 2] = q + fe * (h + (1 - h) * lit) * k; } }
 }
@@ -43602,7 +43625,7 @@ function thinMerge(L, par) {
   if (!L.p.length) return null; const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(L.p, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(L.uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(L.c, 3)); g.computeBoundingSphere(); g.computeBoundingBox();
   const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: thinTex(), vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
-  m.material.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', 'vec4 texelColor = texture2D( map, vUv, 1.5 ); diffuseColor *= texelColor;'); };   /* (a mip and a half blurrier than it need be: across the street the bars are an even haze, up close they are bars) */
+  m.material.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', 'vec4 texelColor = texture2D( map, vMapUv, 1.5 ); diffuseColor *= texelColor;'); };   /* (a mip and a half blurrier than it need be: across the street the bars are an even haze, up close they are bars) */
   m.userData.name = 'Railings'; m.userData.noWalk = true; m.userData.keep = true; par.add(m); return m;
 }
 /* ---------- PKR's Closet: take everything off ---------- */
@@ -43664,7 +43687,7 @@ function pm1MeshOk(m) {
   const g = m.geometry, mat = m.material; if (!m.isMesh || m.userData.pm1 || m.isSkinnedMesh || m.isInstancedMesh || !g || !g.isBufferGeometry || !mat || Array.isArray(mat)) return false;
   if (mat.transparent || mat.visible === false || mat.lightMap || mat.aoMap || mat.morphTargets || mat.isShaderMaterial || m.renderOrder !== 0 || m.frustumCulled === false || m.userData.noMerge || m.getRenderTarget) return false;
   if (Object.prototype.hasOwnProperty.call(m, 'onBeforeRender') || Object.prototype.hasOwnProperty.call(m, 'onAfterRender') || m.customDepthMaterial) return false;
-  const p = g.attributes.position; if (!p || p.count < 3 || p.count > 20000 || g.attributes.uv2 || (g.morphAttributes && Object.keys(g.morphAttributes).length) || g.drawRange.start !== 0 || g.drawRange.count !== Infinity) return false;
+  const p = g.attributes.position; if (!p || p.count < 3 || p.count > 20000 || g.attributes.uv1 || (g.morphAttributes && Object.keys(g.morphAttributes).length) || g.drawRange.start !== 0 || g.drawRange.count !== Infinity) return false;
   return (m.layers.mask === 1);
 }
 function pm1Roots() {                                                    // the named groups straight under the scene, and the front door and garage door outside
@@ -44868,6 +44891,20 @@ function cars2RoadVoice(A, low) {                                             //
 function cars2Make(kind, col, plate) { try { return cars2Build(null, kind, col, plate); } catch (e) { console.error(e); return null; } }
 try { if (typeof updateYardLife === 'function' && !updateYardLife.cars2) { const prev = updateYardLife; updateYardLife = function (dt) { const r = prev.apply(this, arguments); if (cars2On()) try { cars2Tick(dt); } catch (e) { console.error(e); } return r; }; updateYardLife.cars2 = 1; } } catch (e) { console.error(e); }   /* (the one statement that runs at load: the cars' lights, exhaust and engines, after updateYardLife each frame) */
 /* (end of CARS2_V1) */
+function three1Range(a, n) { a.clearUpdateRanges(); a.addUpdateRange(0, n); }   /* (THREE1_V1) upload only the first n numbers of a buffer */
+function three1Mirrors() {   /* (THREE1_V1) A mirror used to draw its reflection in the middle of the main picture. Three.js keeps a separate light list for such a
+     picture-within-a-picture, and every lit material seen in both was re-checked (a slow lookup, slower in r187) each time it changed hands: twice a frame, for every
+     material in the room. Now a mirror only asks, and its reflection is drawn straight after the main picture (same hidden objects, same camera), so the reflection
+     is one frame behind and nothing is re-checked. Mirrors seen inside another mirror keep their last picture. Off: ?mirrors=old */
+  if (/[?&]mirrors=old\b/.test(location.search) || three1Mirrors.M) return; const M = three1Mirrors.M = { q: [], depth: 0, busy: false, n: 0 };
+  scene.traverse(o => { if (!o.getRenderTarget || typeof o.onBeforeRender !== 'function' || o.userData.three1m) return; o.userData.three1m = 1; M.n++; const f0 = o.onBeforeRender;
+    o.onBeforeRender = function (rnd, scn, cam) { if (M.busy) { if (M.now === this) return f0.apply(this, arguments); return; } if (rnd.getRenderTarget() !== null || M.q.length > 8) return; M.q.push([this, f0, scn, cam]); }; });
+  const r0 = renderer.render;
+  renderer.render = function (sc, cam) { M.depth++; try { r0.call(this, sc, cam); } finally { M.depth--; }
+    if (M.depth || M.busy || !M.q.length) return; M.busy = true;
+    try { for (const [o, f, s, c] of M.q.splice(0)) { if (s !== sc) continue; M.now = o; f.call(o, renderer, s, c); } } finally { M.busy = false; M.now = null; } };
+}
+
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
@@ -46351,6 +46388,7 @@ function frame(now) {
   updateBlanketCover(); updateKarenBubble();
   if (state !== 'tvgame') { const hid = cullBegin(); renderer.render(scene, camera); cullEnd(hid); }           // (the room is hidden behind the full-screen TV)
 }
+three1Mirrors();
 requestAnimationFrame(frame);
 { const hide = () => { const bl = document.getElementById('bootLoader'); if (bl && !bl.dataset.gone) { bl.dataset.gone = 1; bl.style.opacity = 0; bl.style.pointerEvents = 'none'; setTimeout(() => bl.remove(), 500); } };   /* (built: the loading screen fades away) */
   requestAnimationFrame(() => requestAnimationFrame(hide)); setTimeout(hide, 700); }
