@@ -10774,7 +10774,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-16 13:55';                                              // stamped when the site is published
+const BUILD = '2026-11-16 14:14';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -43520,7 +43520,7 @@ function ph2Cat(dt) {                                                    // PKR 
   if (state === 'playing' && gameMode === 'walk' && walk.on && walk.rig && walk.rig.g && !(typeof mirrorWorld !== 'undefined' && mirrorWorld)) { live = true;
     const p = walk.pos, indoors = p.x > YARD.HL && p.x < YARD.HR && p.z > UPPER.zF && p.z < UPPER.zB && p.y < (typeof roofRainY === 'function' ? roofRainY(p.x, p.z) : 1e9);
     if (!indoors && p.y < 2.6) { const u = (p.x - D.X0) / (D.X1 - D.X0), w = (p.z - D.Z0) / (D.Z1 - D.Z0), lo = S.cur === S.lo.tex, n = lo ? S.lo.n : S.N, O = lo ? S.lo.out : S.out;
-      if (u > 0 && u < 1 && w > 0 && w < 1) { const o = (((w * n) | 0) * n + ((u * n) | 0)) * 3; for (let c = 0; c < 3; c++) tgt[c] = Math.max(0.7, 1 - 0.55 * (1 - O[o + c] / 255)); } } }   /* (never darker than 0.7: she's the star) */
+      if (u > 0 && u < 1 && w > 0 && w < 1) { const o = (((w * n) | 0) * n + ((u * n) | 0)) * 3; const L = (0.2126 * O[o] + 0.7152 * O[o + 1] + 0.0722 * O[o + 2]) / 255; tgt[0] = tgt[1] = tgt[2] = Math.max(0.7, 1 - 0.55 * (1 - L)); } } }   /* (SHADE2: brightness only, the same on all three: the bake's shade is bluish and tinted her) */   /* (never darker than 0.7: she's the star) */
   const f = live ? Math.min(1, dt * 6) : 1; for (let c = 0; c < 3; c++) C.k[c] += (tgt[c] - C.k[c]) * f;
   C.ap = Math.abs(C.k[0] - 1) + Math.abs(C.k[1] - 1) + Math.abs(C.k[2] - 1) > 0.05 ? C.k : null;   /* (in the open: nothing to do) */
   if (live && ((C.t -= dt) <= 0 || C.rig !== walk.rig.g)) { C.t = 0.5; C.rig = walk.rig.g;      /* her meshes change when she dresses: any new one gets the two hooks */
@@ -43563,6 +43563,19 @@ function pf1Matrix() {
       c[0] = p.x; c[1] = p.y; c[2] = p.z; c[3] = q._x; c[4] = q._y; c[5] = q._z; c[6] = q._w; c[7] = s.x; c[8] = s.y; c[9] = s.z; }
     else this.pf1c = [p.x, p.y, p.z, q._x, q._y, q._z, q._w, s.x, s.y, s.z];
     um.call(this);
+  };
+  P.updateWorldMatrix = function (up, down, force) {   /* (MATRIX2: since r187 a world-position question re-makes the parents' matrices and clears their flag without touching their other children; flag them, as pf1's skip no longer heals it) */
+    const par = this.parent; let f = force === true;
+    if (up === true && par !== null && par.updateWorldMatrix(true, false) === true) f = true;
+    if (this.matrixAutoUpdate) this.updateMatrix();
+    let ch = false;
+    if (this.matrixWorldNeedsUpdate || f) {
+      if (this.matrixWorldAutoUpdate === true) { if (par === null) this.matrixWorld.copy(this.matrix); else this.matrixWorld.multiplyMatrices(par.matrixWorld, this.matrix); }
+      this.matrixWorldNeedsUpdate = false; f = true; ch = true;
+      if (down !== true) { const k = this.children; for (let i = 0; i < k.length; i++) k[i].matrixWorldNeedsUpdate = true; }
+    }
+    if (down === true) { const k = this.children; for (let i = 0; i < k.length; i++) k[i].updateWorldMatrix(false, true, f); }
+    return ch;
   };
   P.add = function (o) { const r = add.apply(this, arguments); if (arguments.length === 1 && o && o.isObject3D) o.matrixWorldNeedsUpdate = true; return r; };
   P.remove = function (o) { const r = rem.apply(this, arguments); if (arguments.length === 1 && o && o.isObject3D) o.matrixWorldNeedsUpdate = true; return r; };
