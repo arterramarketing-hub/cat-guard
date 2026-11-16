@@ -10773,7 +10773,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-15 22:22';                                              // stamped when the site is published
+const BUILD = '2026-11-15 22:29';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -44558,19 +44558,33 @@ function lp1Tick(now) {
 function pf5S() { return pf5S.S || (pf5S.S = { m: null, t0: -9, face: 0 }); }
 function pf5SwipeFx() {                                                  // (walkSwipe, when a swipe really happens)
   const S = pf5S(); if (!walk.on || !walk.rig) return;
-  if (!S.m) { const P = [], I = []; let vo = 0;                          /* three fat claw-mark arcs in one geometry, drawn in the XY plane: the mesh is turned to face the camera, so the slash reads from any side */
-    for (const [r0, r1] of [[0.34, 0.42], [0.5, 0.58], [0.66, 0.74]]) { const n = 16; for (let i = 0; i <= n; i++) { const a = -0.95 + 1.9 * i / n, w = Math.sin(Math.PI * i / n), rm = (r0 + r1) / 2, h = (r1 - r0) / 2 * (0.12 + 0.88 * w);
-        P.push(Math.sin(a) * (rm - h), Math.cos(a) * (rm - h) - 0.5, 0, Math.sin(a) * (rm + h), Math.cos(a) * (rm + h) - 0.5, 0); if (i < n) { const k = vo + i * 2; I.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); } } vo += (n + 1) * 2; }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeBoundingSphere();
-    const m = S.m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-    m.material.userData.noTod = true; m.userData.noWalk = true; m.userData.noMerge = true; m.userData.keep = true; m.userData.name = 'Swipe arc'; m.raycast = function () {}; m.renderOrder = 8; m.frustumCulled = false; m.visible = false; scene.add(m); }
+  if (!S.m) S.m = pf5SlashBuild();
   S.t0 = clock; S.face = walk.face; S.side = S.side === 1 ? -1 : 1; S.m.visible = true; pf5Tick();
 }
-function pf5Tick() {                                                     // (after updateWalk) the arcs sweep across in front of her, grow a little and fade: a quarter of a second
-  const S = pf5S(), m = S.m; if (!m || !m.visible) return; const k = (clock - S.t0) / 0.26; if (k >= 1 || k < 0 || !walk.on) { m.visible = false; m.material.opacity = 0; return; }
-  const p = walk.pos, g = walk.gScale || 1, e = 1 - (1 - k) * (1 - k);
-  m.position.set(p.x + Math.sin(S.face) * 0.5 * g, p.y + 0.42 * g, p.z + Math.cos(S.face) * 0.5 * g);
-  m.quaternion.copy(camera.quaternion); m.rotateZ(S.side * (1.15 - 2.3 * e)); m.scale.setScalar(g * (0.68 + 0.36 * e)); m.material.opacity = 0.95 * (1 - k * k) * (k < 0.1 ? k / 0.1 : 1);
+function pf5SlashBuild() {                                               // SWIPE2 (2026-11-15, the owner's pick "B, anime slash"): one bold crescent with a white core and a hot-pink edge, a lilac ghost behind it,
+  const hex = h => [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255], PINK = hex(0xff5fa2), HOT = hex(0xff2f86), GOLD = hex(0xffd23a), LILAC = hex(0xb48cff), WHITE = [1, 1, 1], OY = -0.22;   // pink speed lines, and a gold star that pops at its tip. Three meshes, drawn in the XY plane and turned to the camera.
+  const V = (P, C, x, y, c, a) => { P.push(x, y + OY, 0); C.push(c[0], c[1], c[2], a); return P.length / 3 - 1; };
+  const crescent = (P, C, I, R, w, a0, a1, ci, co, peak, n, tailA) => { let prev = null;        /* tapered: widest at 'peak' along it; alpha runs from the tail (see-through) to the head */
+    for (let i = 0; i <= n; i++) { const t = i / n, a = a0 + (a1 - a0) * t, sh = t < peak ? Math.pow(t / peak, 0.75) : Math.pow((1 - t) / (1 - peak), 0.6), h = w * sh * 0.5, al = Math.min(1, tailA + (1 - tailA) * Math.pow(t, 1.3)) * (t > 0.96 ? (1 - t) / 0.04 : 1);
+      const s = Math.sin(a), c = Math.cos(a), i0 = V(P, C, s * (R - h), c * (R - h), ci, al), i1 = V(P, C, s * (R + h * 0.35), c * (R + h * 0.35), ci, al), i2 = V(P, C, s * (R + h), c * (R + h), co, al * 0.9);
+      if (prev) I.push(prev[0], prev[1], i0, prev[1], i1, i0, prev[1], prev[2], i1, prev[2], i2, i1); prev = [i0, i1, i2]; } };
+  const star = (P, C, I, x, y, r, col, rot) => { const c0 = V(P, C, x, y, WHITE, 1); let first = null, prev = null; for (let i = 0; i < 8; i++) { const an = rot + i * Math.PI / 4, rr = i % 2 ? r * 0.22 : r, k = V(P, C, x + Math.sin(an) * rr, y + Math.cos(an) * rr, col, i % 2 ? 1 : 0); if (prev !== null) I.push(c0, prev, k); else first = k; prev = k; } I.push(c0, prev, first); };
+  const streak = (P, C, I, x, y, ang, len, w, col) => { const dx = Math.sin(ang), dy = Math.cos(ang), a0 = V(P, C, x, y, col, 0), a1 = V(P, C, x + dx * len * 0.5 + dy * w, y + dy * len * 0.5 - dx * w, col, 0.9), a2 = V(P, C, x + dx * len * 0.5 - dy * w, y + dy * len * 0.5 + dx * w, col, 0.9), a3 = V(P, C, x + dx * len, y + dy * len, WHITE, 0); I.push(a0, a1, a2, a1, a3, a2); };
+  const mesh = (P, C, I, add, k) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 4)); g.setIndex(I); g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, fog: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending }));
+    m.material.userData.noTod = true; m.userData.noWalk = m.userData.noMerge = m.userData.keep = true; m.userData.k = k; m.raycast = function () {}; m.renderOrder = add ? 9 : 8; m.frustumCulled = false; return m; };
+  const G = new THREE.Group(); G.userData.name = 'Swipe arc'; G.userData.noWalk = G.userData.noMerge = G.userData.keep = true; G.visible = false;
+  { const P = [], C = [], I = []; crescent(P, C, I, 0.6, 0.5, -1.5, 0.9, LILAC, LILAC, 0.82, 28, 0); G.add(mesh(P, C, I, false, 0.45)); }
+  { const P = [], C = [], I = []; crescent(P, C, I, 0.6, 0.34, -0.9, 1.0, WHITE, HOT, 0.8, 28, 0.02); crescent(P, C, I, 0.6, 0.1, -0.5, 1.02, WHITE, WHITE, 0.8, 20, 0.2);
+    for (let i = 0; i < 7; i++) { const a = -0.9 + i * 0.3, R = 0.86 + (i % 3) * 0.07; streak(P, C, I, Math.sin(a) * R, Math.cos(a) * R, a + Math.PI / 2, 0.3 + (i % 2) * 0.16, 0.012, PINK); } G.add(mesh(P, C, I, false, 1)); }
+  { const P = [], C = [], I = [], sx = Math.sin(1.0) * 0.6, sy = Math.cos(1.0) * 0.6; star(P, C, I, 0, -OY, 0.3, GOLD, 0.2); star(P, C, I, 0, -OY, 0.17, WHITE, 0.98); const m = mesh(P, C, I, true, 1); m.position.set(sx, sy + OY, 0); m.userData.spark = 1; m.material.depthTest = false; G.add(m); }   /* (the star's own origin is the crescent's tip, so it can pop in place) */
+  scene.add(G); return G;
+}
+function pf5Tick() {                                                     // (after updateWalk) the slash sweeps across in front of her and fades (0.24 s); the star pops as it lands
+  const S = pf5S(), G = S.m; if (!G || !G.visible) return; const k = (clock - S.t0) / 0.24; if (k >= 1 || k < 0 || !walk.on) { G.visible = false; return; }
+  const p = walk.pos, g = walk.gScale || 1, e = 1 - (1 - k) * (1 - k) * (1 - k), fade = (1 - k * k * k) * (k < 0.08 ? k / 0.08 : 1), sc = g * (0.72 + 0.3 * e);
+  G.position.set(p.x + Math.sin(S.face) * 0.5 * g, p.y + 0.5 * g, p.z + Math.cos(S.face) * 0.5 * g); G.quaternion.copy(camera.quaternion); G.rotateZ(S.side * (1.0 - 2.0 * e) - 0.2 * S.side); G.scale.set(sc * S.side, sc, sc);
+  for (const m of G.children) { if (m.userData.spark) { const s = k < 0.5 ? 0.01 : Math.sin(Math.min(1, (k - 0.5) / 0.35) * Math.PI) * 1.25 + 0.01; m.scale.setScalar(s); m.material.opacity = k < 0.5 ? 0 : 1; } else m.material.opacity = fade * m.userData.k; }
 }
 function pf5Info() {                                                     // Settings: how the page sits on this screen (for the Home Screen band)
   const px = css => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;left:0;top:0;width:0;visibility:hidden;pointer-events:none;' + css; document.body.appendChild(d); const r = d.getBoundingClientRect(), o = [Math.round(r.height), parseFloat(getComputedStyle(d).paddingTop) || 0]; d.remove(); return o; };
