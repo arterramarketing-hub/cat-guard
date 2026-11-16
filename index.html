@@ -10773,7 +10773,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-16 11:13';                                              // stamped when the site is published
+const BUILD = '2026-11-16 11:52';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45005,16 +45005,34 @@ try { bk3Install(); } catch (e) { console.error(e); }
 /* ===== end BAKE3_V1 ===== */
 /* ===== EYES1_V1: PKR's eyes dim with the room. Her eyes, pupils and catchlights are unlit colours, so with the lights off they stayed at full brightness
    and seemed to glow. Now they dim with the room lights (about a quarter at lights-off) and, outdoors, with the night (down to 0.4).
-   Only her own walking model: the mirror world's twin is meant to glow. Off with ?eyes=old. ===== */
+   Only her own walking model: the mirror world's twin is meant to glow. Off with ?eyes=old.
+   EYES2 (2026-11-16, the owner: "make the crown and mantel photo dim with the lights too"): her gold crown's own glow and its gems, and the little framed
+   photo on the mantel (an unlit picture), now go down with the downstairs lights as well. The crown is dimmed for its own draw only (its materials are
+   put back straight after), so the time-of-day tint that also drives them is left alone. ===== */
 function eyes1Tick() {
-  const R = typeof walk !== 'undefined' && walk && walk.rig, S = eyes1Tick.S || (eyes1Tick.S = { rig: null, mats: [], k: -1 }); if (!R || !R.peepers) return;
-  if (S.rig !== R || S.n !== R.peepers.length) { S.rig = R; S.n = R.peepers.length; S.mats = []; S.k = -1;
+  const R = typeof walk !== 'undefined' && walk && walk.rig, S = eyes1Tick.S || (eyes1Tick.S = { rig: null, mats: [], k: -1, kr: 1, cn: -1, ph: null, pk: -1, t: 0 }); if (!R || !R.peepers) return;
+  if (S.rig !== R || S.n !== R.peepers.length) { S.rig = R; S.n = R.peepers.length; S.mats = []; S.k = -1; S.cn = -1;
     for (const e of R.peepers) { const m = e.material; if (!m || !m.isMeshBasicMaterial || S.mats.includes(m)) continue; if (!m.userData.eyes1) m.userData.eyes1 = m.color.clone(); S.mats.push(m); } }
   const p = walk.pos, indoors = p.x > YARD.HL && p.x < YARD.HR && p.z > UPPER.zF && p.z < UPPER.zB, night = (typeof TOD !== 'undefined' && TOD && TOD.nightF) || 0;
-  const tgt = mirrorWorld ? 1 : indoors ? (p.y > CEIL_H - 0.5 || p.z > ROOM.visDepth - 0.3 ? 1 : 0.24 + 0.76 * lightF) : 1 - 0.6 * night;   /* downstairs: with the room's lights; upstairs: lit; outdoors: with the night */
-  const k = S.k < 0 ? tgt : S.k + (tgt - S.k) * 0.15; if (Math.abs(k - S.k) < 0.002) return; S.k = k; for (const m of S.mats) m.color.copy(m.userData.eyes1).multiplyScalar(k);
+  const room = mirrorWorld || !walk.on ? 1 : indoors && !(p.y > CEIL_H - 0.5 || p.z > ROOM.visDepth - 0.3) ? 0.24 + 0.76 * lightF : 1;                 /* downstairs: with the room's lights; anywhere else: lit */
+  const tgt = mirrorWorld ? 1 : indoors ? room : 1 - 0.6 * night;                                                                                 /* (outdoors her eyes go down with the night) */
+  S.kr += (room - S.kr) * 0.15;
+  const k = S.k < 0 ? tgt : S.k + (tgt - S.k) * 0.15; if (Math.abs(k - S.k) >= 0.002) { S.k = k; for (const m of S.mats) m.color.copy(m.userData.eyes1).multiplyScalar(k); }
+  if (R.crown && S.t++ % 30 === 0) R.crown.traverse(o => { if (!o.isMesh || Array.isArray(o.material) || !o.material) return; const u = o.userData, own = k => Object.prototype.hasOwnProperty.call(o, k) ? o[k] : null;
+    if (!u.eyes2) { u.eyes2 = 1; const b0 = own('onBeforeRender'), a0 = own('onAfterRender');             /* first time: after whatever hooks are there already, and undone before them */
+      o.onBeforeRender = function () { if (b0) b0.apply(this, arguments); eyes2On.call(this); }; u.e2a = o.onAfterRender = function () { eyes2Off.call(this); if (a0) a0.apply(this, arguments); }; }
+    else if (o.onAfterRender !== u.e2a) { const a1 = own('onAfterRender'); u.e2a = o.onAfterRender = function () { if (a1) a1.apply(this, arguments); eyes2Off.call(this); }; } });   /* (the ground-shade hooks (ph2Cat) came later and wrapped ours: ours now runs first, so it is undone last) */
 }
-function eyes1Install() { if (/[?&]eyes=old\b/.test(location.search)) return; const f0 = updateRoomFx; updateRoomFx = function (dt) { f0(dt); eyes1Tick(); }; }
+function eyes2On() { const kr = eyes1Tick.S.kr, m = this.material, u = this.userData; if (kr > 0.985 || u.e2on || !m || !m.color) return; u.e2on = 1;      // the crown, for this draw only: its glow, its shine (the candles and lamps still catch polished gold) and a little of its colour
+  if (m.emissive) { (u.e2e || (u.e2e = new THREE.Color())).copy(m.emissive); m.emissive.multiplyScalar(kr); } if (m.specular) { (u.e2s || (u.e2s = new THREE.Color())).copy(m.specular); m.specular.multiplyScalar(kr * kr); }
+  (u.e2c || (u.e2c = new THREE.Color())).copy(m.color); m.color.multiplyScalar(m.isMeshBasicMaterial ? kr : 0.45 + 0.55 * kr); }
+function eyes2Off() { const m = this.material, u = this.userData; if (!u.e2on) return; u.e2on = 0; if (m.emissive && u.e2e) m.emissive.copy(u.e2e); if (m.specular && u.e2s) m.specular.copy(u.e2s); if (u.e2c) m.color.copy(u.e2c); }
+function eyes1Photo() {                                                      // the framed photo on the mantel: an unlit picture, so it takes the room's light level by hand
+  const S = eyes1Tick.S || (eyes1Tick.S = { rig: null, mats: [], k: -1, kr: 1, cn: -1, ph: null, pk: -1, t: 0 });
+  if (S.ph === null) { S.ph = []; scene.traverse(o => { if (!o.isMesh || !o.material || !o.material.isMeshBasicMaterial || !o.material.map) return; let n = '', q = o; while (q && !n) { n = q.userData.name || ''; q = q.parent; } if (n === 'Framed photo') S.ph.push(o.material); }); }
+  const k = 0.2 + 0.8 * lightF; if (Math.abs(k - S.pk) < 0.004) return; S.pk = k; for (const m of S.ph) m.color.setScalar(k);
+}
+function eyes1Install() { if (/[?&]eyes=old\b/.test(location.search)) return; const f0 = updateRoomFx; updateRoomFx = function (dt) { f0(dt); eyes1Tick(); eyes1Photo(); }; }
 try { eyes1Install(); } catch (e) { console.error(e); }
 /* ===== end EYES1_V1 ===== */
 /* ===== ZFOG1_V1 (2026-11-16, the owner: "add some ground fog when the zombies come at night"): a low mist creeps over our back lawn while zombie night
@@ -45112,6 +45130,39 @@ function bk5Scan() {                                                         // 
 }
 try { bk5Install(); } catch (e) { console.error(e); }
 /* ===== end BAKE5_V1 ===== */
+/* ===== TRUCK1_V1 (2026-11-16, the owner: "add a pickup truck that drives on the main street in front of the house every once in a while"): one full-size
+   pickup (the CARS2 pickup, no badge, a made-up plate) comes down our street now and then: left to right in the near lane or right to left in the far
+   one, then nothing for half a minute to a minute and a quarter. It is one more entry in yardLife.cars, so everything the off-ramp's cars do it does too:
+   it brakes and honks if she is in its lane, its lamps come on at night, its engine is heard as it passes, and it blows apart if she touches it (then a
+   fresh one comes along later). Built the first time Free roam shows the street. Off with ?truck=0. ===== */
+function truck1S() { return truck1S.S || (truck1S.S = { c: null, wait: 6 + Math.random() * 10, off: false, err: 0 }); }
+function truck1Build() {
+  const S = truck1S(), PY = 1.7, car = new THREE.Group(); car.userData.name = 'A pickup on the street'; car.userData.noWalk = true; povEndWall.add(car); car.position.set(-95, PY, -57);
+  const wk = carBuild(car, 'pickup', 0x1f7f86, 'TUNA 4', { lift: PY, yaw: Math.PI / 2, bnd: [-1e5, 1e5, -71, -51.8] });       // (nose along the street; its bits stay on the road when it blows)
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(1, 24), yardShadowMat()); sh.rotation.x = -Math.PI / 2; sh.scale.set(6.6, 2.8, 1); sh.position.set(-95, 0.006, -57); sh.userData.noWalk = true; sh.visible = false; povEndWall.add(sh);
+  const c = S.c = { g: car, sp: 12, v: 12, lane: -57, honkT: 0, hx: 6.0, hz: 2.25, up: wk.top - PY + 0.25, dn: 1.9, home: car.position.clone(), ry: 0, wk, parked: true, truck: true }; S.sh = sh;
+  car.visible = false; yardLife.cars.push(c);
+}
+function truck1Tick(dt) {
+  const S = truck1S(); if (S.off || S.err > 2 || typeof yardLife === 'undefined' || !yardLife || !yardLife.cars || !povEndWall || !povEndWall.visible) return;
+  if (!S.c) { if (!walk.on || state !== 'playing') return; truck1Build(); }
+  const c = S.c, p = c.g.position;
+  if (c.boom) { S.sh.visible = false; S.driving = true; return; }                                    // (blown up: flyCar clears the wreck after a while and sends it back to the end of the street)
+  if (S.wait > 0) {                                                                                  // nothing coming: it waits out of sight
+    c.parked = true; c.g.visible = false; S.sh.visible = false; if (walk.on && state === 'playing') S.wait -= dt;
+    if (S.wait <= 0) { const dir = Math.random() < 0.5 ? 1 : -1; c.sp = c.v = 12 * dir; c.lane = dir > 0 ? -57 : -63.6; c.ry = dir > 0 ? 0 : Math.PI; c.home.set(-95 * dir, c.home.y, c.lane);
+      p.copy(c.home); c.g.rotation.set(0, c.ry, 0); c.parked = false; c.g.visible = true; S.driving = true; }
+    return; }
+  S.sh.visible = c.g.visible; S.sh.position.set(p.x, 0.006, p.z);
+  if (Math.abs(p.x) > 93 && p.x * c.sp > 0) { S.wait = 30 + Math.random() * 45; c.parked = true; c.g.visible = false; S.sh.visible = false; }   // off the far end of the street: gone for a while
+}
+function truck1Install() {
+  if (/[?&]truck=0\b/.test(location.search)) { truck1S().off = true; return; }
+  const f0 = updateYardLife; updateYardLife = function (dt) { const r = f0.apply(this, arguments); try { truck1Tick(dt); } catch (e) { const S = truck1S(); if (!S.err++) console.error(e); } return r; };
+  if (f0.cars2) updateYardLife.cars2 = f0.cars2;
+}
+try { truck1Install(); } catch (e) { console.error(e); }
+/* ===== end TRUCK1_V1 ===== */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
