@@ -10774,7 +10774,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-16 12:04';                                              // stamped when the site is published
+const BUILD = '2026-11-16 13:55';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45164,6 +45164,37 @@ function truck1Install() {
 }
 try { truck1Install(); } catch (e) { console.error(e); }
 /* ===== end TRUCK1_V1 ===== */
+/* ===== DIAG1_V1 (2026-11-16): a car readout in Settings > Screen info. The owner sees the off-ramp's cars and the street's pickup standing still on their
+   device; here they move in every test. So once a second in Free roam this notes where every moving car is, where its drawn body is, how fast it is going
+   and what state it is in (the last 10 notes are kept), plus any error the page reported. Nothing is drawn and nothing changes how the game plays.
+   Remove once the fault is found. ===== */
+function diag1S() { return diag1S.S || (diag1S.S = { log: [], errs: [], t: 0, n: 0, dts: 0, frames: 0, v: null }); }
+function diag1Tick(dt) {
+  const S = diag1S(); S.frames++; S.dts += dt; S.t += dt; if (S.t < 1 || typeof yardLife === 'undefined' || !yardLife || !yardLife.cars) return;
+  const f = x => (typeof x === 'number' && isFinite(x) ? x.toFixed(1) : String(x)), v = S.v || (S.v = new THREE.Vector3()), p = walk.pos;
+  const cars = yardLife.cars.filter(c => !c.parked || c.truck).map(c => { let lod = null, near = null, far = null; c.g.traverse(o => { if (o.isLOD) { lod = o; near = o.levels[0] && o.levels[0].object; far = o.levels[1] && o.levels[1].object; } });
+    const dx = lod ? v.setFromMatrixPosition(lod.matrixWorld).x : NaN, W = c.wk;
+    return (c.truck ? 'T' : 'R') + ' x' + f(c.g.position.x) + ' z' + f(c.g.position.z) + ' v' + f(c.v) + '/' + f(c.sp) + ' drawn' + f(dx) + ' ' + (c.g.visible ? '' : 'H') + (c.parked ? 'P' : '') + (c.boom ? 'B' + f(c.boom.t) : '') + (c.heldT ? 'h' + f(c.heldT) : '') +
+      (W && W.live ? 'L' : '') + (W && W.pcs && W.pcs[0] && W.pcs[0].ch !== 1 ? 'c' : '') + ' n' + (near ? +near.visible : '-') + 'f' + (far ? +far.visible : '-') + (lod && !lod.matrixAutoUpdate ? ' mAU0' : ''); });
+  S.log.push('#' + (++S.n) + ' ' + state + '/' + gameMode + (walk.on ? '' : ' walkOff') + (povEndWall && povEndWall.visible ? '' : ' yardHid') + ' dt' + (S.dts / S.frames * 1000).toFixed(1) + 'x' + S.frames + ' cat ' + f(p.x) + ',' + f(p.y) + ',' + f(p.z) + '\n  ' + cars.join('\n  ')); if (S.log.length > 10) S.log.shift();
+  S.t = 0; S.dts = 0; S.frames = 0;
+}
+function diag1Text() {
+  const S = diag1S(), T = typeof truck1S === 'function' ? truck1S() : null; let tier = '?'; try { tier = devTier(); } catch (e) {}
+  return ['--- cars ---', 'tier ' + tier + ' gfx ' + (typeof SET !== 'undefined' && SET ? SET.gfx : '?') + ' slow ' + !!perfAdapt.slow + ' touch ' + TOUCH_DEV + ' ua ' + (navigator.userAgent.match(/(iPhone|iPad|Android|Macintosh|Windows)[^;)]*/) || ['?'])[0] + ' ' + (navigator.userAgent.match(/Version\/[\d.]+|Chrome\/[\d.]+/) || [''])[0],
+    'truck ' + (T ? (T.off ? 'off' : T.c ? 'built wait ' + (+T.wait).toFixed(1) + ' err ' + T.err : 'not built') : 'none') + ' cars ' + (typeof yardLife !== 'undefined' && yardLife && yardLife.cars ? yardLife.cars.length : '-') + ' query ' + (location.search || '-'),
+    'errors ' + (S.errs.length ? S.errs.join(' || ') : 'none'), S.log.length ? S.log.join('\n') : '(no notes yet: play Explore for 10 seconds near the cars, then come back here)'].join('\n');
+}
+function diag1Install() {
+  const S = diag1S(), note = m => { if (S.errs.length < 6) S.errs.push(String(m).slice(0, 140)); };
+  window.addEventListener('error', e => note((e && e.message) + ' @' + (e && e.lineno)));
+  window.addEventListener('unhandledrejection', e => note('rej ' + (e && e.reason && (e.reason.message || e.reason))));
+  { const ce = console.error; console.error = function () { try { note(Array.prototype.map.call(arguments, a => (a && a.message) || a).join(' ')); } catch (e) {} return ce.apply(this, arguments); }; }
+  const f0 = updateYardLife; updateYardLife = function (dt) { const r = f0.apply(this, arguments); try { diag1Tick(dt); } catch (e) { note('diag ' + e.message); } return r; }; if (f0.cars2) updateYardLife.cars2 = f0.cars2;
+  const i0 = pf5Info; pf5Info = function () { let a = ''; try { a = i0(); } catch (e) { a = String(e); } try { return a + '\n' + diag1Text(); } catch (e) { return a + '\ncars: ' + e.message; } };
+}
+try { diag1Install(); } catch (e) { console.error(e); }
+/* ===== end DIAG1_V1 ===== */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
