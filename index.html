@@ -9645,7 +9645,8 @@ function updateYardLife(dt) {                                         // the sky
     if (c.boom) { flyCar(c, dt); continue; }                          // (one she's already touched: on its way to the moon)
     if (walk.on && c.g.visible && carTouched(c)) { carBoom(c); continue; }
     if (c.parked) continue;
-    const p = c.g.position, ahead = walk.on && Math.abs(walk.pos.z - c.lane) < 1.6 && (walk.pos.x - p.x) * Math.sign(c.sp) > 0 && Math.abs(walk.pos.x - p.x) < 9;
+    const p = c.g.position, inWay = walk.on && Math.abs(walk.pos.z - c.lane) < 1.6 && (walk.pos.x - p.x) * Math.sign(c.sp) > 0 && Math.abs(walk.pos.x - p.x) < 9 && Math.abs(walk.pos.y - (p.y - 0.9)) < 2.4;   /* (CARS3: on the road itself, not on the ground under the ramp) */
+    c.heldT = inWay ? (c.heldT || 0) + dt : Math.max(0, (c.heldT || 0) - dt * 2); const ahead = inWay && c.heldT < 2.5;   /* (CARS3: it brakes and honks for 2.5 s, then drives on: no car waits for ever) */
     c.v += ((ahead ? 0 : c.sp) - c.v) * Math.min(1, dt * (ahead ? 4 : 1.2)); p.x += c.v * dt;
     if (ahead && (c.honkT -= dt) <= 0) { c.honkT = 1.1; tone(392, 392, 0.35, 'square', 0.03); tone(494, 494, 0.35, 'square', 0.025); if (!walk.honked) { walk.honked = true; showWalkName('🚗 HONK! Get out of the road!'); } }
     if (p.x > 95) p.x = -95; if (p.x < -95) p.x = 95;
@@ -10773,7 +10774,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-16 11:52';                                              // stamped when the site is published
+const BUILD = '2026-11-16 12:04';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
