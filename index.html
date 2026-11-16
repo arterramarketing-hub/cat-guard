@@ -10774,7 +10774,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-16 14:14';                                              // stamped when the site is published
+const BUILD = '2026-11-16 14:38';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45208,6 +45208,58 @@ function diag1Install() {
 }
 try { diag1Install(); } catch (e) { console.error(e); }
 /* ===== end DIAG1_V1 ===== */
+/* WHEELS1_V1 */
+/* =====================================================================
+   WHEELS1_V1 (2026-11-16, the owner: "vehicles need spinning wheels now"): the wheels of every car that drives (the
+   off-ramp's cars and the street's pickup) turn as it goes, at the speed it really rolls (its speed over the wheel's
+   radius). The wheels are pieces of the car's one mesh (the bits it blows apart into), so each frame the four wheel
+   pieces are posed again by carPose with a turn about the axle, and only their stretch of the buffer is uploaded.
+   Not while it's a wreck or mid-bang, not while parked, and not while the far copy is the one shown. ?wheels=0 turns it off.
+   COON2_V1 (same day, the owner: "lower the chipping sounds when the raccoon talks" and "only see the speech bubbles
+   if you are close by the raccoon, it's playing from all sides of the map"): chitter is half as loud; a raccoon's line
+   (the roof raccoon's and the window raccoon's) only shows, and only chitters, when she's within 12 units of him.
+   The roof's conversation still runs at its own pace (roofLine still returns how long the line takes). ?coon2=0 turns it off.
+   ===================================================================== */
+function wheels1On() { return wheels1On.v !== undefined ? wheels1On.v : (wheels1On.v = !/[?&]wheels=0\b/.test(location.search)); }
+function wheels1Tick(dt) {
+  const L = typeof yardLife !== 'undefined' ? yardLife : null; if (!L || !L.cars || !wheels1On()) return;
+  const X = wheels1Tick.X || (wheels1Tick.X = new THREE.Vector3(1, 0, 0));
+  for (const c of L.cars) {
+    const W = c.wk; if (!W || !W.pcs || c.parked || c.boom || !c.g.visible || W.live) continue;
+    const wh = W.wh || (W.wh = W.pcs.filter(P => P.k === 'wheel')); if (!wh.length || !wh[0].r) continue;
+    if (W.pcs[0].ch !== 1 || wh.some(P => P.m !== 0)) continue;                            /* (scorched, or bits flying: leave it to the wreck) */
+    W.wa = ((W.wa || 0) + Math.abs(c.v || 0) * dt / (wh[0].r * (W.sc || 1))) % (Math.PI * 2);
+    if (W.lod && typeof W.lod.getCurrentLevel === 'function' && W.lod.getCurrentLevel() > 0) continue;   /* (far away: the light copy is shown, its wheels are painted on) */
+    if (W.waDrawn === W.wa) continue; W.waDrawn = W.wa;
+    let a0 = Infinity, a1 = 0;
+    for (const P of wh) { P.q.setFromAxisAngle(X, W.wa); carPose(W, P); a0 = Math.min(a0, P.a); a1 = Math.max(a1, P.a + P.n); }
+    for (const at of [W.geo.attributes.position, W.geo.attributes.color]) { at.clearUpdateRanges(); at.addUpdateRange(a0 * 3, (a1 - a0) * 3); at.needsUpdate = true; }
+  }
+}
+function coon2On() { return coon2On.v !== undefined ? coon2On.v : (coon2On.v = !/[?&]coon2=0\b/.test(location.search)); }
+function coon2Far(g) {                                                    // is she too far from this raccoon to hear him?
+  try { if (!coon2On() || !g || typeof walk === 'undefined' || !walk.on) return false; const v = coon2Far.v || (coon2Far.v = new THREE.Vector3()); g.getWorldPosition(v); return v.distanceTo(walk.pos) > 12; }
+  catch (e) { return false; }
+}
+function coon2Install() {
+  if (coon2Install.done) return; coon2Install.done = true;
+  const roofG = () => (typeof RF !== 'undefined' && RF && RF.coon ? RF.coon.g : null), winG = () => (typeof coon !== 'undefined' && coon.rig ? coon.rig.g : null);
+  let hush = -1;                                                          /* (the clock of a line that was too far to hear: its chitter that same moment stays quiet too) */
+  const ch0 = chitter; chitter = function (n, hi) { if (coon2On() && hush === clock) return; if (!coon2On()) return ch0.apply(this, arguments);
+    for (let i = 0; i < (n || 5); i++) tone((hi || 1700) + Math.random() * 500, 1300 + Math.random() * 400, 0.05, 'square', 0.011, i * 0.07); };   /* (COON2: half as loud) */
+  const rl0 = roofLine; roofLine = function (who, text) {
+    if (who !== 'k' && coon2Far(roofG())) { hush = clock; return Math.min(4.8, Math.max(2.3, 1.15 + String(text).length * 0.05)); }   /* (too far: not shown, not heard, same pace) */
+    return rl0.apply(this, arguments); };
+  const rs0 = roofSay; roofSay = function (t) { if (coon2Far(roofG())) { hush = clock; return; } return rs0.apply(this, arguments); };
+  const cs0 = coonSay; coonSay = function (t) { if (coon2Far(winG())) { hush = clock; return; } return cs0.apply(this, arguments); };
+}
+function wheels1Install() {
+  if (wheels1Install.done) return; wheels1Install.done = true;
+  const f0 = updateYardLife; updateYardLife = function (dt) { const r = f0.apply(this, arguments); try { wheels1Tick(dt); } catch (e) { if (!wheels1Install.err) { wheels1Install.err = 1; console.error(e); } } return r; };
+}
+try { wheels1Install(); } catch (e) { console.error(e); }
+try { coon2Install(); } catch (e) { console.error(e); }
+/* (end of WHEELS1_V1 / COON2_V1) */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
