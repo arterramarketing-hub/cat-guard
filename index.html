@@ -3434,7 +3434,8 @@ function updateRoomFx(dt) {
   lightF += (lightTarget - lightF) * Math.min(1, dt * 4);
   if (remoteLed) remoteLed.material.opacity = 0.35 + 0.65 * (Math.sin(clock * 5) > 0 ? 1 : 0.2);   // standby light blinks so you can spot it
   const outK = walk && walk.on && !mirrorWorld ? THREE.MathUtils.clamp((walk.pos.z - (ROOM.visDepth - 0.3)) / 1.5, 0, 1) : 0;   // out through the slider: back to daylight
-  const litF = lightF + (1 - lightF) * outK;
+  const away = walk && walk.on && !mirrorWorld && !(inRoomXZ(walk.pos.x, walk.pos.z) && walk.pos.y < CEIL_H - 0.3) ? 1 : 0; updateRoomFx.away = (updateRoomFx.away || 0) + (away - (updateRoomFx.away || 0)) * Math.min(1, dt * 3);   /* (LIT2: out of the living room, upstairs, in the foyer or out front: its light switch doesn't reach) */
+  const litF = lightF + (1 - lightF) * Math.max(outK, updateRoomFx.away);
   for (const r of roomLights) r.l.intensity = r.base * litF;
   const dimK = 0.03 + 0.97 * lightF; for (const m of stuffMats) m.color.setScalar(dimK); for (const m of scratchMats) m.color.setScalar(dimK); if (wallRig) wallRig.clawMat.color.setScalar(dimK);   // unlit stuffing + rips: darken with the lights
   const g = galaxyRig;
@@ -10771,7 +10772,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-16 14:50';                                              // stamped when the site is published
+const BUILD = '2026-11-17 18:42';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45028,7 +45029,7 @@ function eyes1Tick() {
   if (S.rig !== R || S.n !== R.peepers.length) { S.rig = R; S.n = R.peepers.length; S.mats = []; S.k = -1; S.cn = -1;
     for (const e of R.peepers) { const m = e.material; if (!m || !m.isMeshBasicMaterial || S.mats.includes(m)) continue; if (!m.userData.eyes1) m.userData.eyes1 = m.color.clone(); S.mats.push(m); } }
   const p = walk.pos, indoors = p.x > YARD.HL && p.x < YARD.HR && p.z > UPPER.zF && p.z < UPPER.zB, night = (typeof TOD !== 'undefined' && TOD && TOD.nightF) || 0;
-  const room = mirrorWorld || !walk.on ? 1 : indoors && !(p.y > CEIL_H - 0.5 || p.z > ROOM.visDepth - 0.3) ? 0.24 + 0.76 * lightF : 1;                 /* downstairs: with the room's lights; anywhere else: lit */
+  const room = mirrorWorld || !walk.on ? 1 : inRoomXZ(p.x, p.z) && p.y < CEIL_H - 0.3 && p.z < ROOM.visDepth - 0.3 ? 0.24 + 0.76 * lightF : 1;                 /* in the living room: with its lights; anywhere else: lit (LIT2) */
   const tgt = mirrorWorld ? 1 : indoors ? room : 1 - 0.6 * night;                                                                                 /* (outdoors her eyes go down with the night) */
   S.kr += (room - S.kr) * 0.15;
   const k = S.k < 0 ? tgt : S.k + (tgt - S.k) * 0.15; if (Math.abs(k - S.k) >= 0.002) { S.k = k; for (const m of S.mats) m.color.copy(m.userData.eyes1).multiplyScalar(k); }
