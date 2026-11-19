@@ -10772,7 +10772,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-17 18:42';                                              // stamped when the site is published
+const BUILD = '2026-11-19 13:41';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45178,37 +45178,6 @@ function truck1Install() {
 }
 try { truck1Install(); } catch (e) { console.error(e); }
 /* ===== end TRUCK1_V1 ===== */
-/* ===== DIAG1_V1 (2026-11-16): a car readout in Settings > Screen info. The owner sees the off-ramp's cars and the street's pickup standing still on their
-   device; here they move in every test. So once a second in Free roam this notes where every moving car is, where its drawn body is, how fast it is going
-   and what state it is in (the last 10 notes are kept), plus any error the page reported. Nothing is drawn and nothing changes how the game plays.
-   Remove once the fault is found. ===== */
-function diag1S() { return diag1S.S || (diag1S.S = { log: [], errs: [], t: 0, n: 0, dts: 0, frames: 0, v: null }); }
-function diag1Tick(dt) {
-  const S = diag1S(); S.frames++; S.dts += dt; S.t += dt; if (S.t < 1 || typeof yardLife === 'undefined' || !yardLife || !yardLife.cars) return;
-  const f = x => (typeof x === 'number' && isFinite(x) ? x.toFixed(1) : String(x)), v = S.v || (S.v = new THREE.Vector3()), p = walk.pos;
-  const cars = yardLife.cars.filter(c => !c.parked || c.truck).map(c => { let lod = null, near = null, far = null; c.g.traverse(o => { if (o.isLOD) { lod = o; near = o.levels[0] && o.levels[0].object; far = o.levels[1] && o.levels[1].object; } });
-    const dx = lod ? v.setFromMatrixPosition(lod.matrixWorld).x : NaN, W = c.wk;
-    return (c.truck ? 'T' : 'R') + ' x' + f(c.g.position.x) + ' z' + f(c.g.position.z) + ' v' + f(c.v) + '/' + f(c.sp) + ' drawn' + f(dx) + ' ' + (c.g.visible ? '' : 'H') + (c.parked ? 'P' : '') + (c.boom ? 'B' + f(c.boom.t) : '') + (c.heldT ? 'h' + f(c.heldT) : '') +
-      (W && W.live ? 'L' : '') + (W && W.pcs && W.pcs[0] && W.pcs[0].ch !== 1 ? 'c' : '') + ' n' + (near ? +near.visible : '-') + 'f' + (far ? +far.visible : '-') + (lod && !lod.matrixAutoUpdate ? ' mAU0' : ''); });
-  S.log.push('#' + (++S.n) + ' ' + state + '/' + gameMode + (walk.on ? '' : ' walkOff') + (povEndWall && povEndWall.visible ? '' : ' yardHid') + ' dt' + (S.dts / S.frames * 1000).toFixed(1) + 'x' + S.frames + ' cat ' + f(p.x) + ',' + f(p.y) + ',' + f(p.z) + '\n  ' + cars.join('\n  ')); if (S.log.length > 10) S.log.shift();
-  S.t = 0; S.dts = 0; S.frames = 0;
-}
-function diag1Text() {
-  const S = diag1S(), T = typeof truck1S === 'function' ? truck1S() : null; let tier = '?'; try { tier = devTier(); } catch (e) {}
-  return ['--- cars ---', 'tier ' + tier + ' gfx ' + (typeof SET !== 'undefined' && SET ? SET.gfx : '?') + ' slow ' + !!perfAdapt.slow + ' touch ' + TOUCH_DEV + ' ua ' + (navigator.userAgent.match(/(iPhone|iPad|Android|Macintosh|Windows)[^;)]*/) || ['?'])[0] + ' ' + (navigator.userAgent.match(/Version\/[\d.]+|Chrome\/[\d.]+/) || [''])[0],
-    'truck ' + (T ? (T.off ? 'off' : T.c ? 'built wait ' + (+T.wait).toFixed(1) + ' err ' + T.err : 'not built') : 'none') + ' cars ' + (typeof yardLife !== 'undefined' && yardLife && yardLife.cars ? yardLife.cars.length : '-') + ' query ' + (location.search || '-'),
-    'errors ' + (S.errs.length ? S.errs.join(' || ') : 'none'), S.log.length ? S.log.join('\n') : '(no notes yet: play Explore for 10 seconds near the cars, then come back here)'].join('\n');
-}
-function diag1Install() {
-  const S = diag1S(), note = m => { if (S.errs.length < 6) S.errs.push(String(m).slice(0, 140)); };
-  window.addEventListener('error', e => note((e && e.message) + ' @' + (e && e.lineno)));
-  window.addEventListener('unhandledrejection', e => note('rej ' + (e && e.reason && (e.reason.message || e.reason))));
-  { const ce = console.error; console.error = function () { try { note(Array.prototype.map.call(arguments, a => (a && a.message) || a).join(' ')); } catch (e) {} return ce.apply(this, arguments); }; }
-  const f0 = updateYardLife; updateYardLife = function (dt) { const r = f0.apply(this, arguments); try { diag1Tick(dt); } catch (e) { note('diag ' + e.message); } return r; }; if (f0.cars2) updateYardLife.cars2 = f0.cars2;
-  const i0 = pf5Info; pf5Info = function () { let a = ''; try { a = i0(); } catch (e) { a = String(e); } try { return a + '\n' + diag1Text(); } catch (e) { return a + '\ncars: ' + e.message; } };
-}
-try { diag1Install(); } catch (e) { console.error(e); }
-/* ===== end DIAG1_V1 ===== */
 /* WHEELS1_V1 */
 /* =====================================================================
    WHEELS1_V1 (2026-11-16, the owner: "vehicles need spinning wheels now"): the wheels of every car that drives (the
@@ -45261,6 +45230,104 @@ function wheels1Install() {
 try { wheels1Install(); } catch (e) { console.error(e); }
 try { coon2Install(); } catch (e) { console.error(e); }
 /* (end of WHEELS1_V1 / COON2_V1) */
+/* ===== TEX1_V1 (2026-11-19, the owner's texture and realism upgrade, fixes 1 and 2; trial and pictures in audit/tex1): surface depth and a little shine outdoors,
+   and a Detail choice in Settings for older phones.
+   (1) Relief. The outdoors is unlit and baked (MeshBasic + light maps), so a normal map would have no light to work with. Instead each small tiled canvas texture
+       on the house, the garage, the roof, the driveway, the street and the pavements is redrawn larger, once, with its own light-and-dark pattern read as height:
+       embossed from the upper left, its low lines (mortar, shingle courses, joints) deepened, a fine grain over it, and sharper at glancing angles (anisotropy 8).
+       It is paint: nothing per frame, and it sits under the baked light. Done one texture at a time between frames, starting a moment after load.
+   (2) Reflections. One small, very soft sky picture made here in code, mirrored faintly in car paint and in the door and slider glass (MeshBasic envMap), dimmed at
+       night. Paint only: tyres, trim and dark glass are kept out by brightness. The cars are flat-shaded triangle soup, so their corners get shared, averaged
+       normals (creases over 55 degrees stay sharp) or every facet reads as a dent.
+   Detail (Settings, kept in catguard.detail): Auto, Full or Simple. Full: textures up to 512 and reflections. Reduced (what Auto picks on a mid-range phone):
+   textures up to 256, reflections on. Simple (and Auto on an old phone, or with Graphics on Battery saver): all of it off, the game as it was.
+   Every later effect of the upgrade should ask tex1Level(). ?tex=0 turns it all off, ?tex=high / ?tex=mid force a level. ===== */
+function tex1S() { return tex1S.S || (tex1S.S = { tex: [], cars: [], glass: [], q: [], lvl: null, busy: false, t: 0, env: null, carMat: null, made: 0 }); }
+function tex1Pick() { try { return localStorage.getItem('catguard.detail') || 'auto'; } catch (e) { return 'auto'; } }
+function tex1Level() {                                                       // 'high', 'mid' or 'low': what this device should draw (the address bar, then Settings, then the device)
+  const q = (location.search.match(/[?&]tex=(0|low|mid|high)\b/) || [])[1]; if (q) return q === '0' ? 'low' : q;
+  const p = tex1Pick(); if (p === 'high') return 'high'; if (p === 'low') return 'low';
+  if (typeof SET !== 'undefined' && SET && SET.gfx === 'low') return 'low'; let t = 'high'; try { t = devTier(); } catch (e) {} return t;
+}
+function tex1Kind(n, w) { if (w <= 64) return [0.3, 0.25, 0.025]; return /Driveway|Chipwood|Walkway|Sidewalk/.test(n) ? [0.4, 0.4, 0.07] : /Roof/.test(n) ? [0.9, 0.9, 0.05] : [0.8, 0.9, 0.04]; }   // emboss, deepen, grain (a 64 px texture is plain plaster or paint: only a whisper, or its noise turns to pits)
+function tex1Relief(src, K, cap) {                                           // the texture, larger, with its pattern read as height
+  const w = src.width, h = src.height, k = Math.max(1, Math.min(4, Math.floor(cap / Math.max(w, h)))); if (k < 2) return null;
+  const W = w * k, H = h * k, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d', { willReadFrequently: true });
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, W, H); const im = g.getImageData(0, 0, W, H), d = im.data, n = W * H, L = new Float32Array(n), B = new Float32Array(n), T = new Float32Array(n);
+  for (let i = 0; i < n; i++) L[i] = (d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11) / 255;
+  const R = Math.max(2, Math.round(3 * k)), inv = 1 / (2 * R + 1);                                           /* (the neighbourhood's average, wrapping round the tile: what counts as "low") */
+  for (let y = 0; y < H; y++) { const o = y * W; let s = 0; for (let j = -R; j <= R; j++) s += L[o + (j + W) % W]; for (let x = 0; x < W; x++) { T[o + x] = s * inv; s += L[o + (x + R + 1) % W] - L[o + (x - R + W) % W]; } }
+  for (let x = 0; x < W; x++) { let s = 0; for (let j = -R; j <= R; j++) s += T[((j + H) % H) * W + x]; for (let y = 0; y < H; y++) { B[y * W + x] = s * inv; s += T[((y + R + 1) % H) * W + x] - T[((y - R + H) % H) * W + x]; } }
+  let sd = 12345; const E = K[0] * k * 2.2, A = K[1] * 2.4, G = K[2];
+  for (let y = 0; y < H; y++) { const yu = ((y + H - 1) % H) * W, yd = ((y + 1) % H) * W, o = y * W;
+    for (let x = 0; x < W; x++) { const i = o + x; let s = 1 + E * ((L[o + (x + 1) % W] - L[o + (x + W - 1) % W]) + (L[yd + x] - L[yu + x])); s = s < 0.72 ? 0.72 : s > 1.3 ? 1.3 : s;
+      const lo = B[i] - L[i]; if (lo > 0) s *= 1 - A * lo; sd = (sd * 16807) % 2147483647; s *= 1 + G * (sd / 2147483647 - 0.5); const j = i * 4;
+      d[j] = Math.min(255, d[j] * s); d[j + 1] = Math.min(255, d[j + 1] * s); d[j + 2] = Math.min(255, d[j + 2] * s); } }
+  g.putImageData(im, 0, 0); return c;
+}
+function tex1Env() {                                                         // a very soft sky: a sheen that follows a body's curves, no picture to read in it
+  const S = tex1S(); if (S.env) return S.env; const c = document.createElement('canvas'); c.width = 128; c.height = 64; const s2 = document.createElement('canvas'); s2.width = 32; s2.height = 16; const g = s2.getContext('2d');
+  let gr = g.createLinearGradient(0, 0, 0, 8); gr.addColorStop(0, '#4f86d8'); gr.addColorStop(0.7, '#a9cdf0'); gr.addColorStop(1, '#eef4f8'); g.fillStyle = gr; g.fillRect(0, 0, 32, 8);
+  gr = g.createLinearGradient(0, 8, 0, 16); gr.addColorStop(0, '#6f7f62'); gr.addColorStop(0.25, '#4a5446'); gr.addColorStop(1, '#2c2f2c'); g.fillStyle = gr; g.fillRect(0, 8, 32, 8);
+  { const sg = g.createRadialGradient(9.5, 2.5, 0, 9.5, 2.5, 4); sg.addColorStop(0, 'rgba(255,252,235,.9)'); sg.addColorStop(1, 'rgba(255,246,214,0)'); g.fillStyle = sg; g.fillRect(4, 0, 11, 8); }
+  const g1 = c.getContext('2d'); g1.imageSmoothingEnabled = true; g1.imageSmoothingQuality = 'high'; g1.drawImage(s2, 0, 0, 128, 64);
+  const t = new THREE.CanvasTexture(c); t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace; return (S.env = t);
+}
+function tex1Smooth(g) {                                                     // corners that share a place share one averaged normal, unless the faces meet at a real crease
+  g.computeVertexNormals(); const P = g.attributes.position, N = g.attributes.normal, n = P.count, M = new Map(), pa = P.array, na = N.array;
+  for (let i = 0; i < n; i++) { const k = Math.round(pa[i * 3] * 400) + '|' + Math.round(pa[i * 3 + 1] * 400) + '|' + Math.round(pa[i * 3 + 2] * 400); let L = M.get(k); if (!L) M.set(k, L = []); L.push(i); }
+  const out = new Float32Array(n * 3), c = Math.cos(55 * Math.PI / 180);
+  for (const L of M.values()) for (const i of L) { const ax = na[i * 3], ay = na[i * 3 + 1], az = na[i * 3 + 2]; let x = 0, y = 0, z = 0; for (const j of L) { const bx = na[j * 3], by = na[j * 3 + 1], bz = na[j * 3 + 2]; if (ax * bx + ay * by + az * bz >= c) { x += bx; y += by; z += bz; } }
+    const l = Math.hypot(x, y, z) || 1; out[i * 3] = x / l; out[i * 3 + 1] = y / l; out[i * 3 + 2] = z / l; }
+  g.setAttribute('normal', new THREE.BufferAttribute(out, 3));
+}
+function tex1Scan() {                                                        // what there is to work on (again every few seconds: the street's pickup is built late)
+  const S = tex1S(); if (typeof povEndWall === 'undefined' || !povEndWall) return; const seen = new Set(S.tex.map(e => e.t)), gm = new Set(S.glass.map(e => e.m));
+  povEndWall.traverse(o => { if (!o.isMesh) return; let n = '', p = o; while (p && !n) { n = p.userData.name || ''; p = p.parent; }
+    if (/^(House|Garage|Roof|Driveway|Chipwood Crescent|Walkway|Sidewalk)/.test(n)) for (const m of (Array.isArray(o.material) ? o.material : [o.material])) { const t = m && m.map, im = t && t.image;
+      if (!t || seen.has(t) || m.transparent || !im || !im.getContext || im.width > 256 || im.height > 512 || im.width < 32) continue; seen.add(t); S.tex.push({ t, n, old: im, oa: t.anisotropy, neu: null, cap: 0 }); }
+    if (!Array.isArray(o.material) && /window|glass|door/i.test(n)) { const m = o.material; if (m && m.isMeshBasicMaterial && !m.map && !gm.has(m) && o.geometry.attributes.normal && ((m.color.r + m.color.g + m.color.b < 1.2) || (m.transparent && m.opacity < 0.7))) { gm.add(m); S.glass.push({ m, on: false }); } } });
+  if (typeof yardLife !== 'undefined' && yardLife && yardLife.cars && typeof _yardMat !== 'undefined' && _yardMat) { const have = new Set(S.cars.map(e => e.m));
+    for (const c of yardLife.cars) c.g.traverse(o => { if (o.isMesh && !have.has(o) && (o.material === _yardMat || o.material === S.carMat)) { have.add(o); S.cars.push({ m: o, smooth: false, on: false }); } }); }
+}
+function tex1Apply() {                                                       // bring everything to the level asked for; the heavy jobs go in a queue, one a step
+  const S = tex1S(), lvl = tex1Level(); tex1Scan(); S.lvl = lvl; S.q.length = 0;
+  const cap = lvl === 'high' ? 512 : lvl === 'mid' ? 256 : 0, an = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  for (const e of S.tex) { if (!cap) { if (e.t.image !== e.old || e.t.anisotropy !== e.oa) { e.t.image = e.old; e.t.anisotropy = e.oa; e.t.needsUpdate = true; } continue; }
+    if (e.cap === cap) { const im = e.neu || e.old; if (e.t.image !== im || e.t.anisotropy !== an) { e.t.image = im; e.t.anisotropy = an; e.t.needsUpdate = true; } } else S.q.push(() => { const c = tex1Relief(e.old, tex1Kind(e.n, e.old.width), cap); e.neu = c; e.cap = cap; if (S.lvl !== lvl) return; e.t.image = c || e.old; e.t.anisotropy = an; e.t.needsUpdate = true; S.made++; }); }
+  const refl = lvl !== 'low';
+  if (refl && S.cars.length && !S.carMat) { const m = S.carMat = _yardMat.clone(); m.envMap = tex1Env(); m.combine = THREE.MixOperation; m.reflectivity = 0.14; m.userData = { noTod: true };
+    m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <specularmap_fragment>', '#include <specularmap_fragment>\n\tspecularStrength = smoothstep(0.16, 0.45, max(vColor.r, max(vColor.g, vColor.b)));'); }; }   /* (paint mirrors the sky; tyres, trim and dark glass don't) */
+  for (const c of S.cars) { if (!refl) { if (c.on) { c.m.material = _yardMat; c.on = false; } continue; } if (c.on) continue;
+    if (c.smooth) { c.m.material = S.carMat; c.on = true; } else S.q.push(() => { tex1Smooth(c.m.geometry); c.smooth = true; if (S.lvl === 'low') return; c.m.material = S.carMat; c.on = true; }); }
+  for (const e of S.glass) { if (refl === e.on) continue; e.on = refl; const m = e.m; m.envMap = refl ? tex1Env() : null; if (refl) { m.combine = THREE.MixOperation; m.reflectivity = 0.3; } m.needsUpdate = true; }
+  tex1Pump();
+}
+function tex1Pump() { const S = tex1S(); if (S.busy) return; const step = () => { const f = S.q.shift(); if (!f) { S.busy = false; return; } try { f(); } catch (e) { console.error(e); } setTimeout(step, 70); }; if (S.q.length) { S.busy = true; setTimeout(step, 70); } }
+function tex1Tick(dt) {                                                      // (with the yard's life, each frame) the cars' paint keeps the yard's tint and haze; the mirrored sky goes down with the light; late arrivals are picked up
+  const S = tex1S(); if (!S.lvl) return; const m = S.carMat;
+  if (m && typeof _yardMat !== 'undefined' && _yardMat) { m.color.copy(_yardMat.color); if (m.fog !== _yardMat.fog) { m.fog = _yardMat.fog; m.needsUpdate = true; } }
+  if ((S.t -= dt) > 0) return; S.t = 2;
+  const night = (typeof TOD !== 'undefined' && TOD && TOD.nightF) || 0, k = 1 - 0.8 * night; if (m) m.reflectivity = 0.14 * k; for (const e of S.glass) if (e.on) e.m.reflectivity = 0.3 * k;
+  if (S.lvl !== tex1Level()) tex1Apply(); else { const a = S.cars.length, b = S.tex.length; tex1Scan(); if (S.cars.length !== a || S.tex.length !== b) tex1Apply(); }
+}
+function tex1Settings() {                                                    // Settings: a Detail row under Graphics, in the same style
+  const q = document.getElementById('qNote'); if (!q || document.getElementById('txSeg')) return;
+  const row = document.createElement('div'); row.className = 'set-row set-q'; row.innerHTML = '<span>&#x1F9F1; Detail</span><div class="seg" id="txSeg"><button data-d="auto">Auto</button><button data-d="high">Full</button><button data-d="low">Simple</button></div>';
+  const note = document.createElement('p'); note.className = 'set-note'; note.id = 'txNote'; q.after(row, note);
+  const sync = () => { const p = tex1Pick(), lvl = tex1Level(); for (const b of row.querySelectorAll('button')) b.classList.toggle('on', b.dataset.d === p);
+    note.textContent = p === 'high' ? 'Sharper walls, roofs and roads, and a little shine on cars and glass.' : p === 'low' ? 'Plain surfaces, as before: lightest on an older phone.' : 'Picks for this device: ' + (lvl === 'high' ? 'full detail.' : lvl === 'mid' ? 'reduced detail.' : 'simple' + (typeof SET !== 'undefined' && SET && SET.gfx === 'low' ? ' (Battery saver is on).' : '.')); };
+  for (const b of row.querySelectorAll('button')) b.addEventListener('click', () => { try { localStorage.setItem('catguard.detail', b.dataset.d); } catch (e) {} sync(); tex1Apply(); });
+  tex1Settings.sync = sync; sync();
+}
+function tex1Install() {
+  try { tex1Settings(); } catch (e) { console.error(e); }
+  { const s0 = syncSettings; syncSettings = function () { const r = s0.apply(this, arguments); try { if (tex1Settings.sync) tex1Settings.sync(); } catch (e) {} return r; }; }
+  const f0 = updateYardLife; updateYardLife = function (dt) { const r = f0.apply(this, arguments); try { tex1Tick(dt); } catch (e) { if (!tex1Install.err) { tex1Install.err = 1; console.error(e); } } return r; }; if (f0.cars2) updateYardLife.cars2 = f0.cars2;
+  setTimeout(() => { try { tex1Apply(); } catch (e) { console.error(e); } }, 1800);
+}
+try { tex1Install(); } catch (e) { console.error(e); }
+/* ===== end TEX1_V1 ===== */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
