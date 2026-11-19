@@ -10777,7 +10777,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-19 18:00';                                              // stamped when the site is published
+const BUILD = '2026-11-19 18:35';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -39979,7 +39979,7 @@ function runUpdate(dt) {
   R.t += dt; R.pt += dt;
   if (R.phase === 'intro' && R.go) {
     const u = R.ui, n = R.pt < 0.6 ? '3' : R.pt < 1.2 ? '2' : R.pt < 1.8 ? '1' : 'GO!';
-    if (n !== R.cdShown) { R.cdShown = n; u.Cd.textContent = n; u.Cd.classList.remove('pop'); void u.Cd.offsetWidth; u.Cd.classList.add('pop'); runSfx(n === 'GO!' ? 'go' : 'tap'); }
+    if (n !== R.cdShown) { R.cdShown = n; u.Cd.textContent = n; u.Cd.classList.remove('pop'); void u.Cd.offsetWidth; u.Cd.classList.add('pop'); if (lane1On()) lane1Push('rr', u.Cd, 'mark'); /* LANE1 */ runSfx(n === 'GO!' ? 'go' : 'tap'); }
     if (R.pt >= 1.8) { R.phase = 'run'; R.pt = 0; R.cdShown = ''; }
   }
   if (R.phase === 'run') {
@@ -45760,6 +45760,103 @@ function drives1Flat(w, d, x, z) {                                        // a g
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map, fog: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.022, z); m.userData.name = 'Driveway, next door'; m.userData.noWalk = true; povEndWall.add(m); return m;
 }
 /* ===== end DRIVES1_V1 ===== */
+/* ===== LANE1_V1 (2026-11-19): one text lane per mini-game. The big countdown, the status pop-ups and the banners used to be separate elements at
+   different heights that could show at once, on top of each other and on PKR. Now each game has ONE lane, clear of her, that shows one thing at a time:
+   a countdown number shows at once; anything else waits its turn (the one showing is cut short after a beat, stale ones are dropped); and the lane is
+   emptied the moment a card (game over, pause) opens, so nothing fades through it. See tools/patches/lane1/. Off: ?lane=0 ===== */
+function lane1On() { if (lane1On.v === undefined) lane1On.v = !/[?&]lane=0\b/.test(location.search); return lane1On.v; }
+function lane1G(key) { const S = lane1G.s || (lane1G.s = {}); return S[key] || (S[key] = { cur: null, q: [], timer: 0, root: null }); }
+function lane1Root(key, G) {                                              // the game's own UI (built the first time it is played); watch its cards
+  if (G.root && G.root.isConnected) return G.root;
+  const r = document.getElementById({ bike: 'bikeUI', hop: 'hopUI', chim: 'chimUI', sled: 'sledUI', cy: 'cyUI', rr: 'rrUI' }[key]); if (!r) return null;
+  G.root = r; G.cards = Array.from(r.querySelectorAll('[id$="Over"],[id$="PauseOv"],[id$="IntroOv"],[id$="MapOv"]'));
+  try { const mo = new MutationObserver(() => { if (lane1Card(G)) lane1Flush(key); }); for (const c of G.cards) mo.observe(c, { attributes: true, attributeFilter: ['class'] }); } catch (e) {}
+  return r;
+}
+function lane1Card(G) { if (G.cards) for (const c of G.cards) if (c.classList.contains('on')) return true; return false; }
+function lane1Flush(key) { const G = lane1G(key); G.q.length = 0; if (G.timer) { clearTimeout(G.timer); G.timer = 0; } if (G.cur) { G.cur.el.classList.remove('pop'); G.cur = null; } }
+function lane1Show(key, G, it, now) {
+  if (G.cur && G.cur.el !== it.el) G.cur.el.classList.remove('pop');
+  if (it.show) it.show(); G.cur = { el: it.el, t: now, end: now + it.dur, min: it.min }; lane1Plan(key, G, now);
+}
+function lane1Plan(key, G, now) { if (G.timer) { clearTimeout(G.timer); G.timer = 0; } if (!G.q.length || !G.cur) return; G.timer = setTimeout(() => { G.timer = 0; lane1Drain(key); }, Math.max(30, Math.min(G.cur.end, G.cur.t + G.cur.min) - now)); }
+function lane1Drain(key) {
+  const G = lane1G(key), now = performance.now(); if (lane1Card(G)) { lane1Flush(key); return; }
+  while (G.q.length && now - G.q[0].t > 1700) G.q.shift();                 /* (said too long ago to still mean anything) */
+  if (G.q.length) lane1Show(key, G, G.q.shift(), now);
+}
+function lane1Push(key, el, kind, show) {                                 // kind: 'count' (shows at once), 'msg', 'banner', 'quiet' (dropped if the lane is busy), 'mark' (already shown by the game: just note it)
+  if (!el) { if (show) show(); return; }
+  const G = lane1G(key), now = performance.now(); lane1Root(key, G);
+  if (kind !== 'mark' && lane1Card(G)) return;                             /* (a card is up: nothing over it) */
+  const it = { el, show: kind === 'mark' ? null : show, t: now, dur: kind === 'count' || kind === 'mark' ? 950 : kind === 'banner' ? 2500 : 1250, min: kind === 'count' || kind === 'mark' ? 560 : kind === 'banner' ? 950 : 700 };
+  if (kind === 'count' || kind === 'mark' || !G.cur || now >= G.cur.end) { lane1Show(key, G, it, now); return; }
+  if (kind === 'quiet') return;
+  if (G.q.length >= 2) G.q.pop(); G.q.push(it); lane1Plan(key, G, now);
+}
+function lane1Install() {
+  if (!lane1On() || lane1Install.done) return; lane1Install.done = true;
+  { const f = bikeSay; bikeSay = function (text, hot, quiet) { const a = arguments; lane1Push('bike', BIKE.ui && BIKE.ui.Msg, quiet ? 'quiet' : 'msg', () => f.apply(null, a)); }; }
+  { const f = bikeCountPop; bikeCountPop = function () { const a = arguments; lane1Push('bike', BIKE.ui && BIKE.ui.Count, 'count', () => f.apply(null, a)); }; }
+  { const f = hopSay; hopSay = function () { const a = arguments; lane1Push('hop', HOP.ui && HOP.ui.Msg, 'msg', () => f.apply(null, a)); }; }
+  { const f = chimSay; chimSay = function () { const a = arguments; lane1Push('chim', CHIM.ui && CHIM.ui.Msg, 'msg', () => f.apply(null, a)); }; }
+  { const f = sledPop; sledPop = function () { const a = arguments; lane1Push('sled', SLED.ui && SLED.ui.Msg, 'msg', () => f.apply(null, a)); }; }
+  { const f = sledBanner; sledBanner = function () { const a = arguments; lane1Push('sled', SLED.ui && SLED.ui.Banner, 'banner', () => f.apply(null, a)); }; }
+  { const f = crossyPop; crossyPop = function () { const a = arguments; lane1Push('cy', CROSSY.ui && CROSSY.ui.Msg, 'msg', () => f.apply(null, a)); }; }
+  { const f = crossyBanner; crossyBanner = function () { const a = arguments; lane1Push('cy', CROSSY.ui && CROSSY.ui.Banner, 'banner', () => f.apply(null, a)); }; }
+  { const f = runPop; runPop = function () { const a = arguments; if (RUN.sim || !RUN.ui) return; lane1Push('rr', RUN.ui.Msg, 'msg', () => f.apply(null, a)); }; }
+  const st = document.createElement('style'); st.id = 'lane1Style';       /* (where each lane sits on an upright phone: under the top bar, above PKR. Short sideways screens keep their own rules) */
+  st.textContent = `@media (min-height:521px){
+html #bikeUI .bk-msg,html #bikeUI .bk-count{top:calc(env(safe-area-inset-top,0px) + 218px)}
+html #bikeUI .bk-count{font-size:clamp(64px,18vw,120px)}
+html #chimUI .cd-msg{top:calc(env(safe-area-inset-top,0px) + 74px);font-size:clamp(26px,7.2vw,42px)}
+html #sledUI .sr-msg,html #sledUI .sr-banner{top:17%}
+html #cyUI .cy-msg,html #cyUI .cy-banner{top:17%}
+html #rrUI .rr-msg,html #rrUI .rr-cd{top:calc(env(safe-area-inset-top,0px) + 124px)}
+html #rrUI .rr-cd{font-size:clamp(56px,16vw,96px);line-height:1}
+}`;
+  document.head.appendChild(st);
+}
+try { lane1Install(); } catch (e) { console.error(e); }
+/* ===== end LANE1_V1 ===== */
+/* ===== READ1_V1 (2026-11-19): mini-game readability. Treetop Hop's pop-ups sit on a soft dark pill (cream on pale fog could not be read); a
+   Keep-going button she cannot afford is plainly grey instead of a washed-out copy of the live one; Sled Rush's small print is bigger; the bike's
+   Missions panel shows under the top bar at the countdown, not over PKR; and everything in the chimney's way gets a warm rim of light so dark
+   things read against the dark flue. See tools/patches/read1/. Off: ?read=0 ===== */
+function read1On() { if (read1On.v === undefined) read1On.v = !/[?&]read=0\b/.test(location.search); return read1On.v; }
+function read1Rim(mat) {                                                  // a warm edge light on a vertex-coloured Lambert material (the chimney's obstacles), plus a little of its own colour so it never goes black
+  if (!mat || mat.userData.read1) return; mat.userData.read1 = true;
+  const prev = mat.onBeforeCompile, key = mat.customProgramCacheKey ? mat.customProgramCacheKey() : '';
+  mat.onBeforeCompile = function (sh, r) { if (prev) prev.call(this, sh, r);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n{ float read1R = 1.0 - abs( normalize( normal ).z ); totalEmissiveRadiance += diffuseColor.rgb * 0.22 + vec3( 1.0, 0.72, 0.46 ) * ( read1R * read1R * 0.5 ); }'); };
+  mat.customProgramCacheKey = function () { return key + '|read1'; }; mat.needsUpdate = true;
+}
+function read1Install() {
+  if (!read1On() || read1Install.done) return; read1Install.done = true;
+  { const f = chimBuild; chimBuild = function () { const r = f.apply(this, arguments); try { read1Rim(CHIM.vmat); } catch (e) { console.error(e); } return r; }; }
+  const st = document.createElement('style'); st.id = 'read1Style';
+  st.textContent = `html #hopUI .hp-msg{left:0;right:0;width:fit-content;max-width:calc(100% - 32px);margin:0 auto;padding:8px 20px 10px;border-radius:20px;background:rgba(58,20,52,.78);box-shadow:0 4px 14px rgba(45,19,40,.3);text-shadow:0 3px 0 #d63a82}
+html #hopUI .hp-msg.gold{text-shadow:0 3px 0 #b8531c}
+html #bikeUI .bk-btn.rev:disabled,html #hopUI .hp-btn.rev:disabled,html #sledUI .sr-btn.rev:disabled,html #cyUI .cy-btn.rev:disabled{opacity:1;background:#e4dde1;color:#8a7d85;box-shadow:0 4px 0 #c9c0c5;text-shadow:none}
+html #chimUI .cd-msg small{font:800 max(15px,.46em) var(--body);text-shadow:0 1px 0 #3a1a08,0 0 6px rgba(20,8,4,.9)}
+html #sledUI .sr-msg small,html #sledUI .sr-banner small{font-size:clamp(16px,4.3vw,20px)}
+@media (min-height:521px){html #bikeUI .bk-mstart{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 86px)}}`;
+  document.head.appendChild(st);
+}
+try { read1Install(); } catch (e) { console.error(e); }
+/* ===== end READ1_V1 ===== */
+/* ===== KEEP1_V1 (2026-11-19, the owner: "Keep going" should cost less): carrying on after a wipeout costs 15 fish, then 30, then 60 in the same
+   run, in every mini-game that offers it (Bike, Treetop Hop, Sled Rush, Crossy Kitty, Sky Paws). It was 40 / 80 / 160 (Sky Paws 50 / 95 / 190)
+   while a run brings in about 3 to 8 fish. See tools/patches/keep1/. Off: ?keep=old ===== */
+function keep1Cost(n) { return 15 << Math.max(0, Math.min(2, n | 0)); }
+function keep1Install() {
+  if (/[?&]keep=old\b/.test(location.search) || keep1Install.done) return; keep1Install.done = true;
+  bikeReviveCost = function () { return keep1Cost(BIKE.revives); }; hopReviveCost = function () { return keep1Cost(HOP.revives); };
+  sledReviveCost = function () { return keep1Cost(SLED.revives); }; crossyReviveCost = function () { return keep1Cost(CROSSY.revives); };
+  jetReviveCost = function () { return keep1Cost(JET.run ? JET.run.revives : 0); };
+}
+try { keep1Install(); } catch (e) { console.error(e); }
+/* ===== end KEEP1_V1 ===== */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
