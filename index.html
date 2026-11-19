@@ -3642,9 +3642,9 @@ const ceilingDomes = [], ceilMat = basic(0xe4dfd6);                 // self-lit:
             { const gw = 9.4, gh = 3.4, ang = Math.atan2(gh, gw / 2), sl = Math.hypot(gw / 2, gh);                 // ...under its own front gable: white barge boards, a dark trim inside them, a king post
               wallMesh(tri(gw, gh), stuccoTex, 1.6, 1.6, THREE.DoubleSide).position.set(gx, XH - 0.1, zF - 0.4);
               for (const s of [-1, 1]) { yBox(hd, sl + 0.4, 0.34, 0.12, 0xf6f4ee, gx + s * gw / 4, XH - 0.1 + gh / 2 + 0.14, zF - 0.5).rotation.z = -s * ang;
-                yBox(hd, sl - 0.2, 0.2, 0.12, T, gx + s * (gw / 4 - 0.15), XH - 0.1 + gh / 2 - 0.12, zF - 0.46).rotation.z = -s * ang;
-                yBox(hd, sl + 0.6, 0.16, 3.2, ROOF, gx + s * gw / 4 * 1.02, XH - 0.1 + gh / 2 + 0.34, zF + 0.9).rotation.z = -s * ang; }
-              yBox(hd, 0.18, gh - 0.4, 0.12, T, gx, XH - 0.1 + (gh - 0.4) / 2, zF - 0.46); }
+                yBox(hd, sl - 0.2, 0.2, 0.1, T, gx + s * (gw / 4 - 0.15), XH - 0.1 + gh / 2 - 0.12, zF - 0.47).rotation.z = -s * ang;   /* GABLE1: clear of the stucco's plane */
+                { const G1 = !/[?&]gable=0/.test(location.search); yBox(hd, sl + 0.6, 0.16, G1 ? 6.9 : 3.2, ROOF, gx + s * gw / 4 * 1.02, XH - 0.1 + gh / 2 + 0.34, zF + (G1 ? 2.75 : 0.9)).rotation.z = -s * ang; } }   /* GABLE1: back until it meets the main roof */
+              yBox(hd, 0.18, gh - 0.4, 0.1, T, gx, XH - 0.1 + (gh - 0.4) / 2, zF - 0.47); }   /* GABLE1 */
             for (const x of [mx(XR - 0.5), gx + 3.85, gx - 3.85, mx(XR - 11.7), mx(XR - 13.3), mx(HL + 0.35)]) yBox(hd, 0.2, XH - BH, 0.1, T, x, (BH + XH) / 2, FZ0);   // timber posts
             yBox(hd, 13.1, 0.2, 0.1, T, mx(XR - 7.05), 6.65, FZ0);                                                 // and a rail under the window
             const SWD = 5.6, RC = half ? 0xf4f4f0 : 0xe6d8b2;                                                          // the stoop: a wide concrete landing, and seven steps
@@ -10772,7 +10772,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-19 14:44';                                              // stamped when the site is published
+const BUILD = '2026-11-19 15:27';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -16834,7 +16834,9 @@ function roofGeo() {                                                  // our roo
   R.maple = { x: -16.3, z: fz - 4.9 };                                 // the big red maple between the houses, its east limb reaching for our roof
   return R;
 }
-function roofH(x, z) { const R = RF || roofGeo(); if (x <= R.x0 || x >= R.x1 || z <= R.z0 || z >= R.z1) return -1; return R.y0 + R.k * Math.min(x - R.x0, R.x1 - x, z - R.z0, R.z1 - z); }   // the shingles' height (-1: off the roof)
+function roofH(x, z) { const R = RF || roofGeo(); if (x <= R.x0 || x >= R.x1 || z <= R.z0 || z >= R.z1) return -1; let h = R.y0 + R.k * Math.min(x - R.x0, R.x1 - x, z - R.z0, R.z1 - z);
+  if (z < R.z0 + 6.8 && !roofH.off) { if (roofH.off === undefined) { roofH.off = /[?&]gable=0/.test(location.search); roofH.gx = [YARD.XR - 5.8, YARD.XR + 5.8]; } if (!roofH.off) for (const gx of roofH.gx) { const a = Math.abs(x - gx); if (a < 4.95) h = Math.max(h, R.y0 + 3.67 - 0.7234 * a); } }   /* GABLE1: the two front gables are part of the roof */
+  return h; }   // the shingles' height (-1: off the roof)
 function roofSurf(x, z) {                                             // the shingles, or the deck or the chimney top on them (where the raccoon's feet go)
   const R = RF, h = roofH(x, z); if (h < 0) return h; let t = h;
   for (const s of R.solids) if (x > s[0] && x < s[1] && z > s[2] && z < s[3] && s[4] > t) t = s[4];
