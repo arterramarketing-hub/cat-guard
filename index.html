@@ -10772,7 +10772,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-19 14:18';                                              // stamped when the site is published
+const BUILD = '2026-11-19 14:44';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45463,6 +45463,66 @@ function room2Install() {
 }
 try { room2Install(); } catch (e) { console.error(e); }
 /* ===== end ROOM2_V1 ===== */
+/* ===== TREES1_V1 (2026-11-19, the owner's texture and realism upgrade, fix 6: trees and bushes; pictures in audit/trees1).
+   The trees, bushes, cedars and shrubs keep their low-poly shapes; their flat single-colour facets get leaves and a little variety:
+   (1) a small leaf pattern painted here in code (128 px, tiling), laid over the foliage by where it stands in the world (no UVs needed): light and dark
+       leaves a few inches across, fine and regular;
+   (2) each bush and cedar a slightly different green from its neighbour, and (full detail) a slow drift of colour across a big canopy.
+   Only foliage takes it: trunks and limbs are told apart by colour in the shader (green, or a bright autumn or blossom colour). The bushes and cedars are
+   instanced with materials of their own, which get the extra lines directly; the trees that share the yard's one material get a copy of it, kept in step
+   with its tint, haze and baked shade like the cars' paint.
+   Detail (tex1Level): full = leaves + both kinds of variety; reduced = leaves and the per-bush variety (one texture read); simple = off. ?trees=0 turns it off. ===== */
+function trees1S() { return trees1S.S || (trees1S.S = { lvl: null, inst: [], shared: [], leafMat: null, tex: null, t: 0, U: { tT1Leaf: { value: null }, uT1K: { value: 1 }, uT1V: { value: 1 } } }); }
+function trees1Tex() {                                                       // the leaf tile: a jittered grid of little leaves, half lighter and half darker than the flat colour (128 is mid grey = no change)
+  const S = trees1S(); if (S.tex) return S.tex; const N = 128, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'); g.fillStyle = 'rgb(118,118,118)'; g.fillRect(0, 0, N, N);
+  let sd = 5150; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647, G = 9, cell = N / G;
+  for (let pass = 0; pass < 2; pass++) for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) { const x = (i + 0.5 + (rn() - 0.5) * 0.9) * cell, y = (j + 0.5 + (rn() - 0.5) * 0.9) * cell, a = rn() * 6.283, l = cell * (0.42 + rn() * 0.2), w = l * (0.42 + rn() * 0.12), v = pass ? 150 + rn() * 70 : 60 + rn() * 50;
+      for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) { if (x + ox < -l || x + ox > N + l || y + oy < -l || y + oy > N + l) continue; g.save(); g.translate(x + ox, y + oy); g.rotate(a); g.fillStyle = 'rgb(' + (v | 0) + ',' + (v | 0) + ',' + (v | 0) + ')'; g.beginPath(); g.moveTo(-l, 0); g.quadraticCurveTo(0, -w, l, 0); g.quadraticCurveTo(0, w, -l, 0); g.fill();
+        g.strokeStyle = 'rgba(' + (pass ? '255,255,255' : '0,0,0') + ',.25)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(-l * 0.8, 0); g.lineTo(l * 0.8, 0); g.stroke(); g.restore(); } }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace; t.anisotropy = 4; S.U.tT1Leaf.value = t; return (S.tex = t);
+}
+function trees1Shader(sh) {                                                  // (onBeforeCompile) where each bit of foliage stands in the world, and the leaves laid over it
+  const S = trees1S(); sh.uniforms.tT1Leaf = S.U.tT1Leaf; sh.uniforms.uT1K = S.U.uT1K; sh.uniforms.uT1V = S.U.uT1V;
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vT1W;\nvarying float vT1H;').replace('#include <project_vertex>', '#include <project_vertex>\n\tvec4 t1w = vec4( transformed, 1.0 );\n\tvT1H = 0.5;\n\t#ifdef USE_INSTANCING\n\t\tt1w = instanceMatrix * t1w;\n\t\tvT1H = fract( sin( dot( instanceMatrix[ 3 ].xz, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );\n\t#endif\n\tvT1W = ( modelMatrix * t1w ).xyz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tT1Leaf;\nuniform float uT1K;\nuniform float uT1V;\nvarying vec3 vT1W;\nvarying float vT1H;').replace('#include <color_fragment>', ['#include <color_fragment>',
+    '\t{ vec3 t1c = vColor.rgb; float t1mx = max( t1c.r, max( t1c.g, t1c.b ) ), t1mn = min( t1c.r, min( t1c.g, t1c.b ) );',
+    '\t  float t1leafy = t1c.g > t1c.r * 1.02 ? 1.0 : smoothstep( 0.3, 0.42, t1mx ) * step( 0.3, ( t1mx - t1mn ) / max( t1mx, 0.001 ) );',      /* (green; or a bright, saturated autumn or blossom colour: never the brown of a trunk) */
+    '\t  vec3 t1n = abs( cross( dFdx( vT1W ), dFdy( vT1W ) ) );',                                                         /* (the facet's own direction: the pattern is laid flat on whichever way it mostly faces, so a leaf is never smeared) */
+    '\t  vec2 t1uv = ( t1n.y >= t1n.x && t1n.y >= t1n.z ? vT1W.xz : t1n.x >= t1n.z ? vT1W.zy : vT1W.xy ) * 0.6;',
+    '\t  float t1l = texture2D( tT1Leaf, t1uv ).r - 0.46;',
+    '\t  float t1v = ( vT1H - 0.5 ) * 0.22;',
+    '\t  #ifdef T1_DRIFT',
+    '\t    t1v += ( texture2D( tT1Leaf, t1uv * 0.043 + 0.37 ).r - 0.46 ) * 0.16 * uT1V;',
+    '\t  #endif',
+    '\t  vec3 t1m = vec3( 1.0 + t1v * 1.5, 1.0 + t1v, 1.0 + t1v * 0.4 ) * ( 1.0 + t1l * 0.4 * uT1K * ( t1c.g > t1c.r * 1.02 ? 1.0 : 0.4 ) );',
+    '\t  diffuseColor.rgb *= mix( vec3( 1.0 ), t1m, t1leafy ); }'].join('\n'));
+}
+function trees1Find() {
+  const S = trees1S(); if (typeof povEndWall === 'undefined' || !povEndWall || typeof _yardMat === 'undefined' || !_yardMat) return false; const im = new Set(S.inst), sm = new Set(S.shared.map(e => e.m));
+  povEndWall.traverse(o => { if (!o.isMesh || Array.isArray(o.material) || !o.material) return; let n = '', p = o; while (p && !n) { n = p.userData.name || ''; p = p.parent; } const m = o.material;
+    if (o.isInstancedMesh && m.vertexColors && m.isMeshBasicMaterial && m !== _yardMat && /^(Bushes|Cedars|Flower bed)$/.test(n)) { if (!im.has(m)) { im.add(m); S.inst.push(m); } }
+    else if ((m === _yardMat || m === S.leafMat) && /^(Tree canopy|Limb leaves|Magnolia|Spruce|Autumn tree|Shrubs across the street)$/.test(n) && !sm.has(o)) { sm.add(o); S.shared.push({ m: o, on: false }); } });
+  return S.inst.length + S.shared.length > 0;
+}
+function trees1Apply() {
+  const S = trees1S(); if (!trees1Find()) return false; const lvl = /[?&]trees=0\b/.test(location.search) ? 'low' : tex1Level(), on = lvl !== 'low', key = 'trees1' + lvl; if (on) trees1Tex();
+  const dress = m => { if (on) { m.defines = Object.assign({}, m.defines || {}); if (lvl === 'high') m.defines.T1_DRIFT = 1; else delete m.defines.T1_DRIFT; m.onBeforeCompile = trees1Shader; m.customProgramCacheKey = () => key; } else { m.onBeforeCompile = () => {}; m.customProgramCacheKey = () => 'trees0'; if (m.defines) delete m.defines.T1_DRIFT; } m.needsUpdate = true; };
+  for (const m of S.inst) if (m.userData.trees1 !== key) { m.userData.trees1 = key; dress(m); }
+  if (on && S.shared.length) { if (!S.leafMat) { S.leafMat = _yardMat.clone(); S.leafMat.userData = { noTod: true }; } if (S.leafMat.userData.trees1 !== key) { S.leafMat.userData.trees1 = key; dress(S.leafMat); } }
+  for (const e of S.shared) { if (e.on === on) continue; e.on = on; e.m.material = on ? S.leafMat : _yardMat; }
+  S.lvl = lvl; return true;
+}
+function trees1Tick(dt) {                                                    // (with the yard's life) the trees' copy of the yard's material keeps its tint, haze and baked shade; the level is looked at every couple of seconds
+  const S = trees1S(), q = S.leafMat; if (q && typeof _yardMat !== 'undefined' && _yardMat) { q.color.copy(_yardMat.color); if (q.fog !== _yardMat.fog) { q.fog = _yardMat.fog; q.needsUpdate = true; } if (q.lightMap !== _yardMat.lightMap) { q.lightMap = _yardMat.lightMap; q.needsUpdate = true; } }
+  if ((S.t -= dt) > 0) return; S.t = 2; if (!S.lvl) return; const want = /[?&]trees=0\b/.test(location.search) ? 'low' : tex1Level(); if (S.lvl !== want) trees1Apply();
+}
+function trees1Install() {
+  if (typeof tex1Level !== 'function') return;
+  const f0 = updateYardLife; updateYardLife = function (dt) { const r = f0.apply(this, arguments); try { trees1Tick(dt); } catch (e) { if (!trees1Install.err) { trees1Install.err = 1; console.error(e); } } return r; }; if (f0.cars2) updateYardLife.cars2 = f0.cars2;
+  let n = 0; const go = () => { let ok = false; try { ok = trees1Apply(); } catch (e) { console.error(e); return; } if (!ok && ++n < 30) setTimeout(go, 800); }; setTimeout(go, 3000);
+}
+try { trees1Install(); } catch (e) { console.error(e); }
+/* ===== end TREES1_V1 ===== */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
