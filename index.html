@@ -10772,7 +10772,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-19 13:41';                                              // stamped when the site is published
+const BUILD = '2026-11-19 13:59';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45328,6 +45328,67 @@ function tex1Install() {
 }
 try { tex1Install(); } catch (e) { console.error(e); }
 /* ===== end TEX1_V1 ===== */
+/* ===== GRASS1_V1 (2026-11-19, the owner's texture and realism upgrade, fix 3: grass; trial and pictures in audit/grass1).
+   (1) A new lawn tile painted here in code: thousands of little blades instead of blotches, the old tile's own green a seventh less saturated ("less neon"),
+       sharper at her eye level (anisotropy 8). It goes on the back lawn, the front lawns and the far fields (they share the lawn's picture).
+   (2) Full detail only: on the lawns' materials a second, much larger read of the same tile breaks up the repeat seen from above (one extra texture read).
+   (3) Tufts: real little blades standing along the back yard's fences and the house wall, a sparse scatter across the lawn. One mesh, one draw call. It wears
+       a copy of the lawn's material (kept in step with its tint and haze, and on the baked ground map's list), so it takes the yard's shade and the time of day
+       exactly like the grass under it.
+   Detail (tex1Level, Settings > Detail): full = 512 tile, the repeat breaker, about 2,950 tufts; reduced = 256 tile, 1,200 tufts along the edges only;
+   simple = all of it off, the lawn as it was. ?grass=0 turns it off whatever the level. ===== */
+function grass1S() { return grass1S.S || (grass1S.S = { lvl: null, tex: [], tiles: {}, mats: [], mesh: null, tuftLvl: null, tuftMat: null, lawnMat: null, t: 0, avg: null }); }
+function grass1Lawns() { const L = []; if (typeof povEndWall === 'undefined' || !povEndWall) return L; povEndWall.traverse(o => { if (!o.isMesh || Array.isArray(o.material) || !o.material || !o.material.map) return; let n = '', p = o; while (p && !n) { n = p.userData.name || ''; p = p.parent; } if (n === 'Backyard lawn' || n === 'Front lawn' || n === 'Far fields') L.push({ o, n }); }); return L; }
+function grass1Avg(im) { const c = document.createElement('canvas'); c.width = c.height = 8; const g = c.getContext('2d'); g.drawImage(im, 0, 0, 8, 8); const d = g.getImageData(0, 0, 8, 8).data; let r = 0, gg = 0, b = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; } return [r / 64, gg / 64, b / 64]; }
+function grass1Paint(old, S) {                                               // the lawn tile: soft patches, then blades, all wrapping round the edges
+  const A = grass1Avg(old), col = new THREE.Color().setRGB(A[0] / 255, A[1] / 255, A[2] / 255, THREE.SRGBColorSpace), h = {}; col.getHSL(h, THREE.SRGBColorSpace);
+  const base = (dl, ds, dh) => '#' + new THREE.Color().setHSL(h.h + (dh || 0) - 0.004, Math.min(1, h.s * 0.86 + (ds || 0)), Math.max(0, Math.min(1, h.l + dl)), THREE.SRGBColorSpace).getHexString(THREE.SRGBColorSpace);
+  const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); g.fillStyle = base(-0.012); g.fillRect(0, 0, S, S); g.fillStyle = base(0.012); g.fillRect(0, 0, S / 2, S);   /* (a whisper of the mower's stripes) */
+  let sd = 4711; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 260; i++) { const x = rn() * S, y = rn() * S, r = S * (0.03 + rn() * 0.07), gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, rn() < 0.5 ? 'rgba(20,50,15,.10)' : 'rgba(190,220,120,.09)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr;
+    for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { if (x + ox + r < 0 || x + ox - r > S || y + oy + r < 0 || y + oy - r > S) continue; g.fillRect(x - r + ox, y - r + oy, r * 2, r * 2); } }
+  const n = Math.round(S * S / 26); g.lineCap = 'round';
+  for (let i = 0; i < n; i++) { const x = rn() * S, y = rn() * S, len = S * (0.012 + rn() * 0.02), a = -Math.PI / 2 + (rn() - 0.5) * 1.5, t = rn();
+    g.strokeStyle = t < 0.4 ? base(-0.05 - rn() * 0.04, 0.03) : t < 0.88 ? base(0.025 + rn() * 0.05, 0, 0.004) : base(0.08 + rn() * 0.04, -0.05, 0.015); g.globalAlpha = 0.5 + rn() * 0.4; g.lineWidth = S / 512 * (1 + rn() * 1.1);
+    const dx = Math.cos(a) * len, dy = Math.sin(a) * len; for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { if (x + ox < -len || x + ox > S + len || y + oy < -len || y + oy > S + len) continue; g.beginPath(); g.moveTo(x + ox, y + oy); g.lineTo(x + ox + dx, y + oy + dy); g.stroke(); } }
+  g.globalAlpha = 1; return c;
+}
+function grass1Tufts(nEdge, nIn) {                                           // the blades: along the back yard's fences and the house wall, and a few across the lawn
+  const S = grass1S(), Y = YARD, VD = ROOM.visDepth, P = [], C = [], U1 = [], D = ph2S().D, A = S.avg, cb = new THREE.Color().setRGB(A[0] / 255, A[1] / 255, A[2] / 255, THREE.SRGBColorSpace); let sd = 2024; const rn = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const okAt = (x, z) => inOurYard(x, z) && z > VD + 0.6 && !YARD_BLOCKS.some(([x0, x1, z0, z1]) => x > x0 - 0.25 && x < x1 + 0.25 && z > z0 - 0.25 && z < z1 + 0.25);
+  const tuft = (x, z, s) => { const nb = 6 + (rn() * 4 | 0); for (let b = 0; b < nb; b++) { const a = rn() * 6.283, r = rn() * 0.11 * s, bx = x + Math.cos(a) * r, bz = z + Math.sin(a) * r, hgt = (0.09 + rn() * 0.13) * s, w = (0.016 + rn() * 0.012) * s, la = rn() * 6.283, lean = (0.02 + rn() * 0.07) * s, wx = Math.cos(la + 1.57) * w, wz = Math.sin(la + 1.57) * w;
+      const k = 0.9 + rn() * 0.25, lo = 0.5 * k, hi = 0.9 * k + (rn() < 0.12 ? 0.14 : 0); P.push(bx - wx, 0.004, bz - wz, bx + wx, 0.004, bz + wz, bx + Math.cos(la) * lean, hgt, bz + Math.sin(la) * lean);
+      C.push(cb.r * lo, cb.g * lo, cb.b * lo, cb.r * lo, cb.g * lo, cb.b * lo, Math.min(1, cb.r * hi * 1.08), Math.min(1, cb.g * hi), Math.min(1, cb.b * hi * 0.85)); for (let q = 0; q < 3; q++) U1.push((bx - D.X0) / (D.X1 - D.X0), (bz - D.Z0) / (D.Z1 - D.Z0)); } };
+  let made = 0, tries = 0;
+  while (made < nEdge && tries++ < nEdge * 30) { const side = rn(), d = 0.08 + rn() * rn() * 0.7; let x, z; if (side < 0.36) { z = VD + 1 + rn() * (Y.FZ - VD - 1); x = yardXL(z) + d; } else if (side < 0.72) { z = VD + 1 + rn() * (Y.FZ - VD - 1); x = Y.XR - d; } else if (side < 0.9) { z = Y.FZ - d; x = yardXL(z) + rn() * (Y.XR - yardXL(z)); } else { z = VD + 0.7 + d; x = yardXL(z) + rn() * (Y.XR - yardXL(z)); }
+    if (!okAt(x, z)) continue; tuft(x, z, 0.85 + rn() * 0.6); made++; }
+  let m2 = 0; tries = 0; while (m2 < nIn && tries++ < nIn * 30) { const z = VD + 1 + rn() * (Y.FZ - VD - 1.5), xl = yardXL(z) + 0.5, x = xl + rn() * (Y.XR - 0.5 - xl); if (!okAt(x, z)) continue; tuft(x, z, 0.5 + rn() * 0.35); m2++; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setAttribute('uv1', new THREE.Float32BufferAttribute(U1, 2)); g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(P.length / 3 * 2), 2)); g.computeBoundingSphere();
+  if (!S.tuftMat) { const mat = S.tuftMat = S.lawnMat.clone(); mat.map = null; mat.vertexColors = true; mat.side = THREE.DoubleSide; mat.onBeforeCompile = () => {}; mat.customProgramCacheKey = () => 'grass1t'; ph2S().mats.push(mat); mat.lightMap = ph2S().cur; mat.needsUpdate = true; }
+  if (S.mesh) { S.mesh.geometry.dispose(); S.mesh.geometry = g; } else { const m = S.mesh = new THREE.Mesh(g, S.tuftMat); m.userData.name = 'Grass tufts'; m.userData.noWalk = m.userData.noMerge = m.userData.keep = true; m.raycast = function () {}; povEndWall.add(m); }
+}
+function grass1Apply() {
+  const S = grass1S(); if (typeof ph2S !== 'function' || !ph2S().ready) return false; const L = grass1Lawns(), back = L.find(l => l.n === 'Backyard lawn'); if (!back) return false;
+  const lvl = /[?&]grass=0\b/.test(location.search) ? 'low' : tex1Level(), size = lvl === 'high' ? 512 : lvl === 'mid' ? 256 : 0, an = Math.min(8, renderer.capabilities.getMaxAnisotropy()); S.lawnMat = back.o.material;
+  for (const l of L) { const t = l.o.material.map; let e = S.tex.find(q => q.t === t); if (!e) { e = { t, old: t.image, oa: t.anisotropy }; S.tex.push(e); if (!S.avg && l === back) S.avg = null; }
+    const im = size ? (S.tiles[size] || (S.tiles[size] = grass1Paint(S.tex.find(q => q.t === back.o.material.map).old, size))) : e.old, a = size ? an : e.oa; if (t.image !== im || t.anisotropy !== a) { t.image = im; t.anisotropy = a; t.needsUpdate = true; }
+    const m = l.o.material, want = lvl === 'high' && l.n !== 'Far fields', has = S.mats.includes(m);                 /* the repeat breaker: full detail only */
+    if (want && !has) { S.mats.push(m); m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n\tdiffuseColor.rgb *= 0.84 + 0.3 * texture2D( map, vMapUv * 0.047 ).g;'); }; m.customProgramCacheKey = () => 'grass1'; m.needsUpdate = true; }
+    if (!want && has) { S.mats.splice(S.mats.indexOf(m), 1); m.onBeforeCompile = () => {}; m.customProgramCacheKey = () => 'grass0'; m.needsUpdate = true; } }
+  if (size) { if (!S.avg || S.avgSize !== size) { S.avg = grass1Avg(S.tiles[size]); S.avgSize = size; } if (S.tuftLvl !== lvl) { grass1Tufts(lvl === 'high' ? 2600 : 1200, lvl === 'high' ? 350 : 0); S.tuftLvl = lvl; } S.mesh.visible = true; } else if (S.mesh) S.mesh.visible = false;
+  S.lvl = lvl; return true;
+}
+function grass1Tick(dt) {                                                    // (with the yard's life) the tufts keep the lawn's tint and haze; the level is looked at every couple of seconds
+  const S = grass1S(), a = S.tuftMat, b = S.lawnMat; if (a && b) { a.color.copy(b.color); if (a.fog !== b.fog) { a.fog = b.fog; a.needsUpdate = true; } }
+  if ((S.t -= dt) > 0) return; S.t = 2; const want = /[?&]grass=0\b/.test(location.search) ? 'low' : tex1Level(); if (S.lvl !== want) grass1Apply();
+}
+function grass1Install() {
+  if (typeof tex1Level !== 'function') return;
+  const f0 = updateYardLife; updateYardLife = function (dt) { const r = f0.apply(this, arguments); try { grass1Tick(dt); } catch (e) { if (!grass1Install.err) { grass1Install.err = 1; console.error(e); } } return r; }; if (f0.cars2) updateYardLife.cars2 = f0.cars2;
+  let n = 0; const go = () => { let ok = false; try { ok = grass1Apply(); } catch (e) { console.error(e); return; } if (!ok && ++n < 40) setTimeout(go, 700); }; setTimeout(go, 2600);   /* (once the ground's baked map is ready) */
+}
+try { grass1Install(); } catch (e) { console.error(e); }
+/* ===== end GRASS1_V1 ===== */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
