@@ -10776,7 +10776,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-19 15:31';                                              // stamped when the site is published
+const BUILD = '2026-11-19 16:30';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45529,6 +45529,67 @@ function trees1Install() {
 }
 try { trees1Install(); } catch (e) { console.error(e); }
 /* ===== end TREES1_V1 ===== */
+/* ===== DIET1_V1 (2026-11-19): the draw-call diet (texture upgrade list, fix 9). =====
+   Seen from outdoors, most of the draws were things INSIDE the house that no window shows (624 from the back lawn, 467 from the street).
+   The house's shell is solid except for a known list of openings (probed with rays, tools/patches/diet1/README): the slider, a small low window and
+   three upstairs windows at the back; the front doors, the picture window and the garage at the front; four upstairs windows on the
+   side yard's wall. So, in Free roam with the camera outside the house: every drawable whose middle is inside the shell is left out of
+   the frame unless the cone from the camera to its bounding ball passes through an opening INTO ITS PART of the house (the upstairs flat, the
+   garage, the rest of the ground floor), or it sits on a wall the camera is outside of. While a mirror in that part is in view,
+   that part is left alone (reflections). A margin is added, so it errs on the side of drawing. Put back straight after the draw (cullEnd), like the
+   older rules in cullBegin. Nothing looks different. Off switch: ?diet=0
+   ===================================================================== */
+function diet1S() { return diet1S.S || (diet1S.S = { off: /[?&]diet=0\b/.test(location.search), L: [], t: 0, W: null, v: new THREE.Vector3(), hidN: 0, err: 0 }); }
+function diet1Walls() {                                                  // the three outer walls of our half that have openings: [axis the wall is square to, where, which way is out, openings [a0, a1, y0, y1]]
+  const Y = YARD, U = UPPER, S = SLIDER, gx = Y.XR - 5.8;
+  return [                                                                 /* (the fifth number: which part of the house the opening shows. 1 the upstairs flat, 2 the garage, 8 the living room, 4 the rest of the ground floor. The living room is a closed box: from outdoors only the slider shows it) */
+    { ax: 'z', la: 'x', p: U.zB, s: 1, P: [[S.DX - S.DW / 2 - 0.3, S.DX + S.DW / 2 + 0.3, -0.2, S.DH + 0.3, 12], [10.6, 12.6, -0.2, 1.9, 4], [-5.1, -2.6, 8.4, 10.9, 1], [3.4, 5.9, 8.4, 10.9, 1], [9.1, 11.6, 8.4, 10.9, 1]] },
+    { ax: 'z', la: 'x', p: U.zF, s: -1, P: [[U.dx - U.dw / 2 - 0.4, U.dx + U.dw / 2 + 0.4, U.LH - 0.3, U.LH + U.dh + 0.4, 5], [gx - 3.85, gx + 3.85, 6.7, 11.4, 1], [gx - 3.85, gx + 3.85, -0.2, 5.6, 2]] },   /* (the front doors are glazed and the garage door's top row too: openings even when shut) */
+    { ax: 'x', la: 'z', p: Y.HL, s: -1, P: [[-14.8, -12.3, 8.4, 10.9, 1], [0.5, 3.0, 8.4, 10.9, 1], [15.7, 18.2, 8.4, 10.9, 1], [19.2, 21.2, 8.6, 10.7, 1]] }];
+}
+function diet1List() {                                                   // (once a second) everything drawable in or near the house, except PKR herself
+  const S = diet1S(), L = S.L, Y = YARD, U = UPPER, v = S.v, me = walk.rig && walk.rig.g; L.length = 0;
+  const down = o => { if (o === me) return; if ((o.isMesh || o.isSprite || o.isPoints || o.isLine) && !o.isSkinnedMesh && !o.isInstancedMesh && !o.isBatchedMesh && o.frustumCulled !== false && !o.userData.noDiet && !o.children.length) {   /* (only leaves: hiding a parent would hide a lamp's light or a child that is elsewhere) */ v.setFromMatrixPosition(o.matrixWorld);
+      if (v.x > Y.HL - 15 && v.x < Y.XR + 15 && v.z > U.zF - 15 && v.z < U.zB + 15 && v.y < U.CH + 15) L.push(o); }
+    const k = o.children; for (let i = 0; i < k.length; i++) down(k[i]); };
+  down(scene);
+}
+function diet1Reach(d, w) {                                              // how far the thing itself reaches toward a wall (its box's corners; 0 = on the wall's line, negative = short of it)
+  if (d.isSprite) return -1e9; const g = d.geometry; if (!g.boundingBox) g.computeBoundingBox(); const b = g.boundingBox, e = d.matrixWorld.elements, k = w.ax === 'x' ? 0 : 2; let best = -1e9;
+  for (let i = 0; i < 8; i++) { const x = i & 1 ? b.max.x : b.min.x, y = i & 2 ? b.max.y : b.min.y, z = i & 4 ? b.max.z : b.min.z, q = e[k] * x + e[k + 4] * y + e[k + 8] * z + e[k + 12], t = w.s * (q - w.p); if (t > best) best = t; }
+  return best;
+}
+function diet1Cull(hid) {
+  const S = diet1S(); if (S.off || typeof SLIDER === 'undefined' || !SLIDER || !UPPER || UPPER.zB === undefined) return;
+  const c = camera.position, Y = YARD, U = UPPER;
+  if (c.x > Y.HL - 0.3 && c.x < Y.HR + 0.3 && c.z > U.zF - 0.3 && c.z < U.zB + 0.3) { const rh = roofH(c.x, c.z); if (!(rh > 0 && c.y > rh + 0.05 && c.y > U.CH + 0.25)) return; }   /* (the camera is indoors: the older rules deal with that. Up over the roof: outdoors) */
+  const now = performance.now(); if (now > S.t || !S.L.length) { S.t = now + 1000; diet1List(); }
+  const W = S.W || (S.W = diet1Walls()), v = S.v, L = S.L, x0 = Y.HL + 0.35, x1 = Y.XR + 0.2, z0 = U.zF + 0.35, z1 = U.zB - 0.2, yT = U.CH + 0.1, G = typeof garage !== 'undefined' && garage, gX0 = G && G.X0 !== undefined ? G.X0 - 0.3 : Y.XR - 9.6, gZ1 = G && G.z1 !== undefined ? G.z1 + 0.2 : U.zF + 13, H1 = S.H1 || (S.H1 = []), HZ = S.HZ || (S.HZ = []); const lw = ROOM.halfW + 0.3, lz = ROOM.visDepth + 0.3; let n = 0, mir = 0;
+  for (let i = 0; i < W.length; i++) { const w = W[i]; w.cn = w.s * (c[w.ax] - w.p); }
+  for (let i = 0; i < L.length; i++) { const d = L[i]; if (!d.visible || !(d.layers.mask & 1) || !d.parent) continue;
+    { const mt = d.material; if (!mt || mt.depthTest === false || (Array.isArray(mt) && mt.some(q => q.depthTest === false))) continue; }   /* (a glow drawn over everything: seen through walls, so never left out) */
+    const mw = d.matrixWorld; let r;
+    if (d.isSprite) { v.setFromMatrixPosition(mw); r = 0.75 * mw.getMaxScaleOnAxis(); }
+    else { const g = d.geometry; if (!g) continue; if (!g.boundingSphere) g.computeBoundingSphere(); const bs = g.boundingSphere; if (!bs || !(bs.radius >= 0)) continue; v.copy(bs.center).applyMatrix4(mw); r = bs.radius * mw.getMaxScaleOnAxis(); }
+    if (!(v.x > x0 && v.x < x1 && v.z > z0 && v.z < z1 && v.y > -0.5 && v.y < yT)) continue;      /* (its middle is not inside the shell: not ours to judge) */
+    const dx = v.x - c.x, dy = v.y - c.y, dz = v.z - c.z, dist = Math.sqrt(dx * dx + dy * dy + dz * dz); if (dist < r * 1.5 + 0.5) continue;
+    const zone = (v.x - r > -lw && v.x + r < lw && v.z - r > -0.3 && v.z + r < lz && v.y + r < CEIL_H + 0.3) ? 8 : (v.y + r > U.UF - 0.2 ? 1 : 0) | (v.y - r < U.UF + 0.1 ? ((v.x - r > gX0 && v.z + r < gZ1) ? 2 : (v.x + r > gX0 && v.z - r < gZ1) ? 6 : 4) : 0); let vis = false;   /* (which parts of the house it is in: a big thing can be in more than one) */
+    for (let k = 0; k < W.length && !vis; k++) { const w = W[k], pn = w.s * (v[w.ax] - w.p);      /* (pn: how far inside this wall, negative) */
+      if (-pn < r + 0.7) { const reach = diet1Reach(d, w); if (reach > 0.02 || (w.cn > 0 && reach > -0.45)) { vis = true; break; } }   /* (its ball touches this wall. The thing itself pokes out through the wall: always seen. It is on the wall: seen whenever the camera is outside that wall. Otherwise it is judged by the openings like the rest) */
+      if (w.cn <= 0.05) continue;                                                                  /* (the camera is not outside this wall: nothing is seen through it) */
+      const t = w.cn / (w.cn - pn), t2 = w.cn / Math.max(w.cn - pn - r, w.cn), ha = c[w.la] + t * (v[w.la] - c[w.la]), hy = c.y + t * dy,   /* (t: where the line to its middle crosses the wall. t2: the same for its nearest point, the widest the ball can look from here) */
+        ma = 1.15 * t2 * r + (t2 - t) * Math.abs(v[w.la] - c[w.la]) + 0.8, my = 1.15 * t2 * r + (t2 - t) * Math.abs(dy) + 0.8, P = w.P;
+      for (let q = 0; q < P.length; q++) { const R = P[q]; if ((R[4] & zone) && ha > R[0] - ma && ha < R[1] + ma && hy > R[2] - my && hy < R[3] + my) { vis = true; break; } } }
+    if (vis) { if (d.getRenderTarget) mir |= zone; } else { H1.push(d); HZ.push(zone); } }
+  for (let i = 0; i < H1.length; i++) if (!(mir & HZ[i])) { H1[i].visible = false; hid.push(H1[i]); n++; } H1.length = 0; HZ.length = 0;   /* (a mirror in that part of the house is in view: what it reflects stays) */
+  S.hidN = n;
+}
+function diet1Install() {
+  if (diet1Install.done) return; diet1Install.done = true; const f0 = cullBegin;
+  cullBegin = function () { const hid = f0(); if (hid) { try { diet1Cull(hid); } catch (e) { const S = diet1S(); if (!S.err++) console.error(e); S.off = true; } } return hid; };
+}
+diet1Install();
+/* ===== end DIET1_V1 ===== */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
