@@ -10777,7 +10777,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-19 19:00';                                              // stamped when the site is published
+const BUILD = '2026-11-20 12:34';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45934,6 +45934,323 @@ function polish1Install() {
 }
 try { polish1Install(); } catch (e) { console.error(e); }
 /* ===== end POLISH1_V1 ===== */
+/* ===== RUN4_V1 (2026-11-20): Rooftop Runner, Downtown. (1) The water tank no longer looks like something to slide under: it stood on four
+   thin legs with daylight beneath, the same look as the red slide-under bars. Now it sits on a solid brick base, taller, with steel hoops and
+   a cone roof: plainly a thing to go round (same footprint, same rules). (2) Baked light: sun shadows and soft sky shading (corners, walls
+   under taller towers, the base of every prop) worked out once on the GPU while the level loads, into one light-map texture; each frame it
+   costs one texture read. The live sun and sky lights stay as they were: the bake only says how much of each reaches a spot. Downtown only
+   (?rbake=all: every world, for testing). Off at Simple detail (tex1Level low). Off switches: ?tank=0, ?rbake=0. See tools/patches/run4/.
+   ===== */
+function run4Q(k) { return new RegExp('[?&]' + k + '\\b').test(location.search); }
+function run4TankOn() { return !run4Q('tank=0'); }
+function run4BakeOn(L) {
+  if (run4Q('rbake=0')) return false; let lv = 'high'; try { lv = tex1Level(); } catch (e) {} if (lv === 'low') return false;
+  return !!L && (L.id === 'core' || run4Q('rbake=all'));
+}
+function run4Tank(G, L, o) {                                              // the water tank: a solid brick base (no gap under it), staves, hoops, a cone roof
+  const s = (o.s + o.s1) / 2, x = (o.x0 + o.x1) / 2, M = gbAt(G, s, x, o.yb, 0);
+  gbGeo(G, 'w', s, new THREE.BoxGeometry(1.56, 1.1, 1.56).translate(0, 0.55, 0), M, 0xb4644c, 4);                               /* (the brick base, right down to the roof) */
+  gbGeo(G, 'w', s, new THREE.BoxGeometry(1.7, 0.12, 1.7).translate(0, 1.16, 0), M, 0x3a3e44);                                   /* (a steel deck on it) */
+  gbGeo(G, 'w', s, new THREE.CylinderGeometry(0.8, 0.82, 2.35, 18, 1).translate(0, 1.22 + 1.175, 0), M, 0xa87a54, 5);          /* (the tank: wooden staves) */
+  for (const y of [1.62, 2.38, 3.14]) gbGeo(G, 'w', s, new THREE.TorusGeometry(0.825, 0.04, 4, 22).rotateX(Math.PI / 2).translate(0, y, 0), M, 0x3a3e44);   /* (steel hoops) */
+  gbGeo(G, 'w', s, new THREE.ConeGeometry(0.9, 0.72, 18).translate(0, 3.57 + 0.36, 0), M, 0x6a5040);                            /* (the roof) */
+  gbGeo(G, 'w', s, new THREE.CylinderGeometry(0.05, 0.07, 0.28, 6).translate(0, 4.36, 0), M, 0x3a3e44);
+}
+
+/* ---------- the bake ---------- */
+function run4Charts(L, meshes) {                                          // every triangle into a chart (a gbQuad's pair shares one), packed into one atlas; sets attributes uvL, bkF
+  const pts = [], rY = []; for (let s = 0; s <= L.len; s += 2) { const q = runC(L, s, 0, 0); pts.push(q.x, q.z); let y = -1e9; try { y = runGround(L, s, 0, 1e9); } catch (e) {} rY.push(y); }
+  { let last = null; for (let i = 0; i < rY.length; i++) { if (rY[i] > -1e8) last = rY[i]; else if (last !== null) rY[i] = last; }   /* (gaps: the roof either side) */
+    last = null; for (let i = rY.length - 1; i >= 0; i--) { if (rY[i] > -1e8) last = rY[i]; else rY[i] = last !== null ? last : (L.y0 || 0); } }
+  const np = pts.length / 2, near = (x, z) => { let m = 1e18, k = 0; for (let i = 0; i < np; i++) { const dx = pts[i * 2] - x, dz = pts[i * 2 + 1] - z, d = dx * dx + dz * dz; if (d < m) { m = d; k = i; } } return [Math.sqrt(m), k]; };
+  const C = [], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3(), n2 = new THREE.Vector3(), u = new THREE.Vector3(), v = new THREE.Vector3(), p = new THREE.Vector3();
+  const box = new THREE.Box3(), fineBox = meshes.map(() => new THREE.Box3()), LP = [];   /* (LP: the triangles along her line, which cast the crisp shadows) */
+  meshes.forEach((m, mi) => {
+    const P = m.geometry.attributes.position, A = P.array, nt = P.count / 3, eq = (i, j) => A[i * 3] === A[j * 3] && A[i * 3 + 1] === A[j * 3 + 1] && A[i * 3 + 2] === A[j * 3 + 2];
+    const triN = (t, out) => { a.fromBufferAttribute(P, t * 3); b.fromBufferAttribute(P, t * 3 + 1); c.fromBufferAttribute(P, t * 3 + 2); return out.subVectors(b, a).cross(u.subVectors(c, a)).normalize(); };
+    for (let t = 0; t < nt; t++) {
+      triN(t, n); let tris = [t];
+      if (t + 1 < nt) { let sh = 0; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if (eq(t * 3 + i, (t + 1) * 3 + j)) sh++; if (sh === 2 && triN(t + 1, n2).dot(triN(t, n)) > 0.999) { tris.push(t + 1); t++; } }
+      triN(tris[0], n); a.fromBufferAttribute(P, tris[0] * 3); u.subVectors(b.fromBufferAttribute(P, tris[0] * 3 + 1), a).normalize(); v.crossVectors(n, u);
+      const vs = []; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, cx = 0, cy = 0, cz = 0, lo = 1e9, hi = -1e9;
+      for (const tr of tris) for (let i = 0; i < 3; i++) { const vi = tr * 3 + i; p.fromBufferAttribute(P, vi); const px = p.clone().sub(a).dot(u), py = p.clone().sub(a).dot(v); vs.push(vi, px, py);
+        x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py); cx += p.x; cy += p.y; cz += p.z; lo = Math.min(lo, p.y); hi = Math.max(hi, p.y); }
+      const k = vs.length / 3; cx /= k; cy /= k; cz /= k; const [d, pi] = near(cx, cz), w = x1 - x0, h = y1 - y0, md = Math.max(w, h);
+      if (d > 170 || !(md > 1e-4)) { C.push({ mi, vs, far: true }); continue; }
+      const ry = rY[pi], fine = d < 15 && cy > ry - 6 && cy < ry + 16 && hi - lo < 12,   /* (fine: her line's roofs and props, not the towers' walls) */ ts = fine ? (n.y > 0.6 ? 0.1 : 0.14) : Math.min(6, Math.max(0.5, md / 40));
+      C.push({ mi, vs, x0, y0, ts, fine, tw: Math.max(1, Math.ceil(w / ts)), th: Math.max(1, Math.ceil(h / ts)) });
+      for (let i = 0; i < k; i++) { p.fromBufferAttribute(P, vs[i * 3]); box.expandByPoint(p); if (fine) { fineBox[mi].expandByPoint(p); LP.push(p.x, p.y, p.z); } }
+    }
+  });
+  const PAD = 2, pack = (W, scale) => {                                    // shelf packing, tallest first; a 4x4 white corner for what isn't baked
+    const list = C.filter(q => !q.far).sort((p, q) => q.th * scale - p.th * scale || q.tw - p.tw); let x = 4, y = 0, sh = 4;
+    for (const q of list) { const tw = Math.max(1, Math.ceil(q.tw / scale)) + PAD * 2, th = Math.max(1, Math.ceil(q.th / scale)) + PAD * 2; if (tw > W) return 0;
+      if (x + tw > W) { y += sh; x = 0; sh = 0; } q.cx = x; q.cy = y; q.s = scale; x += tw; sh = Math.max(sh, th); }
+    return y + sh;
+  };
+  const W = 2048, maxH = RUN.low ? 1024 : 2048; let scale = 1, H = 0;
+  for (let k = 0; k < 12; k++) { H = pack(W, scale); if (H && H <= maxH) break; scale *= 1.2; }
+  H = Math.max(64, Math.pow(2, Math.ceil(Math.log2(H))));
+  const UV = meshes.map(m => new Float32Array(m.geometry.attributes.position.count * 2)), F = meshes.map(m => new Float32Array(m.geometry.attributes.position.count));
+  for (const q of C) { const U = UV[q.mi], f = F[q.mi];
+    for (let i = 0; i < q.vs.length; i += 3) { const vi = q.vs[i];
+      if (q.far) { U[vi * 2] = 2 / W; U[vi * 2 + 1] = 2 / H; continue; }
+      const ts = q.ts * q.s; U[vi * 2] = (q.cx + PAD + (q.vs[i + 1] - q.x0) / ts) / W; U[vi * 2 + 1] = (q.cy + PAD + (q.vs[i + 2] - q.y0) / ts) / H; f[vi] = q.fine ? 1 : 0; } }
+  meshes.forEach((m, i) => { m.geometry.setAttribute('uvL', new THREE.BufferAttribute(UV[i], 2)); m.geometry.setAttribute('bkF', new THREE.BufferAttribute(F[i], 1)); });
+  return { W, H, box, fineBox, scale, charts: C.length, LP: new Float32Array(LP) };
+}
+function run4Cam(cam, w, box, S, back) {                                  // an orthographic view down direction -w that covers box (and anything up to `back` beyond it toward the light)
+  const c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() / 2;
+  cam.position.copy(c).addScaledVector(w, r + back); cam.up.set(0, 1, 0); if (Math.abs(w.y) > 0.98) cam.up.set(0, 0, 1); cam.lookAt(c); cam.updateMatrixWorld(true);
+  const inv = cam.matrixWorldInverse.copy(cam.matrixWorld).invert(), q = new THREE.Vector3(); let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z1 = 0;
+  for (let i = 0; i < 8; i++) { q.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).applyMatrix4(inv); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); z1 = Math.max(z1, -q.z); }
+  const m = 2; cam.left = x0 - m; cam.right = x1 + m; cam.bottom = y0 - m; cam.top = y1 + m; cam.near = 0.5; cam.far = z1 + 5; cam.updateProjectionMatrix();
+  return { M: new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, inv), tx: Math.max(cam.right - cam.left, cam.top - cam.bottom) / S, depth: cam.far - cam.near };
+}
+function run4Bake(L) {
+  const R = RUN, rd = renderer, M = runMats(), t0 = performance.now(), hi = (() => { try { return tex1Level() === 'high'; } catch (e) { return true; } })();
+  const tg = R.world.children.filter(m => m.isMesh && m.material === M.w), occ = R.world.children.filter(m => m.isMesh && (m.material === M.w || m.material === M.r || m.material === M.g));
+  if (!tg.length) return null;
+  const A = run4Charts(L, tg), W = A.W, H = A.H;
+  const keep = { rt: rd.getRenderTarget(), ac: rd.autoClear, cc: rd.getClearColor(new THREE.Color()), ca: rd.getClearAlpha(), xr: rd.xr && rd.xr.enabled };
+  const SD = hi ? 2048 : 1024, dep = new THREE.WebGLRenderTarget(SD, SD, { depthBuffer: true, depthTexture: new THREE.DepthTexture(SD, SD) });
+  const acc = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, depthBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false }), accL = acc.clone();   /* (accL: the sky seen past her line's own props) */
+  const cam = new THREE.OrthographicCamera(), oc = new THREE.Scene(), dm = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  for (const m of occ) { const k = new THREE.Mesh(m.geometry, dm); k.matrixAutoUpdate = false; k.matrix.copy(m.matrixWorld); k.frustumCulled = false; oc.add(k); }
+  const ocL = new THREE.Scene(), lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(A.LP, 3)); { const k = new THREE.Mesh(lg, dm); k.frustumCulled = false; ocL.add(k); }   /* (local: her line's roofs and props, and the red things) */
+  for (const m of occ) if (m.material === M.r) { const k = new THREE.Mesh(m.geometry, dm); k.matrixAutoUpdate = false; k.matrix.copy(m.matrixWorld); k.frustumCulled = false; ocL.add(k); }
+  const U = { dTex: { value: dep.depthTexture }, shM: { value: new THREE.Matrix4() }, dir: { value: new THREE.Vector3() }, nOff: { value: 0.1 }, zB: { value: 0 }, mode: { value: 0 }, wt: { value: 1 }, px: { value: 1 / SD } };
+  const bm = new THREE.ShaderMaterial({ uniforms: U, side: THREE.DoubleSide, depthTest: false, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendEquation: THREE.AddEquation,
+    vertexShader: 'attribute vec2 uvL; attribute float bkF; varying vec3 vW; varying vec3 vN; varying float vF; void main() { vW = (modelMatrix * vec4(position, 1.0)).xyz; vN = normalize(mat3(modelMatrix) * normal); vF = bkF; gl_Position = vec4(uvL * 2.0 - 1.0, 0.0, 1.0); }',
+    fragmentShader: `uniform sampler2D dTex; uniform mat4 shM; uniform vec3 dir; uniform float nOff, zB, mode, wt, px; varying vec3 vW; varying vec3 vN; varying float vF;
+      void main() {
+        if (mode > 1.5 && vF < 0.5) discard;   /* (2: the sun, 3: the sky, past local things only, her line only) */
+        vec3 n = normalize(vN); float nd = dot(n, dir);
+        vec4 c = shM * vec4(vW + n * nOff + dir * nOff * 0.5, 1.0); vec3 q = c.xyz / c.w * 0.5 + 0.5; float vis = 0.0;
+        if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) vis = 1.0;
+        else { for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) vis += (q.z - zB <= texture2D(dTex, q.xy + vec2(float(i), float(j)) * px).r) ? 1.0 : 0.0; vis /= 9.0; }
+        if (nd <= 0.0 && mode < 0.5) vis = 0.0;
+        if (mode > 2.5) { float w = max(nd, 0.0) + 0.001; gl_FragColor = vec4(vis * w, w, 0.0, 0.0); }
+        else if (mode > 1.5) gl_FragColor = vec4(0.0, 0.0, 0.0, (0.5 + 0.5 * vis) * wt);
+        else if (mode > 0.5) { float w = max(nd, 0.0) + 0.001; gl_FragColor = vec4(0.0, vis * w, w, 0.0); }
+        else gl_FragColor = vec4(vis * wt, 0.0, 0.0, 0.0);
+      }` });
+  const bs = new THREE.Scene(), bmesh = tg.map(m => { const k = new THREE.Mesh(m.geometry, bm); k.matrixAutoUpdate = false; k.matrix.copy(m.matrixWorld); k.frustumCulled = false; bs.add(k); return k; });
+  const dcam = new THREE.Camera(); let passes = 0;
+  if (rd.xr) rd.xr.enabled = false; rd.autoClear = false;
+  rd.setClearColor(0x000000, 0); rd.setRenderTarget(acc); rd.clear(true, false, false); rd.setRenderTarget(accL); rd.clear(true, false, false);
+  const pass = (w, box, mode, wt, only) => {                               // one direction: its depth picture, then every target texel looks it up
+    const V = run4Cam(cam, w, box, SD, mode > 0.5 && mode < 1.5 ? 600 : 900);
+    rd.setRenderTarget(dep); rd.setClearColor(0xffffff, 1); rd.clear(true, true, false); rd.render(mode > 1.5 ? ocL : oc, cam);
+    U.shM.value.copy(V.M); U.dir.value.copy(w); U.nOff.value = V.tx * (mode > 1.5 ? 1.6 : 2.6); U.zB.value = 0.05 / V.depth; U.mode.value = mode; U.wt.value = wt; U.px.value = 1 / SD;   /* (coarse maps: pushed out past their own edge, or a wall reads its own roof) */
+    bmesh.forEach((k, i) => { k.visible = only === undefined || only === i; });
+    rd.setRenderTarget(mode > 2.5 ? accL : acc); rd.render(bs, dcam); passes++;
+  };
+  const sd = new THREE.Vector3(...(runKit(L.id).sunDir || [0.5, 0.6, -0.6])).normalize(), jit = (k, n, r) => { const e = new THREE.Vector3(1, 0, 0).cross(sd).normalize(), f = new THREE.Vector3().crossVectors(sd, e), a = k * 2.39996, d = r * Math.sqrt((k + 0.5) / n); return sd.clone().addScaledVector(e, Math.cos(a) * d).addScaledVector(f, Math.sin(a) * d).normalize(); };
+  try {
+    const NC = hi ? 4 : 2, NF = hi ? 6 : 3, NS = hi ? 32 : 16, NL = hi ? 12 : 6;
+    for (let k = 0; k < NC; k++) pass(jit(k, NC, 0.02), A.box, 0, 1 / NC);                                  /* the sun, everywhere (coarse) */
+    A.fineBox.forEach((b, i) => { if (b.isEmpty()) return; b.expandByScalar(1); for (let k = 0; k < NF; k++) pass(jit(k, NF, 0.025), b, 2, 1 / NF, i);   /* the sun along her line (fine) */
+      for (let k = 0; k < NL; k++) { const y = 0.18 + 0.8 * (k + 0.5) / NL, r = Math.sqrt(1 - y * y), a = k * 2.39996 + 0.7; pass(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r), b, 3, 1, i); } });   /* and the sky round her line's props (fine) */
+    for (let k = 0; k < NS; k++) { const y = Math.max(0.07, (k + 0.5) / NS), r = Math.sqrt(1 - y * y), a = k * 2.39996; pass(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r), A.box, 1, 1); }   /* the sky */
+    // resolve: sun (fine where she runs), sky, then grow each chart's edge into its padding
+    const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)), qs = new THREE.Scene(); q.frustumCulled = false; qs.add(q);
+    const T0 = new THREE.WebGLRenderTarget(W, H, { depthBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false }), T1 = T0.clone();
+    q.material = new THREE.ShaderMaterial({ uniforms: { t: { value: acc.texture }, tl: { value: accL.texture }, sz: { value: new THREE.Vector2(W, H) } }, depthTest: false, depthWrite: false,
+      vertexShader: 'varying vec2 vu; void main() { vu = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: `uniform sampler2D t, tl; uniform vec2 sz; varying vec2 vu; void main() { vec2 p = floor(vu * sz); if (p.x < 4.0 && p.y < 4.0) { gl_FragColor = vec4(1.0); return; }
+        vec4 a = texture2D(t, vu); if (a.b <= 0.0) { gl_FragColor = vec4(0.0); return; }
+        float city = clamp(a.r, 0.0, 1.0), sky = clamp(a.g / a.b, 0.0, 1.0), loc = 1.0;
+        if (a.a > 0.25) {   // her line: mostly in the sun (the towers' shade a third as strong), its props' shadows crisp, the sky closed only by what's near
+          vec4 l = texture2D(tl, vu); loc = clamp((a.a - 0.5) * 2.0, 0.0, 1.0); city = mix(1.0, city, 0.3); sky = mix(1.0, sky, 0.3) * (l.g > 0.0 ? clamp(l.r / l.g / 0.92, 0.0, 1.0) : 1.0); }
+        gl_FragColor = vec4(city, sky, loc, 1.0); }` });
+    rd.setRenderTarget(T0); rd.render(qs, dcam);
+    const dil = new THREE.ShaderMaterial({ uniforms: { t: { value: null }, sz: { value: new THREE.Vector2(W, H) } }, depthTest: false, depthWrite: false,
+      vertexShader: 'varying vec2 vu; void main() { vu = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: `uniform sampler2D t; uniform vec2 sz; varying vec2 vu; void main() { vec4 a = texture2D(t, vu); if (a.a > 0.5) { gl_FragColor = a; return; }
+        vec4 s = vec4(0.0); for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) { vec4 b = texture2D(t, vu + vec2(float(i), float(j)) / sz); if (b.a > 0.5) s += vec4(b.rgb, 1.0); }
+        gl_FragColor = s.a > 0.0 ? vec4(s.rgb / s.a, 1.0) : vec4(1.0, 1.0, 1.0, 0.0); }` });
+    q.material.dispose(); q.material = dil; let src = T0, dst = T1;
+    for (let k = 0; k < 3; k++) { dil.uniforms.t.value = src.texture; rd.setRenderTarget(dst); rd.render(qs, dcam); const z = src; src = dst; dst = z; }
+    src.texture.minFilter = THREE.LinearFilter; src.texture.magFilter = THREE.LinearFilter; src.texture.needsUpdate = true; dst.dispose(); dil.dispose(); q.geometry.dispose();
+    R.run4 = { rt: src, ms: Math.round(performance.now() - t0), W, H, passes, charts: A.charts, scale: A.scale };
+  } finally {
+    rd.setRenderTarget(keep.rt); rd.autoClear = keep.ac; rd.setClearColor(keep.cc, keep.ca); if (rd.xr) rd.xr.enabled = keep.xr;
+    dep.depthTexture.dispose(); dep.dispose(); acc.dispose(); accL.dispose(); bm.dispose(); dm.dispose(); lg.dispose();
+  }
+  return R.run4;
+}
+function run4Mat(base, tex) {                                             // the route material, reading the bake: direct sun x sun-visibility, sky x sky-visibility
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true, map: base.map, emissive: base.emissive ? base.emissive.clone() : 0x000000 }), pre = base.onBeforeCompile, key = base.customProgramCacheKey ? base.customProgramCacheKey() : '';
+  m.onBeforeCompile = function (sh, r) {
+    if (pre) pre.call(this, sh, r); sh.uniforms.run4B = { value: tex }; sh.uniforms.run4K = { value: run4K() };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 uvL;\nvarying vec2 vUvL;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvUvL = uvL;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D run4B;\nuniform vec4 run4K;\nvarying vec2 vUvL;')
+      .replace('#include <lights_fragment_begin>', '#include <lights_fragment_begin>\n{ vec4 bk = texture2D( run4B, vUvL ); reflectedLight.directDiffuse *= mix( run4K.x, 1.0, bk.b ) * mix( run4K.y, 1.0, bk.r ); irradiance *= mix( run4K.z, 1.0, clamp( bk.g / run4K.w, 0.0, 1.0 ) ); }');
+  };
+  m.customProgramCacheKey = () => key + '|run4'; m.userData.run4 = true; return m;
+}
+function run4K() { return run4K.v || (run4K.v = new THREE.Vector4(0.25, 0.7, 0.55, 0.7)); }   // how dark it gets: in a prop's shadow, in a tower's shadow, under no sky; and how much sky counts as open
+function run4Free() { const R = RUN; if (R.run4) { try { R.run4.rt.dispose(); if (R.run4.mat) R.run4.mat.dispose(); } catch (e) {} R.run4 = null; } }
+function run4Install() {
+  if (run4Install.done) return; run4Install.done = true;
+  if (run4TankOn()) { const f = runKit; runKit = function (id) { const K = f.apply(this, arguments); if (id === 'core' && K && !K.run4) { K.run4 = true; K.block = run4Tank; } return K; }; }
+  { const f = runLoad; runLoad = function (wi) {
+      run4Free(); const L = f.apply(this, arguments);
+      try { if (run4BakeOn(L)) { const B = run4Bake(L); if (B) { const M = runMats(), m = B.mat = run4Mat(M.w, B.rt.texture); for (const o of RUN.world.children) if (o.isMesh && o.material === M.w && o.geometry.attributes.uvL) o.material = m; } } } catch (e) { console.error('RUN4 bake', e); run4Free(); }
+      return L; }; }
+}
+try { run4Install(); } catch (e) { console.error(e); }
+/* ===== end RUN4_V1 ===== */
+/* ===== BIKE2_V1 (2026-11-20): the motorcycle ride goes somewhere. (1) Tree trunks reach up into the leaves (one of the three boulevard trees
+   floated 20 cm clear of its trunk, more on the big back-yard trees). (2) Three stretches, by distance: the suburbs (0-600 m, as before), the
+   Don Valley Parkway (600-1250 m: the valley's wooded slopes both sides, guardrails, the Don River on the right, the Bloor viaduct overhead, a
+   green highway sign in), then downtown Toronto (1250 m on: towers both sides with a second, taller row behind, lit windows at night, street
+   trees in planters, paved sidewalks, streetcar rails). The scenery swaps far ahead in the fog as each piece wraps round, so nothing pops;
+   the ground blends over 50 m. On the parkway: no streetcar and no garbage day. A callout on the way in to each; the 3 km banner says CN
+   Tower now. Same road, same rules, same obstacles otherwise. Off: ?zones=0 (the stretches), ?btree=0 (the trunks). See tools/patches/bike2/.
+   ===== */
+const BIKE2_Z = [600, 1250];                                                // the DVP starts, downtown starts (metres into the ride)
+function bike2On() { return !/[?&]zones=0\b/.test(location.search); }
+function bike2Zone(d) { return d < BIKE2_Z[0] ? 0 : d < BIKE2_Z[1] ? 1 : 2; }
+function bike2Rnd(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+function bike2Pick(a) { return a[(Math.random() * a.length) | 0]; }
+function bike2TreeGeos() {                                                  // the three boulevard trees as before, the trunk now running up into the leaves
+  const G = bikeG; return [['#5fb04a', '#79c75a', 1], ['#4f9e45', '#6dbb52', 1.15], ['#6cbf55', '#8fd36a', 0.9]].map(([a, b, s]) => { const th = 2.9 * s + 0.3;
+    return bikeMerge([[G.cyl(0.12, 0.2, th, 6), '#7a5140', 0, th / 2, 0], [G.ball(1.25 * s, 0), a, 0, 2.9 * s + 0.3, 0], [G.ball(0.95 * s, 0), b, 0.5, 3.6 * s + 0.2, 0.3], [G.ball(0.85 * s, 0), a, -0.4, 3.4 * s, -0.4]]); });
+}
+const BIKE2_SLOPE = [[-3.6, 0], [-1.2, 0.5], [4, 4.6], [10, 10.4], [16, 13.8], [30, 15]];   // the valley side, out from the road (local x: house slot at 16.5 m), height
+function bike2SlopeY(lx) { const P = BIKE2_SLOPE; if (lx <= P[0][0]) return 0; for (let i = 1; i < P.length; i++) if (lx <= P[i][0]) { const a = P[i - 1], b = P[i], f = (lx - a[0]) / (b[0] - a[0]); return a[1] + (b[1] - a[1]) * f; } return P[P.length - 1][1]; }
+function bike2Slope(seed) {                                                 // one 13 m piece of the valley side: grass rising from the road, trees on it
+  const G = bikeG, r = bike2Rnd(seed), P = BIKE2_SLOPE, z0 = -6.56, z1 = 6.56, gc = ['#7bb35a', '#6fa950', '#679f4a', '#5e9643', '#5a8f40'], parts = [];
+  for (let i = 1; i < P.length; i++) { const a = P[i - 1], b = P[i], pos = []; for (const p of [[a, z0], [b, z1], [b, z0], [a, z0], [a, z1], [b, z1]]) pos.push(p[0][0], p[0][1], p[1]);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); parts.push([g, gc[i - 1], 0, 0, 0]); }   /* (one strip per rise, each its own green) */
+  const greens = ['#4f9e45', '#5fb04a', '#3f8a3c', '#6cbf55', '#58a64a'], n = 7 + ((r() * 4) | 0);
+  for (let k = 0; k < n; k++) { const lx = 0.5 + r() * 27, z = (r() - 0.5) * 12, y = bike2SlopeY(lx) - 0.3, s = 0.9 + r() * 0.9;
+    if (r() < 0.3) parts.push([G.cyl(0.12, 0.18, 1.6 * s, 5), '#6a4a3a', lx, y + 0.8 * s, z], [G.cone(1.5 * s, 4.4 * s, 7), '#2f6f3f', lx, y + 3.2 * s, z]);
+    else { const th = 2.8 * s; parts.push([G.cyl(0.13 * s, 0.2 * s, th, 5), '#6a4a3a', lx, y + th / 2, z], [G.ball(1.5 * s, 0), bike2Pick(greens), lx, y + th, z], [G.ball(1.1 * s, 0), bike2Pick(greens), lx + 0.6 * s, y + th + 0.7 * s, z + 0.4 * s]); } }
+  for (let k = 0; k < 5; k++) { const lx = -1 + r() * 6, z = (r() - 0.5) * 12; parts.push([G.ball(0.7 + r() * 0.5, 0), bike2Pick(['#5a9a44', '#4e8c3d', '#6aa84f']), lx, bike2SlopeY(lx) + 0.2, z, 0, 0, 0, 1.4, 0.7, 1.2]); }   /* (scrub at the foot) */
+  return bikeMerge(parts);
+}
+function bike2Rail() {                                                      // a 13 m run of steel guardrail on posts
+  const G = bikeG, P = [[G.box(0.1, 0.34, 13.06), '#c9ccd2', 0.45, 0.62, 0], [G.box(0.12, 0.06, 13.06), '#e4e6ea', 0.45, 0.8, 0]];   /* (out behind the lamp posts: local +x is away from the road) */
+  for (let z = -5.2; z < 6.6; z += 2.6) P.push([G.box(0.13, 0.78, 0.13), '#8d9198', 0.54, 0.39, z]);
+  return bikeMerge(P);
+}
+function bike2Planter() {                                                   // a street tree in a square planter (trunk well into the leaves)
+  const G = bikeG; return bikeMerge([[G.box(1.3, 0.55, 1.3), '#9aa0a8', 0, 0.275, 0], [G.box(1.1, 0.06, 1.1), '#5a4636', 0, 0.56, 0], [G.cyl(0.09, 0.13, 2.9, 6), '#6a4a3a', 0, 2.0, 0],
+    [G.ball(1.05, 0), '#4f9e45', 0, 3.25, 0], [G.ball(0.8, 0), '#6dbb52', 0.35, 3.75, 0.2], [G.ball(0.7, 0), '#5fb04a', -0.4, 3.55, -0.35]]);
+}
+function bike2Tower(seed, o) {                                              // a downtown tower facing the road (-x): o { W across, D along, H, podium, style, back }; returns { g, w } (w: its lit windows)
+  const G = bikeG, r = bike2Rnd(seed), P = [], WP = [], glass = o.style === 'stone' ? ['#d9cfbf', '#cdbfa9', '#e2d9cb'] : ['#86aecb', '#7a9fbd', '#8fb9c6', '#9cb4c4', '#a7b6c2'];
+  const body = bike2Pick(glass), band = o.style === 'stone' ? '#5c6f86' : bike2Pick(['#e9edf0', '#d6dde3', '#58687a']), W = o.W, D = o.D, H = o.H, ph = o.podium || 0;
+  if (ph) { const pc = bike2Pick(['#d9d2c5', '#c8c0b2', '#5b6270', '#e6e1d8']);
+    P.push([G.box(W, ph, D), pc, 0, ph / 2, 0], [G.box(0.12, ph * 0.6, D * 0.86), '#3f566e', -W / 2 - 0.02, ph * 0.42, 0], [G.box(1.1, 0.14, D * 0.86), bike2Pick(['#d63a82', '#2f7d5b', '#f2b134', '#1f4f8a', '#c8402e']), -W / 2 - 0.55, ph * 0.78, 0]); }
+  const sw = W - (ph ? 1.4 : 0), sd = D - (ph ? 1.2 : 0), sx = ph ? 0.5 : 0;
+  P.push([G.box(sw, H, sd), body, sx, ph + H / 2, 0]);
+  for (let y = ph + 3.2; y < ph + H - 0.5; y += 3.4) P.push([G.box(sw + 0.12, o.style === 'stone' ? 1.5 : 0.42, sd + 0.12), band, sx, y, 0]);   /* (floor bands: spandrels, or the stone's window rows) */
+  if (o.style !== 'stone') for (let z = -sd / 2 + 1.6; z < sd / 2 - 1; z += 2.4) P.push([G.box(0.14, H, 0.16), '#eef2f5', sx - sw / 2 - 0.04, ph + H / 2, z]);   /* (fins up the face) */
+  P.push([G.box(sw * 0.4, 2.6, sd * 0.4), '#c8ccd0', sx + 0.6, ph + H + 1.3, 0]);   /* (the plant room on top) */
+  if (r() < 0.25 && H > 40) P.push([G.cyl(0.12, 0.3, 9, 5), '#d8dadc', sx, ph + H + 4.5, 0]);
+  const wc = ['#ffd98a', '#ffe9b8', '#ffc27a', '#cfe4ff'], lit = (y, fn) => { if (r() < 0.36) fn(y, wc[(r() * 4) | 0]); };
+  for (let y = ph + 1.6; y < ph + H - 1; y += 3.4) {
+    for (let z = -sd / 2 + 1; z < sd / 2 - 0.5; z += 2.2) lit(y, (yy, c) => WP.push([new THREE.PlaneGeometry(1.5, 1.3), c, sx - sw / 2 - 0.09, yy, z, 0, -Math.PI / 2, 0]));
+    for (const zs of [-1, 1]) for (let x = -sw / 2 + 1; x < sw / 2 - 0.5; x += 2.2) lit(y, (yy, c) => WP.push([new THREE.PlaneGeometry(1.5, 1.3), c, sx + x, yy, zs * (sd / 2 + 0.07), 0, zs < 0 ? Math.PI : 0, 0]));
+  }
+  if (!WP.length) WP.push([new THREE.PlaneGeometry(1.5, 1.3), wc[0], sx - sw / 2 - 0.09, ph + 2, 0, 0, -Math.PI / 2, 0]);
+  return { g: bikeMerge(P), w: bikeMerge(WP) };
+}
+function bike2Viaduct() {                                                   // the Bloor viaduct, across the valley overhead: concrete piers, steel arches, the deck
+  const G = bikeG, P = [], conc = '#d3cbbf', steel = '#6f7f8c', dy = 21;
+  P.push([G.box(130, 1.7, 9), conc, 0, dy, 0], [G.box(130, 0.9, 0.3), '#e4ddd2', 0, dy + 1.3, 4.35], [G.box(130, 0.9, 0.3), '#e4ddd2', 0, dy + 1.3, -4.35], [G.box(130, 0.5, 9.4), '#bdb4a7', 0, dy - 1.05, 0]);
+  for (const px of [-12, 12, -38, 38, -64, 64]) P.push([G.box(3.4, dy - 1.3, 7.5), conc, px, (dy - 1.3) / 2, 0]);
+  for (const [a, b] of [[-12, 12], [12, 38], [-38, -12], [38, 64], [-64, -38]]) { const c = (a + b) / 2, R = (b - a) / 2 - 1.7, sp = 8;
+    for (const z of [-2.8, 2.8]) { P.push([new THREE.TorusGeometry(R, 0.42, 5, 22, Math.PI), steel, c, sp, z]);
+      for (let k = 1; k < 8; k++) { const t = k / 8 * Math.PI, x = c - Math.cos(t) * R, y = sp + Math.sin(t) * R; if (dy - 1.3 - y > 0.3) P.push([G.box(0.3, dy - 1.3 - y, 0.3), steel, x, (y + dy - 1.3) / 2, z]); } } }
+  return bikeMerge(P);
+}
+function bike2SignTex(lines) {                                              // a green highway sign, white border and lettering
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 192; const x = cv.getContext('2d');
+  x.fillStyle = '#16794a'; x.fillRect(0, 0, 512, 192); x.strokeStyle = '#f4f8f4'; x.lineWidth = 8; x.beginPath(); x.roundRect ? x.roundRect(10, 10, 492, 172, 18) : x.rect(10, 10, 492, 172); x.stroke();
+  x.fillStyle = '#f4f8f4'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = '700 56px "Arial Rounded MT Bold", Arial, sans-serif'; x.fillText(lines[0], 256, 70); x.font = '700 46px "Arial Rounded MT Bold", Arial, sans-serif'; x.fillText(lines[1], 256, 138);
+  const t = new THREE.CanvasTexture(cv); t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); return t;
+}
+function bike2Gantry(lines) {                                               // a sign gantry over the road
+  const G = bikeG, g = new THREE.Group(), B = BIKE;
+  g.add(new THREE.Mesh(bikeMerge([[G.box(0.32, 7.4, 0.32), '#9aa0a8', -5.5, 3.7, 0], [G.box(0.32, 7.4, 0.32), '#9aa0a8', 5.5, 3.7, 0], [G.box(11.4, 0.36, 0.36), '#9aa0a8', 0, 7.0, 0], [G.box(11.4, 0.2, 0.2), '#9aa0a8', 0, 7.55, 0.2]]), B.mat));
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 2.1), new THREE.MeshLambertMaterial({ map: bike2SignTex(lines), side: THREE.DoubleSide })); sign.rotation.y = Math.PI; sign.position.set(1.6, 7.25, -0.25); g.add(sign);
+  return g;
+}
+function bike2Build() {                                                     // after the street is built: the fixed trees, the other stretches' pieces, the ground's blend
+  const B = BIKE, E = B.env, A = B.b2 = { uD: { value: 0 }, uT: { value: 0 }, sets: [] };
+  { const nt = /[?&]btree=0\b/.test(location.search) ? null : bike2TreeGeos(), seen = [];
+    for (const s of B.scen) { const g = s.geometry; if (g.userData.house !== undefined || g === B.lampGeo) continue; let i = seen.indexOf(g); if (i < 0) { seen.push(g); i = seen.length - 1; } if (nt && nt[i]) s.geometry = nt[i]; }
+    A.trees = nt || seen; }
+  for (const s of B.scen) { const u = s.userData, k = s.geometry.userData.house !== undefined ? 'house' : s.geometry === B.lampGeo ? 'lamp' : Math.abs(s.position.x) < 8 ? 'btree' : 'back';
+    u.b2 = { k, side: Math.sign(s.position.x) || 1, x: s.position.x, sc: s.scale.x, ry: s.rotation.y, geo: s.geometry, zone: 0 };
+    if (k === 'back') { const w = new THREE.Mesh(E.winGeos[0], E.winMat); w.visible = false; s.add(w); u.b2.win = w; } }
+  if (!bike2On()) return;
+  A.slopes = [11, 23, 37, 51].map(bike2Slope); A.rail = bike2Rail(); A.planter = bike2Planter();
+  A.towers = []; for (let i = 0; i < 7; i++) A.towers.push(bike2Tower(100 + i * 17, { W: 12, D: 11.4, H: 16 + ((i * 37) % 9) * 7, podium: i % 3 === 2 ? 0 : 5.5, style: i % 4 === 3 ? 'stone' : 'glass' }));
+  A.backs = []; for (let i = 0; i < 5; i++) A.backs.push(bike2Tower(300 + i * 29, { W: 15, D: 14, H: 62 + i * 15, podium: 0, style: i === 2 ? 'stone' : 'glass' }));
+  // set pieces along the ride: the viaduct, two signs
+  for (const [D, mk] of [[980, () => new THREE.Mesh(bike2Viaduct(), B.mat)], [650, () => bike2Gantry(['Don Valley Pkwy', 'Downtown ↑'])], [1190, () => bike2Gantry(['Downtown', 'Richmond St ↑'])]]) {
+    const o = mk(); o.visible = false; bikeScene.add(o); A.sets.push({ D, o }); }
+  // the ground: meadow and river on the parkway, paving downtown (worked out per pixel from how far along the ride it is)
+  const C = { mead: new THREE.Color('#8cc265'), wat: new THREE.Color('#5a8fa8'), bank: new THREE.Color('#b0a487'), pav: new THREE.Color('#d8d3cd'), rail: new THREE.Color('#77747c') };
+  for (const m of bikeScene.children) { const mt = m.material; if (!mt || !mt.map) continue; const kind = mt.map === B.lawnTex ? 'lawn' : mt.map === B.walkTex ? 'walk' : mt.map === B.roadTex ? 'road' : null; if (!kind) continue;
+    mt.onBeforeCompile = sh => {
+      sh.uniforms.b2D = A.uD; sh.uniforms.b2T = A.uT; sh.uniforms.b2Z = { value: new THREE.Vector2(BIKE2_Z[0], BIKE2_Z[1]) };
+      for (const k in C) sh.uniforms['b2' + k] = { value: C[k] };
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vB2;').replace('#include <project_vertex>', '#include <project_vertex>\nvB2 = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vB2;\nuniform float b2D, b2T;\nuniform vec2 b2Z;\nuniform vec3 b2mead, b2wat, b2bank, b2pav, b2rail;')
+        .replace('#include <map_fragment>', '#include <map_fragment>\n{ float d = b2D + vB2.z, zD = smoothstep( b2Z.x - 25.0, b2Z.x + 25.0, d ) * ( 1.0 - smoothstep( b2Z.y - 25.0, b2Z.y + 25.0, d ) ), zC = smoothstep( b2Z.y - 25.0, b2Z.y + 25.0, d ); vec3 c = diffuseColor.rgb;\n' + ({
+          lawn: 'float n = sin( d * 0.21 + vB2.x * 0.13 ) * sin( d * 0.07 - vB2.x * 0.31 ); vec3 mead = b2mead * ( 0.93 + 0.07 * n ); float rx = -vB2.x, rv = smoothstep( 7.7, 8.3, rx ) * ( 1.0 - smoothstep( 12.4, 13.0, rx ) ), bk = smoothstep( 7.0, 7.6, rx ) * ( 1.0 - smoothstep( 13.0, 13.6, rx ) );\n' +
+                'vec3 wat = b2wat * ( 0.92 + 0.08 * sin( d * 0.9 + vB2.x * 2.3 + b2T * 1.7 ) * sin( d * 0.37 - b2T ) ); vec3 dv = mix( mix( mead, b2bank, bk ), wat, rv );\n' +
+                'vec2 g = fract( vec2( vB2.x, d ) / 1.6 ); float j = 1.0 - step( 0.035, g.x ) * step( 0.035, g.y ); c = mix( mix( c, dv, zD ), b2pav * ( 1.0 - 0.09 * j ), zC );',
+          walk: 'c = mix( c, b2mead * 0.97, zD );',
+          road: 'float rl = 1.0 - smoothstep( 0.035, 0.07, abs( abs( vB2.x ) - 0.72 ) ); c = mix( c * ( 1.0 - 0.05 * zD ), b2rail, rl * zC * 0.85 );',
+        })[kind] + '\ndiffuseColor.rgb = c; }');
+    };
+    mt.customProgramCacheKey = () => 'bike2' + kind; mt.needsUpdate = true; }
+}
+function bike2Apply(s, zone) {                                              // dress one piece of scenery for the stretch it is about to stand in
+  const B = BIKE, A = B.b2, u = s.userData.b2; if (!u || u.k === 'lamp' || !A) return; u.zone = zone; const win = u.k === 'house' ? s.userData.win : u.win;
+  if (u.k === 'house') {
+    if (zone === 0 || !A.slopes) { if (s.geometry.userData.house === undefined) s.geometry = B.houses[(Math.random() * 4) | 0]; if (win) { win.visible = true; win.geometry = B.env.winGeos[(Math.random() * 3) | 0]; } }
+    else if (zone === 1) { s.geometry = bike2Pick(A.slopes); if (win) win.visible = false; }
+    else { const t = bike2Pick(A.towers); s.geometry = t.g; if (win) { win.visible = true; win.geometry = t.w; } }
+  } else if (u.k === 'btree') {
+    if (zone === 0 || !A.slopes) { s.geometry = u.geo; s.rotation.y = u.ry; } else { s.geometry = zone === 1 ? A.rail : A.planter; s.rotation.y = zone === 1 ? (u.side > 0 ? 0 : Math.PI) : u.ry; }
+  } else if (u.k === 'back') {
+    if (zone === 2 && A.backs) { const t = bike2Pick(A.backs); s.geometry = t.g; s.position.set(u.side * 34, 0, s.position.z); s.scale.setScalar(1); s.rotation.y = u.side > 0 ? 0 : Math.PI; if (win) { win.visible = true; win.geometry = t.w; } }
+    else { s.geometry = zone === 1 && A.slopes ? bike2Pick(A.trees) : u.geo; s.position.set(u.x, zone === 1 && A.slopes ? bike2SlopeY(Math.abs(u.x) - 16.5) - 0.2 : 0, s.position.z); s.scale.setScalar(u.sc); s.rotation.y = u.ry; if (win) win.visible = false; }
+  }
+}
+function bike2All() { const B = BIKE; if (!B.b2) return; for (const s of B.scen) bike2Apply(s, bike2On() ? bike2Zone(B.dist + s.position.z) : 0); }
+function bike2Install() {
+  if (bike2Install.done) return; bike2Install.done = true;
+  { const f = bikeBuild; bikeBuild = function () { const r = f.apply(this, arguments); try { bike2Build(); } catch (e) { console.error('BIKE2', e); } return r; }; }
+  { const f = bikeWorld; bikeWorld = function (dt) {
+      const B = BIKE; for (const s of B.scen) s.userData.pz = s.position.z; const r = f.apply(this, arguments);
+      if (B.b2) for (const s of B.scen) if (s.position.z > s.userData.pz + 50) bike2Apply(s, bike2On() ? bike2Zone(B.dist + s.position.z) : 0);
+      return r; }; }
+  { const f = bikeRunStart; bikeRunStart = function () { const r = f.apply(this, arguments); try { bike2All(); BIKE.b2z = bike2Zone(BIKE.dist); } catch (e) { console.error(e); } return r; }; }
+  { const f = bikeReplayEnd; bikeReplayEnd = function () { const r = f.apply(this, arguments); try { for (const s of BIKE.scen) { const u = s.userData.b2; if (u && u.zone && s.geometry.userData.house !== undefined) bike2Apply(s, u.zone); } } catch (e) {} return r; }; }
+  { const f = bikeEnv; bikeEnv = function (dt, spd, dist) { const r = f.apply(this, arguments), A = BIKE.b2;
+      if (A) { A.uD.value = dist; A.uT.value = BIKE.t || 0; for (const p of A.sets) { const z = p.D - dist; p.o.visible = bike2On() && z > -60 && z < 230; if (p.o.visible) p.o.position.z = z; } }
+      return r; }; }
+  { const f = bikeRide; bikeRide = function (dt) { const B = BIKE, r = f.apply(this, arguments);
+      if (bike2On() && B.b2) { const z = bike2Zone(B.dist); if (B.b2z !== undefined && z > B.b2z) bikeSay(z === 1 ? '\u{1F6E3}️ Onto the DVP!' : '\u{1F3D9}️ Downtown Toronto!', true); B.b2z = z; }
+      return r; }; }
+  { const f = bikeSetPiece; bikeSetPiece = function (at, d, ln) { const r = f.apply(this, arguments), B = BIKE;
+      if (bike2On() && bike2Zone(r) === 1) { for (let L = 0; L < 3; L++) if (ln[L] === 'T') ln[L] = '.'; if (B.binsTo > r) B.binsTo = r; }   /* (the parkway: no streetcar, no garbage day) */
+      return r; }; }
+  { const f = bikeMilestone; bikeMilestone = function (km) { const r = f.apply(this, arguments); try { if (km === 3 && bike2On()) BIKE.ui.BurstT.textContent = '\u{1F5FC} CN Tower!'; } catch (e) {} return r; }; }
+}
+try { bike2Install(); } catch (e) { console.error(e); }
+/* ===== end BIKE2_V1 ===== */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
