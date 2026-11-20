@@ -10777,7 +10777,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-19 18:35';                                              // stamped when the site is published
+const BUILD = '2026-11-19 19:00';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45857,6 +45857,83 @@ function keep1Install() {
 }
 try { keep1Install(); } catch (e) { console.error(e); }
 /* ===== end KEEP1_V1 ===== */
+/* ===== RUN3_V1 (2026-11-19): Rooftop Runner art pass, the TEX1 way. (1) Relief painted into the atlas tiles that are surfaces (shingles, brick,
+   planks, concrete, roof membrane, road; Catsco's ribbed metal, lot, floor, membrane, cardboard): each tile's own pattern read as height, lit from
+   one side, lows deepened. (2) The red vault box is an AC unit now: louvres on the side she runs at, corner posts, a dark skirt, a fan guard on
+   top (still plainly red, still the same size: it is a game signal). (3) Catsco's trailer tops are ribbed metal, not bare white. Respects
+   tex1Level(): Simple = all off; Reduced = no fan guard. Also: no other game's Free roam button can stay up over the Runner. See
+   tools/patches/run3/. Off: ?run3=0 ===== */
+function run3On() { if (run3On.v === undefined) { let lv = 'high'; try { lv = tex1Level(); } catch (e) {} run3On.v = !/[?&]run3=0\b/.test(location.search) && lv !== 'low'; run3On.hi = lv === 'high'; } return run3On.v; }
+function run3Relief(cv, x0, y0, T, K) {                                   // one atlas cell (tile + its wrapped gutter), in place: K = [emboss, deepen]
+  const g = cv.getContext('2d', { willReadFrequently: true }), im = g.getImageData(x0, y0, T, T), d = im.data, n = T * T, L = new Float32Array(n), B = new Float32Array(n), Tm = new Float32Array(n);
+  for (let i = 0; i < n; i++) L[i] = (d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11) / 255;
+  const k = T / 256, R = Math.max(2, Math.round(3 * k)), inv = 1 / (2 * R + 1), cl = (v, m) => v < 0 ? 0 : v > m ? m : v;
+  for (let y = 0; y < T; y++) { const o = y * T; for (let x = 0; x < T; x++) { let s = 0; for (let j = -R; j <= R; j++) s += L[o + cl(x + j, T - 1)]; Tm[o + x] = s * inv; } }
+  for (let x = 0; x < T; x++) for (let y = 0; y < T; y++) { let s = 0; for (let j = -R; j <= R; j++) s += Tm[cl(y + j, T - 1) * T + x]; B[y * T + x] = s * inv; }
+  const E = K[0] * k * 2.2, A = K[1] * 2.4;
+  for (let y = 0; y < T; y++) { const yu = cl(y - 1, T - 1) * T, yd = cl(y + 1, T - 1) * T, o = y * T;
+    for (let x = 0; x < T; x++) { const i = o + x; let s = 1 + E * ((L[o + cl(x + 1, T - 1)] - L[o + cl(x - 1, T - 1)]) + (L[yd + x] - L[yu + x])); s = s < 0.74 ? 0.74 : s > 1.28 ? 1.28 : s;
+      const lo = B[i] - L[i]; if (lo > 0) s *= 1 - A * lo; const j = i * 4; d[j] = Math.min(255, d[j] * s); d[j + 1] = Math.min(255, d[j + 1] * s); d[j + 2] = Math.min(255, d[j + 2] * s); } }
+  g.putImageData(im, x0, y0);
+}
+function run3Atlas(t, kind) {                                             // (once per atlas) relief on its surface tiles
+  if (!t || !t.image || (t.userData && t.userData.run3)) return t; t.userData = t.userData || {}; t.userData.run3 = true;
+  const T = t.image.width / 4, tiles = kind === 'catsco' ? { 1: [0.15, 0.2], 4: [0.3, 0.4], 5: [0.3, 0.4], 8: [0.2, 0.25], 9: [0.5, 0.5] } : { 3: [1.0, 1.0], 4: [0.8, 0.9], 5: [0.7, 0.8], 6: [0.4, 0.5], 8: [0.2, 0.25], 10: [0.3, 0.4] };
+  for (const i in tiles) run3Relief(t.image, (i % 4) * T, Math.floor(i / 4) * T, T, tiles[i]);
+  t.needsUpdate = true; return t;
+}
+function run3Vault(G, L, o) {                                             // the AC unit's details, on top of the plain box
+  const s = (o.s + o.s1) / 2, x = (o.x0 + o.x1) / 2, y = o.yb, dk = 0xa81710, M = gbAt(G, s, x, y, 0);
+  gbGeo(G, 'w', s, new THREE.BoxGeometry(1.36, 0.07, 1.11).translate(0, 0.035, 0), M, 0x34383e);                                   /* (a dark skirt it stands on) */
+  for (const sz of [1, -1]) { for (let i = 0; i < 4; i++) gbGeo(G, 'r', s, new THREE.BoxGeometry(0.98, 0.045, 0.03).translate(0, 0.4 + i * 0.1, sz * 0.53).rotateX(0), M, dk);   /* (louvres, both ends) */
+    for (const sx of [-1, 1]) gbGeo(G, 'r', s, new THREE.BoxGeometry(0.07, 0.6, 0.07).translate(sx * 0.63, 0.55, sz * 0.5), M, dk); }                                             /* (corner posts) */
+  for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) gbGeo(G, 'r', s, new THREE.BoxGeometry(0.03, 0.045, 0.72).translate(sx * 0.655, 0.4 + i * 0.1, 0), M, dk);                /* (louvres down the sides) */
+  if (run3On.hi) gbGeo(G, 'w', s, new THREE.TorusGeometry(0.37, 0.022, 5, 20).rotateX(Math.PI / 2).translate(0, 0.9, 0), M, 0xd9dde2);                                            /* (the fan guard: a ring and a cross) */
+  for (const r of [0, Math.PI / 2]) gbGeo(G, 'w', s, new THREE.BoxGeometry(0.74, 0.02, 0.035).rotateY(r).translate(0, 0.9, 0), M, 0xd9dde2);
+}
+function run3Install() {
+  if (!run3On() || run3Install.done) return; run3Install.done = true;
+  { const f = run2Atlas; run2Atlas = function (kind) { const t = f.apply(this, arguments); try { run3Atlas(t, kind); } catch (e) { console.error(e); } return t; }; }
+  { const f = runVaultDef; runVaultDef = function (G, L, o) { const r = f.apply(this, arguments); try { run3Vault(G, L, o); } catch (e) { console.error(e); } return r; }; }
+  { const f = run2CatscoKit; run2CatscoKit = function () { const K = f.apply(this, arguments); try { const t = K.st.trailer; t.roofTile = 1; t.rtu = 3.6; t.roof = 0xeceff2; } catch (e) { console.error(e); } return K; }; }
+  { const f = runStart; runStart = function () { try { if (CROSSY.pillOn) crossyPillSet(false); } catch (e) {} return f.apply(this, arguments); }; }   /* (the Crossy button is not in the Runner's own hide list: seen once left on, with its body class, over a run) */
+  const st = document.createElement('style'); st.id = 'run3Style'; st.textContent = 'body.rooftopping #crossyPill,body.rooftopping #sledPill,body.rooftopping #lotPill,body.rooftopping #hopPill,body.rooftopping #chimPill,body.rooftopping #jetPill{display:none!important}'; document.head.appendChild(st);
+}
+try { run3Install(); } catch (e) { console.error(e); }
+/* ===== end RUN3_V1 ===== */
+/* ===== POLISH1_V1 (2026-11-19): small mini-game polish. Meow Lot on an upright phone: the lot sits just above the buttons (the building fills the
+   top) instead of leaving the bottom third as empty grass. Sky Paws: a calmer level card (no tagline, locked levels show no medal slots, the
+   medal legend is one short line) and mowing stripes on the flat green lawns under the jet. See tools/patches/polish1/. Off: ?polish=0 ===== */
+function polish1On() { if (polish1On.v === undefined) polish1On.v = !/[?&]polish=0\b/.test(location.search); return polish1On.v; }
+function polish1Lot() {                                                   // after lotCamFit has framed the lot: on an upright screen, slide the view so the lowest thing in it rests just above the buttons
+  const S = LOT, L = S.L, cam = S.cam; if (!L || !S.camT || S.camT === polish1Lot.last) return; polish1Lot.last = S.camT;
+  const a = cam.aspect, H = Math.max(1, S.size.y); if (!(a < 0.75) || H <= 520) return;
+  const RW = lotRW(), hw = L.w / 2 + RW, hh = L.h / 2 + RW, v = new THREE.Vector3(), pitch = Math.asin(-S.camDir.y), yBot = -1 + 2 * 112 / H, yTop = 1 - 2 * 112 / H;
+  const pts = [[-hw, 0, hh + 0.2], [hw, 0, hh + 0.2], [S.home.x - 0.4, 0, S.home.z + 0.5], [-hw, 0.7, -hh - 0.3], [hw, 0.7, -hh - 0.3]];
+  for (let pass = 0; pass < 3; pass++) {
+    cam.position.copy(S.camT).addScaledVector(S.camDir, -S.camD); cam.lookAt(S.camT); cam.updateMatrixWorld(); let y0 = 9, y1 = -9;
+    for (const p of pts) { v.set(p[0], p[1], p[2]).project(cam); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); }
+    if (!pass) polish1Lot.rest = Math.max(0, (y0 - (yBot + 0.012)) * 0.28); const slack = y0 - (yBot + 0.012 + polish1Lot.rest), room = (yTop - y1) + slack; if (slack <= 0.004 || room < 0) break;   /* (most of the way down: a little grass stays under her) */
+    S.camT.z -= slack * Math.tan(cam.fov * Math.PI / 360) * S.camD / Math.sin(pitch) * 0.9;
+  }
+}
+function polish1Stripes(mat) {                                            // Sky Paws' ground material: soft mowing stripes (along the way she flies) on green that faces up
+  if (!mat || mat.userData.polish1) return; mat.userData.polish1 = true;
+  const prev = mat.onBeforeCompile, key = mat.customProgramCacheKey ? mat.customProgramCacheKey() : '';
+  mat.onBeforeCompile = function (sh, r) { if (prev) prev.call(this, sh, r);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vPol1;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvPol1 = vec3( ( modelMatrix * vec4( transformed, 1.0 ) ).x, normalize( mat3( modelMatrix ) * objectNormal ).y, 0.0 );');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vPol1;').replace('#include <color_fragment>', '#include <color_fragment>\n{ vec3 c = diffuseColor.rgb; if ( vPol1.y > 0.9 && c.g > c.r * 1.25 && c.g > c.b * 1.5 ) diffuseColor.rgb *= mix( 0.945, 1.04, smoothstep( -0.25, 0.25, sin( vPol1.x * 1.3 ) ) ); }'); };
+  mat.customProgramCacheKey = function () { return key + '|polish1'; }; mat.needsUpdate = true;
+}
+function polish1Install() {
+  if (!polish1On() || polish1Install.done) return; polish1Install.done = true;
+  { const f = lotCamFit; lotCamFit = function () { const r = f.apply(this, arguments); try { polish1Lot(); } catch (e) { if (!polish1Install.err) { polish1Install.err = 1; console.error(e); } } return r; }; }
+  { const f = jetChunksStep; jetChunksStep = function () { try { if (JET.mat && !JET.mat.userData.polish1) { let lv = 'high'; try { lv = tex1Level(); } catch (e) {} if (lv !== 'low') polish1Stripes(JET.mat); else JET.mat.userData.polish1 = true; } } catch (e) {} return f.apply(this, arguments); }; }
+  { const f = jetMapNote; jetMapNote = function () { const s = f.apply(this, arguments); if (typeof s === 'string' && s.indexOf('Medals: ') === 0) { const n = s.split(' · ').length; return n + (n === 1 ? ' medal' : ' medals') + ' still to win here'; } return s; }; }
+  const st = document.createElement('style'); st.id = 'polish1Style'; st.textContent = '@media (orientation:portrait){html #jetUI .jt-card .jt-cap{display:none}html #jetUI .jt-lvl.lock .jt-meds{display:none}}'; document.head.appendChild(st);
+}
+try { polish1Install(); } catch (e) { console.error(e); }
+/* ===== end POLISH1_V1 ===== */
 function surfaceTop(x, z, fromY) {                                   // the highest thing she could stand on under (x, z), at or below fromY
   _wRay.set(_wO.set(x, fromY, z), _wDown); _wRay.far = fromY > UPPER.UF - 0.1 && inUpper(x, z) ? fromY - (fromY > UPPER.CH + 0.25 ? UPPER.CH : UPPER.UF) + 0.45 : fromY + 0.5;   /* (upstairs: nothing under the floorboards matters, so don't look through them) */
   let top = 0; walk.hitObj = null;
