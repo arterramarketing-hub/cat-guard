@@ -10,6 +10,10 @@ const CORE = [
   'https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/objects/Reflector.js',
 ];
 const buildOf = txt => { const m = txt.match(/const BUILD = '([^']+)'/); return m ? m[1] : ''; };
+async function savedBuild(c, hit) {                                    // (QW1) the saved page's build, from its tiny note; the page itself is read only if the note is missing
+  const b = await c.match('./__build'); if (b) { const t = await b.text(); if (t) return t; }
+  if (!hit) return ''; const nb = buildOf(await hit.clone().text()); if (nb) await c.put('./__build', new Response(nb)); return nb;
+}
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(CORE.map(u =>
     fetch(u, u.startsWith('http') ? { mode: 'cors' } : { cache: 'no-cache' }).then(r => { if (r && r.ok) return c.put(u, r); }).catch(() => {})))));   // (only a good copy is kept: a failed download never gets stuck in the cache)
@@ -27,7 +31,8 @@ function refreshPage(c, oldBuild) {
       if (!r || !r.ok) return;
       const txt = await r.clone().text(), nb = buildOf(txt);
       if (!nb) return;                                                // not the game page (a captive wifi page etc.): keep the good copy
-      await c.put('./index.html', r);
+      if (oldBuild && nb === oldBuild) return;                          // (QW1) the same version: no 8.7 MB re-save on every launch
+      await c.put('./index.html', r); await c.put('./__build', new Response(nb));
       if (oldBuild && nb !== oldBuild) for (const cl of await self.clients.matchAll({ type: 'window' })) cl.postMessage({ type: 'pkd-update', build: nb });
     } catch (err) {} finally { refreshing = null; }
   })();
@@ -42,11 +47,11 @@ self.addEventListener('fetch', e => {
     if (isPage) {                                                     // the saved copy first: opens instantly, even on a slow connection
       const hit = (await c.match('./index.html')) || (await c.match('./'));
       if (hit) {
-        const oldBuild = buildOf(await hit.clone().text());
+        const oldBuild = await savedBuild(c, hit);
         e.waitUntil(refreshPage(c, oldBuild));                        // ...and quietly fetch the latest for next time
         return hit;
       }
-      try { const r = await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }); if (r && r.ok) c.put('./index.html', r.clone()); return r; }
+      try { const r = await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }); if (r && r.ok) { c.put('./index.html', r.clone()); c.delete('./__build'); } return r; }
       catch (err) { return Response.error(); }
     }
     const hit = await c.match(req, { ignoreSearch: true });            // cache first for scripts, fonts and pictures
@@ -60,7 +65,7 @@ self.addEventListener('message', e => {                               // the gam
   e.waitUntil(caches.open(CACHE).then(async c => {
     if (refreshing) await refreshing;
     const hit = await c.match('./index.html'); if (!hit) return;
-    const b = buildOf(await hit.text());
+    const b = await savedBuild(c, hit);
     if (b && b !== e.data.build && e.source) e.source.postMessage({ type: 'pkd-update', build: b });
   }));
 });
