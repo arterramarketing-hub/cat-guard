@@ -10777,7 +10777,7 @@ const ACHIEVEMENTS = [
 ];
 const ACH_BY_ID = {}; ACHIEVEMENTS.forEach(([, list]) => list.forEach(a => ACH_BY_ID[a[0]] = a));
 const ACH_KEY = 'catguard.ach';
-const BUILD = '2026-11-20 12:34';                                              // stamped when the site is published
+const BUILD = '2026-11-20 13:00';                                              // stamped when the site is published
 async function checkForUpdates() {                                     // manual resync: fetch the live page, and if it's newer, drop the offline copy and reload
   if (!navigator.onLine) { camToast("You're offline: connect to the internet to check", 2800); return; }
   camToast('Checking for updates…', 1500);
@@ -45938,14 +45938,16 @@ try { polish1Install(); } catch (e) { console.error(e); }
    thin legs with daylight beneath, the same look as the red slide-under bars. Now it sits on a solid brick base, taller, with steel hoops and
    a cone roof: plainly a thing to go round (same footprint, same rules). (2) Baked light: sun shadows and soft sky shading (corners, walls
    under taller towers, the base of every prop) worked out once on the GPU while the level loads, into one light-map texture; each frame it
-   costs one texture read. The live sun and sky lights stay as they were: the bake only says how much of each reaches a spot. Downtown only
-   (?rbake=all: every world, for testing). Off at Simple detail (tex1Level low). Off switches: ?tank=0, ?rbake=0. See tools/patches/run4/.
+   costs one texture read. The live sun and sky lights stay as they were: the bake only says how much of each reaches a spot. Every world
+   but Catsco (owner, 2026-11-20: first Downtown only, then "the other levels too"; ?rbake=core: Downtown only, ?rbake=all: Catsco too, for
+   testing). Off at Simple detail (tex1Level low). Off switches: ?tank=0, ?rbake=0. See tools/patches/run4/.
    ===== */
 function run4Q(k) { return new RegExp('[?&]' + k + '\\b').test(location.search); }
 function run4TankOn() { return !run4Q('tank=0'); }
 function run4BakeOn(L) {
   if (run4Q('rbake=0')) return false; let lv = 'high'; try { lv = tex1Level(); } catch (e) {} if (lv === 'low') return false;
-  return !!L && (L.id === 'core' || run4Q('rbake=all'));
+  if (!L) return false; if (run4Q('rbake=all')) return true; if (run4Q('rbake=core')) return L.id === 'core';
+  return L.id !== 'catsco';   /* (every world but Catsco: inside the store the light is its own ceiling lamps, which a sun-and-sky bake can't know: it only darkened the aisles) */
 }
 function run4Tank(G, L, o) {                                              // the water tank: a solid brick base (no gap under it), staves, hoops, a cone roof
   const s = (o.s + o.s1) / 2, x = (o.x0 + o.x1) / 2, M = gbAt(G, s, x, o.yb, 0);
