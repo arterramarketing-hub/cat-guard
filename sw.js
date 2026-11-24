@@ -2,10 +2,11 @@
    Everything is kept on the device. The game page opens straight from the saved copy (no waiting on the
    network); a fresh copy is fetched in the background, and if it's a newer version the game is told so it
    can offer "new version ready". Three.js, fonts and icons come straight from the cache. */
-const CACHE = 'pkd-v6';   // (SCAN1: v6 adds the scanned textures)
+const CACHE = 'pkd-v7';   // (TEX2: v7 adds the garage and bike textures)   // (SCAN1: v6 adds the scanned textures)
 const CORE = [
   './', './index.html', './apple-touch-icon.png', './icon-512.png', './manifest.json',
   './scan-roof.webp', './scan-wood.webp', './scan-wood-n.webp',   // (SCAN1: the scanned roof and upstairs floor, kept beside the page)
+  './tex2-floor.webp', './tex2-wall.webp', './tex2-rubber.webp', './tex2-leather.webp',   // (TEX2: the garage and bike detail maps, kept beside the page)
   'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js',
   'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.core.js',
   'https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/objects/Reflector.js',
